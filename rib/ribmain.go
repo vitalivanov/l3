@@ -57,6 +57,10 @@ func main() {
 		return
 	}
 	routeServiceHandler = handler
+    go routeServiceHandler.NotificationServer()	
+	go routeServiceHandler.StartNetlinkServer()
+	go routeServiceHandler.StartAsicdServer()
+	go routeServiceHandler.StartArpdServer()
 	go routeServiceHandler.StartServer(*paramsDir)
 	up := <-routeServiceHandler.ServerUpCh
 	dbHdl.Close()
