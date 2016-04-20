@@ -25,9 +25,9 @@ func (m RIBDServicesHandler) CreateIPv4Route(cfg *ribd.IPv4Route) (val bool, err
 	var nextHopIfType int
 	var nextHopIf int
 	if cfg.OutgoingIntfType == "VLAN" {
-		nextHopIfType = commonDefs.L2RefTypeVlan
+		nextHopIfType = commonDefs.IfTypeVlan
 	} else if cfg.OutgoingIntfType == "PHY" {
-		nextHopIfType = commonDefs.L2RefTypePort
+		nextHopIfType = commonDefs.IfTypePort
 	} else if cfg.OutgoingIntfType == "NULL" {
 		nextHopIfType = commonDefs.IfTypeNull
 	} else if cfg.OutgoingIntfType == "Loopback" {
@@ -66,12 +66,12 @@ func (m RIBDServicesHandler) CreateIPv4Route(cfg *ribd.IPv4Route) (val bool, err
 		//validate ip and mask string if not a CIDR address
 	    destNetIpAddr, err := getIP(cfg.DestinationNw)
 	    if err != nil {
-		    logger.Println("destNetIpAddr invalid")
+		    logger.Err(fmt.Sprintln("destNetIpAddr ", destNetIpAddr, " invalid"))
 		    return false, errors.New("Invalid destination IP address")
 	    }
 	    networkMaskAddr,err := getIP(cfg.NetworkMask)
 	    if err != nil {
-		    logger.Println("networkMaskAddr invalid")
+		    logger.Err(fmt.Sprintln("networkMaskAddr", networkMaskAddr, " invalid"))
 		    return false, errors.New("Invalid mask")
 	    }
 	    _, err = getPrefixLen(networkMaskAddr)

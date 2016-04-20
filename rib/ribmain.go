@@ -1,13 +1,17 @@
 package main
 
 import (
+	"database/sql"
 	"flag"
 	"fmt"
 	"git.apache.org/thrift.git/lib/go/thrift"
 	"ribd"
+	"strconv"
+	"utils/keepalive"
 	"utils/logging"
 	"utils/policy"
-	"database/sql"
+	"io/ioutil"
+	"encoding/json"
 )
 
 var logger *logging.Writer
@@ -15,11 +19,29 @@ var routeServiceHandler *RIBDServicesHandler
 var PARAMSDIR string
 var PolicyEngineDB *policy.PolicyEngineDB
 
+func getClient(logger *logging.Writer, fileName string, process string) (*ClientJson, error) {
+	var allClients []ClientJson
+
+	data, err := ioutil.ReadFile(fileName)
+	if err != nil {
+		logger.Err(fmt.Sprintf("Failed to open RIBd config file:%s, err:%s", fileName, err))
+		return nil, err
+	}
+
+	json.Unmarshal(data, &allClients)
+	for _, client := range allClients {
+		if client.Name == process {
+			return &client, nil
+		}
+	}
+
+	logger.Err(fmt.Sprintf("Did not find port for %s in config file:%s", process, fileName))
+	return nil, nil
+}
+
 func main() {
 	var transport thrift.TServerTransport
 	var err error
-	var addr = "localhost:5000"
-	fmt.Println("Starting rib daemon")
 	paramsDir := flag.String("params", "./params", "Params directory")
 	flag.Parse()
 	fileName := *paramsDir
@@ -36,6 +58,9 @@ func main() {
 	go logger.ListenForSysdNotifications()
 	logger.Info("Started the logger successfully.")
 
+	// Start keepalive routine
+	go keepalive.InitKeepAlive("ribd", fileName)
+
 	dbName := fileName + "UsrConfDb.db"
 	fmt.Println("RIBd opening Config DB: ", dbName)
 	dbHdl, err := sql.Open("sqlite3", dbName)
@@ -45,8 +70,15 @@ func main() {
 	}
 	if err = dbHdl.Ping(); err != nil {
 		fmt.Println(fmt.Sprintln("Failed to keep DB connection alive"))
-		return 
+		return
 	}
+	clientJson, err := getClient(logger, fileName+"clients.json", "ribd")
+	if err != nil || clientJson == nil {
+		return
+	}
+	var addr = "localhost:" + strconv.Itoa(clientJson.Port)//"localhost:5000"
+	fmt.Println("Starting rib daemon at addr ", addr)
+
 	transport, err = thrift.NewTServerSocket(addr)
 	if err != nil {
 		logger.Info(fmt.Sprintln("Failed to create Socket with:", addr))
@@ -57,7 +89,7 @@ func main() {
 		return
 	}
 	routeServiceHandler = handler
-    go routeServiceHandler.NotificationServer()	
+	go routeServiceHandler.NotificationServer()
 	go routeServiceHandler.StartNetlinkServer()
 	go routeServiceHandler.StartAsicdServer()
 	go routeServiceHandler.StartArpdServer()
