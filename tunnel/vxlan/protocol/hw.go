@@ -2,6 +2,7 @@
 package vxlan
 
 import (
+	"arpd"
 	hwconst "asicd/asicdConstDefs"
 	"asicd/pluginManager/pluginCommon"
 	"asicdInt"
@@ -11,6 +12,7 @@ import (
 	"io/ioutil"
 	"l3/tunnel/vxlan/vxlan_linux"
 	"net"
+	"ribd"
 	"strconv"
 	"strings"
 	"time"
@@ -41,12 +43,32 @@ type AsicdClient struct {
 	ClientHdl *asicdServices.ASICDServicesClient
 }
 
+type RibdClient struct {
+	VXLANClientBase
+	ClientHdl *ribd.RIBDServicesClient
+}
+
+type ArpdClient struct {
+	VXLANClientBase
+	ClientHdl *arpd.ARPDServicesClient
+}
+
 type ClientJson struct {
 	Name string `json:Name`
 	Port int    `json:Port`
 }
 
 var asicdclnt AsicdClient
+var ribdclnt RibdClient
+var arpdclnt ArpdClient
+
+// variable functions
+var hwCreateVxlan = asicDCreateVxlan
+var hwDeleteVxlan = asicDDeleteVxlan
+var hwCreateVtep = asicDCreateVtep
+var hwDeleteVtep = asicDDeleteVtep
+var hwGetNextHop = ribDGetNextHopInfo
+var hwResolveMac = arpDResolveNextHopMac
 
 func ConvertVxlanConfigToVxlanLinuxConfig(c *VxlanConfig) *vxlan_linux.VxlanConfig {
 
@@ -68,56 +90,44 @@ func ConvertVxlanConfigToVxlanAsicdConfig(c *VxlanConfig) *asicdInt.Vxlan {
 	}
 }
 
-func ConvertVtepConfigToVxlanLinuxConfig(c *VtepConfig) *vxlan_linux.VtepConfig {
+func ConvertVtepToVxlanLinuxConfig(vtep *VtepDbEntry) *vxlan_linux.VtepConfig {
 	return &vxlan_linux.VtepConfig{
-		VtepId:    c.VtepId,
-		VxlanId:   c.VxlanId,
-		VtepName:  c.VtepName,
-		SrcIfName: c.SrcIfName,
-		UDP:       c.UDP,
-		TTL:       c.TTL,
-		TOS:       c.TOS,
-		InnerVlanHandlingMode: c.InnerVlanHandlingMode,
-		Learning:              c.Learning,
-		Rsc:                   c.Rsc,
-		L2miss:                c.L2miss,
-		L3miss:                c.L3miss,
-		TunnelSrcIp:           c.TunnelSrcIp,
-		TunnelDstIp:           c.TunnelDstIp,
-		VlanId:                c.VlanId,
-		TunnelSrcMac:          c.TunnelSrcMac,
-		TunnelDstMac:          c.TunnelDstMac,
+		VtepId:       vtep.VtepId,
+		VxlanId:      vtep.VxlanId,
+		VtepName:     vtep.VtepName,
+		SrcIfName:    vtep.SrcIfName,
+		UDP:          vtep.UDP,
+		TTL:          vtep.TTL,
+		TunnelSrcIp:  vtep.SrcIp,
+		TunnelDstIp:  vtep.DstIp,
+		VlanId:       vtep.VlanId,
+		TunnelSrcMac: vtep.SrcMac,
+		TunnelDstMac: vtep.DstMac,
 	}
 }
 
-func ConvertVtepConfigToVxlanAsicdConfig(c *VtepConfig) *asicdInt.Vtep {
+func ConvertVtepToVxlanAsicdConfig(vtep *VtepDbEntry) *asicdInt.Vtep {
 
 	ifindex := int32(0)
 	for _, pc := range PortConfigMap {
-		if pc.Name == c.SrcIfName {
+		if pc.Name == vtep.SrcIfName {
 			ifindex = pc.IfIndex
 		}
 
 	}
 
 	return &asicdInt.Vtep{
-		VtepId:     int32(c.VtepId),
-		VxlanId:    int32(c.VxlanId),
-		VtepName:   c.VtepName,
+		VtepId:     int32(vtep.VtepId),
+		VxlanId:    int32(vtep.VxlanId),
+		VtepName:   vtep.VtepName,
 		SrcIfIndex: ifindex,
-		UDP:        int16(c.UDP),
-		TTL:        int16(c.TTL),
-		TOS:        int16(c.TOS),
-		InnerVlanHandlingMode: int32(c.InnerVlanHandlingMode),
-		Learning:              c.Learning,
-		Rsc:                   c.Rsc,
-		L2miss:                c.L2miss,
-		L3miss:                c.L3miss,
-		SrcIp:                 c.TunnelSrcIp.String(),
-		DstIp:                 c.TunnelDstIp.String(),
-		VlanId:                int16(c.VlanId),
-		SrcMac:                c.TunnelSrcMac.String(),
-		DstMac:                c.TunnelDstMac.String(),
+		UDP:        int16(vtep.UDP),
+		TTL:        int16(vtep.TTL),
+		SrcIp:      vtep.SrcIp.String(),
+		DstIp:      vtep.DstIp.String(),
+		VlanId:     int16(vtep.VlanId),
+		SrcMac:     vtep.SrcMac.String(),
+		DstMac:     vtep.DstMac.String(),
 	}
 }
 
@@ -185,24 +195,57 @@ func ConstructPortConfigMap() {
 	}
 }
 
-// connect the the asic d
+// connect the clients
 func ConnectToClients(paramsFile string) {
-	port := GetClientPort(paramsFile, "asicd")
-	if port != 0 {
-
-		for {
-			asicdclnt.Address = "localhost:" + strconv.Itoa(port)
-			asicdclnt.Transport, asicdclnt.PtrProtocolFactory, _ = ipcutils.CreateIPCHandles(asicdclnt.Address)
-			//StpLogger("INFO", fmt.Sprintf("found asicd at port %d Transport %#v PrtProtocolFactory %#v\n", port, asicdclnt.Transport, asicdclnt.PtrProtocolFactory))
-			if asicdclnt.Transport != nil && asicdclnt.PtrProtocolFactory != nil {
-				//StpLogger("INFO", "connecting to asicd\n")
-				asicdclnt.ClientHdl = asicdServices.NewASICDServicesClientFactory(asicdclnt.Transport, asicdclnt.PtrProtocolFactory)
-				asicdclnt.IsConnected = true
-				// lets gather all info needed from asicd such as the port
-				ConstructPortConfigMap()
-				break
-			} else {
-				time.Sleep(time.Millisecond * 500)
+	allclientsnotconnect := false
+	clientList := [3]string{"asicd", "ribd", "arpd"}
+	for _, client := range clientList {
+		port := GetClientPort(paramsFile, client)
+		if port != 0 {
+			for {
+				if client == "asicd" {
+					asicdclnt.Address = "localhost:" + strconv.Itoa(port)
+					asicdclnt.Transport, asicdclnt.PtrProtocolFactory, _ = ipcutils.CreateIPCHandles(asicdclnt.Address)
+					//StpLogger("INFO", fmt.Sprintf("found asicd at port %d Transport %#v PrtProtocolFactory %#v\n", port, asicdclnt.Transport, asicdclnt.PtrProtocolFactory))
+					if asicdclnt.Transport != nil && asicdclnt.PtrProtocolFactory != nil {
+						//StpLogger("INFO", "connecting to asicd\n")
+						asicdclnt.ClientHdl = asicdServices.NewASICDServicesClientFactory(asicdclnt.Transport, asicdclnt.PtrProtocolFactory)
+						asicdclnt.IsConnected = true
+						// lets gather all info needed from asicd such as the port
+						ConstructPortConfigMap()
+						break
+					} else {
+						allclientsnotconnect = true
+					}
+				} else if client == "ribd" {
+					ribdclnt.Address = "localhost:" + strconv.Itoa(port)
+					ribdclnt.Transport, ribdclnt.PtrProtocolFactory, _ = ipcutils.CreateIPCHandles(ribdclnt.Address)
+					//StpLogger("INFO", fmt.Sprintf("found asicd at port %d Transport %#v PrtProtocolFactory %#v\n", port, asicdclnt.Transport, asicdclnt.PtrProtocolFactory))
+					if ribdclnt.Transport != nil && asicdclnt.PtrProtocolFactory != nil {
+						//StpLogger("INFO", "connecting to asicd\n")
+						ribdclnt.ClientHdl = ribd.NewRIBDServicesClientFactory(ribdclnt.Transport, ribdclnt.PtrProtocolFactory)
+						ribdclnt.IsConnected = true
+						break
+					} else {
+						allclientsnotconnect = true
+					}
+				} else if client == "arpd" {
+					arpdclnt.Address = "localhost:" + strconv.Itoa(port)
+					arpdclnt.Transport, arpdclnt.PtrProtocolFactory, _ = ipcutils.CreateIPCHandles(arpdclnt.Address)
+					//StpLogger("INFO", fmt.Sprintf("found asicd at port %d Transport %#v PrtProtocolFactory %#v\n", port, asicdclnt.Transport, asicdclnt.PtrProtocolFactory))
+					if arpdclnt.Transport != nil && arpdclnt.PtrProtocolFactory != nil {
+						//StpLogger("INFO", "connecting to asicd\n")
+						arpdclnt.ClientHdl = arpd.NewARPDServicesClientFactory(arpdclnt.Transport, arpdclnt.PtrProtocolFactory)
+						arpdclnt.IsConnected = true
+						break
+					} else {
+						allclientsnotconnect = true
+					}
+				}
+				// lets delay to allow time for other processes to come up
+				if allclientsnotconnect {
+					time.Sleep(time.Millisecond * 500)
+				}
 			}
 		}
 	}
@@ -283,27 +326,27 @@ func asicDDeleteVxlan(vxlan *VxlanConfig) {
 	}
 }
 
-func asicDCreateVtep(vtep *VtepConfig) {
+func asicDCreateVtep(vtep *VtepDbEntry) {
 	// convert a vxland config to hw config
 	if asicdclnt.ClientHdl != nil {
-		asicdclnt.ClientHdl.CreateVxlanVtep(ConvertVtepConfigToVxlanAsicdConfig(vtep))
+		asicdclnt.ClientHdl.CreateVxlanVtep(ConvertVtepToVxlanAsicdConfig(vtep))
 	} else {
 		// run standalone
 		if softswitch == nil {
 			softswitch = vxlan_linux.NewVxlanLinux(logger)
 		}
-		softswitch.CreateVtep(ConvertVtepConfigToVxlanLinuxConfig(vtep))
+		softswitch.CreateVtep(ConvertVtepToVxlanLinuxConfig(vtep))
 	}
 }
 
-func asicDDeleteVtep(vtep *VtepConfig) {
+func asicDDeleteVtep(vtep *VtepDbEntry) {
 	// convert a vxland config to hw config
 	if asicdclnt.ClientHdl != nil {
-		asicdclnt.ClientHdl.DeleteVxlanVtep(ConvertVtepConfigToVxlanAsicdConfig(vtep))
+		asicdclnt.ClientHdl.DeleteVxlanVtep(ConvertVtepToVxlanAsicdConfig(vtep))
 	} else {
 		// run standalone
 		if softswitch != nil {
-			softswitch.DeleteVtep(ConvertVtepConfigToVxlanLinuxConfig(vtep))
+			softswitch.DeleteVtep(ConvertVtepToVxlanLinuxConfig(vtep))
 		}
 	}
 }
@@ -320,4 +363,27 @@ func asicDLearnFwdDbEntry(mac net.HardwareAddr, vtepName string, ifindex int32) 
 		}
 	}
 
+}
+
+// rib holds the next hop info, and asicd holds the mac address
+func ribDGetNextHopInfo(ip net.IP, nexthopchan chan net.IP) {
+	if ribdclnt.ClientHdl != nil {
+		nexthopinfo, err := ribdclnt.ClientHdl.GetRouteReachabilityInfo(ip.String())
+		if err == nil {
+			nexthopip := net.ParseIP(nexthopinfo.NextHopIp)
+			// lets let RIB notify us if there is a change in next hop
+			ribdclnt.ClientHdl.TrackReachabilityStatus(ip.String(), "VXLAND", "add")
+			nexthopchan <- nexthopip
+		}
+	}
+}
+
+func arpDResolveNextHopMac(nexthopip net.IP, macchan chan net.HardwareAddr) {
+	if arpdclnt.ClientHdl != nil {
+		arpentrystate, err := arpdclnt.ClientHdl.GetArpEntryState(nexthopip.String())
+		if err == nil {
+			nexthopip, _ := net.ParseMAC(arpentrystate.MacAddr)
+			macchan <- nexthopip
+		}
+	}
 }

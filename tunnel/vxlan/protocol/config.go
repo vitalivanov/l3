@@ -57,7 +57,8 @@ type VtepConfig struct {
 	TunnelDstIp           net.IP           //Destination IP address for the static VxLAN tunnel
 	VlanId                uint16           //Vlan Id to encapsulate with the vtep tunnel ethernet header
 	TunnelSrcMac          net.HardwareAddr //Src Mac assigned to the VTEP within this VxLAN. If an address is not assigned the the local switch address will be used.
-	TunnelDstMac          net.HardwareAddr
+	TunnelDstMac          net.HardwareAddr // Optional - may be looked up based on TunnelNextHopIp
+	TunnelNextHopIP       net.IP           // NextHopIP is used to find the DMAC for the tunnel within Asicd
 }
 
 func ConvertInt32ToBool(val int32) bool {

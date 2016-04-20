@@ -11,6 +11,7 @@ import (
 )
 
 var portDB map[string]*VxlanPort
+var VxlanPortRxTx = CreatePort
 
 type VxlanPort struct {
 	IfName string

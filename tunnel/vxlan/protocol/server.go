@@ -3,6 +3,7 @@ package vxlan
 
 import (
 	"fmt"
+	nanomsg "github.com/op/go-nanomsg"
 	"net"
 	"utils/logging"
 )
@@ -12,8 +13,11 @@ var NetSwitchMac net.HardwareAddr
 var logger *logging.Writer
 
 type VXLANServer struct {
-	Configchans *VxLanConfigChannels
-	Paramspath  string // location of params path
+	Configchans        *VxLanConfigChannels
+	Paramspath         string // location of params path
+	ribdSubSocket      *nanomsg.SubSocket
+	ribdSubSocketCh    chan []byte
+	ribdSubSocketErrCh chan error
 }
 
 type cfgFileJson struct {
@@ -43,8 +47,13 @@ func NewVXLANServer(l *logging.Writer, paramspath string) *VXLANServer {
 	// connect to the various servers
 	ConnectToClients(paramspath + "clients.json")
 
+	server.CreateRIBdSubscriber()
 	// listen for config messages from server
 	server.ConfigListener()
 
 	return server
+}
+
+func (s *VXLANServer) HandleNextHopChange(nexthopip string, reachable bool) {
+	// TOOD do some work to find all VTEP's and deprovision the entries
 }

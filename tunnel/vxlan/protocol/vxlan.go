@@ -5,6 +5,7 @@ import (
 	"net"
 )
 
+// vni -> db entry
 var vxlanDB map[uint32]*vxlanDbEntry
 
 type vxlanDbEntry struct {
@@ -14,6 +15,9 @@ type vxlanDbEntry struct {
 	MTU         uint32 // MTU size for each VTEP
 	VtepMembers []uint32
 }
+
+// vlan -> vni
+var vxlanVlanToVniDb map[uint16]uint32
 
 func NewVxlanDbEntry(c *VxlanConfig) *vxlanDbEntry {
 	return &vxlanDbEntry{
@@ -33,6 +37,7 @@ func saveVxLanConfigData(c *VxlanConfig) {
 	if _, ok := vxlanDB[c.VNI]; !ok {
 		vxlan := NewVxlanDbEntry(c)
 		vxlanDB[c.VNI] = vxlan
+		vxlanVlanToVniDb[c.VlanId] = c.VNI
 	}
 }
 
@@ -40,13 +45,13 @@ func CreateVxLAN(c *VxlanConfig) {
 	saveVxLanConfigData(c)
 
 	// create vxlan resources in hw
-	asicDCreateVxlan(c)
+	hwCreateVxlan(c)
 }
 
 func DeleteVxLAN(c *VxlanConfig) {
 
 	// create vxlan resources in hw
-	asicDDeleteVxlan(c)
+	hwDeleteVxlan(c)
 
 	delete(vxlanDB, c.VNI)
 
