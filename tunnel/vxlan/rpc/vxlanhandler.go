@@ -171,7 +171,7 @@ func (v *VXLANDServiceHandler) HandleDbReadVxlanVtepInstances(dbHdl *sql.DB) err
 	for rows.Next() {
 
 		object := new(vxland.VxlanVtepInstances)
-		if err = rows.Scan(&object.VtepId, &object.VxlanId, &object.VtepName, &object.SrcIfIndex, &object.UDP, &object.TTL, &object.TOS, &object.InnerVlanHandlingMode, &object.Learning, &object.Rsc, &object.L2miss, &object.L3miss, &object.DstIp, &object.SrcIp, &object.SrcMac, &object.DstMac, &object.VlanId); err != nil {
+		if err = rows.Scan(&object.VtepId, &object.VtepName, &object.SrcIfIndex, &object.UDP, &object.TTL, &object.TOS, &object.InnerVlanHandlingMode, &object.Learning, &object.Rsc, &object.L2miss, &object.L3miss, &object.VxlanId, &object.DstIp, &object.SrcIp, &object.SrcMac, &object.VlanId); err != nil {
 
 			fmt.Println("Db method Scan failed when interating over VxlanVtepInstances")
 		}

@@ -83,7 +83,7 @@ func ConvertVxlanConfigToVxlanLinuxConfig(c *VxlanConfig) *vxlan_linux.VxlanConf
 func ConvertVxlanConfigToVxlanAsicdConfig(c *VxlanConfig) *asicdInt.Vxlan {
 
 	return &asicdInt.Vxlan{
-		VxlanId:  int32(c.VNI),
+		Vni:      int32(c.VNI),
 		VlanId:   int16(c.VlanId),
 		McDestIp: c.Group.String(),
 		Mtu:      int32(c.MTU),
@@ -117,9 +117,9 @@ func ConvertVtepToVxlanAsicdConfig(vtep *VtepDbEntry) *asicdInt.Vtep {
 	}
 
 	return &asicdInt.Vtep{
-		VtepId:     int32(vtep.VtepId),
-		VxlanId:    int32(vtep.VxlanId),
-		VtepName:   vtep.VtepName,
+		IfIndex:    int32(vtep.VtepId),
+		Vni:        int32(vtep.VxlanId),
+		IfName:     vtep.VtepName,
 		SrcIfIndex: ifindex,
 		UDP:        int16(vtep.UDP),
 		TTL:        int16(vtep.TTL),
@@ -127,7 +127,6 @@ func ConvertVtepToVxlanAsicdConfig(vtep *VtepDbEntry) *asicdInt.Vtep {
 		DstIp:      vtep.DstIp.String(),
 		VlanId:     int16(vtep.VlanId),
 		SrcMac:     vtep.SrcMac.String(),
-		DstMac:     vtep.DstMac.String(),
 	}
 }
 

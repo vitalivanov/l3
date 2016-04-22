@@ -102,7 +102,6 @@ func ConvertVxlanVtepInstanceToVtepConfig(c *vxland.VxlanVtepInstances) (*VtepCo
 	}
 
 	srcName := asicDGetLinuxIfName(c.SrcIfIndex)
-	DstNetMac, _ := net.ParseMAC(c.DstMac)
 
 	logger.Info(fmt.Sprintf("Forcing Vtep %s to use Lb %s SrcMac %s Ip %s", c.VtepName, name, mac, ip))
 	return &VtepConfig{
@@ -122,7 +121,6 @@ func ConvertVxlanVtepInstanceToVtepConfig(c *vxland.VxlanVtepInstances) (*VtepCo
 		TunnelDstIp:           net.ParseIP(c.DstIp),
 		VlanId:                uint16(c.VlanId),
 		TunnelSrcMac:          mac,
-		TunnelDstMac:          DstNetMac,
 	}, nil
 }
 
