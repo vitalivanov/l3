@@ -8,6 +8,7 @@ import (
 	"asicdInt"
 	"asicdServices"
 	"encoding/json"
+	"fmt"
 	"git.apache.org/thrift.git/lib/go/thrift"
 	"io/ioutil"
 	"l3/tunnel/vxlan/vxlan_linux"
@@ -20,8 +21,15 @@ import (
 	"utils/ipcutils"
 )
 
+// vtep vlan membership
+var PortVlanDb map[uint16][]*portVlanValue
 var PortConfigMap map[int32]portConfig
 var softswitch *vxlan_linux.VxlanLinux
+
+type portVlanValue struct {
+	ifIndex string
+	refCnt  int
+}
 
 type portConfig struct {
 	Name         string
@@ -325,9 +333,72 @@ func asicDDeleteVxlan(vxlan *VxlanConfig) {
 	}
 }
 
+// asicDCreateVtep:
+// Creates a VTEP interface with the ASICD.  Should create an interface within
+// the HW as well as within Linux stack.   AsicD also requires that vlan membership is
+// provisioned separately from VTEP.  The vlan in question is the VLAN found
+// within the VXLAN header.
 func asicDCreateVtep(vtep *VtepDbEntry) {
 	// convert a vxland config to hw config
 	if asicdclnt.ClientHdl != nil {
+
+		// need to create a vlan membership of the vtep vlan Id
+		if _, ok := PortVlanDb[vtep.VlanId]; !ok {
+			v := &portVlanValue{
+				ifIndex: vtep.SrcIfName,
+				refCnt:  1,
+			}
+			PortVlanDb[vtep.VlanId] = append(PortVlanDb[vtep.VlanId], v)
+			pbmp := fmt.Sprintf("%d", vtep.SrcIfName)
+
+			asicdVlan := &asicdServices.Vlan{
+				VlanId:   int32(vtep.VlanId),
+				IntfList: pbmp,
+			}
+			asicdclnt.ClientHdl.CreateVlan(asicdVlan)
+
+		} else {
+			portExists := -1
+			for i, p := range PortVlanDb[vtep.VlanId] {
+				if p.ifIndex == vtep.SrcIfName {
+					portExists = i
+					break
+				}
+			}
+			if portExists == -1 {
+				oldpbmp := ""
+				for _, p := range PortVlanDb[vtep.VlanId] {
+					oldpbmp += fmt.Sprintf("%s", p.ifIndex)
+				}
+				v := &portVlanValue{
+					ifIndex: vtep.SrcIfName,
+					refCnt:  1,
+				}
+				PortVlanDb[vtep.VlanId] = append(PortVlanDb[vtep.VlanId], v)
+				newpbmp := ""
+				for _, p := range PortVlanDb[vtep.VlanId] {
+					newpbmp += fmt.Sprintf("%s", p.ifIndex)
+				}
+
+				oldAsicdVlan := &asicdServices.Vlan{
+					VlanId:   int32(vtep.VlanId),
+					IntfList: oldpbmp,
+				}
+				newAsicdVlan := &asicdServices.Vlan{
+					VlanId:   int32(vtep.VlanId),
+					IntfList: newpbmp,
+				}
+				// note if the thrift attribute id's change then
+				// this attr may need to be updated
+				attrset := []bool{false, true, false}
+				asicdclnt.ClientHdl.UpdateVlan(oldAsicdVlan, newAsicdVlan, attrset)
+			} else {
+				v := PortVlanDb[vtep.VlanId][portExists]
+				v.refCnt++
+				PortVlanDb[vtep.VlanId][portExists] = v
+			}
+		}
+		// create the vtep
 		asicdclnt.ClientHdl.CreateVxlanVtep(ConvertVtepToVxlanAsicdConfig(vtep))
 	} else {
 		// run standalone
@@ -338,10 +409,69 @@ func asicDCreateVtep(vtep *VtepDbEntry) {
 	}
 }
 
+// asicDDeleteVtep:
+// Delete a VTEP interface with the ASICD.  Should create an interface within
+// the HW as well as within Linux stack. AsicD also requires that vlan membership is
+// provisioned separately from VTEP.  The vlan in question is the VLAN found
+// within the VXLAN header.
 func asicDDeleteVtep(vtep *VtepDbEntry) {
 	// convert a vxland config to hw config
 	if asicdclnt.ClientHdl != nil {
+		// delete the vtep
 		asicdclnt.ClientHdl.DeleteVxlanVtep(ConvertVtepToVxlanAsicdConfig(vtep))
+
+		// update the vlan the vtep was using
+		if _, ok := PortVlanDb[vtep.VlanId]; ok {
+			portExists := -1
+			for i, p := range PortVlanDb[vtep.VlanId] {
+				if p.ifIndex == vtep.SrcIfName {
+					portExists = i
+					break
+				}
+			}
+			if portExists != -1 {
+				v := PortVlanDb[vtep.VlanId][portExists]
+				v.refCnt--
+				PortVlanDb[vtep.VlanId][portExists] = v
+
+				// lets remove this port from the vlan
+				if v.refCnt == 0 {
+					oldpbmp := ""
+					for _, p := range PortVlanDb[vtep.VlanId] {
+						oldpbmp += fmt.Sprintf("%s", p.ifIndex)
+					}
+					// remove from local list
+					PortVlanDb[vtep.VlanId] = append(PortVlanDb[vtep.VlanId][:portExists], PortVlanDb[vtep.VlanId][portExists+1:]...)
+					newpbmp := ""
+					for _, p := range PortVlanDb[vtep.VlanId] {
+						newpbmp += fmt.Sprintf("%s", p.ifIndex)
+					}
+
+					oldAsicdVlan := &asicdServices.Vlan{
+						VlanId:   int32(vtep.VlanId),
+						IntfList: oldpbmp,
+					}
+					newAsicdVlan := &asicdServices.Vlan{
+						VlanId:   int32(vtep.VlanId),
+						IntfList: newpbmp,
+					}
+					// note if the thrift attribute id's change then
+					// this attr may need to be updated
+					attrset := []bool{false, true, false}
+					asicdclnt.ClientHdl.UpdateVlan(oldAsicdVlan, newAsicdVlan, attrset)
+				}
+				// lets remove the vlan
+				if len(PortVlanDb[vtep.VlanId]) == 0 {
+
+					asicdVlan := &asicdServices.Vlan{
+						VlanId: int32(vtep.VlanId),
+					}
+					asicdclnt.ClientHdl.DeleteVlan(asicdVlan)
+					delete(PortVlanDb, vtep.VlanId)
+
+				}
+			}
+		}
 	} else {
 		// run standalone
 		if softswitch != nil {
