@@ -41,17 +41,34 @@ func saveVxLanConfigData(c *VxlanConfig) {
 	}
 }
 
+// DeleteVxLAN:
+// Configuration interface for creating the vlxlan instance
 func CreateVxLAN(c *VxlanConfig) {
 	saveVxLanConfigData(c)
 
-	// create vxlan resources in hw
-	hwCreateVxlan(c)
+	for _, client := range ClientIntf {
+		// create vxlan resources in hw
+		client.CreateVxlan(c)
+	}
+
+	// lets find all the vteps which are in VtepStatusConfigPending state
+	// and initiate a hwConfig
+	for _, vtep := range GetVtepDB() {
+		if vtep.Status == VtepStatusIncompletNoAssociation {
+			// start the fsm for the vtep
+			vtep.VtepFsm()
+		}
+	}
 }
 
+// DeleteVxLAN:
+// Configuration interface for deleting the vlxlan instance
 func DeleteVxLAN(c *VxlanConfig) {
 
-	// create vxlan resources in hw
-	hwDeleteVxlan(c)
+	// delete vxlan resources in hw
+	for _, client := range ClientIntf {
+		client.DeleteVxlan(c)
+	}
 
 	delete(vxlanDB, c.VNI)
 

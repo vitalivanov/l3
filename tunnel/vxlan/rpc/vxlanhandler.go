@@ -19,6 +19,28 @@ type VXLANDServiceHandler struct {
 	logger *logging.Writer
 }
 
+// look up the various other daemons based on c string
+func GetClientPort(paramsFile string, c string) int {
+	var clientsList []ClientJson
+
+	bytes, err := ioutil.ReadFile(paramsFile)
+	if err != nil {
+		return 0
+	}
+
+	err = json.Unmarshal(bytes, &clientsList)
+	if err != nil {
+		return 0
+	}
+
+	for _, client := range clientsList {
+		if client.Name == c {
+			return client.Port
+		}
+	}
+	return 0
+}
+
 func NewVXLANDServiceHandler(server *vxlan.VXLANServer, logger *logging.Writer) *VXLANDServiceHandler {
 	//lacp.LacpStartTime = time.Now()
 	// link up/down events for now
@@ -40,7 +62,7 @@ func (v *VXLANDServiceHandler) StartThriftServer() {
 	var err error
 
 	fileName := v.server.Paramspath + "clients.json"
-	port := vxlan.GetClientPort(fileName, "vxland")
+	port := GetClientPort(fileName, "vxland")
 	if port != 0 {
 		addr := fmt.Sprintf("localhost:%d", port)
 		transport, err = thrift.NewTServerSocket(addr)
@@ -146,8 +168,7 @@ func (v *VXLANDServiceHandler) HandleDbReadVxlanInstance(dbHdl *sql.DB) error {
 	for rows.Next() {
 
 		object := new(vxland.VxlanInstance)
-		if err = rows.Scan(&object.VxlanId, &object.McDestIp, &object.VlanId, &object.Mtu); err != nil {
-
+		if err = rows.Scan(&object.Vni, &object.VlanId); err != nil {
 			fmt.Println("Db method Scan failed when interating over VxlanInstance")
 		}
 		_, err = v.CreateVxlanInstance(object)
@@ -171,7 +192,7 @@ func (v *VXLANDServiceHandler) HandleDbReadVxlanVtepInstance(dbHdl *sql.DB) erro
 	for rows.Next() {
 
 		object := new(vxland.VxlanVtepInstance)
-		if err = rows.Scan(&object.VtepId, &object.VtepName, &object.SrcIfIndex, &object.UDP, &object.TTL, &object.TOS, &object.InnerVlanHandlingMode, &object.Learning, &object.Rsc, &object.L2miss, &object.L3miss, &object.VxlanId, &object.DstIp, &object.SrcIp, &object.SrcMac, &object.VlanId); err != nil {
+		if err = rows.Scan(&object.Intf, &object.IntfRef, &object.DstUDP, &object.TTL, &object.TOS, &object.InnerVlanHandlingMode, &object.Vni, &object.DstIp, &object.SrcIp, &object.VlanId, &object.Mtu); err != nil {
 
 			fmt.Println("Db method Scan failed when interating over VxlanVtepInstance")
 		}

@@ -1,6 +1,6 @@
 // vxlan_linux.go
 // NOTE: this is meant for testing, it should eventually live in asicd
-package vxlan_linux
+package test_linux
 
 import (
 	"fmt"
@@ -46,8 +46,7 @@ type VxlanConfig struct {
 
 // tunnel endpoint for the VxLAN
 type VtepConfig struct {
-	VtepId                uint32           `SNAPROUTE: KEY` //VTEP ID.
-	VxlanId               uint32           `SNAPROUTE: KEY` //VxLAN ID.
+	Vni                   uint32           `SNAPROUTE: KEY` //VxLAN ID.
 	VtepName              string           //VTEP instance name.
 	SrcIfName             string           //Source interface ifIndex.
 	UDP                   uint16           //vxlan udp port.  Deafult is the iana default udp port
@@ -170,12 +169,12 @@ func (v *VxlanLinux) CreateVtep(c *VtepConfig) {
 		vtep := &netlink.Vxlan{
 			LinkAttrs: netlink.LinkAttrs{
 				Name: c.VtepName,
-				//MasterIndex: VxlanDB[c.VxlanId].Brg.Attrs().Index,
+				//MasterIndex: VxlanDB[c.Vni].Brg.Attrs().Index,
 				HardwareAddr: c.TunnelSrcMac,
-				//MTU:          VxlanDB[c.VxlanId].Brg.Attrs().MTU,
+				//MTU:          VxlanDB[c.Vni].Brg.Attrs().MTU,
 				MTU: 1550,
 			},
-			VxlanId:      int(c.VxlanId),
+			VxlanId:      int(c.Vni),
 			VtepDevIndex: link.Attrs().Index,
 			SrcAddr:      c.TunnelSrcIp,
 			Group:        c.TunnelDstIp,
@@ -217,9 +216,9 @@ func (v *VxlanLinux) CreateVtep(c *VtepConfig) {
 		vtep := &netlink.Veth{
 			LinkAttrs: netlink.LinkAttrs{
 				Name:         c.VtepName,
-				MasterIndex:  VxlanDB[c.VxlanId].Brg.Attrs().Index,
+				MasterIndex:  VxlanDB[c.Vni].Brg.Attrs().Index,
 				HardwareAddr: c.TunnelSrcMac,
-				MTU:          VxlanDB[c.VxlanId].Brg.Attrs().MTU,
+				MTU:          VxlanDB[c.Vni].Brg.Attrs().MTU,
 			},
 			PeerName: c.VtepName + "Int",
 		}
@@ -332,9 +331,9 @@ func (v *VxlanLinux) CreateVtep(c *VtepConfig) {
 			v.logger.Info(fmt.Sprintf("neighbor: not configured dstIp %#v dstmac %#v", c.TunnelDstIp, c.TunnelDstMac))
 		}
 	}
-	vxlanDbEntry := VxlanDB[uint32(c.VxlanId)]
+	vxlanDbEntry := VxlanDB[uint32(c.Vni)]
 	vxlanDbEntry.Links = append(vxlanDbEntry.Links, &link)
-	VxlanDB[uint32(c.VxlanId)] = vxlanDbEntry
+	VxlanDB[uint32(c.Vni)] = vxlanDbEntry
 
 	if err := netlink.LinkSetMaster(link, vxlanDbEntry.Brg); err != nil {
 		v.logger.Err(err.Error())
@@ -360,7 +359,7 @@ func (v *VxlanLinux) CreateVtep(c *VtepConfig) {
 func (v *VxlanLinux) DeleteVtep(c *VtepConfig) {
 
 	foundEntry := false
-	if vxlanentry, ok := VxlanDB[c.VxlanId]; ok {
+	if vxlanentry, ok := VxlanDB[c.Vni]; ok {
 		for i, link := range vxlanentry.Links {
 			var linkName string
 			if VxlanConfigMode == "linux" {
@@ -371,9 +370,9 @@ func (v *VxlanLinux) DeleteVtep(c *VtepConfig) {
 			if linkName == c.VtepName {
 				v.logger.Info(fmt.Sprintf("deleteVtep: link found %s looking for %s", linkName, c.VtepName))
 				foundEntry = true
-				vxlanDbEntry := VxlanDB[c.VxlanId]
+				vxlanDbEntry := VxlanDB[c.Vni]
 				vxlanDbEntry.Links = append(vxlanDbEntry.Links[:i], vxlanDbEntry.Links[i+1:]...)
-				VxlanDB[c.VxlanId] = vxlanDbEntry
+				VxlanDB[c.Vni] = vxlanDbEntry
 				break
 			}
 		}

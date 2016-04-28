@@ -1,7 +1,9 @@
 // utils.go
 package vxlan
 
-import ()
+import (
+	"reflect"
+)
 
 func CompareVNI(vni uint32, netvni [3]byte) int {
 	v := [3]byte{byte(vni >> 16 & 0xff),
@@ -16,4 +18,17 @@ func CompareVNI(vni uint32, netvni [3]byte) int {
 		return 1
 	}
 	return -1
+}
+
+func CopyStruct(source interface{}, destin interface{}) {
+	x := reflect.ValueOf(source)
+	if x.Kind() == reflect.Ptr {
+		starX := x.Elem()
+		y := reflect.New(starX.Type())
+		starY := y.Elem()
+		starY.Set(starX)
+		reflect.ValueOf(destin).Elem().Set(y.Elem())
+	} else {
+		destin = x.Interface()
+	}
 }

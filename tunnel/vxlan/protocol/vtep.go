@@ -10,21 +10,24 @@ import (
 	"io/ioutil"
 	"net"
 	"strings"
+	"sync"
 	"time"
 )
 
 const (
-	VtepStatusUp             vtepStatus = "UP"
-	VtepStatusDown                      = "DOWN"
-	VtepStatusAdminDown                 = "ADMIN DOWN"
-	VtepStatusIncomplete                = "INCOMPLETE PROV"
-	VtepStatusNextHopUnknown            = "NEXT HOP UKNOWN"
-	VtepStatusArpUnresolved             = "ARP UNRESOLVED"
-	VtepStatusConfigPending             = "CONFIG PENDING"
+	VtepStatusUp                     vtepStatus = "UP"
+	VtepStatusDown                              = "DOWN"
+	VtepStatusAdminDown                         = "ADMIN DOWN"
+	VtepStatusIncompletNoAssociation            = "ICOMPLETE VTEP VXLAN NOT PROV"
+	VtepStatusIncomplete                        = "INCOMPLETE VTEP PROV"
+	VtepStatusIntfUnknown                       = "SRC INTF UNKNOWN"
+	VtepStatusNextHopUnknown                    = "NEXT HOP UKNOWN"
+	VtepStatusArpUnresolved                     = "ARP UNRESOLVED"
+	VtepStatusConfigPending                     = "CONFIG PENDING"
 )
 
 type VtepDbKey struct {
-	VtepId uint32
+	name string
 }
 
 type vtepVniCMACToVtepKey struct {
@@ -35,8 +38,7 @@ type vtepVniCMACToVtepKey struct {
 type vtepStatus string
 
 type VtepDbEntry struct {
-	VtepId      uint32
-	VxlanId     uint32
+	Vni         uint32
 	VtepName    string
 	SrcIfName   string
 	UDP         uint16
@@ -52,19 +54,27 @@ type VtepDbEntry struct {
 	Status vtepStatus
 
 	// handle used to rx/tx packets to linux if
-	handle *pcap.Handle
+	VtepHandleName string
+	handle         *pcap.Handle
 
 	server *VXLANServer
 
 	rxpkts uint64
 	txpkts uint64
 
-	nexthopchan chan net.IP
-	macchan     chan net.HardwareAddr
-	hwconfig    chan bool
-	killroutine chan bool
+	nexthopchan  chan net.IP
+	macchan      chan net.HardwareAddr
+	hwconfig     chan bool
+	killroutine  chan bool
+	intfinfochan chan VxlanIntfInfo
+
+	// number of ticks before hw was able to come up
+	ticksTillConfig int
 
 	retrytimer *time.Timer
+
+	// wait group used to help sync on cleanup of FSM
+	wg sync.WaitGroup
 }
 
 // pcap handle (vtep) per source ip defined
@@ -121,10 +131,10 @@ type srcMacVtepMap struct {
 
 func NewVtepDbEntry(c *VtepConfig) *VtepDbEntry {
 	vtep := &VtepDbEntry{
-		VtepId:  c.VtepId,
-		VxlanId: c.VxlanId,
+		Vni: c.Vni,
 		// TODO if we are running in hw linux vs proxy then this should not be + Int
-		VtepName: c.VtepName + "Int",
+		VtepName:       c.VtepName,
+		VtepHandleName: c.VtepName + "Int",
 		//VtepName:  c.VtepName,
 		SrcIfName: c.SrcIfName,
 		UDP:       c.UDP,
@@ -134,108 +144,168 @@ func NewVtepDbEntry(c *VtepConfig) *VtepDbEntry {
 		SrcMac:    c.TunnelSrcMac,
 		DstMac:    c.TunnelDstMac,
 		VlanId:    c.VlanId,
-		Status:    VtepStatusNextHopUnknown,
+		Status:    VtepStatusIncomplete,
 	}
 
 	return vtep
 }
 
 func (vtep *VtepDbEntry) VtepFsmCleanup() {
-	vtep.retrytimer.Stop()
-	close(vtep.nexthopchan)
-	close(vtep.macchan)
-	close(vtep.hwconfig)
-	close(vtep.killroutine)
+	// FSM may not have been launched
+	// lets based this determination based on
+	// the retry timer
+	if vtep.retrytimer != nil {
+		vtep.retrytimer.Stop()
+		close(vtep.macchan)
+		close(vtep.hwconfig)
+		close(vtep.killroutine)
+		vtep.wg.Wait()
+	}
 }
 
-// used to resolve mac/ip of the next hop
+// VtepFsm:
+// FSM used to resolve mac/ip of the next hop
 func (vtep *VtepDbEntry) VtepFsm() {
 
 	vtep.nexthopchan = make(chan net.IP, 1)
 	vtep.macchan = make(chan net.HardwareAddr, 1)
 	vtep.hwconfig = make(chan bool, 1)
 	vtep.killroutine = make(chan bool, 1)
+	vtep.intfinfochan = make(chan VxlanIntfInfo, 1)
 
 	// TODO, what should this time be
 	retrytime := time.Millisecond * 50
 
 	vtep.retrytimer = time.NewTimer(retrytime)
 
-	go func() {
+	// add a wait group to help with cleanup of FSM
+	vtep.wg.Add(1)
 
+	go func() {
+		logger.Info(fmt.Sprintf("Starting FSM for vtep %s", vtep.VtepName))
+		defer vtep.wg.Done()
 		for {
 			select {
 			case <-vtep.retrytimer.C:
-				if vtep.Status == VtepStatusNextHopUnknown {
-					hwGetNextHop(vtep.DstIp, vtep.nexthopchan)
-				} else if vtep.Status == VtepStatusArpUnresolved {
-					hwResolveMac(vtep.NextHopIp, vtep.macchan)
+				if _, ok := GetVxlanDB()[vtep.Vni]; ok {
+					for _, client := range ClientIntf {
+						if vtep.Status == VtepStatusIncomplete {
+							// get the interface which contains ip/mac for use
+							// by this vtep
+							client.GetIntfInfo(vtep.SrcIfName, vtep.intfinfochan)
+						} else if vtep.Status == VtepStatusNextHopUnknown {
+							// determine the next hop ip based on the dst ip
+							client.GetNextHopInfo(vtep.DstIp, vtep.nexthopchan)
+						} else if vtep.Status == VtepStatusArpUnresolved {
+							// resolve the next hop mac based on the next hop ip
+							client.ResolveNextHopMac(vtep.NextHopIp, vtep.macchan)
+						}
+					}
+				}
+				vtep.ticksTillConfig++
+				vtep.retrytimer.Reset(retrytime)
+
+			case intfinfo := <-vtep.intfinfochan:
+				vtep.retrytimer.Stop()
+				if vtep.Status == VtepStatusIncomplete {
+					// next state
+					vtep.Status = VtepStatusNextHopUnknown
+
+					// save off info related to the source
+					vtep.SrcIfName = intfinfo.IntfName
+					vtep.SrcIp = intfinfo.Ip
+					vtep.SrcMac = intfinfo.Mac
+
+					// lets try and resolve the next hop
+					for _, client := range ClientIntf {
+						client.GetNextHopInfo(vtep.DstIp, vtep.nexthopchan)
+					}
 				}
 
 				vtep.retrytimer.Reset(retrytime)
-
 			case ip, _ := <-vtep.nexthopchan:
 				// stop the timer if we have the response
 				vtep.retrytimer.Stop()
 				if vtep.Status == VtepStatusNextHopUnknown {
 					vtep.NextHopIp = ip
+					// TODO need create a port listener per next hop interface
+					// lets start listening on this port for VXLAN frames
+					// Call will protect against multiple calls to same port
+					//CreatePort(VxlanNextHopIp.Intf, vtep.UDP)
 					logger.Info(fmt.Sprintf("%s: found dstip %s next hop %s", strings.TrimRight(vtep.VtepName, "Int"), vtep.DstIp, vtep.NextHopIp))
+					// next state
 					vtep.Status = VtepStatusArpUnresolved
-					hwResolveMac(vtep.NextHopIp, vtep.macchan)
+					for _, client := range ClientIntf {
+						client.ResolveNextHopMac(vtep.NextHopIp, vtep.macchan)
+					}
 				}
 				vtep.retrytimer.Reset(retrytime)
 
 			case mac, _ := <-vtep.macchan:
 				vtep.retrytimer.Stop()
 
-				fmt.Printf("%s: resolved mac %s for next hop ip %#v status=%d", strings.TrimRight(vtep.VtepName, "Int"), vtep.DstMac, vtep.NextHopIp, vtep.Status)
-
 				if vtep.Status == VtepStatusArpUnresolved {
 					vtep.DstMac = mac
-					//logger.Info(fmt.Sprintf("%s: resolved mac %s for next hop ip %#v", strings.TrimRight(vtep.VtepName, "Int"), vtep.DstMac, vtep.NextHopIp))
 					vtep.Status = VtepStatusConfigPending
-					vtep.hwconfig <- true
+					logger.Info(fmt.Sprintf("%s: resolved mac %s for next hop ip %s status %s", strings.TrimRight(vtep.VtepName, "Int"), vtep.DstMac, vtep.NextHopIp, vtep.Status))
+					// protect against vxlan not existing yet
+					if _, ok := GetVxlanDB()[vtep.Vni]; ok {
+						vtep.hwconfig <- true
+					}
 				} else {
 					vtep.retrytimer.Reset(retrytime)
 				}
 
 			case _, ok := <-vtep.hwconfig:
 				if ok {
-					// TODO this is only necessary in "proxy" mode
-					VxlanPortRxTx(vtep.SrcIfName, vtep.UDP)
 					// lets create the packet listener for the rx/tx packets
 					VxlanVtepRxTx(vtep)
 					// we are commit to the hw
 					vtep.Status = VtepStatusUp
 					// create vtep resources in hw
-					hwCreateVtep(vtep)
+					for _, client := range ClientIntf {
+						client.CreateVtep(vtep)
+					}
+					vtep.retrytimer.Stop()
 
 				} else {
 					// channel closed lets return
+					logger.Info(fmt.Sprintf("Stopping FSM for vtep %s", vtep.VtepName))
 					return
 				}
 			}
 		}
 	}()
 
-	vtep.Status = VtepStatusNextHopUnknown
-	if vtep.DstMac.String() == "" {
-		// lets try and resolve the mac
-		hwGetNextHop(vtep.DstIp, vtep.nexthopchan)
-	} else {
-		fmt.Println("DstMac provisioned by user")
-		// no need to get next hop the user appears to know what the next hop mac is
-		vtep.Status = VtepStatusArpUnresolved
-		vtep.macchan <- vtep.DstMac
+	// src interface was supplied
+	// lets lookup the appropriate info
+	if vtep.SrcIfName != "" {
+		for _, client := range ClientIntf {
+			client.GetIntfInfo(vtep.SrcIfName, vtep.intfinfochan)
+		}
+	} else if vtep.SrcIp.String() != "0.0.0.0" {
+		// SrcIfName is the current vtep
+		vtep.Status = VtepStatusNextHopUnknown
+		if vtep.DstMac.String() == "" {
+			// lets try and resolve the mac
+			for _, client := range ClientIntf {
+				client.GetNextHopInfo(vtep.DstIp, vtep.nexthopchan)
+			}
+		}
 	}
+
 }
 
 func CreateVtep(c *VtepConfig) *VtepDbEntry {
 
 	vtep := saveVtepConfigData(c)
 
-	// lets resolve the mac address
-	vtep.VtepFsm()
+	if _, ok := GetVxlanDB()[vtep.Vni]; ok {
+		// lets resolve the mac address
+		vtep.VtepFsm()
+	} else {
+		vtep.Status = VtepStatusIncompletNoAssociation
+	}
 
 	return vtep
 }
@@ -243,25 +313,25 @@ func CreateVtep(c *VtepConfig) *VtepDbEntry {
 func DeleteVtep(c *VtepConfig) {
 
 	key := VtepDbKey{
-		VtepId: c.VtepId,
+		name: c.VtepName,
 	}
 
 	if vtep, ok := vtepDB[key]; ok {
 		// delete vtep resources in hw
-		hwDeleteVtep(vtep)
+		for _, client := range ClientIntf {
+			client.DeleteVtep(vtep)
+		}
 		if vtep.handle != nil {
 			vtep.handle.Close()
 		}
+		vtep.VtepFsmCleanup()
 		delete(vtepDB, key)
 	}
-
-	DeletePort(c.SrcIfName, c.UDP)
-
 }
 
 func saveVtepConfigData(c *VtepConfig) *VtepDbEntry {
 	key := VtepDbKey{
-		VtepId: c.VtepId,
+		name: c.VtepName,
 	}
 	vtep, ok := vtepDB[key]
 	if !ok {
@@ -294,11 +364,15 @@ func CreateVtepRxTx(vtep *VtepDbEntry) {
 	vtep.createVtepSenderListener()
 }
 
+// createVtepSenderListener:
+// This will listen for packets from the linux stack on the VtepHandleName
+// Similarly if the MAC was learned against this VTEP traffic will be transmited
+// back to the linux stack from this interface.
 func (vtep *VtepDbEntry) createVtepSenderListener() error {
 
 	// TODO need to revisit the timeout interval in case of processing lots of
 	// data frames
-	handle, err := pcap.OpenLive(vtep.VtepName, 65536, false, 50*time.Millisecond)
+	handle, err := pcap.OpenLive(vtep.VtepHandleName, 65536, false, 50*time.Millisecond)
 	if err != nil {
 		logger.Err(fmt.Sprintf("%s: Error opening pcap.OpenLive %s", vtep.VtepName, err))
 		return err
@@ -354,7 +428,7 @@ func (vtep *VtepDbEntry) snoop(data []byte) {
 		learnmac := ethernet.SrcMAC
 		// fdb entry mac -> vtep ip interface
 		logger.Info(fmt.Sprintf("Learning mac", learnmac, "against", strings.TrimRight(vtep.VtepName, "Int")))
-		asicDLearnFwdDbEntry(learnmac, vtep.VtepName, vtep.VtepIfIndex)
+		//asicDLearnFwdDbEntry(learnmac, vtep.VtepName, vtep.VtepIfIndex)
 	}
 
 }
@@ -410,7 +484,7 @@ func (vtep *VtepDbEntry) encapAndDispatchPkt(packet gopacket.Packet) {
 			},
 			Flags: 0x08,
 		}
-		vxlan.SetVNI(vtep.VxlanId)
+		vxlan.SetVNI(vtep.Vni)
 
 		// Set up buffer and options for serialization.
 		buf := gopacket.NewSerializeBuffer()

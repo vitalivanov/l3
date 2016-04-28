@@ -4,6 +4,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"l3/tunnel/vxlan/clients/snapclient"
 	vxlan "l3/tunnel/vxlan/protocol"
 	"l3/tunnel/vxlan/rpc"
 	"utils/keepalive"
@@ -35,6 +36,13 @@ func main() {
 	// create a new vxlan server
 	server := vxlan.NewVXLANServer(logger, path)
 	handler := rpc.NewVXLANDServiceHandler(server, logger)
+
+	// register all appropriate clients for use by server
+	// TODO add logic to read a param file which contains
+	// which client interface to use
+	client := NewVXLANSnapClient()
+	vxlan.RegisterClients(*client)
+
 	// blocking call
 	handler.StartThriftServer()
 }

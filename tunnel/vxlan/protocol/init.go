@@ -9,8 +9,7 @@ func init() {
 	vxlanDB = make(map[uint32]*vxlanDbEntry, 0)
 	vxlanVlanToVniDb = make(map[uint16]uint32, 0)
 
-	PortConfigMap = make(map[int32]portConfig, 0)
-	PortVlanDb = make(map[uint16][]*portVlanValue, 0)
+	PortConfigMap = make(map[int32]*PortConfig, 0)
 	portDB = make(map[string]*VxlanPort, 0)
 
 }
