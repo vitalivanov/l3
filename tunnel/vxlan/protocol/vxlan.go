@@ -54,8 +54,9 @@ func CreateVxLAN(c *VxlanConfig) {
 	// lets find all the vteps which are in VtepStatusConfigPending state
 	// and initiate a hwConfig
 	for _, vtep := range GetVtepDB() {
-		if vtep.Status == VtepStatusIncompletNoAssociation {
+		if vtep.Status == VtepStatusDetached {
 			// start the fsm for the vtep
+			vtep.Status = VtepStatusIncomplete
 			vtep.VtepFsm()
 		}
 	}

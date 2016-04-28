@@ -91,28 +91,24 @@ func (s *VXLANServer) HandleNextHopChange(dip net.IP, nexthopip net.IP, reachabl
 	// TOOD do some work to find all VTEP's and deprovision the entries
 	for _, vtep := range GetVtepDB() {
 		if reachable &&
-			vtep.Status == VtepStatusNextHopUnknown &&
 			vtep.DstIp.String() == dip.String() {
-			// update next hop
-			vtep.nexthopchan <- nexthopip
+			if vtep.Status == VtepStatusNextHopUnknown {
+				// update next hop
+				vtep.nexthopchan <- nexthopip
+
+			} else if vtep.Status == VtepStatusIncomplete {
+				vtep.VtepFsm()
+			}
 
 		} else if !reachable &&
 			vtep.DstIp.String() == dip.String() {
 			// set state
-			vtep.Status = VtepStatusIncomplete
-			// send config
-			s.Configchans.Vtepdelete <- VtepConfig{
-				Vni:             vtep.Vni,
-				VtepName:        vtep.VtepName,
-				SrcIfName:       vtep.SrcIfName,
-				UDP:             vtep.UDP,
-				TTL:             vtep.TTL,
-				TunnelSrcIp:     vtep.SrcIp,
-				TunnelDstIp:     vtep.DstIp,
-				VlanId:          vtep.VlanId,
-				TunnelSrcMac:    vtep.SrcMac,
-				TunnelDstMac:    vtep.DstMac,
-				TunnelNextHopIP: vtep.NextHopIp,
+			// TODO need to have a small state machine to handle
+			// tearing down the connection appropriately
+			if vtep.Status == VtepStatusUp {
+				vtep.Status = VtepStatusIncomplete
+				// deprovision the vtep
+				DeProvisionVtep(vtep)
 			}
 		}
 	}

@@ -15,15 +15,15 @@ import (
 )
 
 const (
-	VtepStatusUp                     vtepStatus = "UP"
-	VtepStatusDown                              = "DOWN"
-	VtepStatusAdminDown                         = "ADMIN DOWN"
-	VtepStatusIncompletNoAssociation            = "ICOMPLETE VTEP VXLAN NOT PROV"
-	VtepStatusIncomplete                        = "INCOMPLETE VTEP PROV"
-	VtepStatusIntfUnknown                       = "SRC INTF UNKNOWN"
-	VtepStatusNextHopUnknown                    = "NEXT HOP UKNOWN"
-	VtepStatusArpUnresolved                     = "ARP UNRESOLVED"
-	VtepStatusConfigPending                     = "CONFIG PENDING"
+	VtepStatusUp             vtepStatus = "UP"
+	VtepStatusDown                      = "DOWN"
+	VtepStatusAdminDown                 = "ADMIN DOWN"
+	VtepStatusIncomplete                = "INCOMPLETE VTEP PROV"
+	VtepStatusDetached                  = "ICOMPLETE VTEP VXLAN NOT PROV"
+	VtepStatusIntfUnknown               = "SRC INTF UNKNOWN"
+	VtepStatusNextHopUnknown            = "NEXT HOP UKNOWN"
+	VtepStatusArpUnresolved             = "ARP UNRESOLVED"
+	VtepStatusConfigPending             = "CONFIG PENDING"
 )
 
 type VtepDbKey struct {
@@ -207,6 +207,7 @@ func (vtep *VtepDbEntry) VtepFsm() {
 
 			case intfinfo := <-vtep.intfinfochan:
 				vtep.retrytimer.Stop()
+				logger.Info(fmt.Sprintf("infinfochan rx: status %s", vtep.Status))
 				if vtep.Status == VtepStatusIncomplete {
 					// next state
 					vtep.Status = VtepStatusNextHopUnknown
@@ -283,17 +284,18 @@ func (vtep *VtepDbEntry) VtepFsm() {
 		for _, client := range ClientIntf {
 			client.GetIntfInfo(vtep.SrcIfName, vtep.intfinfochan)
 		}
-	} else if vtep.SrcIp.String() != "0.0.0.0" {
+	} else if vtep.SrcIp.String() != "0.0.0.0" &&
+		vtep.SrcIp != nil {
 		// SrcIfName is the current vtep
 		vtep.Status = VtepStatusNextHopUnknown
-		if vtep.DstMac.String() == "" {
+		if vtep.DstMac.String() == "" ||
+			vtep.DstMac.String() == "00:00:00:00:00:00" {
 			// lets try and resolve the mac
 			for _, client := range ClientIntf {
 				client.GetNextHopInfo(vtep.DstIp, vtep.nexthopchan)
 			}
 		}
 	}
-
 }
 
 func CreateVtep(c *VtepConfig) *VtepDbEntry {
@@ -304,39 +306,56 @@ func CreateVtep(c *VtepConfig) *VtepDbEntry {
 		// lets resolve the mac address
 		vtep.VtepFsm()
 	} else {
-		vtep.Status = VtepStatusIncompletNoAssociation
+		vtep.Status = VtepStatusDetached
 	}
 
 	return vtep
 }
 
-func DeleteVtep(c *VtepConfig) {
-
-	key := VtepDbKey{
-		name: c.VtepName,
-	}
-
-	if vtep, ok := vtepDB[key]; ok {
-		// delete vtep resources in hw
+func DeProvisionVtep(vtep *VtepDbEntry) {
+	// delete vtep resources in hw
+	if vtep.Status == VtepStatusUp {
 		for _, client := range ClientIntf {
 			client.DeleteVtep(vtep)
 		}
 		if vtep.handle != nil {
 			vtep.handle.Close()
 		}
+	}
+	if vtep.Status != VtepStatusDetached {
 		vtep.VtepFsmCleanup()
-		delete(vtepDB, key)
+	}
+
+	// clear out the information which was discovered for this VTEP
+	vtep.NextHopIp = nil
+	if vtep.SrcIfName != "" {
+		vtep.SrcIp = nil
+	}
+	vtep.DstMac, _ = net.ParseMAC("00:00:00:00:00:00")
+	vtep.Status = VtepStatusIncomplete
+}
+
+func DeleteVtep(c *VtepConfig) {
+
+	key := &VtepDbKey{
+		name: c.VtepName,
+	}
+
+	vtep := GetVtepDBEntry(key)
+	if vtep != nil {
+		DeProvisionVtep(vtep)
+		delete(vtepDB, *key)
 	}
 }
 
 func saveVtepConfigData(c *VtepConfig) *VtepDbEntry {
-	key := VtepDbKey{
+	key := &VtepDbKey{
 		name: c.VtepName,
 	}
-	vtep, ok := vtepDB[key]
-	if !ok {
+	vtep := GetVtepDBEntry(key)
+	if vtep == nil {
 		vtep = NewVtepDbEntry(c)
-		vtepDB[key] = vtep
+		vtepDB[*key] = vtep
 	}
 	return vtep
 }
