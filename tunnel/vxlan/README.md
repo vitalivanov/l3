@@ -19,3 +19,17 @@ Case 2 - vEth interface, where the peer interface will be vtep<vtepid>Int only t
 		with this interface. 
 		
 This will be added to the associated VXLAN (VNI) bridge.
+=======
+# Virtual Extensible LAN (VxLan)
+
+### Introduction
+Brief Introduction about the module
+
+### Architecture
+Pictorial Representation of module architecture. Flow diagram
+
+### Interfaces
+Exposed Interfaces
+
+### Configuration
+Location of configuration and expected entries in configuration file
