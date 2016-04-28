@@ -3,10 +3,12 @@ package snapclient
 
 import (
 	nanomsg "github.com/op/go-nanomsg"
+	vxlan "l3/tunnel/vxlan/protocol"
 )
 
 // Base Snaproute Interface
 type VXLANSnapClient struct {
+	vxlan.BaseClientIntf
 	ribdSubSocket       *nanomsg.SubSocket
 	ribdSubSocketCh     chan []byte
 	ribdSubSocketErrCh  chan error
@@ -16,5 +18,5 @@ type VXLANSnapClient struct {
 }
 
 func NewVXLANSnapClient() VXLANSnapClient {
-	return &VXLANSnapClient{}
+	return VXLANSnapClient{}
 }

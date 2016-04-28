@@ -39,8 +39,8 @@ func main() {
 	// register all appropriate clients for use by server
 	// TODO add logic to read a param file which contains
 	// which client interface to use
-	client := NewVXLANSnapClient()
-	vxlan.RegisterClients(*client)
+	client := snapclient.NewVXLANSnapClient()
+	vxlan.RegisterClients(client)
 
 	// blocking call
 	handler.StartThriftServer()

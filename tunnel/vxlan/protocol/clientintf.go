@@ -25,48 +25,48 @@ type VXLANClientIntf interface {
 type BaseClientIntf struct {
 }
 
-func (b *BaseClientIntf) ConnectToClients(path string) {
+func (b BaseClientIntf) ConnectToClients(path string) {
 
 }
-func (b *BaseClientIntf) ConstructPortConfigMap() {
+func (b BaseClientIntf) ConstructPortConfigMap() {
 
 }
-func (b *BaseClientIntf) GetIntfInfo(name string, intfchan chan<- VxlanIntfInfo) {
+func (b BaseClientIntf) GetIntfInfo(name string, intfchan chan<- VxlanIntfInfo) {
 
 }
-func (b *BaseClientIntf) CreateVtep(vtep *VtepDbEntry) {
+func (b BaseClientIntf) CreateVtep(vtep *VtepDbEntry) {
 
 }
-func (b *BaseClientIntf) DeleteVtep(vtep *VtepDbEntry) {
+func (b BaseClientIntf) DeleteVtep(vtep *VtepDbEntry) {
 
 }
-func (b *BaseClientIntf) CreateVxlan(vxlan *VxlanConfig) {
+func (b BaseClientIntf) CreateVxlan(vxlan *VxlanConfig) {
 
 }
-func (b *BaseClientIntf) DeleteVxlan(vxlan *VxlanConfig) {
+func (b BaseClientIntf) DeleteVxlan(vxlan *VxlanConfig) {
 
 }
-func (b *BaseClientIntf) CreateVxlanAccess() {
+func (b BaseClientIntf) CreateVxlanAccess() {
 
 }
-func (b *BaseClientIntf) DeleteVxlanAccess() {
+func (b BaseClientIntf) DeleteVxlanAccess() {
 
 }
-func (b *BaseClientIntf) GetAccessPorts(vlan uint16) {
+func (b BaseClientIntf) GetAccessPorts(vlan uint16) {
 
 }
-func (b *BaseClientIntf) UpdateAccessPorts() {
+func (b BaseClientIntf) UpdateAccessPorts() {
 
 }
-func (b *BaseClientIntf) CreateAccessPortVlan(vlan uint16, intfList []int) {
+func (b BaseClientIntf) CreateAccessPortVlan(vlan uint16, intfList []int) {
 
 }
-func (b *BaseClientIntf) DeleteAccessPortVlan(vlan uint16, intfList []int) {
+func (b BaseClientIntf) DeleteAccessPortVlan(vlan uint16, intfList []int) {
 
 }
-func (b *BaseClientIntf) GetNextHopInfo(ip net.IP, nexthopchan chan<- net.IP) {
+func (b BaseClientIntf) GetNextHopInfo(ip net.IP, nexthopchan chan<- net.IP) {
 
 }
-func (b *BaseClientIntf) ResolveNextHopMac(nextHopIp net.IP, nexthopmacchan chan<- net.HardwareAddr) {
+func (b BaseClientIntf) ResolveNextHopMac(nextHopIp net.IP, nexthopmacchan chan<- net.HardwareAddr) {
 
 }

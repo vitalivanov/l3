@@ -1,11 +1,14 @@
 package snapclient
 
 import (
-	//"asicd/asicdConstDefs"
+	//"asicd/asicdCommonDefs"
 	"encoding/json"
 	"fmt"
 	nanomsg "github.com/op/go-nanomsg"
 	"l3/rib/ribdCommonDefs"
+	vxlan "l3/tunnel/vxlan/protocol"
+	"net"
+	"ribd"
 )
 
 type RibdClient struct {
@@ -75,17 +78,17 @@ func (intf VXLANSnapClient) processRibdNotification(rxBuf []byte) error {
 		logger.Info(fmt.Sprintln(" IP ", msgInfo.Network, " reachabilityStatus: ", msgInfo.IsReachable))
 		if msgInfo.IsReachable {
 			//logger.Info(fmt.Sprintln(" NextHop IP:", msgInfo.NextHopIntf.NextHopIp, " IntfType:IntfId ", msgInfo.NextHopIntf.NextHopIfType, ":", msgInfo.NextHopIntf.NextHopIfIndex))
-			//ifIndex := asicdConstDefs.GetIfIndexFromIntfIdAndIntfType(int(msgInfo.NextHopIntf.NextHopIfType), int(msgInfo.NextHopIntf.NextHopIfIndex))
-			serverchannels.VxlanNextHopUpdate <- VxlanNextHopIp{
+			//ifIndex := asicdCommonDefs.GetIfIndexFromIntfIdAndIntfType(int(msgInfo.NextHopIntf.NextHopIfType), int(msgInfo.NextHopIntf.NextHopIfIndex))
+			serverchannels.VxlanNextHopUpdate <- vxlan.VxlanNextHopIp{
 				Command:   vxlan.VxlanCommandCreate,
-				Intf:      msgInfo.NextHopIntf.NextHopIfIndex,
+				Intf:      int32(msgInfo.NextHopIntf.NextHopIfIndex),
 				NextHopIp: net.ParseIP(msgInfo.NextHopIntf.NextHopIp),
 			}
 		} else {
 			logger.Info(fmt.Sprintln(" NextHop IP:", msgInfo.NextHopIntf.NextHopIp, " is not reachable "))
-			serverchannels.VxlanNextHopUpdate <- VxlanNextHopIp{
+			serverchannels.VxlanNextHopUpdate <- vxlan.VxlanNextHopIp{
 				Command:   vxlan.VxlanCommandDelete,
-				Intf:      msgInfo.NextHopIntf.NextHopIfIndex,
+				Intf:      int32(msgInfo.NextHopIntf.NextHopIfIndex),
 				NextHopIp: net.ParseIP(msgInfo.NextHopIntf.NextHopIp),
 			}
 		}
@@ -99,7 +102,7 @@ func (intf VXLANSnapClient) processRibdNotification(rxBuf []byte) error {
 // GetNextHopInfo:
 // rib holds the next hop info so lets quiery the for the next hop
 // then notify the vtep channel of that ip
-func (intf VXLANSnapClient) GetNextHopInfo(ip net.IP, vtepnexthopchan <-chan net.IP) {
+func (intf VXLANSnapClient) GetNextHopInfo(ip net.IP, vtepnexthopchan chan<- net.IP) {
 	if ribdclnt.ClientHdl != nil {
 		nexthopinfo, err := ribdclnt.ClientHdl.GetRouteReachabilityInfo(ip.String())
 		if err == nil {

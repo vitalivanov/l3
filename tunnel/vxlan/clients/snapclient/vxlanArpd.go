@@ -13,7 +13,7 @@ type ArpdClient struct {
 
 var arpdclnt ArpdClient
 
-func (intf VXLANSnapClient) ResolveNextHopMac(nexthopip net.IP, macchan chan net.HardwareAddr) {
+func (intf VXLANSnapClient) ResolveNextHopMac(nexthopip net.IP, macchan chan<- net.HardwareAddr) {
 	if arpdclnt.ClientHdl != nil {
 		arpentrystate, err := arpdclnt.ClientHdl.GetArpEntryState(nexthopip.String())
 		if err == nil {

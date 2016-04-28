@@ -3,16 +3,23 @@ package rpc
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"git.apache.org/thrift.git/lib/go/thrift"
 	_ "github.com/mattn/go-sqlite3"
+	"io/ioutil"
 	vxlan "l3/tunnel/vxlan/protocol"
 	"utils/logging"
 	"vxland"
 )
 
 const DBName string = "UsrConfDb.db"
+
+type ClientJson struct {
+	Name string `json:Name`
+	Port int    `json:Port`
+}
 
 type VXLANDServiceHandler struct {
 	server *vxlan.VXLANServer

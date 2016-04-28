@@ -30,6 +30,7 @@ type VxLanConfigChannels struct {
 }
 
 type VxlanIntfInfo struct {
+	Command  int
 	IntfName string
 	IfIndex  int32
 	Mac      net.HardwareAddr
@@ -47,7 +48,7 @@ type VxlanNextHopIp struct {
 type VxlanAccessPortVlan struct {
 	Command  int
 	VlanId   uint16
-	IntfList []int
+	IntfList []int32
 }
 
 type VxlanUpdate struct {

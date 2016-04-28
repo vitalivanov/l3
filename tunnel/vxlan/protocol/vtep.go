@@ -41,6 +41,7 @@ type VtepDbEntry struct {
 	Vni         uint32
 	VtepName    string
 	SrcIfName   string
+	SrcIfIndex  int32
 	UDP         uint16
 	TTL         uint16
 	SrcIp       net.IP
@@ -216,6 +217,7 @@ func (vtep *VtepDbEntry) VtepFsm() {
 					vtep.SrcIfName = intfinfo.IntfName
 					vtep.SrcIp = intfinfo.Ip
 					vtep.SrcMac = intfinfo.Mac
+					vtep.SrcIfIndex = intfinfo.IfIndex
 
 					// lets try and resolve the next hop
 					for _, client := range ClientIntf {

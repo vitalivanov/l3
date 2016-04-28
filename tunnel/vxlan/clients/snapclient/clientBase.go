@@ -2,6 +2,7 @@
 package snapclient
 
 import (
+	"arpd"
 	"asicd/pluginManager/pluginCommon"
 	"asicdServices"
 	"encoding/json"
@@ -102,7 +103,7 @@ func (intf VXLANSnapClient) ConnectToClients(paramsFile string) {
 						asicdclnt.ClientHdl = asicdServices.NewASICDServicesClientFactory(asicdclnt.Transport, asicdclnt.PtrProtocolFactory)
 						asicdclnt.IsConnected = true
 						// lets gather all info needed from asicd such as the port
-						ConstructPortConfigMap()
+						intf.ConstructPortConfigMap()
 						break
 					} else {
 						allclientsnotconnect = true
@@ -139,14 +140,6 @@ func (intf VXLANSnapClient) ConnectToClients(paramsFile string) {
 	go intf.createRIBdSubscriber()
 	// need to listen for por vlan membership notifications
 	go intf.createASICdSubscriber()
-}
-
-func asicDGetLinuxIfName(ifindex int32) string {
-
-	if p, ok := PortConfigMap[ifindex]; ok {
-		return p.Name
-	}
-	return ""
 }
 
 func asicDGetLoopbackInfo() (success bool, lbname string, mac net.HardwareAddr, ip net.IP) {
@@ -191,11 +184,11 @@ func asicDGetLoopbackInfo() (success bool, lbname string, mac net.HardwareAddr, 
 }
 
 func asicDLearnFwdDbEntry(mac net.HardwareAddr, vtepName string, ifindex int32) {
-	macstr := mac.String()
+	//macstr := mac.String()
 	// convert a vxland config to hw config
-	if asicdclnt.ClientHdl != nil {
-		//asicdclnt.ClientHdl.DeleteVxlanVtep(ConvertVtepConfigToVxlanAsicdConfig(vtep))
-	}
+	//if asicdclnt.ClientHdl != nil {
+	//asicdclnt.ClientHdl.DeleteVxlanVtep(ConvertVtepConfigToVxlanAsicdConfig(vtep))
+	//}
 	/* Add as another interface
 	else {
 		// run standalone
