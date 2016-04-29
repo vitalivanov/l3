@@ -65,24 +65,34 @@ func GetConfigChannels() *VxLanConfigChannels {
 func NewVXLANServer(l *logging.Writer, paramspath string) *VXLANServer {
 
 	if VxlanServer == nil {
-		// set global instance
-		SetLogger(l)
 
 		logger.Info(fmt.Sprintf("Params path: %s", paramspath))
 		VxlanServer = &VXLANServer{
 			Paramspath: paramspath,
 			logger:     l,
+			Configchans: &VxLanConfigChannels{
+				Vxlancreate:               make(chan VxlanConfig, 0),
+				Vxlandelete:               make(chan VxlanConfig, 0),
+				Vxlanupdate:               make(chan VxlanUpdate, 0),
+				Vtepcreate:                make(chan VtepConfig, 0),
+				Vtepdelete:                make(chan VtepConfig, 0),
+				Vtepupdate:                make(chan VtepUpdate, 0),
+				VxlanAccessPortVlanUpdate: make(chan VxlanAccessPortVlan, 0),
+				VxlanNextHopUpdate:        make(chan VxlanNextHopIp, 0),
+				VxlanPortCreate:           make(chan PortConfig, 0),
+			},
 		}
+
+		// listen for config messages from intf and server listener (thrift)
+		VxlanServer.ConfigListener()
 
 		// connect to the various servers in order to get additional information
 		// such as connecting to RIB for next hop ip of the vtep dst ip, and
 		// resolve the mac for the next hop ip
 		for _, client := range ClientIntf {
+			client.SetServerChannels(VxlanServer.Configchans)
 			client.ConnectToClients(paramspath + "clients.json")
 		}
-
-		// listen for config messages from intf and server listener (thrift)
-		VxlanServer.ConfigListener()
 	}
 	return VxlanServer
 }

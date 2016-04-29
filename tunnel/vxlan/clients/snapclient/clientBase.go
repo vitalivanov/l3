@@ -6,6 +6,7 @@ import (
 	"asicd/pluginManager/pluginCommon"
 	"asicdServices"
 	"encoding/json"
+	//"fmt"
 	"git.apache.org/thrift.git/lib/go/thrift"
 	"io/ioutil"
 	"net"
@@ -89,53 +90,53 @@ func GetClientPort(paramsFile string, c string) int {
 // 2) ribd - provision: next hop ip retreival
 //           notifications: next hop reachability changes
 // 3) arpd - provision: resolve next hop ip
-func (intf VXLANSnapClient) ConnectToClients(paramsFile string) {
-	allclientsnotconnect := false
+func (intf VXLANSnapClient) ConnectToClients(clientFile string) {
+	allclientsconnect := 0
 	clientList := [3]string{"asicd", "ribd", "arpd"}
-	for _, client := range clientList {
-		port := GetClientPort(paramsFile, client)
-		if port != 0 {
-			for {
-				if client == "asicd" {
-					asicdclnt.Address = "localhost:" + strconv.Itoa(port)
-					asicdclnt.Transport, asicdclnt.PtrProtocolFactory, _ = ipcutils.CreateIPCHandles(asicdclnt.Address)
-					if asicdclnt.Transport != nil && asicdclnt.PtrProtocolFactory != nil {
-						asicdclnt.ClientHdl = asicdServices.NewASICDServicesClientFactory(asicdclnt.Transport, asicdclnt.PtrProtocolFactory)
-						asicdclnt.IsConnected = true
-						// lets gather all info needed from asicd such as the port
-						intf.ConstructPortConfigMap()
-						break
-					} else {
-						allclientsnotconnect = true
-					}
-				} else if client == "ribd" {
-					ribdclnt.Address = "localhost:" + strconv.Itoa(port)
-					ribdclnt.Transport, ribdclnt.PtrProtocolFactory, _ = ipcutils.CreateIPCHandles(ribdclnt.Address)
-					if ribdclnt.Transport != nil && asicdclnt.PtrProtocolFactory != nil {
-						ribdclnt.ClientHdl = ribd.NewRIBDServicesClientFactory(ribdclnt.Transport, ribdclnt.PtrProtocolFactory)
-						ribdclnt.IsConnected = true
-						break
-					} else {
-						allclientsnotconnect = true
-					}
-				} else if client == "arpd" {
-					arpdclnt.Address = "localhost:" + strconv.Itoa(port)
-					arpdclnt.Transport, arpdclnt.PtrProtocolFactory, _ = ipcutils.CreateIPCHandles(arpdclnt.Address)
-					if arpdclnt.Transport != nil && arpdclnt.PtrProtocolFactory != nil {
-						arpdclnt.ClientHdl = arpd.NewARPDServicesClientFactory(arpdclnt.Transport, arpdclnt.PtrProtocolFactory)
-						arpdclnt.IsConnected = true
-						break
-					} else {
-						allclientsnotconnect = true
-					}
+	for allclientsconnect < len(clientList) {
+		for _, client := range clientList {
+			port := GetClientPort(clientFile, client)
+			//logger.Info(fmt.Sprintf("VXLAN -> looking to connect %s isconnected asicd[%t] ribd[%t] arpd[%t] numconnected[%d]",
+			//	client, asicdclnt.IsConnected, ribdclnt.IsConnected, arpdclnt.IsConnected, allclientsconnect))
+
+			if !asicdclnt.IsConnected && client == "asicd" {
+				asicdclnt.Address = "localhost:" + strconv.Itoa(port)
+				asicdclnt.Transport, asicdclnt.PtrProtocolFactory, _ = ipcutils.CreateIPCHandles(asicdclnt.Address)
+				if asicdclnt.Transport != nil && asicdclnt.PtrProtocolFactory != nil {
+					asicdclnt.ClientHdl = asicdServices.NewASICDServicesClientFactory(asicdclnt.Transport, asicdclnt.PtrProtocolFactory)
+					asicdclnt.IsConnected = true
+					// lets gather all info needed from asicd such as the port
+					logger.Info("VXLAN -> ASICD connected")
+					allclientsconnect++
 				}
-				// lets delay to allow time for other processes to come up
-				if allclientsnotconnect {
-					time.Sleep(time.Millisecond * 500)
+			} else if !ribdclnt.IsConnected && client == "ribd" {
+				ribdclnt.Address = "localhost:" + strconv.Itoa(port)
+				ribdclnt.Transport, ribdclnt.PtrProtocolFactory, _ = ipcutils.CreateIPCHandles(ribdclnt.Address)
+				if ribdclnt.Transport != nil && asicdclnt.PtrProtocolFactory != nil {
+					ribdclnt.ClientHdl = ribd.NewRIBDServicesClientFactory(ribdclnt.Transport, ribdclnt.PtrProtocolFactory)
+					ribdclnt.IsConnected = true
+					logger.Info("VXLAN -> RIBD connected")
+					allclientsconnect++
+				}
+			} else if !arpdclnt.IsConnected && client == "arpd" {
+				arpdclnt.Address = "localhost:" + strconv.Itoa(port)
+				arpdclnt.Transport, arpdclnt.PtrProtocolFactory, _ = ipcutils.CreateIPCHandles(arpdclnt.Address)
+				if arpdclnt.Transport != nil && arpdclnt.PtrProtocolFactory != nil {
+					arpdclnt.ClientHdl = arpd.NewARPDServicesClientFactory(arpdclnt.Transport, arpdclnt.PtrProtocolFactory)
+					arpdclnt.IsConnected = true
+					logger.Info("VXLAN -> ARPD connected")
+					allclientsconnect++
 				}
 			}
 		}
+		// lets delay to allow time for other processes to come up
+		if allclientsconnect < len(clientList) {
+			time.Sleep(time.Millisecond * 500)
+		}
 	}
+	// lets call any client init configuration needed here
+	intf.ConstructPortConfigMap()
+
 	// need to listen for next hop notifications
 	go intf.createRIBdSubscriber()
 	// need to listen for por vlan membership notifications

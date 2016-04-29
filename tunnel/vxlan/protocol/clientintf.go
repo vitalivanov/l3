@@ -7,7 +7,8 @@ import (
 // interface class is used to store the communication methods
 // for the various daemon communications
 type VXLANClientIntf interface {
-	ConnectToClients(path string)
+	SetServerChannels(s *VxLanConfigChannels)
+	ConnectToClients(clientFile string)
 	ConstructPortConfigMap()
 	GetIntfInfo(name string, intfchan chan<- VxlanIntfInfo)
 	CreateVtep(vtep *VtepDbEntry)
@@ -25,7 +26,10 @@ type VXLANClientIntf interface {
 type BaseClientIntf struct {
 }
 
-func (b BaseClientIntf) ConnectToClients(path string) {
+func (b BaseClientIntf) SetServerChannels(s *VxLanConfigChannels) {
+
+}
+func (b BaseClientIntf) ConnectToClients(clientFile string) {
 
 }
 func (b BaseClientIntf) ConstructPortConfigMap() {

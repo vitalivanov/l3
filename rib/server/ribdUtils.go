@@ -9,8 +9,8 @@ import (
 	"fmt"
 	"github.com/op/go-nanomsg"
 	"l3/rib/ribdCommonDefs"
-	"net"
 	"models"
+	"net"
 	"ribd"
 	"ribdInt"
 	"sort"
@@ -84,6 +84,7 @@ func BuildPublisherMap() {
 	PublisherInfoMap["EBGP"] = PublisherInfoMap["BGP"]
 	PublisherInfoMap["IBGP"] = PublisherInfoMap["BGP"]
 	PublisherInfoMap["BFD"] = PublisherMapInfo{ribdCommonDefs.PUB_SOCKET_BFDD_ADDR, InitPublisher(ribdCommonDefs.PUB_SOCKET_BFDD_ADDR)}
+	PublisherInfoMap["VXLAN"] = PublisherMapInfo{ribdCommonDefs.PUB_SOCKET_VXLAND_ADDR, InitPublisher(ribdCommonDefs.PUB_SOCKET_VXLAND_ADDR)}
 }
 func BuildRouteProtocolTypeMapDB() {
 	RouteProtocolTypeMapDB["CONNECTED"] = ribdCommonDefs.CONNECTED
@@ -693,28 +694,28 @@ func getNetworkPrefix(destNetIp net.IP, networkMask net.IP) (destNet patriciaDB.
 	return destNet, err
 }
 func (m RIBDServer) WriteIPv4RouteStateEntryToDB(entry RouteInfoRecord, routeList RouteInfoRecordList) error {
-    logger.Info(fmt.Sprintln("WriteIPv4RouteStateEntryToDB"))
+	logger.Info(fmt.Sprintln("WriteIPv4RouteStateEntryToDB"))
 	m.DelIPv4RouteStateEntryFromDB(entry)
 	var dbObj models.IPv4RouteState
 	obj := ribd.NewIPv4RouteState()
 	obj.DestinationNw = entry.networkAddr
-/*	obj.NextHopIp = entry.nextHopIp.String()
-	nextHopIfTypeStr, _ := m.GetNextHopIfTypeStr(ribdInt.Int(entry.nextHopIfType))
-	obj.OutgoingIntfType = nextHopIfTypeStr
-	obj.OutgoingInterface = strconv.Itoa(int(entry.nextHopIfIndex))
-	obj.Protocol = ReverseRouteProtoTypeMapDB[int(entry.protocol)]*/
-	obj.NextHopList = make([] *ribd.NextHopInfo,0)
+	/*	obj.NextHopIp = entry.nextHopIp.String()
+		nextHopIfTypeStr, _ := m.GetNextHopIfTypeStr(ribdInt.Int(entry.nextHopIfType))
+		obj.OutgoingIntfType = nextHopIfTypeStr
+		obj.OutgoingInterface = strconv.Itoa(int(entry.nextHopIfIndex))
+		obj.Protocol = ReverseRouteProtoTypeMapDB[int(entry.protocol)]*/
+	obj.NextHopList = make([]*ribd.NextHopInfo, 0)
 	routeInfoList := routeList.routeInfoProtocolMap[routeList.selectedRouteProtocol]
 	logger.Info(fmt.Sprintln("len of routeInfoList - ", len(routeInfoList), "selected route protocol = ", routeList.selectedRouteProtocol))
-	nextHopInfo := make([]ribd.NextHopInfo,len(routeInfoList))
+	nextHopInfo := make([]ribd.NextHopInfo, len(routeInfoList))
 	i := 0
 	for sel := 0; sel < len(routeInfoList); sel++ {
 		nextHopInfo[i].NextHopIp = routeInfoList[sel].nextHopIp.String()
-	    nextHopIfTypeStr, _ := m.GetNextHopIfTypeStr(ribdInt.Int(entry.nextHopIfType))
-	    nextHopInfo[i].OutgoingIntfType = nextHopIfTypeStr
-	    nextHopInfo[i].OutgoingInterface = strconv.Itoa(int(routeInfoList[sel].nextHopIfIndex))
-	    nextHopInfo[i].Protocol = ReverseRouteProtoTypeMapDB[int(routeInfoList[sel].protocol)]
-		obj.NextHopList = append(obj.NextHopList,&nextHopInfo[i])
+		nextHopIfTypeStr, _ := m.GetNextHopIfTypeStr(ribdInt.Int(entry.nextHopIfType))
+		nextHopInfo[i].OutgoingIntfType = nextHopIfTypeStr
+		nextHopInfo[i].OutgoingInterface = strconv.Itoa(int(routeInfoList[sel].nextHopIfIndex))
+		nextHopInfo[i].Protocol = ReverseRouteProtoTypeMapDB[int(routeInfoList[sel].protocol)]
+		obj.NextHopList = append(obj.NextHopList, &nextHopInfo[i])
 		i++
 	}
 	obj.RouteCreatedTime = entry.routeCreatedTime
@@ -757,7 +758,7 @@ func (m RIBDServer) WriteIPv4RouteStateEntryToDB(entry RouteInfoRecord, routeLis
 }
 
 func (m RIBDServer) DelIPv4RouteStateEntryFromDB(entry RouteInfoRecord) error {
-    logger.Info(fmt.Sprintln("DelIPv4RouteStateEntryFromDB"))
+	logger.Info(fmt.Sprintln("DelIPv4RouteStateEntryFromDB"))
 	var dbObj models.IPv4RouteState
 	obj := ribd.NewIPv4RouteState()
 	obj.DestinationNw = entry.networkAddr

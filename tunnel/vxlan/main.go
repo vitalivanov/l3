@@ -32,15 +32,23 @@ func main() {
 	// Start keepalive routine
 	go keepalive.InitKeepAlive("vxland", path)
 
-	// create a new vxlan server
-	server := vxlan.NewVXLANServer(logger, path)
-	handler := rpc.NewVXLANDServiceHandler(server, logger)
+	// Order of calls here matters as the logger
+	// needs to exist before clients are registerd
+	// and before the server is created.  Similarly
+	// the clients need to exist before the server
+	// is created as they are connected at time
+	// of server creation
+	vxlan.SetLogger(logger)
 
 	// register all appropriate clients for use by server
 	// TODO add logic to read a param file which contains
 	// which client interface to use
-	client := snapclient.NewVXLANSnapClient()
-	vxlan.RegisterClients(client)
+	client := snapclient.NewVXLANSnapClient(logger)
+	vxlan.RegisterClients(*client)
+
+	// create a new vxlan server
+	server := vxlan.NewVXLANServer(logger, path)
+	handler := rpc.NewVXLANDServiceHandler(server, logger)
 
 	// blocking call
 	handler.StartThriftServer()

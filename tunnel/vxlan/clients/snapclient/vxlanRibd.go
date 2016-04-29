@@ -18,9 +18,31 @@ type RibdClient struct {
 
 var ribdclnt RibdClient
 
-func (intf VXLANSnapClient) createRIBdSubscriber() {
+func (intf VXLANSnapClient) createRIBdSubscriber() error {
 	logger.Info("Listen for RIBd updates")
-	intf.listenForRIBdUpdates(ribdCommonDefs.PUB_SOCKET_BFDD_ADDR)
+	address := ribdCommonDefs.PUB_SOCKET_VXLAND_ADDR
+	var err error
+	if intf.ribdSubSocket, err = nanomsg.NewSubSocket(); err != nil {
+		logger.Err(fmt.Sprintln("Failed to create RIBd subscribe socket, error:", err))
+		return err
+	}
+
+	if _, err = intf.ribdSubSocket.Connect(address); err != nil {
+		logger.Err(fmt.Sprintln("Failed to connect to RIBd publisher socket, address:", address, "error:", err))
+		return err
+	}
+
+	if err = intf.ribdSubSocket.Subscribe(""); err != nil {
+		logger.Err(fmt.Sprintln("Failed to subscribe to \"\" on RIBd subscribe socket, error:", err))
+		return err
+	}
+
+	logger.Info(fmt.Sprintln("Connected to RIBd publisher at address:", address))
+	if err = intf.ribdSubSocket.SetRecvBuffer(1024 * 1024); err != nil {
+		logger.Err(fmt.Sprintln("Failed to set the buffer size for RIBd publisher socket, error:", err))
+		return err
+	}
+	//intf.listenForRIBdUpdates(ribdCommonDefs.PUB_SOCKET_VXLAND_ADDR)
 	for {
 		logger.Info("Read on RIBd subscriber socket...")
 		rxBuf, err := intf.ribdSubSocket.Recv(0)
@@ -32,6 +54,7 @@ func (intf VXLANSnapClient) createRIBdSubscriber() {
 		logger.Info(fmt.Sprintln("RIB subscriber recv returned:", rxBuf))
 		intf.ribdSubSocketCh <- rxBuf
 	}
+	return nil
 }
 
 func (intf VXLANSnapClient) listenForRIBdUpdates(address string) error {

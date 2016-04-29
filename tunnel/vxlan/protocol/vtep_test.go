@@ -33,6 +33,10 @@ type mockintf struct {
 	failResolveNexHop        bool
 }
 
+func (b mockintf) SetServerChannels(s *VxlanConfigChannels) {
+
+}
+
 func (b mockintf) ConnectToClients(path string) {
 
 }

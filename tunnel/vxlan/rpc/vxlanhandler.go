@@ -2,14 +2,15 @@
 package rpc
 
 import (
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"git.apache.org/thrift.git/lib/go/thrift"
+	"github.com/garyburd/redigo/redis"
 	_ "github.com/mattn/go-sqlite3"
 	"io/ioutil"
 	vxlan "l3/tunnel/vxlan/protocol"
+	"models"
 	"utils/logging"
 	"vxland"
 )
@@ -162,59 +163,51 @@ func (v *VXLANDServiceHandler) UpdateVxlanVtepInstance(origconfig *vxland.VxlanV
 	return false, err
 }
 
-func (v *VXLANDServiceHandler) HandleDbReadVxlanInstance(dbHdl *sql.DB) error {
-	dbCmd := "select * from VxlanInstance"
-	rows, err := dbHdl.Query(dbCmd)
-	if err != nil {
-		fmt.Println(fmt.Sprintf("DB method Query failed for 'VxlanInstance' with error ", dbCmd, err))
-		return err
-	}
-
-	defer rows.Close()
-
-	for rows.Next() {
-
-		object := new(vxland.VxlanInstance)
-		if err = rows.Scan(&object.Vni, &object.VlanId); err != nil {
-			fmt.Println("Db method Scan failed when interating over VxlanInstance")
-		}
-		_, err = v.CreateVxlanInstance(object)
+func (v *VXLANDServiceHandler) HandleDbReadVxlanInstance(dbHdl redis.Conn) error {
+	if dbHdl != nil {
+		var dbObj models.VxlanInstance
+		objList, err := dbObj.GetAllObjFromDb(dbHdl)
 		if err != nil {
+			v.logger.Warning("DB Query failed when retrieving VxlanInstance objects")
 			return err
+		}
+		for idx := 0; idx < len(objList); idx++ {
+			obj := vxland.NewVxlanInstance()
+			dbObject := objList[idx].(models.VxlanInstance)
+			models.ConvertvxlandVxlanInstanceObjToThrift(&dbObject, obj)
+			_, err = v.CreateVxlanInstance(obj)
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return nil
 }
 
-func (v *VXLANDServiceHandler) HandleDbReadVxlanVtepInstance(dbHdl *sql.DB) error {
-	dbCmd := "select * from VxlanVtepInstance"
-	rows, err := dbHdl.Query(dbCmd)
-	if err != nil {
-		fmt.Println(fmt.Sprintf("DB method Query failed for 'VxlanVtepInstance' with error ", dbCmd, err))
-		return err
-	}
-
-	defer rows.Close()
-
-	for rows.Next() {
-
-		object := new(vxland.VxlanVtepInstance)
-		if err = rows.Scan(&object.Intf, &object.IntfRef, &object.DstUDP, &object.TTL, &object.TOS, &object.InnerVlanHandlingMode, &object.Vni, &object.DstIp, &object.SrcIp, &object.VlanId, &object.Mtu); err != nil {
-
-			fmt.Println("Db method Scan failed when interating over VxlanVtepInstance")
-		}
-		_, err = v.CreateVxlanVtepInstance(object)
+func (v *VXLANDServiceHandler) HandleDbReadVxlanVtepInstance(dbHdl redis.Conn) error {
+	if dbHdl != nil {
+		var dbObj models.VxlanVtepInstance
+		objList, err := dbObj.GetAllObjFromDb(dbHdl)
 		if err != nil {
+			v.logger.Warning("DB Query failed when retrieving VxlanVtepInstance objects")
 			return err
+		}
+		for idx := 0; idx < len(objList); idx++ {
+			obj := vxland.NewVxlanVtepInstance()
+			dbObject := objList[idx].(models.VxlanVtepInstance)
+			models.ConvertvxlandVxlanVtepInstanceObjToThrift(&dbObject, obj)
+			_, err = v.CreateVxlanVtepInstance(obj)
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return nil
 }
 
 func (v *VXLANDServiceHandler) ReadConfigFromDB() error {
-	var dbPath string = v.server.Paramspath + DBName
 
-	dbHdl, err := sql.Open("sqlite3", dbPath)
+	dbHdl, err := redis.Dial("tcp", ":6379")
 	if err != nil {
 		//h.logger.Err(fmt.Sprintf("Failed to open the DB at %s with error %s", dbPath, err))
 		//stp.StpLogger("ERROR", fmt.Sprintf("Failed to open the DB at %s with error %s", dbPath, err))

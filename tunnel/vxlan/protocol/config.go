@@ -259,18 +259,6 @@ func (s *VXLANServer) updateThriftVtep(c *VtepUpdate) {
 
 func (s *VXLANServer) ConfigListener() {
 
-	s.Configchans = &VxLanConfigChannels{
-		Vxlancreate:               make(chan VxlanConfig, 0),
-		Vxlandelete:               make(chan VxlanConfig, 0),
-		Vxlanupdate:               make(chan VxlanUpdate, 0),
-		Vtepcreate:                make(chan VtepConfig, 0),
-		Vtepdelete:                make(chan VtepConfig, 0),
-		Vtepupdate:                make(chan VtepUpdate, 0),
-		VxlanAccessPortVlanUpdate: make(chan VxlanAccessPortVlan, 0),
-		VxlanNextHopUpdate:        make(chan VxlanNextHopIp, 0),
-		VxlanPortCreate:           make(chan PortConfig, 0),
-	}
-
 	go func(cc *VxLanConfigChannels) {
 		for {
 			select {
