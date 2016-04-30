@@ -97,6 +97,8 @@ func NewVXLANServer(l *logging.Writer, paramspath string) *VXLANServer {
 	return VxlanServer
 }
 
+//HandleNextHopChange:
+// Handle notifications from client that the next hop reachabilty has changed
 func (s *VXLANServer) HandleNextHopChange(dip net.IP, nexthopip net.IP, reachable bool) {
 	// TOOD do some work to find all VTEP's and deprovision the entries
 	for _, vtep := range GetVtepDB() {

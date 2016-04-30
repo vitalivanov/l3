@@ -7,18 +7,22 @@ import (
 // interface class is used to store the communication methods
 // for the various daemon communications
 type VXLANClientIntf interface {
+	// used to notify server of updates
 	SetServerChannels(s *VxLanConfigChannels)
 	ConnectToClients(clientFile string)
 	ConstructPortConfigMap()
-	GetIntfInfo(name string, intfchan chan<- VxlanIntfInfo)
+	// create/delete
 	CreateVtep(vtep *VtepDbEntry)
 	DeleteVtep(vtep *VtepDbEntry)
 	CreateVxlan(vxlan *VxlanConfig)
 	DeleteVxlan(vxlan *VxlanConfig)
+	// access ports
 	GetAccessPorts(vlan uint16)
 	UpdateAccessPorts()
 	CreateAccessPortVlan(vlan uint16, intfList []int)
 	DeleteAccessPortVlan(vlan uint16, intfList []int)
+	// vtep fsm
+	GetIntfInfo(name string, intfchan chan<- VxlanIntfInfo)
 	GetNextHopInfo(ip net.IP, nexthopchan chan<- net.IP)
 	ResolveNextHopMac(nextHopIp net.IP, nexthopmacchan chan<- net.HardwareAddr)
 }

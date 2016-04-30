@@ -128,31 +128,11 @@ func (intf VXLANSnapClient) createASICdSubscriber() error {
 	return nil
 }
 
-func (intf VXLANSnapClient) listenForASICdUpdates(address string) error {
-	var err error
-	if intf.asicdSubSocket, err = nanomsg.NewSubSocket(); err != nil {
-		logger.Err(fmt.Sprintln("Failed to create ASICd subscribe socket, error:", err))
-		return err
-	}
-
-	if err = intf.asicdSubSocket.Subscribe(""); err != nil {
-		logger.Err(fmt.Sprintln("Failed to subscribe to \"\" on ASICd subscribe socket, error:", err))
-		return err
-	}
-
-	if _, err = intf.asicdSubSocket.Connect(address); err != nil {
-		logger.Err(fmt.Sprintln("Failed to connect to ASICd publisher socket, address:", address, "error:", err))
-		return err
-	}
-
-	logger.Info(fmt.Sprintln("Connected to ASICd publisher at address:", address, intf))
-	if err = intf.asicdSubSocket.SetRecvBuffer(1024 * 1024); err != nil {
-		logger.Err(fmt.Sprintln("Failed to set the buffer size for ASICd publisher socket, error:", err))
-		return err
-	}
-	return nil
-}
-
+// processAsicdNotification:
+// Proceses the various ASICD notifications for the following events
+// 1) Vlan membership updates - to create Virtual Access Ports
+// 2) IPv4 interface updates - to inform when VTEP src interface has an update
+//    for its IP address
 func (intf VXLANSnapClient) processAsicdNotification(asicdrxBuf []byte) {
 	var rxMsg asicdCommonDefs.AsicdNotification
 	err := json.Unmarshal(asicdrxBuf, &rxMsg)
@@ -234,8 +214,9 @@ func (intf VXLANSnapClient) GetAccessPortVlan(vlan uint16) {
 	curMark := 0
 	logger.Info("Calling Asicd for getting Vlan Property")
 	count := 100
+	more := true
 	if asicdclnt.ClientHdl != nil {
-		for {
+		for more {
 			bulkVlanInfo, _ := asicdclnt.ClientHdl.GetBulkVlan(asicdInt.Int(curMark), asicdInt.Int(count))
 			if bulkVlanInfo == nil {
 				break
@@ -246,7 +227,7 @@ func (intf VXLANSnapClient) GetAccessPortVlan(vlan uint16) {
 				break
 			}
 			objCnt := int(bulkVlanInfo.Count)
-			more := bool(bulkVlanInfo.More)
+			more = bool(bulkVlanInfo.More)
 			curMark = int(bulkVlanInfo.EndIdx)
 			for i := 0; i < objCnt; i++ {
 				ifindex := int(bulkVlanStateInfo.VlanStateList[i].IfIndex)
@@ -257,9 +238,6 @@ func (intf VXLANSnapClient) GetAccessPortVlan(vlan uint16) {
 				}
 				// lets send the config back to the server
 				serverchannels.VxlanAccessPortVlanUpdate <- config
-			}
-			if more == false {
-				break
 			}
 		}
 	}
