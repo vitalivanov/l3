@@ -183,11 +183,13 @@ func (vtep *VtepDbEntry) VtepFsm() {
 	vtep.wg.Add(1)
 
 	go func() {
-		logger.Info(fmt.Sprintf("Starting FSM for vtep %s", vtep.VtepName))
+		logger.Info(fmt.Sprintf("Starting FSM for vtep %s state %s", vtep.VtepName, vtep.Status))
 		defer vtep.wg.Done()
 		for {
 			select {
 			case <-vtep.retrytimer.C:
+				logger.Info(fmt.Sprintf("FSM: Timer Expire vtep %s state %s", vtep.VtepName, vtep.Status))
+
 				if _, ok := GetVxlanDB()[vtep.Vni]; ok {
 					for _, client := range ClientIntf {
 						if vtep.Status == VtepStatusIncomplete {
@@ -208,7 +210,7 @@ func (vtep *VtepDbEntry) VtepFsm() {
 
 			case intfinfo := <-vtep.intfinfochan:
 				vtep.retrytimer.Stop()
-				logger.Info(fmt.Sprintf("infinfochan rx: status %s", vtep.Status))
+				logger.Info(fmt.Sprintf("FSM: intf info rx: vtep %s status %s", vtep.VtepName, vtep.Status))
 				if vtep.Status == VtepStatusIncomplete {
 					// next state
 					vtep.Status = VtepStatusNextHopUnknown
@@ -229,6 +231,7 @@ func (vtep *VtepDbEntry) VtepFsm() {
 			case ip, _ := <-vtep.nexthopchan:
 				// stop the timer if we have the response
 				vtep.retrytimer.Stop()
+				logger.Info(fmt.Sprintf("FSM: next hop info rx: vtep %s status %s", vtep.VtepName, vtep.Status))
 				if vtep.Status == VtepStatusNextHopUnknown {
 					vtep.NextHopIp = ip
 					// TODO need create a port listener per next hop interface
@@ -246,6 +249,7 @@ func (vtep *VtepDbEntry) VtepFsm() {
 
 			case mac, _ := <-vtep.macchan:
 				vtep.retrytimer.Stop()
+				logger.Info(fmt.Sprintf("FSM: resolve mac rx: vtep %s status %s", vtep.VtepName, vtep.Status))
 
 				if vtep.Status == VtepStatusArpUnresolved {
 					vtep.DstMac = mac
@@ -260,6 +264,8 @@ func (vtep *VtepDbEntry) VtepFsm() {
 				}
 
 			case _, ok := <-vtep.hwconfig:
+				logger.Info(fmt.Sprintf("FSM: create hw rx: vtep %s status %s", vtep.VtepName, vtep.Status))
+
 				if ok {
 					// lets create the packet listener for the rx/tx packets
 					VxlanVtepRxTx(vtep)

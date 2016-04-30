@@ -3,10 +3,10 @@
 package vxlan
 
 import (
-	//"fmt"
+	"fmt"
 	"net"
 	"reflect"
-	"strings"
+	//"strings"
 	"vxland"
 )
 
@@ -119,9 +119,9 @@ func ConvertVxlanInstanceToVxlanConfig(c *vxland.VxlanInstance) (*VxlanConfig, e
 
 func getVtepName(intf string) string {
 	vtepName := intf
-	if !strings.Contains("vtep", intf) {
-		vtepName = "vtep" + intf
-	}
+	//if !strings.Contains("vtep", intf) {
+	//	vtepName = "vtep" + intf
+	//}
 	return vtepName
 }
 
@@ -307,6 +307,7 @@ func (s *VXLANServer) ConfigListener() {
 				}
 			case intfinfo := <-cc.Vxlanintfinfo:
 				for _, vtep := range GetVtepDB() {
+					logger.Info(fmt.Sprintln("received intf info", intfinfo, vtep))
 					if vtep.SrcIfName == intfinfo.IntfName {
 						vtep.intfinfochan <- intfinfo
 					}

@@ -2,15 +2,15 @@ package snapclient
 
 import (
 	"asicd/asicdCommonDefs"
+	"asicdInt"
 	"asicdServices"
 	"encoding/json"
 	"fmt"
 	nanomsg "github.com/op/go-nanomsg"
-	"net"
-	"utils/commonDefs"
-	//"utils/commonDefs"
-	"asicdInt"
 	vxlan "l3/tunnel/vxlan/protocol"
+	"net"
+	"strings"
+	"utils/commonDefs"
 )
 
 type AsicdClient struct {
@@ -297,51 +297,54 @@ func (intf VXLANSnapClient) updateIpv4Intf(msg asicdCommonDefs.IPv4IntfNotifyMsg
 	ipAddr := net.ParseIP(msg.IpAddr)
 	IfIndex := msg.IfIndex
 
-	nextindex := asicdInt.Int(0)
-	count := asicdInt.Int(1024)
+	nextindex := 0
+	count := 1024
 	var IfName string
 	foundIntf := false
 	if asicdclnt.ClientHdl != nil {
-
+		exitnotfound := true
 		// TODO when api is available should just call GetIntf...
-		for {
-			bulkIntf, _ := asicdclnt.ClientHdl.GetBulkIntf(nextindex, count)
-
+		for exitnotfound && !foundIntf {
+			bulkIntf, _ := asicdclnt.ClientHdl.GetBulkIntf(asicdInt.Int(nextindex), asicdInt.Int(count))
+			logger.Info(fmt.Sprintln("Return from GetBulkIntf", bulkIntf))
 			for _, intf := range bulkIntf.IntfList {
-				if intf.IfIndex == IfIndex {
-					IfName = intf.IfName
+				if intf.IfName == IfName {
+					IfIndex = intf.IfIndex
 					foundIntf = true
+					logger.Info(fmt.Sprintln("Found IfName", IfName, bulkIntf))
 					break
 				}
 			}
 
 			if !foundIntf {
 				if bulkIntf.More == true {
-					nextindex = count
+					nextindex += count
 				} else {
-					break
+					exitnotfound = false
 				}
 			} else {
-				break
+				exitnotfound = false
 			}
 		}
-		logicalIntfState, _ := asicdclnt.ClientHdl.GetLogicalIntfState(IfName)
-		mac, _ := net.ParseMAC(logicalIntfState.SrcMac)
-		config := vxlan.VxlanIntfInfo{
-			Command:  vxlan.VxlanCommandCreate,
-			Ip:       ipAddr,
-			Mac:      mac,
-			IfIndex:  IfIndex,
-			IntfName: IfName,
-		}
+		if foundIntf {
+			logicalIntfState, _ := asicdclnt.ClientHdl.GetLogicalIntfState(IfName)
+			mac, _ := net.ParseMAC(logicalIntfState.SrcMac)
+			config := vxlan.VxlanIntfInfo{
+				Command:  vxlan.VxlanCommandCreate,
+				Ip:       ipAddr,
+				Mac:      mac,
+				IfIndex:  IfIndex,
+				IntfName: IfName,
+			}
 
-		if msgType == asicdCommonDefs.NOTIFY_VLAN_CREATE {
-			config.Command = vxlan.VxlanCommandCreate
-			serverchannels.Vxlanintfinfo <- config
+			if msgType == asicdCommonDefs.NOTIFY_VLAN_CREATE {
+				config.Command = vxlan.VxlanCommandCreate
+				serverchannels.Vxlanintfinfo <- config
 
-		} else if msgType == asicdCommonDefs.NOTIFY_VLAN_DELETE {
-			config.Command = vxlan.VxlanCommandDelete
-			serverchannels.Vxlanintfinfo <- config
+			} else if msgType == asicdCommonDefs.NOTIFY_VLAN_DELETE {
+				config.Command = vxlan.VxlanCommandDelete
+				serverchannels.Vxlanintfinfo <- config
+			}
 		}
 	}
 }
@@ -533,34 +536,34 @@ func (intf VXLANSnapClient) DeleteVtep(vtep *vxlan.VtepDbEntry) {
 
 func (intf VXLANSnapClient) GetIntfInfo(IfName string, intfchan chan<- vxlan.VxlanIntfInfo) {
 	// TODO
-	nextindex := asicdInt.Int(0)
-	count := asicdInt.Int(1024)
+	nextindex := 0
+	count := 1024
 	var IfIndex int32
-	var ipAddr net.IP
 	var mac net.HardwareAddr
 	foundIntf := false
-	foundIp := false
 	if asicdclnt.ClientHdl != nil {
+		exitnotfound := true
 		// TODO when api is available should just call GetIntf...
-		for {
-			bulkIntf, _ := asicdclnt.ClientHdl.GetBulkIntf(nextindex, count)
-
+		for exitnotfound && !foundIntf {
+			bulkIntf, _ := asicdclnt.ClientHdl.GetBulkIntf(asicdInt.Int(nextindex), asicdInt.Int(count))
+			logger.Info(fmt.Sprintln("Return from GetBulkIntf", bulkIntf))
 			for _, intf := range bulkIntf.IntfList {
 				if intf.IfName == IfName {
 					IfIndex = intf.IfIndex
 					foundIntf = true
+					logger.Info(fmt.Sprintln("Found IfName", IfName, bulkIntf))
 					break
 				}
 			}
 
 			if !foundIntf {
 				if bulkIntf.More == true {
-					nextindex = count
+					nextindex += count
 				} else {
-					break
+					exitnotfound = false
 				}
 			} else {
-				break
+				exitnotfound = false
 			}
 		}
 		// if we found the interface all other objects at least the logical interface should exist
@@ -568,42 +571,24 @@ func (intf VXLANSnapClient) GetIntfInfo(IfName string, intfchan chan<- vxlan.Vxl
 
 			// get the object that holds the mac
 			logicalIntfState, _ := asicdclnt.ClientHdl.GetLogicalIntfState(IfName)
+			logger.Info(fmt.Sprintln("Return from GetLogicalIntfState", logicalIntfState))
 			mac, _ = net.ParseMAC(logicalIntfState.SrcMac)
 
-			// lets get all the ip associated with this object
-			nextindex = 0
-			for {
-				bulkIpV4, _ := asicdclnt.ClientHdl.GetBulkIPv4IntfState(asicdServices.Int(nextindex), asicdServices.Int(count))
-
-				for _, ipv4 := range bulkIpV4.IPv4IntfStateList {
-					if ipv4.IfIndex == IfIndex {
-						ipAddr = net.ParseIP(ipv4.IpAddr)
-						foundIp = true
-						break
-					}
+			ipV4, err := asicdclnt.ClientHdl.GetIPv4IntfState(IfName)
+			logger.Info(fmt.Sprintln("Return from GetIPv4IntfState", ipV4))
+			if err == nil {
+				ipaddrstr := strings.Split(ipV4.IpAddr, "/")[0]
+				ip := net.ParseIP(ipaddrstr)
+				config := vxlan.VxlanIntfInfo{
+					Command:  vxlan.VxlanCommandCreate,
+					Ip:       ip,
+					Mac:      mac,
+					IfIndex:  IfIndex,
+					IntfName: IfName,
 				}
-
-				if !foundIp {
-					if bulkIpV4.More == true {
-						nextindex = count
-					} else {
-						break
-					}
-				} else {
-					break
-				}
+				logger.Info(fmt.Sprintln("Intf info complete, sending config to channel", config))
+				intfchan <- config
 			}
-		}
-
-		if foundIp {
-			config := vxlan.VxlanIntfInfo{
-				Command:  vxlan.VxlanCommandCreate,
-				Ip:       ipAddr,
-				Mac:      mac,
-				IfIndex:  IfIndex,
-				IntfName: IfName,
-			}
-			serverchannels.Vxlanintfinfo <- config
 		}
 	}
 }
