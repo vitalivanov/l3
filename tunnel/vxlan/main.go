@@ -28,9 +28,6 @@ func main() {
 	}
 	logger.Info("Started the logger successfully.")
 
-	// Start keepalive routine
-	go keepalive.InitKeepAlive("vxland", path)
-
 	// Order of calls here matters as the logger
 	// needs to exist before clients are registerd
 	// and before the server is created.  Similarly
@@ -48,6 +45,9 @@ func main() {
 	// create a new vxlan server
 	server := vxlan.NewVXLANServer(logger, path)
 	handler := rpc.NewVXLANDServiceHandler(server, logger)
+
+	// Start keepalive routine
+	go keepalive.InitKeepAlive("vxland", path)
 
 	// blocking call
 	handler.StartThriftServer()
