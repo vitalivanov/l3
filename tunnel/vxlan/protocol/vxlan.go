@@ -57,7 +57,7 @@ func CreateVxLAN(c *VxlanConfig) {
 		if vtep.Status == VtepStatusDetached {
 			// start the fsm for the vtep
 			vtep.Status = VtepStatusIncomplete
-			vtep.VtepFsm()
+			go vtep.VtepFsm()
 		}
 	}
 }

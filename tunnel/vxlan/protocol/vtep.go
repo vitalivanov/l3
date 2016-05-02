@@ -71,6 +71,7 @@ type VtepDbEntry struct {
 
 	// number of ticks before hw was able to come up
 	ticksTillConfig int
+	ticksToPollArp  int
 
 	retrytimer *time.Timer
 
@@ -174,8 +175,8 @@ func (vtep *VtepDbEntry) VtepFsm() {
 	vtep.killroutine = make(chan bool, 1)
 	vtep.intfinfochan = make(chan VxlanIntfInfo, 1)
 
-	// TODO, what should this time be
-	retrytime := time.Millisecond * 50
+	// TODO, what should this time be ???
+	retrytime := time.Second * 3
 
 	vtep.retrytimer = time.NewTimer(retrytime)
 
@@ -198,10 +199,15 @@ func (vtep *VtepDbEntry) VtepFsm() {
 							client.GetIntfInfo(vtep.SrcIfName, vtep.intfinfochan)
 						} else if vtep.Status == VtepStatusNextHopUnknown {
 							// determine the next hop ip based on the dst ip
-							client.GetNextHopInfo(vtep.DstIp, vtep.nexthopchan)
+							//client.GetNextHopInfo(vtep.DstIp, vtep.nexthopchan)
+							// Nothing to do here as RIB should notify us of next hop info
 						} else if vtep.Status == VtepStatusArpUnresolved {
-							// resolve the next hop mac based on the next hop ip
-							client.ResolveNextHopMac(vtep.NextHopIp, vtep.macchan)
+							// only going to poll 3 times before declaring missconfiguration
+							if vtep.ticksToPollArp < 3 {
+								// resolve the next hop mac based on the next hop ip
+								client.ResolveNextHopMac(vtep.NextHopIp, vtep.macchan)
+								vtep.ticksToPollArp++
+							}
 						}
 					}
 				}
@@ -248,6 +254,7 @@ func (vtep *VtepDbEntry) VtepFsm() {
 				vtep.retrytimer.Reset(retrytime)
 
 			case mac, _ := <-vtep.macchan:
+				vtep.ticksToPollArp = 0
 				vtep.retrytimer.Stop()
 				logger.Info(fmt.Sprintf("FSM: resolve mac rx: vtep %s status %s", vtep.VtepName, vtep.Status))
 
@@ -312,7 +319,7 @@ func CreateVtep(c *VtepConfig) *VtepDbEntry {
 
 	if _, ok := GetVxlanDB()[vtep.Vni]; ok {
 		// lets resolve the mac address
-		vtep.VtepFsm()
+		go vtep.VtepFsm()
 	} else {
 		vtep.Status = VtepStatusDetached
 	}

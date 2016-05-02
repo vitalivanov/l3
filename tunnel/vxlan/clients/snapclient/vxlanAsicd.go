@@ -547,13 +547,30 @@ func (intf VXLANSnapClient) GetIntfInfo(IfName string, intfchan chan<- vxlan.Vxl
 		// if we found the interface all other objects at least the logical interface should exist
 		if foundIntf {
 
-			// get the object that holds the mac
-			logicalIntfState, _ := asicdclnt.ClientHdl.GetLogicalIntfState(IfName)
-			logger.Info(fmt.Sprintln("Return from GetLogicalIntfState", logicalIntfState))
-			mac, _ = net.ParseMAC(logicalIntfState.SrcMac)
+			// interface exists now what type of interface is it
+			intfType := asicdCommonDefs.GetIntfTypeFromIfIndex(IfIndex)
+			switch intfType {
+			case commonDefs.IfTypePort:
+				portNum := asicdCommonDefs.GetIntfIdFromIfIndex(IfIndex)
+				phyIntfState, _ := asicdclnt.ClientHdl.GetPort(int32(portNum))
+				logger.Info(fmt.Sprintln("Return from GetPort", phyIntfState))
+				mac, _ = net.ParseMAC(phyIntfState.MacAddr)
+			//case IfTypeLag:
+			//case IfTypeVlan:
+			//case IfTypeP2P:
+			//case IfTypeBcast:
+			case commonDefs.IfTypeLoopback:
+				logicalIntfState, _ := asicdclnt.ClientHdl.GetLogicalIntfState(IfName)
+				logger.Info(fmt.Sprintln("Return from GetLogicalIntfState", logicalIntfState))
+				mac, _ = net.ParseMAC(logicalIntfState.SrcMac)
+
+				//case IfTypeSecondary:
+				//case IfTypeVirtual:
+				//case IfTypeVtep:
+			}
 
 			ipV4, err := asicdclnt.ClientHdl.GetIPv4IntfState(IfName)
-			logger.Info(fmt.Sprintln("Return from GetIPv4IntfState", ipV4))
+			logger.Info(fmt.Sprintln("Return from GetIPv4IntfState ", IfName, ipV4))
 			if err == nil {
 				ipaddrstr := strings.Split(ipV4.IpAddr, "/")[0]
 				ip := net.ParseIP(ipaddrstr)

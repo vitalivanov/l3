@@ -109,7 +109,7 @@ func (s *VXLANServer) HandleNextHopChange(dip net.IP, nexthopip net.IP, reachabl
 				vtep.nexthopchan <- nexthopip
 
 			} else if vtep.Status == VtepStatusIncomplete {
-				vtep.VtepFsm()
+				go vtep.VtepFsm()
 			}
 
 		} else if !reachable &&
