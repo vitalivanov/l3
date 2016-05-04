@@ -208,7 +208,7 @@ func (vtep *VtepDbEntry) VtepFsm() {
 		for {
 			select {
 			case _, ok := <-vtep.retrytimer.C:
-				//logger.Info(fmt.Sprintf("FSM: Timer Expire vtep %s state %s", vtep.VtepName, vtep.Status))
+				logger.Info(fmt.Sprintf("FSM: Timer Expire vtep %s state %s", vtep.VtepName, vtep.Status))
 				if ok {
 					if _, found := GetVxlanDB()[vtep.Vni]; found {
 						for _, client := range ClientIntf {
@@ -218,7 +218,7 @@ func (vtep *VtepDbEntry) VtepFsm() {
 								client.GetIntfInfo(vtep.SrcIfName, vtep.intfinfochan)
 							} else if vtep.Status == VtepStatusNextHopUnknown {
 								// determine the next hop ip based on the dst ip
-								//client.GetNextHopInfo(vtep.DstIp, vtep.nexthopchan)
+								client.GetNextHopInfo(vtep.DstIp, vtep.nexthopchan)
 								// Nothing to do here as RIB should notify us of next hop info
 							} else if vtep.Status == VtepStatusArpUnresolved {
 								// only going to poll 3 times before declaring missconfiguration

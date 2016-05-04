@@ -524,12 +524,12 @@ func (intf VXLANSnapClient) GetIntfInfo(IfName string, intfchan chan<- vxlan.Vxl
 		// TODO when api is available should just call GetIntf...
 		for exitnotfound && !foundIntf {
 			bulkIntf, _ := asicdclnt.ClientHdl.GetBulkIntf(asicdInt.Int(nextindex), asicdInt.Int(count))
-			logger.Info(fmt.Sprintln("Return from GetBulkIntf", bulkIntf))
+			//logger.Info(fmt.Sprintln("Return from GetBulkIntf"))
 			for _, intf := range bulkIntf.IntfList {
 				if intf.IfName == IfName {
 					IfIndex = intf.IfIndex
 					foundIntf = true
-					logger.Info(fmt.Sprintln("Found IfName", IfName, bulkIntf))
+					logger.Info(fmt.Sprintln("Found IfName", IfName))
 					break
 				}
 			}
