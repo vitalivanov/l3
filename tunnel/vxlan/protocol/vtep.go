@@ -1,4 +1,8 @@
 // vtepdb.go
+// File contains db and struct which holds the vtep db.  Also it contains the logic
+// for a small FSM which will wait till Next Hop and Next Hop MAC are resolved.
+// The VTEP Encap and Decap functions are defined
+// The pcap listener/sender for the VTEP is also defined
 package vxlan
 
 import (
@@ -14,6 +18,7 @@ import (
 	"time"
 )
 
+// constants for the status of the VTEP based on FSM and provisioning
 const (
 	VtepStatusUp             vtepStatus = "UP"
 	VtepStatusDown                      = "DOWN"
@@ -26,38 +31,52 @@ const (
 	VtepStatusConfigPending             = "CONFIG PENDING"
 )
 
+// VtepDbKey
+// Holds the key for the VtepDB
 type VtepDbKey struct {
 	name string
 }
 
-type vtepVniCMACToVtepKey struct {
-	Vni uint32
-	Mac net.HardwareAddr
-}
-
+// vtepStatus
+// defines the type for the status
 type vtepStatus string
 
 type VtepDbEntry struct {
-	Vni         uint32
-	VtepName    string
-	SrcIfName   string
-	SrcIfIndex  int32
-	UDP         uint16
-	TTL         uint16
-	SrcIp       net.IP
-	DstIp       net.IP
-	VlanId      uint16
-	SrcMac      net.HardwareAddr
-	DstMac      net.HardwareAddr
+	// reference to the vxlan db, and value used in encap/decap
+	Vni uint32
+	// name of this vtep interface
+	VtepName string
+	// interface name for which packets vxlan packets should rx/tx for this vtep
+	SrcIfName string
+	// interface id for which packets vxlan packets should rx/tx for this vtep
+	SrcIfIndex int32
+	// dst UDP port
+	UDP uint16
+	// TTL used in the ip header in the vxlan header
+	TTL uint16
+	// Source Ip used in ip header in the vxlan header
+	SrcIp net.IP
+	// Destination Ip used in ip header in the vxlan header
+	DstIp net.IP
+	// Vlan to be used to in the ethernet header in the vxlan header
+	VlanId uint16
+	// Source MAC to be used to in the ethernet header in the vxlan header
+	SrcMac net.HardwareAddr
+	// Destination MAC to be used to in the ethernet header in the vxlan header
+	DstMac net.HardwareAddr
+	// interface id for which packets vxlan packets should rx/tx for this vtep
 	VtepIfIndex int32
-	NextHopIp   net.IP
-
+	// Next Hop Ip used to find the next hop MAC which will be used as the DstMac of the vxlan header
+	NextHopIp net.IP
+	// VTEP status of VTEP
 	Status vtepStatus
 
-	// handle used to rx/tx packets to linux if
+	// handle name used to rx/tx packets to linux if
 	VtepHandleName string
-	handle         *pcap.Handle
+	// handle used to rx/tx packets to linux if
+	handle *pcap.Handle
 
+	// Reference to the vxlan server
 	server *VXLANServer
 
 	rxpkts uint64
@@ -188,25 +207,26 @@ func (vtep *VtepDbEntry) VtepFsm() {
 		defer vtep.wg.Done()
 		for {
 			select {
-			case <-vtep.retrytimer.C:
-				logger.Info(fmt.Sprintf("FSM: Timer Expire vtep %s state %s", vtep.VtepName, vtep.Status))
-
-				if _, ok := GetVxlanDB()[vtep.Vni]; ok {
-					for _, client := range ClientIntf {
-						if vtep.Status == VtepStatusIncomplete {
-							// get the interface which contains ip/mac for use
-							// by this vtep
-							client.GetIntfInfo(vtep.SrcIfName, vtep.intfinfochan)
-						} else if vtep.Status == VtepStatusNextHopUnknown {
-							// determine the next hop ip based on the dst ip
-							//client.GetNextHopInfo(vtep.DstIp, vtep.nexthopchan)
-							// Nothing to do here as RIB should notify us of next hop info
-						} else if vtep.Status == VtepStatusArpUnresolved {
-							// only going to poll 3 times before declaring missconfiguration
-							if vtep.ticksToPollArp < 3 {
-								// resolve the next hop mac based on the next hop ip
-								client.ResolveNextHopMac(vtep.NextHopIp, vtep.macchan)
-								vtep.ticksToPollArp++
+			case _, ok := <-vtep.retrytimer.C:
+				//logger.Info(fmt.Sprintf("FSM: Timer Expire vtep %s state %s", vtep.VtepName, vtep.Status))
+				if ok {
+					if _, found := GetVxlanDB()[vtep.Vni]; found {
+						for _, client := range ClientIntf {
+							if vtep.Status == VtepStatusIncomplete {
+								// get the interface which contains ip/mac for use
+								// by this vtep
+								client.GetIntfInfo(vtep.SrcIfName, vtep.intfinfochan)
+							} else if vtep.Status == VtepStatusNextHopUnknown {
+								// determine the next hop ip based on the dst ip
+								//client.GetNextHopInfo(vtep.DstIp, vtep.nexthopchan)
+								// Nothing to do here as RIB should notify us of next hop info
+							} else if vtep.Status == VtepStatusArpUnresolved {
+								// only going to poll 3 times before declaring missconfiguration
+								if vtep.ticksToPollArp < 3 {
+									// resolve the next hop mac based on the next hop ip
+									client.ResolveNextHopMac(vtep.NextHopIp, vtep.macchan)
+									vtep.ticksToPollArp++
+								}
 							}
 						}
 					}
@@ -214,60 +234,66 @@ func (vtep *VtepDbEntry) VtepFsm() {
 				vtep.ticksTillConfig++
 				vtep.retrytimer.Reset(retrytime)
 
-			case intfinfo := <-vtep.intfinfochan:
+			case intfinfo, ok := <-vtep.intfinfochan:
 				vtep.retrytimer.Stop()
-				logger.Info(fmt.Sprintf("FSM: intf info rx: vtep %s status %s", vtep.VtepName, vtep.Status))
-				if vtep.Status == VtepStatusIncomplete {
-					// next state
-					vtep.Status = VtepStatusNextHopUnknown
+				if ok {
+					logger.Info(fmt.Sprintf("FSM: intf info rx: vtep %s status %s", vtep.VtepName, vtep.Status))
+					if vtep.Status == VtepStatusIncomplete {
+						// next state
+						vtep.Status = VtepStatusNextHopUnknown
 
-					// save off info related to the source
-					vtep.SrcIfName = intfinfo.IntfName
-					vtep.SrcIp = intfinfo.Ip
-					vtep.SrcMac = intfinfo.Mac
-					vtep.SrcIfIndex = intfinfo.IfIndex
+						// save off info related to the source
+						vtep.SrcIfName = intfinfo.IntfName
+						vtep.SrcIp = intfinfo.Ip
+						vtep.SrcMac = intfinfo.Mac
+						vtep.SrcIfIndex = intfinfo.IfIndex
 
-					// lets try and resolve the next hop
-					for _, client := range ClientIntf {
-						client.GetNextHopInfo(vtep.DstIp, vtep.nexthopchan)
+						// lets try and resolve the next hop
+						for _, client := range ClientIntf {
+							client.GetNextHopInfo(vtep.DstIp, vtep.nexthopchan)
+						}
 					}
 				}
-
 				vtep.retrytimer.Reset(retrytime)
-			case ip, _ := <-vtep.nexthopchan:
+			case ip, ok := <-vtep.nexthopchan:
 				// stop the timer if we have the response
 				vtep.retrytimer.Stop()
-				logger.Info(fmt.Sprintf("FSM: next hop info rx: vtep %s status %s", vtep.VtepName, vtep.Status))
-				if vtep.Status == VtepStatusNextHopUnknown {
-					vtep.NextHopIp = ip
-					// TODO need create a port listener per next hop interface
-					// lets start listening on this port for VXLAN frames
-					// Call will protect against multiple calls to same port
-					//CreatePort(VxlanNextHopIp.Intf, vtep.UDP)
-					logger.Info(fmt.Sprintf("%s: found dstip %s next hop %s", strings.TrimRight(vtep.VtepName, "Int"), vtep.DstIp, vtep.NextHopIp))
-					// next state
-					vtep.Status = VtepStatusArpUnresolved
-					for _, client := range ClientIntf {
-						client.ResolveNextHopMac(vtep.NextHopIp, vtep.macchan)
+				if ok {
+					logger.Info(fmt.Sprintf("FSM: next hop info rx: vtep %s status %s", vtep.VtepName, vtep.Status))
+					if vtep.Status == VtepStatusNextHopUnknown {
+						vtep.NextHopIp = ip
+						// TODO need create a port listener per next hop interface
+						// lets start listening on this port for VXLAN frames
+						// Call will protect against multiple calls to same port
+						//CreatePort(VxlanNextHopIp.Intf, vtep.UDP)
+						logger.Info(fmt.Sprintf("%s: found dstip %s next hop %s", strings.TrimRight(vtep.VtepName, "Int"), vtep.DstIp, vtep.NextHopIp))
+						// next state
+						vtep.Status = VtepStatusArpUnresolved
+						for _, client := range ClientIntf {
+							client.ResolveNextHopMac(vtep.NextHopIp, vtep.macchan)
+						}
 					}
-				}
-				vtep.retrytimer.Reset(retrytime)
 
-			case mac, _ := <-vtep.macchan:
+					vtep.retrytimer.Reset(retrytime)
+				}
+
+			case mac, ok := <-vtep.macchan:
 				vtep.ticksToPollArp = 0
 				vtep.retrytimer.Stop()
-				logger.Info(fmt.Sprintf("FSM: resolve mac rx: vtep %s status %s", vtep.VtepName, vtep.Status))
+				if ok {
+					logger.Info(fmt.Sprintf("FSM: resolve mac rx: vtep %s status %s", vtep.VtepName, vtep.Status))
 
-				if vtep.Status == VtepStatusArpUnresolved {
-					vtep.DstMac = mac
-					vtep.Status = VtepStatusConfigPending
-					logger.Info(fmt.Sprintf("%s: resolved mac %s for next hop ip %s status %s", strings.TrimRight(vtep.VtepName, "Int"), vtep.DstMac, vtep.NextHopIp, vtep.Status))
-					// protect against vxlan not existing yet
-					if _, ok := GetVxlanDB()[vtep.Vni]; ok {
-						vtep.hwconfig <- true
+					if vtep.Status == VtepStatusArpUnresolved {
+						vtep.DstMac = mac
+						vtep.Status = VtepStatusConfigPending
+						logger.Info(fmt.Sprintf("%s: resolved mac %s for next hop ip %s status %s", strings.TrimRight(vtep.VtepName, "Int"), vtep.DstMac, vtep.NextHopIp, vtep.Status))
+						// protect against vxlan not existing yet
+						if _, ok := GetVxlanDB()[vtep.Vni]; ok {
+							vtep.hwconfig <- true
+						}
+					} else {
+						vtep.retrytimer.Reset(retrytime)
 					}
-				} else {
-					vtep.retrytimer.Reset(retrytime)
 				}
 
 			case _, ok := <-vtep.hwconfig:

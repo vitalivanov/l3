@@ -33,7 +33,7 @@ type mockintf struct {
 	failResolveNexHop        bool
 }
 
-func (b mockintf) SetServerChannels(s *VxlanConfigChannels) {
+func (b mockintf) SetServerChannels(s *VxLanConfigChannels) {
 
 }
 
@@ -102,6 +102,8 @@ func (b mockintf) GetNextHopInfo(ip net.IP, nexthopchan chan<- net.IP) {
 	nexthopip := net.ParseIP("100.1.1.2")
 	if !b.failGetNextHop {
 		nexthopchan <- nexthopip
+	} else {
+		logger.Info("MOCK: force fail")
 	}
 }
 func (b mockintf) ResolveNextHopMac(nextHopIp net.IP, nexthopmacchan chan<- net.HardwareAddr) {
@@ -109,6 +111,8 @@ func (b mockintf) ResolveNextHopMac(nextHopIp net.IP, nexthopmacchan chan<- net.
 	mac, _ := net.ParseMAC("00:55:44:33:22:11")
 	if !b.failResolveNexHop {
 		nexthopmacchan <- mac
+	} else {
+		logger.Info("MOCK: force fail")
 	}
 }
 
@@ -133,11 +137,12 @@ func teardown() {
 	close(vxlandeletedone)
 	exec.Command("/bin/rm", "UsrConfDb.db")
 	DeRegisterClients()
+	SetLogger(nil)
 }
 
 func setVxlanTestLogger() {
 
-	logger, _ := logging.NewLogger("./", "vxland", "TEST")
+	logger, _ := logging.NewLogger("vxland", "TEST", true)
 	SetLogger(logger)
 }
 

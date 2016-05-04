@@ -263,6 +263,14 @@ func (s *VXLANServer) ConfigListener() {
 		for {
 			select {
 
+			case daemonstatus := <-s.DaemonStatusCh:
+				if daemonstatus.Name == "asicd" {
+					// TODO do something
+				} else if daemonstatus.Name == "ribd" {
+					// TODO do something
+				} else if daemonstatus.Name == "arpd" {
+					// TODO do something
+				}
 			case vxlan := <-cc.Vxlancreate:
 				CreateVxLAN(&vxlan)
 

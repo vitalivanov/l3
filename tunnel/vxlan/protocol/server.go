@@ -3,7 +3,9 @@ package vxlan
 
 import (
 	"fmt"
+	"infra/sysd/sysdCommonDefs"
 	"net"
+	"utils/keepalive"
 	"utils/logging"
 )
 
@@ -18,9 +20,10 @@ var VxlanServer *VXLANServer
 var PortConfigMap map[int32]*PortConfig
 
 type VXLANServer struct {
-	logger      *logging.Writer
-	Configchans *VxLanConfigChannels
-	Paramspath  string // location of params path
+	logger         *logging.Writer
+	Configchans    *VxLanConfigChannels
+	DaemonStatusCh chan sysdCommonDefs.DaemonStatus
+	Paramspath     string // location of params path
 }
 
 type cfgFileJson struct {
@@ -67,9 +70,14 @@ func NewVXLANServer(l *logging.Writer, paramspath string) *VXLANServer {
 	if VxlanServer == nil {
 
 		logger.Info(fmt.Sprintf("Params path: %s", paramspath))
+
+		// setup server to monitor the daemons vxlan have a depenance on
+		keepalivelistener := keepalive.InitDaemonStatusListner()
+
 		VxlanServer = &VXLANServer{
-			Paramspath: paramspath,
-			logger:     l,
+			Paramspath:     paramspath,
+			logger:         l,
+			DaemonStatusCh: keepalivelistener.DaemonStatusCh,
 			Configchans: &VxLanConfigChannels{
 				Vxlancreate:               make(chan VxlanConfig, 0),
 				Vxlandelete:               make(chan VxlanConfig, 0),

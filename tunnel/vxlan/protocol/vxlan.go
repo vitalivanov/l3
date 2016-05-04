@@ -8,17 +8,27 @@ import (
 // vni -> db entry
 var vxlanDB map[uint32]*vxlanDbEntry
 
+// vxlanDbEntry
+// Struct to store the data associated with vxlan
 type vxlanDbEntry struct {
-	VNI         uint32
-	VlanId      uint16 // used to tag inner ethernet frame when egressing
-	Group       net.IP // multicast group IP
-	MTU         uint32 // MTU size for each VTEP
+	// VNI associated with the vxlan domain
+	VNI uint32
+	// VlanId associated with the Access endpoints
+	VlanId uint16 // used to tag inner ethernet frame when egressing
+	// Multicast IP group (NOT SUPPORTED)
+	Group net.IP
+	// Shortcut to apply MTU to each VTEP
+	MTU uint32
+	// VTEP's associated with this vxlan domain
+	// Vlan db will hold port membership for access
 	VtepMembers []uint32
 }
 
-// vlan -> vni
+// vlan -> vni mapping
 var vxlanVlanToVniDb map[uint16]uint32
 
+// NewVxlanDbEntry:
+// Create a new vxlan db entry
 func NewVxlanDbEntry(c *VxlanConfig) *vxlanDbEntry {
 	return &vxlanDbEntry{
 		VNI:         c.VNI,
@@ -29,10 +39,14 @@ func NewVxlanDbEntry(c *VxlanConfig) *vxlanDbEntry {
 	}
 }
 
+// GetVxlanDB:
+// returns the vxlan db
 func GetVxlanDB() map[uint32]*vxlanDbEntry {
 	return vxlanDB
 }
 
+// saveVxLanConfigData:
+// function saves off the configuration data and saves off the vlan to vni mapping
 func saveVxLanConfigData(c *VxlanConfig) {
 	if _, ok := vxlanDB[c.VNI]; !ok {
 		vxlan := NewVxlanDbEntry(c)
