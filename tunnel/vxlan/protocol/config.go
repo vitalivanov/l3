@@ -7,6 +7,7 @@ import (
 	"net"
 	"reflect"
 	//"strings"
+	"errors"
 	"vxland"
 )
 
@@ -107,9 +108,34 @@ func ConvertInt32ToBool(val int32) bool {
 	return true
 }
 
+// VxlanConfigCheck
+// Validate the VXLAN provisioning
+func VxlanConfigCheck(c *VxlanConfig) error {
+	if GetVxlanDBEntry(c.VNI) != nil {
+		return errors.New(fmt.Sprintln("Error VxlanInstance Exists vni is not unique", c))
+	}
+	return nil
+}
+
+// VtepConfigCheck
+// Validate the VTEP provisioning
+func VtepConfigCheck(c *VtepConfig) error {
+	key := VtepDbKey{
+		name: c.VtepName,
+	}
+	if GetVtepDBEntry(&key) != nil {
+		return errors.New(fmt.Sprintln("Error VtepInstance Exists name is not unique", c))
+	}
+	return nil
+}
+
 // ConvertVxlanInstanceToVxlanConfig:
-// Convert thrift struct to vxlan config
+// Convert thrift struct to vxlan config and check that db entry exists already
 func ConvertVxlanInstanceToVxlanConfig(c *vxland.VxlanInstance) (*VxlanConfig, error) {
+
+	if GetVxlanDBEntry(uint32(c.Vni)) != nil {
+		return nil, errors.New(fmt.Sprintln("Error VxlanInstance Exists", c))
+	}
 
 	return &VxlanConfig{
 		VNI:    uint32(c.Vni),

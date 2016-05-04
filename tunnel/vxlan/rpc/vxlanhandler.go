@@ -94,8 +94,11 @@ func (v *VXLANDServiceHandler) CreateVxlanInstance(config *vxland.VxlanInstance)
 
 	c, err := vxlan.ConvertVxlanInstanceToVxlanConfig(config)
 	if err == nil {
-		v.server.Configchans.Vxlancreate <- *c
-		return true, nil
+		err = vxlan.VxlanConfigCheck(c)
+		if err == nil {
+			v.server.Configchans.Vxlancreate <- *c
+			return true, nil
+		}
 	}
 	return false, err
 }
@@ -115,13 +118,16 @@ func (v *VXLANDServiceHandler) UpdateVxlanInstance(origconfig *vxland.VxlanInsta
 	oc, _ := vxlan.ConvertVxlanInstanceToVxlanConfig(origconfig)
 	nc, err := vxlan.ConvertVxlanInstanceToVxlanConfig(newconfig)
 	if err == nil {
-		update := vxlan.VxlanUpdate{
-			Oldconfig: *oc,
-			Newconfig: *nc,
-			Attr:      attrset,
+		err = vxlan.VxlanConfigCheck(nc)
+		if err == nil {
+			update := vxlan.VxlanUpdate{
+				Oldconfig: *oc,
+				Newconfig: *nc,
+				Attr:      attrset,
+			}
+			v.server.Configchans.Vxlanupdate <- update
+			return true, nil
 		}
-		v.server.Configchans.Vxlanupdate <- update
-		return true, nil
 	}
 	return false, err
 }
@@ -130,8 +136,11 @@ func (v *VXLANDServiceHandler) CreateVxlanVtepInstance(config *vxland.VxlanVtepI
 	v.logger.Info(fmt.Sprintf("CreateVxlanVtepInstance %#v", config))
 	c, err := vxlan.ConvertVxlanVtepInstanceToVtepConfig(config)
 	if err == nil {
-		v.server.Configchans.Vtepcreate <- *c
-		return true, err
+		err = vxlan.VtepConfigCheck(c)
+		if err == nil {
+			v.server.Configchans.Vtepcreate <- *c
+			return true, err
+		}
 	}
 	return false, err
 }
@@ -151,13 +160,16 @@ func (v *VXLANDServiceHandler) UpdateVxlanVtepInstance(origconfig *vxland.VxlanV
 	oc, _ := vxlan.ConvertVxlanVtepInstanceToVtepConfig(origconfig)
 	nc, err := vxlan.ConvertVxlanVtepInstanceToVtepConfig(newconfig)
 	if err == nil {
-		update := vxlan.VtepUpdate{
-			Oldconfig: *oc,
-			Newconfig: *nc,
-			Attr:      attrset,
+		err = vxlan.VtepConfigCheck(nc)
+		if err == nil {
+			update := vxlan.VtepUpdate{
+				Oldconfig: *oc,
+				Newconfig: *nc,
+				Attr:      attrset,
+			}
+			v.server.Configchans.Vtepupdate <- update
+			return true, nil
 		}
-		v.server.Configchans.Vtepupdate <- update
-		return true, nil
 	}
 
 	return false, err
