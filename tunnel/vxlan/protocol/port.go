@@ -43,10 +43,9 @@ func CreatePort(ifname string, udpport uint16) {
 			UDP:    make([]uint16, 0),
 		}
 
-		p = portDB[ifname]
-		p.UDP = append(p.UDP, udpport)
-		p.createPortSenderListener()
-		p.createVxlanUdpFilter()
+		portDB[ifname].UDP = append(p.UDP, udpport)
+		portDB[ifname].createPortSenderListener()
+		portDB[ifname].createVxlanUdpFilter()
 	} else {
 		p.VtepRefCnt++
 		foundUdpPort := false
@@ -84,9 +83,11 @@ func (p *VxlanPort) createVxlanUdpFilter() error {
 			filter = filter + fmt.Sprintf("or udp dst port %d", udp)
 		}
 	}
-	if err := p.handle.SetBPFFilter(filter); err != nil {
-		logger.Err(fmt.Sprintf("%s: Error setting pcap filter %s %s", p.IfName, filter, err))
-		return err
+	if p.handle != nil {
+		if err := p.handle.SetBPFFilter(filter); err != nil {
+			logger.Err(fmt.Sprintf("%s: Error setting pcap filter %s %s", p.IfName, filter, err))
+			return err
+		}
 	}
 	return nil
 }
