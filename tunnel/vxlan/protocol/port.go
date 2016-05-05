@@ -43,7 +43,7 @@ func CreatePort(ifname string, udpport uint16) {
 			UDP:    make([]uint16, 0),
 		}
 
-		portDB[ifname].UDP = append(p.UDP, udpport)
+		portDB[ifname].UDP = append(portDB[ifname].UDP, udpport)
 		portDB[ifname].createPortSenderListener()
 		portDB[ifname].createVxlanUdpFilter()
 	} else {
