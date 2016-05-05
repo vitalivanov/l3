@@ -325,7 +325,7 @@ func (s *VXLANServer) ConfigListener() {
 					reachable = true
 				}
 				//ip := net.ParseIP(fmt.Sprintf("%s.%s.%s.%s", uint8(ipinfo.Ip>>24&0xff), uint8(ipinfo.Ip>>16&0xff), uint8(ipinfo.Ip>>8&0xff), uint8(ipinfo.Ip>>0&0xff)))
-				s.HandleNextHopChange(ipinfo.Ip, ipinfo.NextHopIp, reachable)
+				s.HandleNextHopChange(ipinfo.Ip, ipinfo.NextHopIp, ipinfo.Intf, ipinfo.IntfName, reachable)
 
 			case port := <-cc.VxlanPortCreate:
 				// store all the valid physical ports
@@ -333,11 +333,6 @@ func (s *VXLANServer) ConfigListener() {
 					var portcfg = &PortConfig{}
 					CopyStruct(p, portcfg)
 					PortConfigMap[port.IfIndex] = portcfg
-
-					// TODO remove this once code exists to
-					// only listen on ports where a vtep's next hop
-					// resides
-					VxlanPortRxTx(p.Name, 4789)
 				}
 			case intfinfo := <-cc.Vxlanintfinfo:
 				for _, vtep := range GetVtepDB() {

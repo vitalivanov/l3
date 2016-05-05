@@ -12,7 +12,7 @@ type VXLANClientIntf interface {
 	ConnectToClients(clientFile string)
 	ConstructPortConfigMap()
 	// create/delete
-	CreateVtep(vtep *VtepDbEntry)
+	CreateVtep(vtep *VtepDbEntry, vteplistener chan<- string)
 	DeleteVtep(vtep *VtepDbEntry)
 	CreateVxlan(vxlan *VxlanConfig)
 	DeleteVxlan(vxlan *VxlanConfig)
@@ -23,7 +23,7 @@ type VXLANClientIntf interface {
 	DeleteAccessPortVlan(vlan uint16, intfList []int)
 	// vtep fsm
 	GetIntfInfo(name string, intfchan chan<- VxlanIntfInfo)
-	GetNextHopInfo(ip net.IP, nexthopchan chan<- net.IP)
+	GetNextHopInfo(ip net.IP, nexthopchan chan<- VtepNextHopInfo)
 	ResolveNextHopMac(nextHopIp net.IP, nexthopmacchan chan<- net.HardwareAddr)
 }
 

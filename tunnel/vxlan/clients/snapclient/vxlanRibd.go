@@ -125,14 +125,19 @@ func (intf VXLANSnapClient) processRibdNotification(rxBuf []byte) error {
 // GetNextHopInfo:
 // rib holds the next hop info so lets quiery the for the next hop
 // then notify the vtep channel of that ip
-func (intf VXLANSnapClient) GetNextHopInfo(ip net.IP, vtepnexthopchan chan<- net.IP) {
+func (intf VXLANSnapClient) GetNextHopInfo(ip net.IP, vtepnexthopchan chan<- VtepNextHopInfo) {
 	if ribdclnt.ClientHdl != nil {
 		nexthopinfo, err := ribdclnt.ClientHdl.GetRouteReachabilityInfo(ip.String())
 		if err == nil {
 			nexthopip := net.ParseIP(nexthopinfo.NextHopIp)
 			// lets let RIB notify us if there is a change in next hop
 			ribdclnt.ClientHdl.TrackReachabilityStatus(ip.String(), "VXLAND", "add")
-			vtepnexthopchan <- nexthopip
+			// TODO at this point assuming the next hop is a physical interface
+			vtepnexthopchan <- vxlan.VtepNextHopInfo{
+				Ip:      nexthopip,
+				IfIndex: int32(nexthopinfo.NextHopIfIndex),
+				IfName:  fmt.Sprintf("fpPort%s", asicdCommonDefs.GetIntfIdFromIfIndex(nexthopinfo.NextHopIfIndex)),
+			}
 		}
 	}
 }

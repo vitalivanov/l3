@@ -107,15 +107,18 @@ func NewVXLANServer(l *logging.Writer, paramspath string) *VXLANServer {
 
 //HandleNextHopChange:
 // Handle notifications from client that the next hop reachabilty has changed
-func (s *VXLANServer) HandleNextHopChange(dip net.IP, nexthopip net.IP, reachable bool) {
+func (s *VXLANServer) HandleNextHopChange(dip net.IP, nexthopip net.IP, nexthopIfIndex int32, nexthopIfName string, reachable bool) {
 	// TOOD do some work to find all VTEP's and deprovision the entries
 	for _, vtep := range GetVtepDB() {
 		if reachable &&
 			vtep.DstIp.String() == dip.String() {
 			if vtep.Status == VtepStatusNextHopUnknown {
-				// update next hop
-				vtep.nexthopchan <- nexthopip
 
+				vtep.nexthopchan <- VtepNextHopInfo{
+					Ip:      nexthopip,
+					IfIndex: nexthopIfIndex,
+					IfName:  nexthopIfName,
+				}
 			} else if vtep.Status == VtepStatusIncomplete {
 				go vtep.VtepFsm()
 			}

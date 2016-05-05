@@ -57,7 +57,7 @@ func (b mockintf) GetIntfInfo(name string, intfchan chan<- VxlanIntfInfo) {
 		}
 	}
 }
-func (b mockintf) CreateVtep(vtep *VtepDbEntry) {
+func (b mockintf) CreateVtep(vtep *VtepDbEntry, vtepname chan<- string) {
 	if !b.failCreateVtep {
 		logger.Info(fmt.Sprintf("Create vtep %#v", vtep))
 		vtepcreatedone <- true
@@ -97,11 +97,15 @@ func (b mockintf) DeleteAccessPortVlan(vlan uint16, intfList []int) {
 
 	}
 }
-func (b mockintf) GetNextHopInfo(ip net.IP, nexthopchan chan<- net.IP) {
+func (b mockintf) GetNextHopInfo(ip net.IP, nexthopchan chan<- VtepNextHopInfo) {
 	logger.Info("MOCK: Calling GetNextHopInfo")
 	nexthopip := net.ParseIP("100.1.1.2")
 	if !b.failGetNextHop {
-		nexthopchan <- nexthopip
+		nexthopchan <- VtepNextHopInfo{
+			Ip:      nexthopip,
+			IfIndex: 1,
+			IfName:  "eth0",
+		}
 	} else {
 		logger.Info("MOCK: force fail")
 	}
@@ -618,10 +622,10 @@ func TestFSMNextHopFailVtepVxlanCreate(t *testing.T) {
 		t.Errorf("State not as expected expected[%s] actual[%s]", VtepStatusNextHopUnknown, vtep.Status)
 	}
 
-	if vtep.NextHopIp.String() != "0.0.0.0" &&
-		vtep.NextHopIp.String() != "" &&
-		vtep.NextHopIp != nil {
-		t.Errorf("Why was the next hop IP address[%s] found for interface [%s]", vtep.NextHopIp, vtep.SrcIfName)
+	if vtep.NextHop.Ip.String() != "0.0.0.0" &&
+		vtep.NextHop.Ip.String() != "" &&
+		vtep.NextHop.Ip != nil {
+		t.Errorf("Why was the next hop IP address[%s] found for interface [%s]", vtep.NextHop.Ip, vtep.SrcIfName)
 	}
 
 	DeleteVtep(vtepConfig)
@@ -711,10 +715,10 @@ func TestFSMNextHopFailThenSucceedVtepVxlanCreate(t *testing.T) {
 		t.Errorf("State not as expected expected[%s] actual[%s]", VtepStatusNextHopUnknown, vtep.Status)
 	}
 
-	if vtep.NextHopIp.String() != "0.0.0.0" &&
-		vtep.NextHopIp.String() != "" &&
-		vtep.NextHopIp != nil {
-		t.Errorf("Why was the next hop IP address[%s] found for interface [%s]", vtep.NextHopIp, vtep.SrcIfName)
+	if vtep.NextHop.Ip.String() != "0.0.0.0" &&
+		vtep.NextHop.Ip.String() != "" &&
+		vtep.NextHop.Ip != nil {
+		t.Errorf("Why was the next hop IP address[%s] found for interface [%s]", vtep.NextHop.Ip, vtep.SrcIfName)
 	}
 
 	// notify that next hop found
@@ -722,7 +726,11 @@ func TestFSMNextHopFailThenSucceedVtepVxlanCreate(t *testing.T) {
 
 	// notify next hop has been found
 	nexthopip := net.ParseIP("100.1.1.100")
-	vtep.nexthopchan <- nexthopip
+	vtep.nexthopchan <- VtepNextHopInfo{
+		Ip:      nexthopip,
+		IfIndex: 1,
+		IfName:  "eth0",
+	}
 
 	<-vtepcreatedone
 
@@ -821,10 +829,10 @@ func TestFSMResolveNextHopFailVtepVxlanCreate(t *testing.T) {
 		t.Errorf("Why was the IP address[%s] not found for interface [%s]", VtepStatusNextHopUnknown, vtep.SrcIp, vtep.SrcIfName)
 	}
 
-	if vtep.NextHopIp.String() == "0.0.0.0" ||
-		vtep.NextHopIp.String() == "" ||
-		vtep.NextHopIp == nil {
-		t.Errorf("Why was the next hop IP address[%s] not found for interface [%s]", VtepStatusNextHopUnknown, vtep.NextHopIp, vtep.SrcIfName)
+	if vtep.NextHop.Ip.String() == "0.0.0.0" ||
+		vtep.NextHop.Ip.String() == "" ||
+		vtep.NextHop.Ip == nil {
+		t.Errorf("Why was the next hop IP address[%s] not found for interface [%s]", VtepStatusNextHopUnknown, vtep.NextHop.Ip, vtep.SrcIfName)
 	}
 
 	if vtep.DstMac.String() != "00:00:00:00:00:00" &&

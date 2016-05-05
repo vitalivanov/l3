@@ -364,7 +364,7 @@ func (intf VXLANSnapClient) DeleteVxlan(vxlan *vxlan.VxlanConfig) {
 // the HW as well as within Linux stack.   AsicD also requires that vlan membership is
 // provisioned separately from VTEP.  The vlan in question is the VLAN found
 // within the VXLAN header.
-func (intf VXLANSnapClient) CreateVtep(vtep *vxlan.VtepDbEntry) {
+func (intf VXLANSnapClient) CreateVtep(vtep *vxlan.VtepDbEntry, vteplistener chan<- string) {
 	// convert a vxland config to hw config
 	if asicdclnt.ClientHdl != nil {
 
@@ -426,6 +426,8 @@ func (intf VXLANSnapClient) CreateVtep(vtep *vxlan.VtepDbEntry) {
 		}
 		// create the vtep
 		asicdclnt.ClientHdl.CreateVxlanVtep(ConvertVtepToVxlanAsicdConfig(vtep))
+
+		vteplistener <- vtep.VtepHandleName
 	}
 	/* Add as another interface
 	else {

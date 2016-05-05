@@ -46,9 +46,9 @@ type VtepDbEntry struct {
 	Vni uint32
 	// name of this vtep interface
 	VtepName string
-	// interface name for which packets vxlan packets should rx/tx for this vtep
+	// interface name which vtep will get src ip/mac info from
 	SrcIfName string
-	// interface id for which packets vxlan packets should rx/tx for this vtep
+	// interface id which vtep will get src ip/mac info from
 	SrcIfIndex int32
 	// dst UDP port
 	UDP uint16
@@ -67,7 +67,8 @@ type VtepDbEntry struct {
 	// interface id for which packets vxlan packets should rx/tx for this vtep
 	VtepIfIndex int32
 	// Next Hop Ip used to find the next hop MAC which will be used as the DstMac of the vxlan header
-	NextHopIp net.IP
+	NextHop VtepNextHopInfo
+
 	// VTEP status of VTEP
 	Status vtepStatus
 
@@ -82,11 +83,12 @@ type VtepDbEntry struct {
 	rxpkts uint64
 	txpkts uint64
 
-	nexthopchan  chan net.IP
-	macchan      chan net.HardwareAddr
-	hwconfig     chan bool
-	killroutine  chan bool
-	intfinfochan chan VxlanIntfInfo
+	nexthopchan      chan VtepNextHopInfo
+	macchan          chan net.HardwareAddr
+	hwconfig         chan bool
+	killroutine      chan bool
+	intfinfochan     chan VxlanIntfInfo
+	vteplistenerchan chan string
 
 	// number of ticks before hw was able to come up
 	ticksTillConfig int
@@ -96,6 +98,12 @@ type VtepDbEntry struct {
 
 	// wait group used to help sync on cleanup of FSM
 	wg sync.WaitGroup
+}
+
+type VtepNextHopInfo struct {
+	Ip      net.IP
+	IfIndex int32
+	IfName  string
 }
 
 // pcap handle (vtep) per source ip defined
@@ -178,6 +186,7 @@ func (vtep *VtepDbEntry) VtepFsmCleanup() {
 	if vtep.retrytimer != nil {
 		vtep.retrytimer.Stop()
 		close(vtep.macchan)
+		close(vtep.vteplistenerchan)
 		close(vtep.hwconfig)
 		close(vtep.killroutine)
 		vtep.wg.Wait()
@@ -188,11 +197,12 @@ func (vtep *VtepDbEntry) VtepFsmCleanup() {
 // FSM used to resolve mac/ip of the next hop
 func (vtep *VtepDbEntry) VtepFsm() {
 
-	vtep.nexthopchan = make(chan net.IP, 1)
+	vtep.nexthopchan = make(chan VtepNextHopInfo, 1)
 	vtep.macchan = make(chan net.HardwareAddr, 1)
 	vtep.hwconfig = make(chan bool, 1)
 	vtep.killroutine = make(chan bool, 1)
 	vtep.intfinfochan = make(chan VxlanIntfInfo, 1)
+	vtep.vteplistenerchan = make(chan string, 1)
 
 	// TODO, what should this time be ???
 	retrytime := time.Second * 3
@@ -223,7 +233,7 @@ func (vtep *VtepDbEntry) VtepFsm() {
 							} else if vtep.Status == VtepStatusArpUnresolved {
 								// only going to poll 3 times before declaring missconfiguration
 								// resolve the next hop mac based on the next hop ip
-								client.ResolveNextHopMac(vtep.NextHopIp, vtep.macchan)
+								client.ResolveNextHopMac(vtep.NextHop.Ip, vtep.macchan)
 								vtep.ticksToPollArp++
 							}
 						}
@@ -253,22 +263,25 @@ func (vtep *VtepDbEntry) VtepFsm() {
 					}
 				}
 				vtep.retrytimer.Reset(retrytime)
-			case ip, ok := <-vtep.nexthopchan:
+			case info, ok := <-vtep.nexthopchan:
 				// stop the timer if we have the response
 				vtep.retrytimer.Stop()
 				if ok {
 					logger.Info(fmt.Sprintf("FSM: next hop info rx: vtep %s status %s", vtep.VtepName, vtep.Status))
 					if vtep.Status == VtepStatusNextHopUnknown {
-						vtep.NextHopIp = ip
+						vtep.NextHop.Ip = info.Ip
+						vtep.NextHop.IfIndex = info.IfIndex
+						vtep.NextHop.IfName = info.IfName
+
 						// TODO need create a port listener per next hop interface
 						// lets start listening on this port for VXLAN frames
 						// Call will protect against multiple calls to same port
 						//CreatePort(VxlanNextHopIp.Intf, vtep.UDP)
-						logger.Info(fmt.Sprintf("%s: found dstip %s next hop %s", strings.TrimRight(vtep.VtepName, "Int"), vtep.DstIp, vtep.NextHopIp))
+						logger.Info(fmt.Sprintf("%s: found dstip %s next hop %s", strings.TrimRight(vtep.VtepName, "Int"), vtep.DstIp, vtep.NextHop.Ip))
 						// next state
 						vtep.Status = VtepStatusArpUnresolved
 						for _, client := range ClientIntf {
-							client.ResolveNextHopMac(vtep.NextHopIp, vtep.macchan)
+							client.ResolveNextHopMac(vtep.NextHop.Ip, vtep.macchan)
 						}
 					}
 
@@ -284,7 +297,7 @@ func (vtep *VtepDbEntry) VtepFsm() {
 					if vtep.Status == VtepStatusArpUnresolved {
 						vtep.DstMac = mac
 						vtep.Status = VtepStatusConfigPending
-						logger.Info(fmt.Sprintf("%s: resolved mac %s for next hop ip %s status %s", strings.TrimRight(vtep.VtepName, "Int"), vtep.DstMac, vtep.NextHopIp, vtep.Status))
+						logger.Info(fmt.Sprintf("%s: resolved mac %s for next hop ip %s status %s", strings.TrimRight(vtep.VtepName, "Int"), vtep.DstMac, vtep.NextHop.Ip, vtep.Status))
 						// protect against vxlan not existing yet
 						if _, ok := GetVxlanDB()[vtep.Vni]; ok {
 							vtep.hwconfig <- true
@@ -298,20 +311,25 @@ func (vtep *VtepDbEntry) VtepFsm() {
 				logger.Info(fmt.Sprintf("FSM: create hw rx: vtep %s status %s", vtep.VtepName, vtep.Status))
 
 				if ok {
-					// lets create the packet listener for the rx/tx packets
-					VxlanVtepRxTx(vtep)
 					// we are commit to the hw
 					vtep.Status = VtepStatusUp
 					// create vtep resources in hw
 					for _, client := range ClientIntf {
-						client.CreateVtep(vtep)
+						client.CreateVtep(vtep, vtep.vteplistenerchan)
 					}
+
 					vtep.retrytimer.Stop()
 
 				} else {
 					// channel closed lets return
 					logger.Info(fmt.Sprintf("Stopping FSM for vtep %s", vtep.VtepName))
 					return
+				}
+			case _, ok := <-vtep.vteplistenerchan:
+				if ok {
+					logger.Info(fmt.Sprintf("FSM: Starting listening for packets on intf %s and port %s", vtep.VtepHandleName, vtep.NextHop.IfName))
+					VxlanVtepRxTx(vtep)
+					VxlanPortRxTx(vtep.NextHop.IfName, vtep.UDP)
 				}
 			}
 		}
@@ -366,7 +384,9 @@ func DeProvisionVtep(vtep *VtepDbEntry) {
 	}
 
 	// clear out the information which was discovered for this VTEP
-	vtep.NextHopIp = nil
+	vtep.NextHop.Ip = nil
+	vtep.NextHop.IfIndex = 0
+	vtep.NextHop.IfName = ""
 	if vtep.SrcIfName != "" {
 		vtep.SrcIp = nil
 	}
