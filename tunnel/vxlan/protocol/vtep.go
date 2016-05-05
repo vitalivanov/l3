@@ -222,11 +222,9 @@ func (vtep *VtepDbEntry) VtepFsm() {
 								// Nothing to do here as RIB should notify us of next hop info
 							} else if vtep.Status == VtepStatusArpUnresolved {
 								// only going to poll 3 times before declaring missconfiguration
-								if vtep.ticksToPollArp < 3 {
-									// resolve the next hop mac based on the next hop ip
-									client.ResolveNextHopMac(vtep.NextHopIp, vtep.macchan)
-									vtep.ticksToPollArp++
-								}
+								// resolve the next hop mac based on the next hop ip
+								client.ResolveNextHopMac(vtep.NextHopIp, vtep.macchan)
+								vtep.ticksToPollArp++
 							}
 						}
 					}
