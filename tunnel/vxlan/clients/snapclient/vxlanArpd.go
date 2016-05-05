@@ -3,6 +3,7 @@ package snapclient
 
 import (
 	"arpd"
+	"fmt"
 	"net"
 )
 
@@ -16,9 +17,10 @@ var arpdclnt ArpdClient
 func (intf VXLANSnapClient) ResolveNextHopMac(nexthopip net.IP, macchan chan<- net.HardwareAddr) {
 	if arpdclnt.ClientHdl != nil {
 		arpentrystate, err := arpdclnt.ClientHdl.GetArpEntryState(nexthopip.String())
+		logger.Info(fmt.Sprintln("calling GetArpEntryState", arpentrystate, err))
 		if err == nil {
-			nexthopip, _ := net.ParseMAC(arpentrystate.MacAddr)
-			macchan <- nexthopip
+			nexthopmac, _ := net.ParseMAC(arpentrystate.MacAddr)
+			macchan <- nexthopmac
 		}
 	}
 }
