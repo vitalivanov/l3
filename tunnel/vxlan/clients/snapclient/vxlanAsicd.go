@@ -39,15 +39,18 @@ func ConvertVxlanConfigToVxlanAsicdConfig(c *vxlan.VxlanConfig) *asicdInt.Vxlan 
 func ConvertVtepToVxlanAsicdConfig(vtep *vxlan.VtepDbEntry) *asicdInt.Vtep {
 
 	return &asicdInt.Vtep{
-		Vni:        int32(vtep.Vni),
-		IfName:     vtep.VtepName,
-		SrcIfIndex: vtep.SrcIfIndex,
-		UDP:        int16(vtep.UDP),
-		TTL:        int16(vtep.TTL),
-		SrcIp:      vtep.SrcIp.String(),
-		DstIp:      vtep.DstIp.String(),
-		VlanId:     int16(vtep.VlanId),
-		SrcMac:     vtep.SrcMac.String(),
+		Vni:            int32(vtep.Vni),
+		IfName:         vtep.VtepName,
+		SrcIfIndex:     vtep.SrcIfIndex,
+		SrcIfName:      vtep.SrcIfName,
+		UDP:            int16(vtep.UDP),
+		TTL:            int16(vtep.TTL),
+		SrcIp:          vtep.SrcIp.String(),
+		DstIp:          vtep.DstIp.String(),
+		VlanId:         int16(vtep.VlanId),
+		SrcMac:         vtep.SrcMac.String(),
+		NextHopIfIndex: vtep.NextHop.IfIndex,
+		NextHopIfName:  vtep.NextHop.IfName,
 	}
 }
 
@@ -375,7 +378,7 @@ func (intf VXLANSnapClient) CreateVtep(vtep *vxlan.VtepDbEntry, vteplistener cha
 				refCnt:  1,
 			}
 			PortVlanDb[vtep.VlanId] = append(PortVlanDb[vtep.VlanId], v)
-			pbmp := fmt.Sprintf("%d", vtep.SrcIfName)
+			pbmp := fmt.Sprintf("%d", vtep.NextHop.IfIndex)
 
 			asicdVlan := &asicdServices.Vlan{
 				VlanId:   int32(vtep.VlanId),
