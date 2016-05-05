@@ -1,7 +1,7 @@
 package snapclient
 
 import (
-	//"asicd/asicdCommonDefs"
+	"asicd/asicdCommonDefs"
 	"encoding/json"
 	"fmt"
 	nanomsg "github.com/op/go-nanomsg"
@@ -125,7 +125,7 @@ func (intf VXLANSnapClient) processRibdNotification(rxBuf []byte) error {
 // GetNextHopInfo:
 // rib holds the next hop info so lets quiery the for the next hop
 // then notify the vtep channel of that ip
-func (intf VXLANSnapClient) GetNextHopInfo(ip net.IP, vtepnexthopchan chan<- VtepNextHopInfo) {
+func (intf VXLANSnapClient) GetNextHopInfo(ip net.IP, vtepnexthopchan chan<- vxlan.VtepNextHopInfo) {
 	if ribdclnt.ClientHdl != nil {
 		nexthopinfo, err := ribdclnt.ClientHdl.GetRouteReachabilityInfo(ip.String())
 		if err == nil {
