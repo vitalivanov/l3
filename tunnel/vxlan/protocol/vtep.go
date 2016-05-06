@@ -327,7 +327,7 @@ func (vtep *VtepDbEntry) VtepFsm() {
 				}
 			case _, ok := <-vtep.vteplistenerchan:
 				if ok {
-					logger.Info(fmt.Sprintf("FSM: Starting listening for packets on intf %s and port %s", vtep.VtepHandleName, vtep.NextHop.IfName))
+					logger.Info(fmt.Sprintln("FSM: Starting listening for packets on intf/port ", vtep.VtepHandleName, vtep.NextHop.IfName))
 					VxlanVtepRxTx(vtep)
 					VxlanPortRxTx(vtep.NextHop.IfName, vtep.UDP)
 				}

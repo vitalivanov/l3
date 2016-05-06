@@ -136,7 +136,7 @@ func (intf VXLANSnapClient) GetNextHopInfo(ip net.IP, vtepnexthopchan chan<- vxl
 			vtepnexthopchan <- vxlan.VtepNextHopInfo{
 				Ip:      nexthopip,
 				IfIndex: int32(nexthopinfo.NextHopIfIndex),
-				IfName:  fmt.Sprintf("fpPort%s", asicdCommonDefs.GetIntfIdFromIfIndex(int32(nexthopinfo.NextHopIfIndex))),
+				IfName:  fmt.Sprintf("fpPort%d", asicdCommonDefs.GetIntfIdFromIfIndex(int32(nexthopinfo.NextHopIfIndex))),
 			}
 		}
 	}
