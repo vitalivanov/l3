@@ -51,7 +51,7 @@ func ConvertVtepToVxlanAsicdConfig(vtep *vxlan.VtepDbEntry) *asicdInt.Vtep {
 		SrcMac:         vtep.SrcMac.String(),
 		NextHopIfIndex: vtep.NextHop.IfIndex,
 		NextHopIfName:  vtep.NextHop.IfName,
-		nextHopIp:      vtep.NextHop.Ip,
+		NextHopIp:      vtep.NextHop.Ip.String(),
 	}
 }
 
