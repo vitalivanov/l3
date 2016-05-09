@@ -106,32 +106,35 @@ func NewVXLANServer(l *logging.Writer, paramspath string) *VXLANServer {
 }
 
 //HandleNextHopChange:
-// Handle notifications from client that the next hop reachabilty has changed
+// Handle notifications from RIB that the next hop reachabilty has changed
 func (s *VXLANServer) HandleNextHopChange(dip net.IP, nexthopip net.IP, nexthopIfIndex int32, nexthopIfName string, reachable bool) {
 	// TOOD do some work to find all VTEP's and deprovision the entries
 	for _, vtep := range GetVtepDB() {
 		if reachable &&
 			vtep.DstIp.String() == dip.String() {
-			if vtep.Status == VtepStatusNextHopUnknown {
+			if vtep.VxlanVtepMachineFsm.Machine.Curr.CurrentState() == VxlanVtepStateInterface {
 
-				vtep.nexthopchan <- VtepNextHopInfo{
+				nexthopinfo := VtepNextHopInfo{
 					Ip:      nexthopip,
 					IfIndex: nexthopIfIndex,
 					IfName:  nexthopIfName,
 				}
-			} else if vtep.Status == VtepStatusIncomplete {
-				go vtep.VtepFsm()
-			}
+				event := MachineEvent{
+					E:    VxlanVtepEventNextHopInfoResolved,
+					Src:  VxlanVtepMachineModuleStr,
+					Data: nexthopinfo,
+				}
 
+				vtep.VxlanVtepMachineFsm.VxlanVtepEvents <- event
+
+			}
 		} else if !reachable &&
 			vtep.DstIp.String() == dip.String() {
 			// set state
-			// TODO need to have a small state machine to handle
 			// tearing down the connection appropriately
-			if vtep.Status == VtepStatusUp {
-				vtep.Status = VtepStatusIncomplete
+			if vtep.VxlanVtepMachineFsm.Machine.Curr.CurrentState() >= VxlanVtepStateNextHopInfo {
 				// deprovision the vtep
-				DeProvisionVtep(vtep)
+				DeProvisionVtep(vtep, false)
 			}
 		}
 	}

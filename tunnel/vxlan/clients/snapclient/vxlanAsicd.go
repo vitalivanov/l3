@@ -272,7 +272,6 @@ func (intf VXLANSnapClient) updateVlanAccessPorts(msg asicdCommonDefs.VlanNotify
 		// lets send the config back to the server
 		serverchannels.VxlanAccessPortVlanUpdate <- config
 	}
-	//logger.Info(fmt.Sprintln("Vlan Property Map:", server.vlanPropMap))
 }
 
 func (intf VXLANSnapClient) updateIpv4Intf(msg asicdCommonDefs.IPv4IntfNotifyMsg, msgType uint8) {
@@ -336,16 +335,6 @@ func (intf VXLANSnapClient) CreateVxlan(vxlan *vxlan.VxlanConfig) {
 	if asicdclnt.ClientHdl != nil {
 		asicdclnt.ClientHdl.CreateVxlan(ConvertVxlanConfigToVxlanAsicdConfig(vxlan))
 	}
-	/* Add as another interface
-	else {
-
-		// run standalone
-		if softswitch == nil {
-			softswitch = vxlan_linux.NewVxlanLinux(logger)
-		}
-		softswitch.CreateVxLAN(ConvertVxlanConfigToVxlanLinuxConfig(vxlan))
-	}
-	*/
 }
 
 func (intf VXLANSnapClient) DeleteVxlan(vxlan *vxlan.VxlanConfig) {
@@ -353,14 +342,6 @@ func (intf VXLANSnapClient) DeleteVxlan(vxlan *vxlan.VxlanConfig) {
 	if asicdclnt.ClientHdl != nil {
 		asicdclnt.ClientHdl.DeleteVxlan(ConvertVxlanConfigToVxlanAsicdConfig(vxlan))
 	}
-	/* Add as another interface
-	else {
-		// run standalone
-		if softswitch != nil {
-			softswitch.DeleteVxLAN(ConvertVxlanConfigToVxlanLinuxConfig(vxlan))
-		}
-	}
-	*/
 }
 
 // CreateVtep:
@@ -368,7 +349,7 @@ func (intf VXLANSnapClient) DeleteVxlan(vxlan *vxlan.VxlanConfig) {
 // the HW as well as within Linux stack.   AsicD also requires that vlan membership is
 // provisioned separately from VTEP.  The vlan in question is the VLAN found
 // within the VXLAN header.
-func (intf VXLANSnapClient) CreateVtep(vtep *vxlan.VtepDbEntry, vteplistener chan<- string) {
+func (intf VXLANSnapClient) CreateVtep(vtep *vxlan.VtepDbEntry, vteplistener chan<- vxlan.MachineEvent) {
 	// convert a vxland config to hw config
 	if asicdclnt.ClientHdl != nil {
 
@@ -431,17 +412,14 @@ func (intf VXLANSnapClient) CreateVtep(vtep *vxlan.VtepDbEntry, vteplistener cha
 		// create the vtep
 		asicdclnt.ClientHdl.CreateVxlanVtep(ConvertVtepToVxlanAsicdConfig(vtep))
 
-		vteplistener <- vtep.VtepHandleName
-	}
-	/* Add as another interface
-	else {
-		// run standalone
-		if softswitch == nil {
-			softswitch = vxlan_linux.NewVxlanLinux(logger)
+		event := vxlan.MachineEvent{
+			E:    vxlan.VxlanVtepEventHwConfigComplete,
+			Src:  vxlan.VXLANSnapClientStr,
+			Data: vtep.VtepHandleName,
 		}
-		softswitch.CreateVtep(ConvertVtepToVxlanLinuxConfig(vtep))
+
+		vteplistener <- event
 	}
-	*/
 }
 
 // DeleteVtep:
@@ -508,17 +486,9 @@ func (intf VXLANSnapClient) DeleteVtep(vtep *vxlan.VtepDbEntry) {
 			}
 		}
 	}
-	/* Add as another interface
-	else {
-		// run standalone
-		if softswitch != nil {
-			softswitch.DeleteVtep(ConvertVtepToVxlanLinuxConfig(vtep))
-		}
-	}
-	*/
 }
 
-func (intf VXLANSnapClient) GetIntfInfo(IfName string, intfchan chan<- vxlan.VxlanIntfInfo) {
+func (intf VXLANSnapClient) GetIntfInfo(IfName string, intfchan chan<- vxlan.MachineEvent) {
 	// TODO
 	nextindex := 0
 	count := 1024
@@ -587,7 +557,12 @@ func (intf VXLANSnapClient) GetIntfInfo(IfName string, intfchan chan<- vxlan.Vxl
 					IntfName: IfName,
 				}
 				logger.Info(fmt.Sprintln("Intf info complete, sending config to channel", config))
-				intfchan <- config
+				event := vxlan.MachineEvent{
+					E:    vxlan.VxlanVtepEventSrcInterfaceResolved,
+					Src:  vxlan.VXLANSnapClientStr,
+					Data: config,
+				}
+				intfchan <- event
 			}
 		}
 	}

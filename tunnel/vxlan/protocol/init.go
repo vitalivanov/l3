@@ -12,4 +12,6 @@ func init() {
 	PortConfigMap = make(map[int32]*PortConfig, 0)
 	portDB = make(map[string]*VxlanPort, 0)
 
+	VxlanVtepMachineStrStateMapInit()
+
 }

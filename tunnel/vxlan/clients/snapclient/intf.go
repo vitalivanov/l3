@@ -56,3 +56,13 @@ func (intf VXLANSnapClient) ClientChanListener() {
 func (v VXLANSnapClient) SetServerChannels(s *vxlan.VxLanConfigChannels) {
 	serverchannels = s
 }
+
+func (v VXLANSnapClient) IsClientIntfType(client vxlan.VXLANClientIntf, clientStr string) bool {
+	switch client.(type) {
+	case *VXLANSnapClient:
+		if clientStr == "SnapClient" {
+			return true
+		}
+	}
+	return false
+}

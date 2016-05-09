@@ -33,6 +33,15 @@ type mockintf struct {
 	failResolveNexHop        bool
 }
 
+func (b mockintf) IsClientIntfType(client VXLANClientIntf, clientStr string) bool {
+	switch client.(type) {
+	case *BaseClientIntf:
+		if clientStr == "SnapMockTestClient" {
+			return true
+		}
+	}
+	return false
+}
 func (b mockintf) SetServerChannels(s *VxLanConfigChannels) {
 
 }
@@ -43,21 +52,27 @@ func (b mockintf) ConnectToClients(path string) {
 func (b mockintf) ConstructPortConfigMap() {
 
 }
-func (b mockintf) GetIntfInfo(name string, intfchan chan<- VxlanIntfInfo) {
+func (b mockintf) GetIntfInfo(name string, intfchan chan<- MachineEvent) {
 
 	logger.Info("MOCK: Calling GetIntfInfo")
 	if !b.failGetIntfInfo {
 		mac, _ := net.ParseMAC("00:01:02:03:04:05")
 		ip := net.ParseIP("100.1.1.1")
-		intfchan <- VxlanIntfInfo{
+		intfinfo := VxlanIntfInfo{
+			Command:  VxlanCommandCreate,
 			IntfName: "eth0",
 			IfIndex:  pluginCommon.GetIfIndexFromIdType(1, commonDefs.IfTypePort),
 			Mac:      mac,
 			Ip:       ip,
 		}
+		intfchan <- MachineEvent{
+			E:    VxlanVtepEventSrcInterfaceResolved,
+			Src:  "TEST",
+			Data: intfinfo,
+		}
 	}
 }
-func (b mockintf) CreateVtep(vtep *VtepDbEntry, vtepname chan<- string) {
+func (b mockintf) CreateVtep(vtep *VtepDbEntry, vtepname chan<- MachineEvent) {
 	if !b.failCreateVtep {
 		logger.Info(fmt.Sprintf("Create vtep %#v", vtep))
 		vtepcreatedone <- true
@@ -76,6 +91,7 @@ func (b mockintf) CreateVxlan(vxlan *VxlanConfig) {
 }
 func (b mockintf) DeleteVxlan(vxlan *VxlanConfig) {
 	if !b.failDeleteVxlan {
+		logger.Info("MOCK: calling Delete Vxlan")
 		vxlandeletedone <- true
 	}
 }
@@ -97,24 +113,38 @@ func (b mockintf) DeleteAccessPortVlan(vlan uint16, intfList []int) {
 
 	}
 }
-func (b mockintf) GetNextHopInfo(ip net.IP, nexthopchan chan<- VtepNextHopInfo) {
+func (b mockintf) GetNextHopInfo(ip net.IP, nexthopchan chan<- MachineEvent) {
 	logger.Info("MOCK: Calling GetNextHopInfo")
 	nexthopip := net.ParseIP("100.1.1.2")
 	if !b.failGetNextHop {
-		nexthopchan <- VtepNextHopInfo{
-			Ip:      nexthopip,
-			IfIndex: 1,
-			IfName:  "eth0",
+
+		nexthop := VxlanNextHopIp{
+			Command:   VxlanCommandCreate,
+			Ip:        ip,
+			Intf:      1,
+			IntfName:  "eth0",
+			NextHopIp: nexthopip,
+		}
+
+		nexthopchan <- MachineEvent{
+			E:    VxlanVtepEventNextHopInfoResolved,
+			Src:  "TEST",
+			Data: nexthop,
 		}
 	} else {
 		logger.Info("MOCK: force fail")
 	}
 }
-func (b mockintf) ResolveNextHopMac(nextHopIp net.IP, nexthopmacchan chan<- net.HardwareAddr) {
+func (b mockintf) ResolveNextHopMac(nextHopIp net.IP, nexthopmacchan chan<- MachineEvent) {
 	logger.Info("MOCK: Calling ResolveNextHopMac")
 	mac, _ := net.ParseMAC("00:55:44:33:22:11")
 	if !b.failResolveNexHop {
-		nexthopmacchan <- mac
+		nexthopmac := mac
+		nexthopmacchan <- MachineEvent{
+			E:    VxlanVtepEventNextHopInfoMacResolved,
+			Src:  "TEST",
+			Data: nexthopmac,
+		}
 	} else {
 		logger.Info("MOCK: force fail")
 	}
@@ -154,7 +184,7 @@ func TimerTest(v *VtepDbEntry, exitchan chan<- bool) {
 	cnt := 0
 	for {
 		time.Sleep(time.Millisecond * 10)
-		if v.ticksTillConfig > 2 {
+		if v.ticksTillConfig > 5 {
 			exitchan <- true
 			return
 		}
@@ -212,8 +242,8 @@ func TestFSMValidVxlanVtepCreate(t *testing.T) {
 	}
 
 	vtep := GetVtepDBEntry(key)
-	if vtep.Status != VtepStatusUp {
-		t.Errorf("State not as expected expected[%s] actual[%s]", VtepStatusUp, vtep.Status)
+	if vtep.VxlanVtepMachineFsm.Machine.Curr.CurrentState() < VxlanVtepStateHwConfig {
+		t.Errorf("State not as expected expected[%s] actual[%s]", VxlanVtepStateHwConfig, vtep.VxlanVtepMachineFsm.Machine.Curr.CurrentState())
 	}
 
 	DeleteVtep(vtepConfig)
@@ -268,19 +298,30 @@ func TestFSMValidVtepVxlanCreate(t *testing.T) {
 
 	CreateVtep(vtepConfig)
 
+	key := &VtepDbKey{
+		name: vtepConfig.VtepName,
+	}
+
+	vtep := GetVtepDBEntry(key)
+
+	// delay to allow for time for FSM to come up
+	exitchan := make(chan bool, 1)
+	go TimerTest(vtep, exitchan)
+
+	<-exitchan
+
+	if vtep.VxlanVtepMachineFsm.Machine.Curr.CurrentState() != VxlanVtepStateDetached {
+		t.Errorf("State not as expected expected[%s] actual[%s]", VxlanVtepStateDetached, vtep.VxlanVtepMachineFsm.Machine.Curr.CurrentState())
+	}
+
 	// need to wait for test to hwcreate to be called
 	CreateVxLAN(vxlanConfig)
 
 	<-vxlancreatedone
 	<-vtepcreatedone
 
-	key := &VtepDbKey{
-		name: vtepConfig.VtepName,
-	}
-
-	vtep := GetVtepDBEntry(key)
-	if vtep.Status != VtepStatusUp {
-		t.Errorf("State not as expected expected[%s] actual[%s]", VtepStatusUp, vtep.Status)
+	if vtep.VxlanVtepMachineFsm.Machine.Curr.CurrentState() < VxlanVtepStateHwConfig {
+		t.Errorf("State not as expected expected[%s] actual[%s]", VxlanVtepStateHwConfig, vtep.VxlanVtepMachineFsm.Machine.Curr.CurrentState())
 	}
 
 	DeleteVtep(vtepConfig)
@@ -340,15 +381,10 @@ func TestFSMCreateVtepNoVxlan(t *testing.T) {
 
 	<-exitchan
 
-	// test timer mechanism
-	if vtep.ticksTillConfig > 0 ||
-		vtep.retrytimer != nil {
-		t.Errorf("Why was FSM started")
+	if vtep.VxlanVtepMachineFsm.Machine.Curr.CurrentState() != VxlanVtepStateDetached {
+		t.Errorf("State not as expected expected[%s] actual[%s]", VxlanVtepStateInit, vtep.VxlanVtepMachineFsm.Machine.Curr.CurrentState())
 	}
 
-	if vtep.Status != VtepStatusDetached {
-		t.Errorf("State not as expected expected[%s] actual[%s]", VtepStatusDetached, vtep.Status)
-	}
 	DeleteVtep(vtepConfig)
 }
 
@@ -421,8 +457,8 @@ func TestFSMIntfFailVtepVxlanCreate(t *testing.T) {
 
 	wg.Wait()
 
-	if vtep.Status != VtepStatusIncomplete {
-		t.Errorf("State not as expected expected[%s] actual[%s]", VtepStatusIncomplete, vtep.Status)
+	if vtep.VxlanVtepMachineFsm.Machine.Curr.CurrentState() != VxlanVtepStateInit {
+		t.Errorf("State not as expected expected[%s] actual[%s]", VxlanVtepStateInit, vtep.VxlanVtepMachineFsm.Machine.Curr.CurrentState())
 	}
 
 	DeleteVtep(vtepConfig)
@@ -509,8 +545,8 @@ func TestFSMIntfFailThenSendIntfSuccessVtepVxlanCreate(t *testing.T) {
 
 	wg.Wait()
 
-	if vtep.Status != VtepStatusIncomplete {
-		t.Errorf("State not as expected expected[%s] actual[%s]", VtepStatusIncomplete, vtep.Status)
+	if vtep.VxlanVtepMachineFsm.Machine.Curr.CurrentState() != VxlanVtepStateInit {
+		t.Errorf("State not as expected expected[%s] actual[%s]", VxlanVtepStateInit, vtep.VxlanVtepMachineFsm.Machine.Curr.CurrentState())
 	}
 
 	// allow this to proceed in order to process
@@ -520,17 +556,23 @@ func TestFSMIntfFailThenSendIntfSuccessVtepVxlanCreate(t *testing.T) {
 	// a notification from the client to the server
 	mac, _ := net.ParseMAC("00:01:02:03:04:05")
 	ip := net.ParseIP("100.1.1.1")
-	vtep.intfinfochan <- VxlanIntfInfo{
+	intfinfo := VxlanIntfInfo{
 		IntfName: "eth0",
 		IfIndex:  pluginCommon.GetIfIndexFromIdType(1, commonDefs.IfTypePort),
 		Mac:      mac,
 		Ip:       ip,
 	}
 
+	vtep.VxlanVtepMachineFsm.VxlanVtepEvents <- MachineEvent{
+		E:    VxlanVtepEventSrcInterfaceResolved,
+		Src:  "TEST",
+		Data: intfinfo,
+	}
+
 	<-vtepcreatedone
 
-	if vtep.Status != VtepStatusUp {
-		t.Errorf("State not as expected expected[%s] actual[%s]", VtepStatusUp, vtep.Status)
+	if vtep.VxlanVtepMachineFsm.Machine.Curr.CurrentState() < VxlanVtepStateHwConfig {
+		t.Errorf("State not as expected expected[%s] actual[%s]", VxlanVtepStateHwConfig, vtep.VxlanVtepMachineFsm.Machine.Curr.CurrentState())
 	}
 
 	DeleteVtep(vtepConfig)
@@ -618,8 +660,8 @@ func TestFSMNextHopFailVtepVxlanCreate(t *testing.T) {
 
 	wg.Wait()
 
-	if vtep.Status != VtepStatusNextHopUnknown {
-		t.Errorf("State not as expected expected[%s] actual[%s]", VtepStatusNextHopUnknown, vtep.Status)
+	if vtep.VxlanVtepMachineFsm.Machine.Curr.CurrentState() != VxlanVtepStateInterface {
+		t.Errorf("State not as expected expected[%s] actual[%s]", VxlanVtepStateInterface, vtep.VxlanVtepMachineFsm.Machine.Curr.CurrentState())
 	}
 
 	if vtep.NextHop.Ip.String() != "0.0.0.0" &&
@@ -711,8 +753,8 @@ func TestFSMNextHopFailThenSucceedVtepVxlanCreate(t *testing.T) {
 
 	wg.Wait()
 
-	if vtep.Status != VtepStatusNextHopUnknown {
-		t.Errorf("State not as expected expected[%s] actual[%s]", VtepStatusNextHopUnknown, vtep.Status)
+	if vtep.VxlanVtepMachineFsm.Machine.Curr.CurrentState() != VxlanVtepStateInterface {
+		t.Errorf("State not as expected expected[%s] actual[%s]", VxlanVtepStateInterface, vtep.VxlanVtepMachineFsm.Machine.Curr.CurrentState())
 	}
 
 	if vtep.NextHop.Ip.String() != "0.0.0.0" &&
@@ -726,16 +768,22 @@ func TestFSMNextHopFailThenSucceedVtepVxlanCreate(t *testing.T) {
 
 	// notify next hop has been found
 	nexthopip := net.ParseIP("100.1.1.100")
-	vtep.nexthopchan <- VtepNextHopInfo{
+	nexthopinfo := VtepNextHopInfo{
 		Ip:      nexthopip,
 		IfIndex: 1,
 		IfName:  "eth0",
 	}
 
+	vtep.VxlanVtepMachineFsm.VxlanVtepEvents <- MachineEvent{
+		E:    VxlanVtepEventNextHopInfoResolved,
+		Src:  "TEST",
+		Data: nexthopinfo,
+	}
+
 	<-vtepcreatedone
 
-	if vtep.Status != VtepStatusUp {
-		t.Errorf("State not as expected expected[%s] actual[%s]", VtepStatusUp, vtep.Status)
+	if vtep.VxlanVtepMachineFsm.Machine.Curr.CurrentState() < VxlanVtepStateHwConfig {
+		t.Errorf("State not as expected expected[%s] actual[%s]", VxlanVtepStateHwConfig, vtep.VxlanVtepMachineFsm.Machine.Curr.CurrentState())
 	}
 
 	DeleteVtep(vtepConfig)
@@ -753,7 +801,7 @@ func TestFSMNextHopFailThenSucceedVtepVxlanCreate(t *testing.T) {
 
 // TestFSMResolveNextHopFailVtepVxlanCreate:
 // Test that next hop ip mac address does not exist yet
-func TestFSMResolveNextHopFailVtepVxlanCreate(t *testing.T) {
+func TestFSMResolveNextHopMacFailVtepVxlanCreate(t *testing.T) {
 
 	// setup common test info
 	setup()
@@ -819,20 +867,14 @@ func TestFSMResolveNextHopFailVtepVxlanCreate(t *testing.T) {
 
 	wg.Wait()
 
-	if vtep.Status != VtepStatusArpUnresolved {
-		t.Errorf("State not as expected expected[%s] actual[%s]", VtepStatusArpUnresolved, vtep.Status)
+	if vtep.VxlanVtepMachineFsm.Machine.Curr.CurrentState() != VxlanVtepStateNextHopInfo {
+		t.Errorf("State not as expected expected[%s] actual[%s]", VxlanVtepStateNextHopInfo, vtep.VxlanVtepMachineFsm.Machine.Curr.CurrentState())
 	}
 
 	if vtep.SrcIp.String() == "0.0.0.0" ||
 		vtep.SrcIp.String() == "" ||
 		vtep.SrcIp == nil {
-		t.Errorf("Why was the IP address[%s] not found for interface [%s]", VtepStatusNextHopUnknown, vtep.SrcIp, vtep.SrcIfName)
-	}
-
-	if vtep.NextHop.Ip.String() == "0.0.0.0" ||
-		vtep.NextHop.Ip.String() == "" ||
-		vtep.NextHop.Ip == nil {
-		t.Errorf("Why was the next hop IP address[%s] not found for interface [%s]", VtepStatusNextHopUnknown, vtep.NextHop.Ip, vtep.SrcIfName)
+		t.Errorf("Why was the IP address[%s] not found for interface [%s]", vtep.SrcIp, vtep.SrcIfName)
 	}
 
 	if vtep.DstMac.String() != "00:00:00:00:00:00" &&

@@ -2,6 +2,7 @@
 package vxlan
 
 import (
+	"fmt"
 	"net"
 )
 
@@ -75,10 +76,12 @@ func CreateVxLAN(c *VxlanConfig) {
 	// lets find all the vteps which are in VtepStatusConfigPending state
 	// and initiate a hwConfig
 	for _, vtep := range GetVtepDB() {
-		if vtep.Status == VtepStatusDetached {
-			// start the fsm for the vtep
-			vtep.Status = VtepStatusIncomplete
-			go vtep.VtepFsm()
+		if vtep.VxlanVtepMachineFsm.Machine.Curr.CurrentState() == VxlanVtepStateDetached {
+			// restart the state machine
+			vtep.VxlanVtepMachineFsm.VxlanVtepEvents <- MachineEvent{
+				E:   VxlanVtepEventBegin,
+				Src: VxlanVtepMachineModuleStr,
+			}
 		}
 	}
 }
@@ -94,4 +97,5 @@ func DeleteVxLAN(c *VxlanConfig) {
 
 	delete(vxlanDB, c.VNI)
 
+	logger.Info(fmt.Sprintln("DeleteVxLAN", c.VNI))
 }

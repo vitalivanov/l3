@@ -11,7 +11,8 @@ import (
 )
 
 var portDB map[string]*VxlanPort
-var VxlanPortRxTx = CreatePort
+var VxlanCreatePortRxTx = CreatePort
+var VxlanDelPortRxTx = DeletePort
 
 type VxlanPort struct {
 	IfName string
@@ -33,6 +34,13 @@ func (p *VxlanPort) GetRxStats() uint64 {
 
 func (p *VxlanPort) GetTxStats() uint64 {
 	return p.txPkts
+}
+
+func GetVxlanPortDbEntry(ifname string) *VxlanPort {
+	if port, ok := portDB[ifname]; ok {
+		return port
+	}
+	return nil
 }
 
 func CreatePort(ifname string, udpport uint16) {

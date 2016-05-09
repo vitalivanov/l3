@@ -338,7 +338,12 @@ func (s *VXLANServer) ConfigListener() {
 				for _, vtep := range GetVtepDB() {
 					logger.Info(fmt.Sprintln("received intf info", intfinfo, vtep))
 					if vtep.SrcIfName == intfinfo.IntfName {
-						vtep.intfinfochan <- intfinfo
+
+						vtep.VxlanVtepMachineFsm.VxlanVtepEvents <- MachineEvent{
+							E:    VxlanVtepEventSrcInterfaceResolved,
+							Src:  VxlanVtepMachineModuleStr,
+							Data: intfinfo,
+						}
 					}
 				}
 			}
