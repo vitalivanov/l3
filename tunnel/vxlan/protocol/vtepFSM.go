@@ -290,6 +290,8 @@ func (vm *VxlanVtepMachine) VxlanVtepInterface(m fsm.Machine, data interface{}) 
 	return VxlanVtepStateInterface
 }
 
+// VxlanVtepNextHopInfo is the state at which the next hop info is found and the data
+// is stored on the vtep.  It will then try to resolve the mac address of the next hop ip
 func (vm *VxlanVtepMachine) VxlanVtepNextHopInfo(m fsm.Machine, data interface{}) fsm.State {
 	vtep := vm.vtep
 
@@ -319,6 +321,9 @@ func (vm *VxlanVtepMachine) VxlanVtepNextHopInfo(m fsm.Machine, data interface{}
 
 }
 
+// VxlanVtepResolveNextHopInfoMac is the state at which the next hop ip mac address has
+// been resolved via ARP.  The info is then stored against the vtep.  No action as this
+// state will immediately tranisition to VxlanVtepStateHwConfig
 func (vm *VxlanVtepMachine) VxlanVtepResolveNextHopInfoMac(m fsm.Machine, data interface{}) fsm.State {
 
 	vtep := vm.vtep
@@ -335,6 +340,8 @@ func (vm *VxlanVtepMachine) VxlanVtepResolveNextHopInfoMac(m fsm.Machine, data i
 	return VxlanVtepStateResolveNextHopMac
 }
 
+// VxlanVtepConfigHw is the state which all VTEP info is known and now we are ready
+// to configure this info into the hw.  Stop the running timer as well
 func (vm *VxlanVtepMachine) VxlanVtepConfigHw(m fsm.Machine, data interface{}) fsm.State {
 	vtep := vm.vtep
 
@@ -347,6 +354,9 @@ func (vm *VxlanVtepMachine) VxlanVtepConfigHw(m fsm.Machine, data interface{}) f
 	return VxlanVtepStateHwConfig
 }
 
+// VxlanVtepStartListener is the state which the VTEP will start to listen on the linux
+// interfaces for VXLAN packets as well as listen for packets which are transmitted out
+// of the vtep interface
 func (vm *VxlanVtepMachine) VxlanVtepStartListener(m fsm.Machine, data interface{}) fsm.State {
 
 	vtep := vm.vtep
@@ -357,6 +367,8 @@ func (vm *VxlanVtepMachine) VxlanVtepStartListener(m fsm.Machine, data interface
 	return VxlanVtepStateStart
 }
 
+//VxlanVtepDisabled is the state which holds says the vtep interface is disabled and
+// should not process any packets.  It will be deprovisioned in the hw as a result
 func (vm *VxlanVtepMachine) VxlanVtepDisabled(m fsm.Machine, data interface{}) fsm.State {
 
 	vtep := vm.vtep

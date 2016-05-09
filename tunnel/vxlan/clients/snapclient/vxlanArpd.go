@@ -22,7 +22,7 @@ func (intf VXLANSnapClient) ResolveNextHopMac(nexthopip net.IP, macchan chan<- v
 		if err == nil {
 			nexthopmac, _ := net.ParseMAC(arpentrystate.MacAddr)
 			event := vxlan.MachineEvent{
-				E:    vxlan.VxlanVtepEventNextHopInfoNextHopInfoMacResolved,
+				E:    vxlan.VxlanVtepEventNextHopInfoMacResolved,
 				Src:  vxlan.VXLANSnapClientStr,
 				Data: nexthopmac,
 			}

@@ -224,6 +224,10 @@ func DeProvisionVtep(vtep *VtepDbEntry, del bool) {
 			E:   VxlanVtepEventBegin,
 			Src: VxlanVtepMachineModuleStr,
 		}
+
+		// restart the timer on deprovisioning as we will retry each of the
+		// state transitions again
+		vtep.retrytimer.Reset(retrytime)
 	}
 }
 
