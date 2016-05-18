@@ -13,13 +13,13 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 // main.go
 package main
@@ -27,6 +27,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"l3/bgp/api"
 	"l3/bgp/flexswitch"
 	"l3/bgp/ovs"
 	bgppolicy "l3/bgp/policy"
@@ -87,10 +88,10 @@ func main() {
 		iMgr := ovsMgr.NewOvsIntfMgr()
 		bMgr := ovsMgr.NewOvsBfdMgr()
 
-	    // starting bgp policy engine...
-	    logger.Info(fmt.Sprintln("Starting BGP policy engine..."))
-	    bgpPolicyEng := bgppolicy.NewBGPPolicyEngine(logger,pMgr)
-	    go bgpPolicyEng.StartPolicyEngine()
+		// starting bgp policy engine...
+		logger.Info(fmt.Sprintln("Starting BGP policy engine..."))
+		bgpPolicyEng := bgppolicy.NewBGPPolicyEngine(logger, pMgr)
+		go bgpPolicyEng.StartPolicyEngine()
 
 		bgpServer := server.NewBGPServer(logger, bgpPolicyEng, iMgr,
 			rMgr, bMgr)
@@ -132,16 +133,18 @@ func main() {
 		if err != nil {
 			return
 		}
-	    // starting bgp policy engine...
-	    logger.Info(fmt.Sprintln("Starting BGP policy engine..."))
-	    bgpPolicyEng := bgppolicy.NewBGPPolicyEngine(logger,pMgr)
-	    go bgpPolicyEng.StartPolicyEngine()
+		// starting bgp policy engine...
+		logger.Info(fmt.Sprintln("Starting BGP policy engine..."))
+		bgpPolicyEng := bgppolicy.NewBGPPolicyEngine(logger, pMgr)
+		go bgpPolicyEng.StartPolicyEngine()
 
 		logger.Info(fmt.Sprintln("Starting BGP Server..."))
 
-		bgpServer := server.NewBGPServer(logger, bgpPolicyEng, iMgr,
-			rMgr, bMgr)
+		bgpServer := server.NewBGPServer(logger, bgpPolicyEng, iMgr, rMgr, bMgr)
 		go bgpServer.StartServer()
+
+		api.InitPolicy(bgpPolicyEng)
+		api.Init(bgpServer)
 
 		// Start keepalive routine
 		go keepalive.InitKeepAlive("bgpd", fileName)

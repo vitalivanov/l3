@@ -13,25 +13,24 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 package api
 
 import (
-	"models"
-	utilspolicy "utils/policy"
+	bgppolicy "l3/bgp/policy"
 	"sync"
+	utilspolicy "utils/policy"
 )
 
 type PolicyApiLayer struct {
-	conditionAddCh chan utilspolicy.PolicyConditionConfig
-	conditionDelCh chan string
+	policyEngine *bgppolicy.BGPPolicyEngine
 }
 
 var bgppolicyapi *PolicyApiLayer = nil
@@ -49,35 +48,43 @@ func getPolicyInstance() *PolicyApiLayer {
 /*  Initialize bgp api layer with the channels that will be used for communicating
  *  with the policy engine server
  */
-func InitPolicy(conditionAddCh chan utilspolicy.PolicyConditionConfig,
-                conditionDelCh chan string) {
+func InitPolicy(policyEngine *bgppolicy.BGPPolicyEngine) {
 	bgppolicyapi = getPolicyInstance()
-	bgppolicyapi.conditionAddCh = conditionAddCh
-	bgppolicyapi.conditionDelCh = conditionDelCh
-}
-func convertModelsToPolicyConditionConfig(
-	cfg *models.PolicyCondition) utilspolicy.PolicyConditionConfig {
-	condition := utilspolicy.PolicyConditionConfig{}
-	if cfg == nil {
-		return  condition
-	}
-	destIPMatch := utilspolicy.PolicyDstIpMatchPrefixSetCondition{
-		Prefix: utilspolicy.PolicyPrefix{
-			IpPrefix:        cfg.IpPrefix,
-			MasklengthRange: cfg.MaskLengthRange,
-		},
-	}
-	return utilspolicy.PolicyConditionConfig{
-		Name:                          cfg.Name,
-		ConditionType:                 cfg.ConditionType,
-		MatchDstIpPrefixConditionInfo: destIPMatch,
-	}
+	bgppolicyapi.policyEngine = policyEngine
 }
 
-func SendPolicyConditionNotification(add *models.PolicyCondition, remove *models.PolicyCondition, update *models.PolicyCondition) {
-    if add != nil {  //conditionAdd
-		bgppolicyapi.conditionAddCh <- convertModelsToPolicyConditionConfig(add)
-	} else if remove != nil {
-		bgppolicyapi.conditionDelCh <- (convertModelsToPolicyConditionConfig(remove)).Name
-	}
+func AddPolicyCondition(condition utilspolicy.PolicyConditionConfig) {
+	bgppolicyapi.policyEngine.ConditionCfgCh <- condition
+}
+
+func RemovePolicyCondition(conditionName string) {
+	bgppolicyapi.policyEngine.ConditionDelCh <- conditionName
+}
+
+func UpdatePolicyCondition(condition utilspolicy.PolicyConditionConfig) {
+	return
+}
+
+func AddPolicyStmt(stmt utilspolicy.PolicyStmtConfig) {
+	bgppolicyapi.policyEngine.StmtCfgCh <- stmt
+}
+
+func RemovePolicyStmt(stmtName string) {
+	bgppolicyapi.policyEngine.StmtDelCh <- stmtName
+}
+
+func UpdatePolicyStmt(stmt utilspolicy.PolicyStmtConfig) {
+	return
+}
+
+func AddPolicyDefinition(definition utilspolicy.PolicyDefinitionConfig) {
+	bgppolicyapi.policyEngine.DefinitionCfgCh <- definition
+}
+
+func RemovePolicyDefinition(definitionName string) {
+	bgppolicyapi.policyEngine.DefinitionDelCh <- definitionName
+}
+
+func UpdatePolicyDefinition(definition utilspolicy.PolicyDefinitionConfig) {
+	return
 }

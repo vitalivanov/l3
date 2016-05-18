@@ -13,23 +13,22 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 // policy.go
 package server
 
 import (
 	"fmt"
+	"l3/bgp/config"
 	bgprib "l3/bgp/rib"
 	"utils/logging"
-	"l3/bgp/api"
-	"l3/bgp/config"
 	utilspolicy "utils/policy"
 )
 
@@ -73,7 +72,7 @@ func NewBGPPolicyEngine(logger *logging.Writer, pMgr config.PolicyMgrIntf) *BGPP
 		bgpPE.ActionDelCh = make(chan string)
 		bgpPE.StmtDelCh = make(chan string)
 		bgpPE.DefinitionDelCh = make(chan string)
-	    bgpPE.policyMgr = pMgr
+		bgpPE.policyMgr = pMgr
 		PolicyEngine = bgpPE
 	}
 
@@ -82,7 +81,6 @@ func NewBGPPolicyEngine(logger *logging.Writer, pMgr config.PolicyMgrIntf) *BGPP
 }
 
 func (eng *BGPPolicyEngine) StartPolicyEngine() {
-	api.InitPolicy(eng.ConditionCfgCh, eng.ConditionDelCh)
 	eng.policyMgr.Start()
 	for {
 		select {

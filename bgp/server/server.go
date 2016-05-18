@@ -13,20 +13,19 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 // server.go
 package server
 
 import (
 	"fmt"
-	"l3/bgp/api"
 	"l3/bgp/config"
 	"l3/bgp/fsm"
 	"l3/bgp/packet"
@@ -92,9 +91,9 @@ type BGPServer struct {
 	PeerCommandCh    chan config.PeerCommand
 	ReachabilityCh   chan config.ReachabilityInfo
 	BGPPktSrcCh      chan *packet.BGPPktSrc
-	bfdCh            chan config.BfdInfo
-	intfCh           chan config.IntfStateInfo
-	routesCh         chan *config.RouteCh
+	BfdCh            chan config.BfdInfo
+	IntfCh           chan config.IntfStateInfo
+	RoutesCh         chan *config.RouteCh
 	acceptCh         chan *net.TCPConn
 	GlobalCfgDone    bool
 
@@ -135,6 +134,10 @@ func NewBGPServer(logger *logging.Writer, policyEngine *bgppolicy.BGPPolicyEngin
 	bgpServer.PeerCommandCh = make(chan config.PeerCommand)
 	bgpServer.ReachabilityCh = make(chan config.ReachabilityInfo)
 	bgpServer.BGPPktSrcCh = make(chan *packet.BGPPktSrc)
+	bgpServer.BfdCh = make(chan config.BfdInfo)
+	bgpServer.IntfCh = make(chan config.IntfStateInfo)
+	bgpServer.RoutesCh = make(chan *config.RouteCh)
+
 	bgpServer.NeighborMutex = sync.RWMutex{}
 	bgpServer.PeerMap = make(map[string]*Peer)
 	bgpServer.Neighbors = make([]*Peer, 0)
@@ -1164,10 +1167,10 @@ func (server *BGPServer) listenChannelUpdates() {
 			} else {
 				reachabilityInfo.ReachableCh <- true
 			}
-		case bfdNotify := <-server.bfdCh:
+		case bfdNotify := <-server.BfdCh:
 			server.handleBfdNotifications(bfdNotify.Oper,
 				bfdNotify.DestIp, bfdNotify.State)
-		case ifState := <-server.intfCh:
+		case ifState := <-server.IntfCh:
 			if ifState.State == config.INTF_STATE_DOWN {
 				if peerList, ok := server.IfacePeerMap[ifState.Idx]; ok {
 					for _, peerIP := range peerList {
@@ -1181,7 +1184,7 @@ func (server *BGPServer) listenChannelUpdates() {
 			} else if ifState.State == config.INTF_DELETED {
 				server.ifaceMgr.RemoveIface(ifState.Idx, ifState.IPAddr)
 			}
-		case routeInfo := <-server.routesCh:
+		case routeInfo := <-server.RoutesCh:
 			server.ProcessConnectedRoutes(routeInfo.Add, routeInfo.Remove)
 		}
 	}
@@ -1203,18 +1206,11 @@ func (server *BGPServer) StartServer() {
 	server.logger.Info("Setting up Peer connections")
 	// channel for accepting connections
 	server.acceptCh = make(chan *net.TCPConn)
-	// Channel for handling BFD notifications
-	server.bfdCh = make(chan config.BfdInfo)
-	// Channel for handling Interface notifications
-	server.intfCh = make(chan config.IntfStateInfo)
-	// Channel for handling route notifications
-	server.routesCh = make(chan *config.RouteCh)
 
 	server.listener, _ = server.createListener()
 	go server.listenForPeers(server.listener, server.acceptCh)
 
 	server.logger.Info("Start all managers and initialize API Layer")
-	api.Init(server.bfdCh, server.intfCh, server.routesCh)
 	server.IntfMgr.Start()
 	server.routeMgr.Start()
 	server.bfdMgr.Start()
