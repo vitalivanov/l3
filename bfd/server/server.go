@@ -1,3 +1,26 @@
+//
+//Copyright [2016] [SnapRoute Inc]
+//
+//Licensed under the Apache License, Version 2.0 (the "License");
+//you may not use this file except in compliance with the License.
+//You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+//	 Unless required by applicable law or agreed to in writing, software
+//	 distributed under the License is distributed on an "AS IS" BASIS,
+//	 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//	 See the License for the specific language governing permissions and
+//	 limitations under the License.
+//
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
+//                                                                                                           
+
 package server
 
 import (
@@ -5,7 +28,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"git.apache.org/thrift.git/lib/go/thrift"
-	"github.com/garyburd/redigo/redis"
 	"github.com/google/gopacket/pcap"
 	nanomsg "github.com/op/go-nanomsg"
 	"io/ioutil"
@@ -17,6 +39,7 @@ import (
 	"strconv"
 	"syscall"
 	"time"
+	"utils/dbutils"
 	"utils/ipcutils"
 	"utils/logging"
 )
@@ -50,13 +73,6 @@ type IpIntfProperty struct {
 	NetMask []byte
 }
 
-type BfdInterface struct {
-	Enabled     bool
-	NumSessions int32
-	conf        IntfConfig
-	property    IpIntfProperty
-}
-
 type BfdSessionMgmt struct {
 	DestIp    string
 	ParamName string
@@ -67,36 +83,38 @@ type BfdSessionMgmt struct {
 }
 
 type BfdSession struct {
-	state                       SessionState
-	rxInterval                  int32
-	sessionTimer                *time.Timer
-	txInterval                  int32
-	txTimer                     *time.Timer
-	TxTimeoutCh                 chan int32
-	txJitter                    int32
-	SessionTimeoutCh            chan int32
-	bfdPacket                   *BfdControlPacket
-	bfdPacketBuf                []byte
-	ReceivedPacketCh            chan *BfdControlPacket
-	SessionStopClientCh         chan bool
-	pollSequence                bool
-	pollSequenceFinal           bool
-	authEnabled                 bool
-	authType                    AuthenticationType
-	authSeqNum                  uint32
-	authKeyId                   uint32
-	authData                    string
-	txConn                      net.Conn
-	sendPcapHandle              *pcap.Handle
-	recvPcapHandle              *pcap.Handle
-	useDedicatedMac             bool
-	intfConfigChanged           bool
-	paramConfigChanged          bool
-	stateChanged                bool
-	isClientActive              bool
-	remoteParamChanged          bool
-	switchingToConfiguredTimers bool
-	server                      *BFDServer
+	state               SessionState
+	rxInterval          int32
+	sessionTimer        *time.Timer
+	txInterval          int32
+	txTimer             *time.Timer
+	TxTimeoutCh         chan int32
+	txJitter            int32
+	SessionTimeoutCh    chan int32
+	bfdPacket           *BfdControlPacket
+	bfdPacketBuf        []byte
+	ReceivedPacketCh    chan *BfdControlPacket
+	SessionStopClientCh chan bool
+	SessionStopServerCh chan bool
+	pollSequence        bool
+	pollSequenceFinal   bool
+	pollChanged         bool
+	authEnabled         bool
+	authType            AuthenticationType
+	authSeqNum          uint32
+	authKeyId           uint32
+	authData            string
+	txConn              net.Conn
+	sendPcapHandle      *pcap.Handle
+	recvPcapHandle      *pcap.Handle
+	useDedicatedMac     bool
+	paramChanged        bool
+	remoteParamChanged  bool
+	stateChanged        bool
+	isClientActive      bool
+	movedToDownState    bool
+	notifiedState       bool
+	server              *BFDServer
 }
 
 type BfdSessionParam struct {
@@ -105,9 +123,6 @@ type BfdSessionParam struct {
 
 type BfdGlobal struct {
 	Enabled                 bool
-	NumInterfaces           uint32
-	Interfaces              map[int32]*BfdInterface
-	InterfacesIdSlice       []int32
 	NumSessions             uint32
 	Sessions                map[int32]*BfdSession
 	SessionsIdSlice         []int32
@@ -139,7 +154,6 @@ type BFDServer struct {
 	ribdSubSocketErrCh    chan error
 	portPropertyMap       map[int32]PortProperty
 	vlanPropertyMap       map[int32]VlanProperty
-	IPIntfPropertyMap     map[string]IPIntfProperty
 	CreateSessionCh       chan BfdSessionMgmt
 	DeleteSessionCh       chan BfdSessionMgmt
 	AdminUpSessionCh      chan BfdSessionMgmt
@@ -173,9 +187,6 @@ func NewBFDServer(logger *logging.Writer) *BFDServer {
 	bfdServer.SessionParamConfigCh = make(chan SessionParamConfig)
 	bfdServer.SessionParamDeleteCh = make(chan string)
 	bfdServer.bfdGlobal.Enabled = false
-	bfdServer.bfdGlobal.NumInterfaces = 0
-	bfdServer.bfdGlobal.Interfaces = make(map[int32]*BfdInterface)
-	bfdServer.bfdGlobal.InterfacesIdSlice = []int32{}
 	bfdServer.bfdGlobal.NumSessions = 0
 	bfdServer.bfdGlobal.Sessions = make(map[int32]*BfdSession)
 	bfdServer.bfdGlobal.SessionsIdSlice = []int32{}
@@ -188,7 +199,7 @@ func NewBFDServer(logger *logging.Writer) *BFDServer {
 	return bfdServer
 }
 
-func (server *BFDServer) SigHandler(dbHdl redis.Conn) {
+func (server *BFDServer) SigHandler(dbHdl *dbutils.DBUtil) {
 	sigChan := make(chan os.Signal, 1)
 	signalList := []os.Signal{syscall.SIGHUP}
 	signal.Notify(sigChan, signalList...)
@@ -204,7 +215,7 @@ func (server *BFDServer) SigHandler(dbHdl redis.Conn) {
 				server.SendDeleteToAllSessions()
 				time.Sleep(500 * time.Millisecond)
 				server.logger.Info("Stopped all sessions")
-				dbHdl.Close()
+				dbHdl.Disconnect()
 				server.logger.Info("Exting!!!")
 				os.Exit(0)
 			default:
@@ -322,11 +333,10 @@ func (server *BFDServer) InitServer(paramFile string) {
 	server.initBfdGlobalConfDefault()
 	server.BuildPortPropertyMap()
 	server.BuildLagPropertyMap()
-	server.BuildIPv4InterfacesMap()
 	server.createDefaultSessionParam()
 }
 
-func (server *BFDServer) StartServer(paramFile string, dbHdl redis.Conn) {
+func (server *BFDServer) StartServer(paramFile string, dbHdl *dbutils.DBUtil) {
 	// Initialize BFD server from params file
 	server.InitServer(paramFile)
 	// Start subcriber for ASICd events

@@ -1,7 +1,6 @@
 namespace go ribdInt
 typedef i32 int
 struct NextHopInfo {
-	1: int NextHopIfType,
     2: string NextHopIp,
     3: int NextHopIfIndex,
 	4: int Metric,
@@ -13,7 +12,6 @@ struct Routes {
 	1: string Ipaddr,
 	2: string Mask,
 	3: string NextHopIp,
-	4: int NextHopIfType
 	5: int IfIndex,
 	6: int Metric,
 	7: int Prototype,
@@ -29,6 +27,7 @@ struct Routes {
 	16: string DestNetIp
 	17: bool NetworkStatement
 	18: string RouteOrigin
+	19: int Weight
 }
 struct RoutesGetInfo {
 	1: int StartIdx,
@@ -36,6 +35,16 @@ struct RoutesGetInfo {
 	3: int Count,
 	4: bool More,
 	5: list<Routes> RouteList,
+}
+struct PolicyAction {
+	1 : string Name
+	2 : string ActionType
+	3 : i32 SetAdminDistanceValue
+	4 : bool Accept
+	5 : bool Reject
+	6 : string RedistributeAction
+	7 : string RedistributeTargetProtocol
+	8 : string NetworkStatementTargetProtocol
 }
 struct PolicyPrefix {
 	1 : string	IpPrefix,
@@ -61,10 +70,16 @@ struct IPv4Route {
 	2 : string NetworkMask
 	3 : string NextHopIp
 	4 : i32 Cost
-	5 : string OutgoingIntfType
-	6 : string OutgoingInterface
+	6 : string NextHopIntRef
 	7 : string Protocol
 	8 : string CreateTime
+	9 : i32    Weight
+}
+struct ConditionInfo {
+	1 : string ConditionType
+	2 : string Protocol
+	3 : string IpPrefix
+	4 : string MasklengthRange 
 }
 
 service RIBDINTServices 
@@ -78,5 +93,9 @@ service RIBDINTServices
 	//RoutesGetInfo getBulkRoutes(1: int fromIndex, 2: int count);
 	Routes getRoute(1: string destNetIp, 2:string networkMask);
 	oneway void OnewayCreateBulkIPv4Route(1: list<IPv4Route> config);
-	
+	bool CreatePolicyAction(1: PolicyAction config);
+	bool UpdatePolicyAction(1: PolicyAction origconfig, 2: PolicyAction newconfig, 3: list<bool> attrset, 4: string op);
+	bool DeletePolicyAction(1: PolicyAction config);
+	void ApplyPolicy(1: string source, 2: string policy, 3: string action, 4: list<ConditionInfo>conditions)
+	void UpdateApplyPolicy(1: string source, 2: string policy, 3: string action, 4: list<ConditionInfo>conditions)
 }

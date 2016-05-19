@@ -1,3 +1,26 @@
+//
+//Copyright [2016] [SnapRoute Inc]
+//
+//Licensed under the Apache License, Version 2.0 (the "License");
+//you may not use this file except in compliance with the License.
+//You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+//	 Unless required by applicable law or agreed to in writing, software
+//	 distributed under the License is distributed on an "AS IS" BASIS,
+//	 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//	 See the License for the specific language governing permissions and
+//	 limitations under the License.
+//
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
+//                                                                                                           
+
 // peer.go
 package server
 
@@ -45,13 +68,20 @@ func (p *Peer) UpdateNeighborConf(nConf config.NeighborConfig, bgp *config.Bgp) 
 	p.NeighborConf.UpdateNeighborConf(nConf, bgp)
 }
 
-func (p *Peer) Init() {
-	if p.NeighborConf.RunningConf.BfdEnable &&
-		p.NeighborConf.Neighbor.State.BfdNeighborState == "down" {
-		p.logger.Info(fmt.Sprintf("Neighbor's bfd state is down for %s\n",
-			p.NeighborConf.Neighbor.NeighborAddress))
-		return
+func (p *Peer) IsBfdStateUp() bool {
+	up := true
+	if p.NeighborConf.Neighbor.State.UseBfdState {
+		if p.NeighborConf.RunningConf.BfdEnable &&
+			p.NeighborConf.Neighbor.State.BfdNeighborState == "down" {
+			p.logger.Info(fmt.Sprintf("Neighbor's bfd state is down for %s\n",
+				p.NeighborConf.Neighbor.NeighborAddress))
+			up = false
+		}
 	}
+	return up
+}
+
+func (p *Peer) Init() {
 	if p.fsmManager == nil {
 		p.logger.Info(fmt.Sprintf("Instantiating new FSM Manager for neighbor %s\n",
 			p.NeighborConf.Neighbor.NeighborAddress))
@@ -85,13 +115,6 @@ func (p *Peer) getIfIdx() int32 {
 }
 
 func (p *Peer) AcceptConn(conn *net.TCPConn) {
-	if p.NeighborConf.RunningConf.BfdEnable &&
-		p.NeighborConf.Neighbor.State.BfdNeighborState == "down" {
-		p.logger.Info(fmt.Sprintf("Neighbor's bfd state is down for %s\n",
-			p.NeighborConf.Neighbor.NeighborAddress))
-		(*conn).Close()
-		return
-	}
 	if p.fsmManager == nil {
 		p.logger.Info(fmt.Sprintf("FSM Manager is not instantiated yet for neighbor %s\n",
 			p.NeighborConf.Neighbor.NeighborAddress))
@@ -166,10 +189,10 @@ func (p *Peer) clearRibOut() {
 	}
 }
 
-func (p *Peer) ProcessBfd() {
+func (p *Peer) ProcessBfd(add bool) {
 	ipAddr := p.NeighborConf.Neighbor.NeighborAddress.String()
 	sessionParam := p.NeighborConf.RunningConf.BfdSessionParam
-	if p.NeighborConf.RunningConf.BfdEnable {
+	if add && p.NeighborConf.RunningConf.BfdEnable {
 		p.logger.Info(fmt.Sprintln("Bfd enabled on :",
 			p.NeighborConf.Neighbor.NeighborAddress))
 		ret, err := p.Server.bfdMgr.CreateBfdSession(ipAddr, sessionParam)
@@ -206,8 +229,8 @@ func (p *Peer) PeerConnEstablished(conn *net.Conn) {
 		return
 	}
 	p.NeighborConf.Neighbor.Transport.Config.LocalAddress = net.ParseIP(host)
+	p.NeighborConf.PeerConnEstablished()
 	p.clearRibOut()
-	p.ProcessBfd()
 	//p.Server.PeerConnEstCh <- p.Neighbor.NeighborAddress.String()
 }
 
@@ -216,13 +239,7 @@ func (p *Peer) PeerConnBroken(fsmCleanup bool) {
 		p.NeighborConf.Neighbor.Transport.Config.LocalAddress = nil
 		//p.Server.PeerConnBrokenCh <- p.Neighbor.NeighborAddress.String()
 	}
-
-	p.NeighborConf.Neighbor.State.ConnectRetryTime = p.NeighborConf.RunningConf.ConnectRetryTime
-	p.NeighborConf.Neighbor.State.HoldTime = p.NeighborConf.RunningConf.HoldTime
-	p.NeighborConf.Neighbor.State.KeepaliveTime = p.NeighborConf.RunningConf.KeepaliveTime
-	p.NeighborConf.Neighbor.State.AddPathsRx = false
-	p.NeighborConf.Neighbor.State.AddPathsMaxTx = 0
-	p.NeighborConf.Neighbor.State.TotalPrefixes = 0
+	p.NeighborConf.PeerConnBroken()
 	p.clearRibOut()
 }
 

@@ -1,3 +1,26 @@
+//
+//Copyright [2016] [SnapRoute Inc]
+//
+//Licensed under the Apache License, Version 2.0 (the "License");
+//you may not use this file except in compliance with the License.
+//You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+//	 Unless required by applicable law or agreed to in writing, software
+//	 distributed under the License is distributed on an "AS IS" BASIS,
+//	 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//	 See the License for the specific language governing permissions and
+//	 limitations under the License.
+//
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
+//                                                                                                           
+
 package server
 
 import (
@@ -8,7 +31,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"git.apache.org/thrift.git/lib/go/thrift"
-	"github.com/garyburd/redigo/redis"
 	"github.com/op/go-nanomsg"
 	"io/ioutil"
 	"l3/rib/ribdCommonDefs"
@@ -18,6 +40,7 @@ import (
 	"strconv"
 	"time"
 	"utils/commonDefs"
+	"utils/dbutils"
 	"utils/ipcutils"
 	"utils/logging"
 	"utils/patriciaDB"
@@ -29,6 +52,7 @@ type UpdateRouteInfo struct {
 	OrigRoute *ribd.IPv4Route
 	NewRoute  *ribd.IPv4Route
 	Attrset   []bool
+	Op        string
 }
 type TrackReachabilityInfo struct {
 	IpAddr   string
@@ -41,15 +65,20 @@ type NextHopInfoKey struct {
 type NextHopInfo struct {
 	refCount int //number of routes using this as a next hop
 }
+type ApplyPolicyInfo struct {
+	Source     string
+	Policy     string
+	Action     string
+	Conditions []*ribdInt.ConditionInfo
+}
 type RIBDServer struct {
 	Logger                       *logging.Writer
 	PolicyEngineDB               *policy.PolicyEngineDB
+	GlobalPolicyEngineDB         *policy.PolicyEngineDB
 	TrackReachabilityCh          chan TrackReachabilityInfo
 	RouteCreateConfCh            chan *ribd.IPv4Route
 	RouteDeleteConfCh            chan *ribd.IPv4Route
 	RouteUpdateConfCh            chan UpdateRouteInfo
-	NetlinkAddRouteCh            chan RouteInfoRecord
-	NetlinkDelRouteCh            chan RouteInfoRecord
 	AsicdAddRouteCh              chan RouteInfoRecord
 	AsicdDelRouteCh              chan RouteInfoRecord
 	ArpdResolveRouteCh           chan RouteInfoRecord
@@ -59,18 +88,22 @@ type RIBDServer struct {
 	PolicyConditionCreateConfCh  chan *ribd.PolicyCondition
 	PolicyConditionDeleteConfCh  chan *ribd.PolicyCondition
 	PolicyConditionUpdateConfCh  chan *ribd.PolicyCondition
-	PolicyActionCreateConfCh     chan *ribd.PolicyAction
-	PolicyActionDeleteConfCh     chan *ribd.PolicyAction
-	PolicyActionUpdateConfCh     chan *ribd.PolicyAction
+	PolicyActionCreateConfCh     chan *ribdInt.PolicyAction
+	PolicyActionDeleteConfCh     chan *ribdInt.PolicyAction
+	PolicyActionUpdateConfCh     chan *ribdInt.PolicyAction
 	PolicyStmtCreateConfCh       chan *ribd.PolicyStmt
 	PolicyStmtDeleteConfCh       chan *ribd.PolicyStmt
 	PolicyStmtUpdateConfCh       chan *ribd.PolicyStmt
 	PolicyDefinitionCreateConfCh chan *ribd.PolicyDefinition
 	PolicyDefinitionDeleteConfCh chan *ribd.PolicyDefinition
 	PolicyDefinitionUpdateConfCh chan *ribd.PolicyDefinition
+	PolicyApplyCh                chan ApplyPolicyInfo
+	PolicyUpdateApplyCh          chan ApplyPolicyInfo
+	DBRouteAddCh                 chan RouteDBInfo
+	DBRouteDelCh                 chan RouteDBInfo
 	AcceptConfig                 bool
 	ServerUpCh                   chan bool
-	DbHdl                        redis.Conn
+	DbHdl                        *dbutils.DBUtil
 	//RouteInstallCh                 chan RouteParams
 }
 
@@ -150,6 +183,8 @@ var logger *logging.Writer
 var AsicdSub *nanomsg.SubSocket
 var RouteServiceHandler *RIBDServer
 var IntfIdNameMap map[int32]IntfEntry
+var IfNameToIfIndex map[string]int32
+var GlobalPolicyEngineDB *policy.PolicyEngineDB
 var PolicyEngineDB *policy.PolicyEngineDB
 var PARAMSDIR string
 
@@ -192,8 +227,8 @@ func (ribdServiceHandler *RIBDServer) ProcessL3IntfUpEvent(ipAddr string) {
 			logger.Info(fmt.Sprintln("Add this route with destAddress = %s, nwMask = %s\n", ConnectedRoutes[i].Ipaddr, ConnectedRoutes[i].Mask))
 
 			ConnectedRoutes[i].IsValid = true
-			policyRoute := ribdInt.Routes{Ipaddr: ConnectedRoutes[i].Ipaddr, Mask: ConnectedRoutes[i].Mask, NextHopIp: ConnectedRoutes[i].NextHopIp, NextHopIfType: ConnectedRoutes[i].NextHopIfType, IfIndex: ConnectedRoutes[i].IfIndex, Metric: ConnectedRoutes[i].Metric, Prototype: ConnectedRoutes[i].Prototype}
-			params := RouteParams{destNetIp: ConnectedRoutes[i].Ipaddr, networkMask: ConnectedRoutes[i].Mask, nextHopIp: ConnectedRoutes[i].NextHopIp, nextHopIfType: ribd.Int(ConnectedRoutes[i].NextHopIfType), nextHopIfIndex: ribd.Int(ConnectedRoutes[i].IfIndex), metric: ribd.Int(ConnectedRoutes[i].Metric), routeType: ribd.Int(ConnectedRoutes[i].Prototype), sliceIdx: ribd.Int(ConnectedRoutes[i].SliceIdx), createType: FIBOnly, deleteType: Invalid}
+			policyRoute := ribdInt.Routes{Ipaddr: ConnectedRoutes[i].Ipaddr, Mask: ConnectedRoutes[i].Mask, NextHopIp: ConnectedRoutes[i].NextHopIp, IfIndex: ConnectedRoutes[i].IfIndex, Metric: ConnectedRoutes[i].Metric, Prototype: ConnectedRoutes[i].Prototype}
+			params := RouteParams{destNetIp: ConnectedRoutes[i].Ipaddr, networkMask: ConnectedRoutes[i].Mask, nextHopIp: ConnectedRoutes[i].NextHopIp, nextHopIfIndex: ribd.Int(ConnectedRoutes[i].IfIndex), metric: ribd.Int(ConnectedRoutes[i].Metric), routeType: ribd.Int(ConnectedRoutes[i].Prototype), sliceIdx: ribd.Int(ConnectedRoutes[i].SliceIdx), createType: FIBOnly, deleteType: Invalid}
 			PolicyEngineFilter(policyRoute, policyCommonDefs.PolicyPath_Import, params)
 		}
 	}
@@ -224,6 +259,10 @@ func getLogicalIntfInfo() {
 			}
 			intfEntry := IntfEntry{name: bulkInfo.LogicalIntfStateList[i].Name}
 			IntfIdNameMap[ifId] = intfEntry
+			if IfNameToIfIndex == nil {
+				IfNameToIfIndex = make(map[string]int32)
+			}
+			IfNameToIfIndex[bulkInfo.LogicalIntfStateList[i].Name] = ifId
 		}
 		if bulkInfo.More == false {
 			logger.Println("more returned as false, so no more get bulks")
@@ -257,6 +296,10 @@ func getVlanInfo() {
 			}
 			intfEntry := IntfEntry{name: bulkInfo.VlanStateList[i].VlanName}
 			IntfIdNameMap[ifId] = intfEntry
+			if IfNameToIfIndex == nil {
+				IfNameToIfIndex = make(map[string]int32)
+			}
+			IfNameToIfIndex[bulkInfo.VlanStateList[i].VlanName] = ifId
 		}
 		if bulkInfo.More == false {
 			logger.Println("more returned as false, so no more get bulks")
@@ -291,6 +334,10 @@ func getPortInfo() {
 			}
 			intfEntry := IntfEntry{name: bulkInfo.PortStateList[i].Name}
 			IntfIdNameMap[ifId] = intfEntry
+			if IfNameToIfIndex == nil {
+				IfNameToIfIndex = make(map[string]int32)
+			}
+			IfNameToIfIndex[bulkInfo.PortStateList[i].Name] = ifId
 		}
 		if bulkInfo.More == false {
 			logger.Info(fmt.Sprintln("more returned as false, so no more get bulks"))
@@ -311,6 +358,7 @@ func (ribdServiceHandler *RIBDServer) AcceptConfigActions() {
 	getConnectedRoutes()
 	ribdServiceHandler.UpdateRoutesFromDB()
 	go ribdServiceHandler.SetupEventHandler(AsicdSub, asicdCommonDefs.PUB_SOCKET_ADDR, SUB_ASICD)
+	logger.Info("All set to signal start the RIBd server")
 	ribdServiceHandler.ServerUpCh <- true
 }
 func (ribdServiceHandler *RIBDServer) connectToClient(client ClientJson) {
@@ -405,6 +453,26 @@ func (ribdServiceHandler *RIBDServer) ConnectToClients(paramsFile string) {
 	}
 }
 
+func (ribdServiceHandler *RIBDServer) InitializeGlobalPolicyDB() *policy.PolicyEngineDB {
+	ribdServiceHandler.GlobalPolicyEngineDB = policy.NewPolicyEngineDB(logger)
+	ribdServiceHandler.GlobalPolicyEngineDB.SetDefaultImportPolicyActionFunc(defaultImportPolicyEngineActionFunc)
+	ribdServiceHandler.GlobalPolicyEngineDB.SetDefaultExportPolicyActionFunc(defaultExportPolicyEngineActionFunc)
+	ribdServiceHandler.GlobalPolicyEngineDB.SetIsEntityPresentFunc(DoesRouteExist)
+	ribdServiceHandler.GlobalPolicyEngineDB.SetEntityUpdateFunc(UpdateRouteAndPolicyDB)
+	ribdServiceHandler.GlobalPolicyEngineDB.SetActionFunc(policyCommonDefs.PolicyActionTypeRouteDisposition, policyEngineRouteDispositionAction)
+	ribdServiceHandler.GlobalPolicyEngineDB.SetActionFunc(policyCommonDefs.PolicyActionTypeRouteRedistribute, policyEngineActionRedistribute)
+	ribdServiceHandler.GlobalPolicyEngineDB.SetActionFunc(policyCommonDefs.PolicyActionTypeNetworkStatementAdvertise, policyEngineActionNetworkStatementAdvertise)
+	ribdServiceHandler.GlobalPolicyEngineDB.SetActionFunc(policyCommonDefs.PoilcyActionTypeSetAdminDistance, policyEngineActionSetAdminDistance)
+	ribdServiceHandler.GlobalPolicyEngineDB.SetUndoActionFunc(policyCommonDefs.PolicyActionTypeRouteDisposition, policyEngineUndoRouteDispositionAction)
+	ribdServiceHandler.GlobalPolicyEngineDB.SetUndoActionFunc(policyCommonDefs.PolicyActionTypeRouteRedistribute, policyEngineActionUndoRedistribute)
+	ribdServiceHandler.GlobalPolicyEngineDB.SetUndoActionFunc(policyCommonDefs.PoilcyActionTypeSetAdminDistance, policyEngineActionUndoSetAdminDistance)
+	ribdServiceHandler.GlobalPolicyEngineDB.SetUndoActionFunc(policyCommonDefs.PolicyActionTypeNetworkStatementAdvertise, policyEngineActionUndoNetworkStatemenAdvertiseAction)
+	ribdServiceHandler.GlobalPolicyEngineDB.SetTraverseAndApplyPolicyFunc(policyEngineTraverseAndApply)
+	ribdServiceHandler.GlobalPolicyEngineDB.SetTraverseAndReversePolicyFunc(policyEngineTraverseAndReverse)
+	ribdServiceHandler.GlobalPolicyEngineDB.SetGetPolicyEntityMapIndexFunc(getPolicyRouteMapIndex)
+	return ribdServiceHandler.GlobalPolicyEngineDB
+}
+
 func (ribdServiceHandler *RIBDServer) InitializePolicyDB() *policy.PolicyEngineDB {
 	ribdServiceHandler.PolicyEngineDB = policy.NewPolicyEngineDB(logger)
 	ribdServiceHandler.PolicyEngineDB.SetDefaultImportPolicyActionFunc(defaultImportPolicyEngineActionFunc)
@@ -424,7 +492,7 @@ func (ribdServiceHandler *RIBDServer) InitializePolicyDB() *policy.PolicyEngineD
 	ribdServiceHandler.PolicyEngineDB.SetGetPolicyEntityMapIndexFunc(getPolicyRouteMapIndex)
 	return ribdServiceHandler.PolicyEngineDB
 }
-func NewRIBDServicesHandler(dbHdl redis.Conn, loggerC *logging.Writer) *RIBDServer {
+func NewRIBDServicesHandler(dbHdl *dbutils.DBUtil, loggerC *logging.Writer) *RIBDServer {
 	fmt.Println("NewRIBDServicesHandler")
 	RouteInfoMap = patriciaDB.NewTrie()
 	ribdServicesHandler := &RIBDServer{}
@@ -442,8 +510,6 @@ func NewRIBDServicesHandler(dbHdl redis.Conn, loggerC *logging.Writer) *RIBDServ
 	ribdServicesHandler.RouteCreateConfCh = make(chan *ribd.IPv4Route, 5000)
 	ribdServicesHandler.RouteDeleteConfCh = make(chan *ribd.IPv4Route)
 	ribdServicesHandler.RouteUpdateConfCh = make(chan UpdateRouteInfo)
-	ribdServicesHandler.NetlinkAddRouteCh = make(chan RouteInfoRecord, 5000)
-	ribdServicesHandler.NetlinkDelRouteCh = make(chan RouteInfoRecord, 100)
 	ribdServicesHandler.AsicdAddRouteCh = make(chan RouteInfoRecord, 5000)
 	ribdServicesHandler.AsicdDelRouteCh = make(chan RouteInfoRecord, 1000)
 	ribdServicesHandler.ArpdResolveRouteCh = make(chan RouteInfoRecord, 5000)
@@ -452,15 +518,19 @@ func NewRIBDServicesHandler(dbHdl redis.Conn, loggerC *logging.Writer) *RIBDServ
 	ribdServicesHandler.PolicyConditionCreateConfCh = make(chan *ribd.PolicyCondition)
 	ribdServicesHandler.PolicyConditionDeleteConfCh = make(chan *ribd.PolicyCondition)
 	ribdServicesHandler.PolicyConditionUpdateConfCh = make(chan *ribd.PolicyCondition)
-	ribdServicesHandler.PolicyActionCreateConfCh = make(chan *ribd.PolicyAction)
-	ribdServicesHandler.PolicyActionDeleteConfCh = make(chan *ribd.PolicyAction)
-	ribdServicesHandler.PolicyActionUpdateConfCh = make(chan *ribd.PolicyAction)
+	ribdServicesHandler.PolicyActionCreateConfCh = make(chan *ribdInt.PolicyAction)
+	ribdServicesHandler.PolicyActionDeleteConfCh = make(chan *ribdInt.PolicyAction)
+	ribdServicesHandler.PolicyActionUpdateConfCh = make(chan *ribdInt.PolicyAction)
 	ribdServicesHandler.PolicyStmtCreateConfCh = make(chan *ribd.PolicyStmt)
 	ribdServicesHandler.PolicyStmtDeleteConfCh = make(chan *ribd.PolicyStmt)
 	ribdServicesHandler.PolicyStmtUpdateConfCh = make(chan *ribd.PolicyStmt)
 	ribdServicesHandler.PolicyDefinitionCreateConfCh = make(chan *ribd.PolicyDefinition)
 	ribdServicesHandler.PolicyDefinitionDeleteConfCh = make(chan *ribd.PolicyDefinition)
 	ribdServicesHandler.PolicyDefinitionUpdateConfCh = make(chan *ribd.PolicyDefinition)
+	ribdServicesHandler.PolicyApplyCh = make(chan ApplyPolicyInfo, 100)
+	ribdServicesHandler.PolicyUpdateApplyCh = make(chan ApplyPolicyInfo, 100)
+	ribdServicesHandler.DBRouteAddCh = make(chan RouteDBInfo)
+	ribdServicesHandler.DBRouteDelCh = make(chan RouteDBInfo)
 	ribdServicesHandler.ServerUpCh = make(chan bool)
 	ribdServicesHandler.DbHdl = dbHdl
 	RouteServiceHandler = ribdServicesHandler
@@ -469,22 +539,24 @@ func NewRIBDServicesHandler(dbHdl redis.Conn, loggerC *logging.Writer) *RIBDServ
 	BuildProtocolAdminDistanceMapDB()
 	BuildPublisherMap()
 	PolicyEngineDB = ribdServicesHandler.InitializePolicyDB()
+	GlobalPolicyEngineDB = ribdServicesHandler.InitializeGlobalPolicyDB()
 	return ribdServicesHandler
 }
 func (ribdServiceHandler *RIBDServer) StartServer(paramsDir string) {
-	fmt.Println("StartServer")
 	DummyRouteInfoRecord.protocol = PROTOCOL_NONE
 	configFile := paramsDir + "/clients.json"
-	logger.Info(fmt.Sprintln("configfile = ", configFile))
+	logger.Debug(fmt.Sprintln("configfile = ", configFile))
 	PARAMSDIR = paramsDir
-	//RIBD_BGPD_PUB = InitPublisher(ribdCommonDefs.PUB_SOCKET_BGPD_ADDR)
-	//CreateRoutes("RouteSetup.json")
 	ribdServiceHandler.UpdatePolicyObjectsFromDB() //(paramsDir)
 	ribdServiceHandler.ConnectToClients(configFile)
-	logger.Println("Starting the server loop")
+	logger.Debug("Starting the server loop")
+	count := 0
 	for {
 		if !RouteServiceHandler.AcceptConfig {
-			logger.Println("Not ready to accept config")
+			if count%1000 == 0 {
+				logger.Debug("RIBD not ready to accept config")
+			}
+			count++
 			continue
 		}
 		select {
@@ -496,34 +568,15 @@ func (ribdServiceHandler *RIBDServer) StartServer(paramsDir string) {
 			ribdServiceHandler.ProcessRouteDeleteConfig(routeDeleteConf)
 		case routeUpdateConf := <-ribdServiceHandler.RouteUpdateConfCh:
 			logger.Info("received message on RouteUpdateConfCh channel")
-			ribdServiceHandler.ProcessRouteUpdateConfig(routeUpdateConf.OrigRoute, routeUpdateConf.NewRoute, routeUpdateConf.Attrset)
+			ribdServiceHandler.ProcessRouteUpdateConfig(routeUpdateConf.OrigRoute, routeUpdateConf.NewRoute, routeUpdateConf.Attrset, routeUpdateConf.Op)
 			/*		case routeInfo := <-ribdServiceHandler.RouteInstallCh:
 			    logger.Println("received message on RouteInstallConfCh channel")
 				ribdServiceHandler.ProcessRouteInstall(routeInfo)*/
-		case condCreateConf := <-ribdServiceHandler.PolicyConditionCreateConfCh:
-			logger.Info("received message on PolicyConditionCreateConfCh channel")
-			ribdServiceHandler.ProcessPolicyConditionConfigCreate(condCreateConf)
-		case condDeleteConf := <-ribdServiceHandler.PolicyConditionDeleteConfCh:
-			logger.Info("received message on PolicyConditionDeleteConfCh channel")
-			ribdServiceHandler.ProcessPolicyConditionConfigDelete(condDeleteConf)
-		case actionCreateConf := <-ribdServiceHandler.PolicyActionCreateConfCh:
-			logger.Info("received message on PolicyActionCreateConfCh channel")
-			ribdServiceHandler.ProcessPolicyActionConfigCreate(actionCreateConf)
-		case actionDeleteConf := <-ribdServiceHandler.PolicyActionDeleteConfCh:
-			logger.Info("received message on PolicyActionDeleteConfCh channel")
-			ribdServiceHandler.ProcessPolicyActionConfigDelete(actionDeleteConf)
-		case stmtCreateConf := <-ribdServiceHandler.PolicyStmtCreateConfCh:
-			logger.Info("received message on PolicyStmtCreateConfCh channel")
-			ribdServiceHandler.ProcessPolicyStmtConfigCreate(stmtCreateConf)
-		case stmtDeleteConf := <-ribdServiceHandler.PolicyStmtDeleteConfCh:
-			logger.Info("received message on PolicyStmtDeleteConfCh channel")
-			ribdServiceHandler.ProcessPolicyStmtConfigDelete(stmtDeleteConf)
-		case policyCreateConf := <-ribdServiceHandler.PolicyDefinitionCreateConfCh:
-			logger.Info("received message on PolicyDefinitionCreateConfCh channel")
-			ribdServiceHandler.ProcessPolicyDefinitionConfigCreate(policyCreateConf)
-		case policyDeleteConf := <-ribdServiceHandler.PolicyDefinitionDeleteConfCh:
-			logger.Info("received message on PolicyDefinitionDeleteConfCh channel")
-			ribdServiceHandler.ProcessPolicyDefinitionConfigDelete(policyDeleteConf)
+		case info := <-ribdServiceHandler.PolicyApplyCh:
+			logger.Info("received message on PolicyApplyCh channel")
+			//update the local policyEngineDB
+			ribdServiceHandler.UpdateApplyPolicy(info, true, PolicyEngineDB)
+			ribdServiceHandler.PolicyUpdateApplyCh <- info
 		case info := <-ribdServiceHandler.TrackReachabilityCh:
 			logger.Info("received message on TrackReachabilityCh channel")
 			ribdServiceHandler.TrackReachabilityStatus(info.IpAddr, info.Protocol, info.Op)

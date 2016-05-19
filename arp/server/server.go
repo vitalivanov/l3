@@ -1,23 +1,38 @@
+//
+//Copyright [2016] [SnapRoute Inc]
+//
+//Licensed under the Apache License, Version 2.0 (the "License");
+//you may not use this file except in compliance with the License.
+//You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+//       Unless required by applicable law or agreed to in writing, software
+//       distributed under the License is distributed on an "AS IS" BASIS,
+//       WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//       See the License for the specific language governing permissions and
+//       limitations under the License.
+//
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
+//                                                                                                           
+
 package server
 
 import (
-	"asicd/asicdCommonDefs"
-	"encoding/json"
 	"fmt"
-	"git.apache.org/thrift.git/lib/go/thrift"
-	"github.com/garyburd/redigo/redis"
-	nanomsg "github.com/op/go-nanomsg"
-	"io/ioutil"
 	"os"
 	"os/signal"
-	"strconv"
 	"syscall"
 	"time"
-	"utils/ipcutils"
+	"utils/asicdClient"
+	"utils/commonDefs"
+	"utils/dbutils"
 	"utils/logging"
-	//"github.com/google/gopacket/pcap"
-	"asicdServices"
-	//"utils/commonDefs"
 )
 
 type ClientJson struct {
@@ -26,12 +41,11 @@ type ClientJson struct {
 }
 
 type ArpEntry struct {
-	MacAddr string
-	VlanId  int
-	IfName  string
-	L3IfIdx int
-	Counter int
-	//Valid           bool
+	MacAddr   string
+	VlanId    int
+	IfName    string
+	L3IfIdx   int
+	Counter   int
 	TimeStamp time.Time
 	PortNum   int
 	Type      bool //True : RIB False: RX
@@ -51,24 +65,34 @@ type ResolveIPv4 struct {
 	IfId     int
 }
 
+type DeleteResolvedIPv4 struct {
+	IpAddr string
+}
+
 type ArpConf struct {
 	RefTimeout int
 }
 
-type ArpClientBase struct {
-	Address            string
-	Transport          thrift.TTransport
-	PtrProtocolFactory *thrift.TBinaryProtocolFactory
+type ActionType uint8
+
+const (
+	DeleteByIPAddr  ActionType = 1
+	RefreshByIPAddr ActionType = 2
+	DeleteByIfName  ActionType = 3
+	RefreshByIfName ActionType = 4
+)
+
+type ArpActionMsg struct {
+	Type ActionType
+	Obj  string
 }
 
 type ARPServer struct {
-	logger                  *logging.Writer
-	arpCache                map[string]ArpEntry //Key: Dest IpAddr
-	asicdClient             AsicdClient
-	asicdSubSocket          *nanomsg.SubSocket
-	asicdSubSocketCh        chan []byte
-	asicdSubSocketErrCh     chan error
-	dbHdl                   redis.Conn
+	logger           *logging.Writer
+	arpCache         map[string]ArpEntry //Key: Dest IpAddr
+	AsicdSubSocketCh chan commonDefs.AsicdNotifyMsg
+	//AsicdSubSocketErrCh     chan error
+	dbHdl                   *dbutils.DBUtil
 	snapshotLen             int32
 	pcapTimeout             time.Duration
 	promiscuous             bool
@@ -94,23 +118,30 @@ type ARPServer struct {
 	arpEntryUpdateCh        chan UpdateArpEntryMsg
 	arpEntryDeleteCh        chan DeleteArpEntryMsg
 	//arpEntryCreateCh        chan CreateArpEntryMsg
-	arpEntryMacMoveCh      chan asicdCommonDefs.IPv4NbrMacMoveNotifyMsg
+	arpEntryMacMoveCh      chan commonDefs.IPv4NbrMacMoveNotifyMsg
 	arpEntryCntUpdateCh    chan int
 	arpSliceRefreshStartCh chan bool
 	arpSliceRefreshDoneCh  chan bool
 	arpCounterUpdateCh     chan bool
+	arpActionProcessCh     chan ArpActionMsg
 	ResolveIPv4Ch          chan ResolveIPv4
+	DeleteResolvedIPv4Ch   chan DeleteResolvedIPv4
 	ArpConfCh              chan ArpConf
 	dumpArpTable           bool
 	InitDone               chan bool
+
+	ArpActionCh                chan ArpActionMsg
+	arpDeleteArpEntryFromRibCh chan string
+
+	AsicdPlugin asicdClient.AsicdClientIntf
 }
 
 func NewARPServer(logger *logging.Writer) *ARPServer {
 	arpServer := &ARPServer{}
 	arpServer.logger = logger
 	arpServer.arpCache = make(map[string]ArpEntry)
-	arpServer.asicdSubSocketCh = make(chan []byte)
-	arpServer.asicdSubSocketErrCh = make(chan error)
+	arpServer.AsicdSubSocketCh = make(chan commonDefs.AsicdNotifyMsg)
+	//arpServer.AsicdSubSocketErrCh = make(chan error)
 	arpServer.l3IntfPropMap = make(map[int]L3IntfProperty)
 	arpServer.lagPropMap = make(map[int]LagProperty)
 	arpServer.vlanPropMap = make(map[int]VlanProperty)
@@ -123,9 +154,14 @@ func NewARPServer(logger *logging.Writer) *ARPServer {
 	arpServer.arpSliceRefreshStartCh = make(chan bool)
 	arpServer.arpSliceRefreshDoneCh = make(chan bool)
 	arpServer.arpCounterUpdateCh = make(chan bool)
+	arpServer.arpActionProcessCh = make(chan ArpActionMsg)
+	arpServer.arpDeleteArpEntryFromRibCh = make(chan string)
 	arpServer.ResolveIPv4Ch = make(chan ResolveIPv4)
+	arpServer.DeleteResolvedIPv4Ch = make(chan DeleteResolvedIPv4)
 	arpServer.ArpConfCh = make(chan ArpConf)
 	arpServer.InitDone = make(chan bool)
+	arpServer.ArpActionCh = make(chan ArpActionMsg)
+	arpServer.arpEntryMacMoveCh = make(chan commonDefs.IPv4NbrMacMoveNotifyMsg)
 	return arpServer
 }
 
@@ -151,50 +187,6 @@ func (server *ARPServer) initArpParams() {
 	server.dumpArpTable = false
 }
 
-func (server *ARPServer) connectToServers(paramsFile string) {
-	server.logger.Debug(fmt.Sprintln("Inside connectToServers...paramsFile", paramsFile))
-	var clientsList []ClientJson
-
-	bytes, err := ioutil.ReadFile(paramsFile)
-	if err != nil {
-		server.logger.Err("Error in reading configuration file")
-		return
-	}
-
-	err = json.Unmarshal(bytes, &clientsList)
-	if err != nil {
-		server.logger.Err("Error in Unmarshalling Json")
-		return
-	}
-
-	for _, client := range clientsList {
-		if client.Name == "asicd" {
-			server.logger.Debug(fmt.Sprintln("found asicd at port", client.Port))
-			server.asicdClient.Address = "localhost:" + strconv.Itoa(client.Port)
-			server.asicdClient.Transport, server.asicdClient.PtrProtocolFactory, err = ipcutils.CreateIPCHandles(server.asicdClient.Address)
-			if err != nil {
-				server.logger.Err(fmt.Sprintln("Failed to connect to Asicd, retrying until connection is successful"))
-				count := 0
-				ticker := time.NewTicker(time.Duration(1000) * time.Millisecond)
-				for _ = range ticker.C {
-					server.asicdClient.Transport, server.asicdClient.PtrProtocolFactory, err = ipcutils.CreateIPCHandles(server.asicdClient.Address)
-					if err == nil {
-						ticker.Stop()
-						break
-					}
-					count++
-					if (count % 10) == 0 {
-						server.logger.Err("Still can't connect to Asicd, retrying..")
-					}
-				}
-
-			}
-			server.logger.Info("Arpd is connected to Asicd")
-			server.asicdClient.ClientHdl = asicdServices.NewASICDServicesClientFactory(server.asicdClient.Transport, server.asicdClient.PtrProtocolFactory)
-		}
-	}
-}
-
 func (server *ARPServer) sigHandler(sigChan <-chan os.Signal) {
 	server.logger.Debug("Inside sigHandler....")
 	signal := <-sigChan
@@ -204,7 +196,7 @@ func (server *ARPServer) sigHandler(sigChan <-chan os.Signal) {
 		server.printArpEntries()
 		server.logger.Debug("Closing DB handler")
 		if server.dbHdl != nil {
-			server.dbHdl.Close()
+			server.dbHdl.Disconnect()
 		}
 		os.Exit(0)
 	default:
@@ -212,21 +204,18 @@ func (server *ARPServer) sigHandler(sigChan <-chan os.Signal) {
 	}
 }
 
-func (server *ARPServer) InitServer(paramDir string) {
+func (server *ARPServer) InitServer(asicdPlugin asicdClient.AsicdClientIntf) {
 	server.initArpParams()
 
-	fileName := paramDir
-	if fileName[len(fileName)-1] != '/' {
-		fileName = fileName + "/"
-	}
-	fileName = fileName + "clients.json"
-
 	server.logger.Debug("Starting Arp Server")
-	server.connectToServers(fileName)
+	server.AsicdPlugin = asicdPlugin
+	if server.AsicdPlugin == nil {
+		server.logger.Err("Unable to instantiate Asicd Interface")
+		return
+	}
 	server.logger.Debug("Listen for ASICd updates")
-	server.listenForASICdUpdates(asicdCommonDefs.PUB_SOCKET_ADDR)
-	go server.createASICdSubscriber()
 	server.buildArpInfra()
+	server.processArpInfra()
 
 	err := server.initiateDB()
 	if err != nil {
@@ -247,13 +236,12 @@ func (server *ARPServer) InitServer(paramDir string) {
 	go server.sigHandler(sigChan)
 	go server.updateArpCache()
 	go server.refreshArpSlice()
-	server.processArpInfra()
+	server.FlushLinuxArpCache()
 	go server.arpCacheTimeout()
 }
 
-func (server *ARPServer) StartServer(paramDir string) {
-	server.logger.Debug(fmt.Sprintln("Inside Start Server...", paramDir))
-	server.InitServer(paramDir)
+func (server *ARPServer) StartServer(asicdPlugin asicdClient.AsicdClientIntf) {
+	server.InitServer(asicdPlugin)
 	server.InitDone <- true
 	for {
 		select {
@@ -261,9 +249,13 @@ func (server *ARPServer) StartServer(paramDir string) {
 			server.processArpConf(arpConf)
 		case rConf := <-server.ResolveIPv4Ch:
 			server.processResolveIPv4(rConf)
-		case asicdrxBuf := <-server.asicdSubSocketCh:
-			server.processAsicdNotification(asicdrxBuf)
-		case <-server.asicdSubSocketErrCh:
+		case rConf := <-server.DeleteResolvedIPv4Ch:
+			server.processDeleteResolvedIPv4(rConf.IpAddr)
+		case arpActionMsg := <-server.ArpActionCh:
+			server.processArpAction(arpActionMsg)
+		case msg := <-server.AsicdSubSocketCh:
+			server.processAsicdNotification(msg)
+			//case <-server.AsicdSubSocketErrCh:
 		}
 	}
 }
