@@ -13,13 +13,13 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 package server
 
@@ -39,7 +39,6 @@ import (
 	"ribdInt"
 	"strconv"
 	"time"
-	"utils/commonDefs"
 	"utils/dbutils"
 	"utils/ipcutils"
 	"utils/logging"
@@ -52,6 +51,7 @@ type UpdateRouteInfo struct {
 	OrigRoute *ribd.IPv4Route
 	NewRoute  *ribd.IPv4Route
 	Attrset   []bool
+	Op        string
 }
 type TrackReachabilityInfo struct {
 	IpAddr   string
@@ -65,10 +65,10 @@ type NextHopInfo struct {
 	refCount int //number of routes using this as a next hop
 }
 type ApplyPolicyInfo struct {
-	Source         string
-	Policy         string
-	Action         string
-	Conditions     []*ribdInt.ConditionInfo
+	Source     string
+	Policy     string
+	Action     string
+	Conditions []*ribdInt.ConditionInfo
 }
 type RIBDServer struct {
 	Logger                       *logging.Writer
@@ -182,8 +182,9 @@ var logger *logging.Writer
 var AsicdSub *nanomsg.SubSocket
 var RouteServiceHandler *RIBDServer
 var IntfIdNameMap map[int32]IntfEntry
-var	GlobalPolicyEngineDB  *policy.PolicyEngineDB
-var	PolicyEngineDB  *policy.PolicyEngineDB
+var IfNameToIfIndex map[string]int32
+var GlobalPolicyEngineDB *policy.PolicyEngineDB
+var PolicyEngineDB *policy.PolicyEngineDB
 var PARAMSDIR string
 
 func (ribdServiceHandler *RIBDServer) ProcessL3IntfDownEvent(ipAddr string) {
@@ -225,8 +226,8 @@ func (ribdServiceHandler *RIBDServer) ProcessL3IntfUpEvent(ipAddr string) {
 			logger.Info(fmt.Sprintln("Add this route with destAddress = %s, nwMask = %s\n", ConnectedRoutes[i].Ipaddr, ConnectedRoutes[i].Mask))
 
 			ConnectedRoutes[i].IsValid = true
-			policyRoute := ribdInt.Routes{Ipaddr: ConnectedRoutes[i].Ipaddr, Mask: ConnectedRoutes[i].Mask, NextHopIp: ConnectedRoutes[i].NextHopIp, NextHopIfType: ConnectedRoutes[i].NextHopIfType, IfIndex: ConnectedRoutes[i].IfIndex, Metric: ConnectedRoutes[i].Metric, Prototype: ConnectedRoutes[i].Prototype}
-			params := RouteParams{destNetIp: ConnectedRoutes[i].Ipaddr, networkMask: ConnectedRoutes[i].Mask, nextHopIp: ConnectedRoutes[i].NextHopIp, nextHopIfType: ribd.Int(ConnectedRoutes[i].NextHopIfType), nextHopIfIndex: ribd.Int(ConnectedRoutes[i].IfIndex), metric: ribd.Int(ConnectedRoutes[i].Metric), routeType: ribd.Int(ConnectedRoutes[i].Prototype), sliceIdx: ribd.Int(ConnectedRoutes[i].SliceIdx), createType: FIBOnly, deleteType: Invalid}
+			policyRoute := ribdInt.Routes{Ipaddr: ConnectedRoutes[i].Ipaddr, Mask: ConnectedRoutes[i].Mask, NextHopIp: ConnectedRoutes[i].NextHopIp, IfIndex: ConnectedRoutes[i].IfIndex, Metric: ConnectedRoutes[i].Metric, Prototype: ConnectedRoutes[i].Prototype}
+			params := RouteParams{destNetIp: ConnectedRoutes[i].Ipaddr, networkMask: ConnectedRoutes[i].Mask, nextHopIp: ConnectedRoutes[i].NextHopIp, nextHopIfIndex: ribd.Int(ConnectedRoutes[i].IfIndex), metric: ribd.Int(ConnectedRoutes[i].Metric), routeType: ribd.Int(ConnectedRoutes[i].Prototype), sliceIdx: ribd.Int(ConnectedRoutes[i].SliceIdx), createType: FIBOnly, deleteType: Invalid}
 			PolicyEngineFilter(policyRoute, policyCommonDefs.PolicyPath_Import, params)
 		}
 	}
@@ -257,6 +258,10 @@ func getLogicalIntfInfo() {
 			}
 			intfEntry := IntfEntry{name: bulkInfo.LogicalIntfStateList[i].Name}
 			IntfIdNameMap[ifId] = intfEntry
+			if IfNameToIfIndex == nil {
+				IfNameToIfIndex = make(map[string]int32)
+			}
+			IfNameToIfIndex[bulkInfo.LogicalIntfStateList[i].Name] = ifId
 		}
 		if bulkInfo.More == false {
 			logger.Println("more returned as false, so no more get bulks")
@@ -290,6 +295,10 @@ func getVlanInfo() {
 			}
 			intfEntry := IntfEntry{name: bulkInfo.VlanStateList[i].VlanName}
 			IntfIdNameMap[ifId] = intfEntry
+			if IfNameToIfIndex == nil {
+				IfNameToIfIndex = make(map[string]int32)
+			}
+			IfNameToIfIndex[bulkInfo.VlanStateList[i].VlanName] = ifId
 		}
 		if bulkInfo.More == false {
 			logger.Println("more returned as false, so no more get bulks")
@@ -316,14 +325,17 @@ func getPortInfo() {
 		}
 		logger.Info(fmt.Sprintln("len(bulkInfo.PortStateList)  = %d, num objects returned = %d\n", len(bulkInfo.PortStateList), bulkInfo.Count))
 		for i := 0; i < int(bulkInfo.Count); i++ {
-			portNum := bulkInfo.PortStateList[i].PortNum
-			ifId := asicdCommonDefs.GetIfIndexFromIntfIdAndIntfType(int(portNum), commonDefs.IfTypePort)
-			logger.Info(fmt.Sprintln("portNum = ", portNum, "ifId = ", ifId))
+			ifId := bulkInfo.PortStateList[i].IfIndex
+			logger.Info(fmt.Sprintln("ifId = ", ifId))
 			if IntfIdNameMap == nil {
 				IntfIdNameMap = make(map[int32]IntfEntry)
 			}
 			intfEntry := IntfEntry{name: bulkInfo.PortStateList[i].Name}
 			IntfIdNameMap[ifId] = intfEntry
+			if IfNameToIfIndex == nil {
+				IfNameToIfIndex = make(map[string]int32)
+			}
+			IfNameToIfIndex[bulkInfo.PortStateList[i].Name] = ifId
 		}
 		if bulkInfo.More == false {
 			logger.Info(fmt.Sprintln("more returned as false, so no more get bulks"))
@@ -513,8 +525,8 @@ func NewRIBDServicesHandler(dbHdl *dbutils.DBUtil, loggerC *logging.Writer) *RIB
 	ribdServicesHandler.PolicyDefinitionCreateConfCh = make(chan *ribd.PolicyDefinition)
 	ribdServicesHandler.PolicyDefinitionDeleteConfCh = make(chan *ribd.PolicyDefinition)
 	ribdServicesHandler.PolicyDefinitionUpdateConfCh = make(chan *ribd.PolicyDefinition)
-	ribdServicesHandler.PolicyApplyCh = make(chan ApplyPolicyInfo,100)
-	ribdServicesHandler.PolicyUpdateApplyCh = make(chan ApplyPolicyInfo,100)
+	ribdServicesHandler.PolicyApplyCh = make(chan ApplyPolicyInfo, 100)
+	ribdServicesHandler.PolicyUpdateApplyCh = make(chan ApplyPolicyInfo, 100)
 	ribdServicesHandler.DBRouteAddCh = make(chan RouteDBInfo)
 	ribdServicesHandler.DBRouteDelCh = make(chan RouteDBInfo)
 	ribdServicesHandler.ServerUpCh = make(chan bool)
@@ -554,15 +566,15 @@ func (ribdServiceHandler *RIBDServer) StartServer(paramsDir string) {
 			ribdServiceHandler.ProcessRouteDeleteConfig(routeDeleteConf)
 		case routeUpdateConf := <-ribdServiceHandler.RouteUpdateConfCh:
 			logger.Info("received message on RouteUpdateConfCh channel")
-			ribdServiceHandler.ProcessRouteUpdateConfig(routeUpdateConf.OrigRoute, routeUpdateConf.NewRoute, routeUpdateConf.Attrset)
+			ribdServiceHandler.ProcessRouteUpdateConfig(routeUpdateConf.OrigRoute, routeUpdateConf.NewRoute, routeUpdateConf.Attrset, routeUpdateConf.Op)
 			/*		case routeInfo := <-ribdServiceHandler.RouteInstallCh:
 			    logger.Println("received message on RouteInstallConfCh channel")
 				ribdServiceHandler.ProcessRouteInstall(routeInfo)*/
 		case info := <-ribdServiceHandler.PolicyApplyCh:
-		    logger.Info("received message on PolicyApplyCh channel")
+			logger.Info("received message on PolicyApplyCh channel")
 			//update the local policyEngineDB
 			ribdServiceHandler.UpdateApplyPolicy(info, true, PolicyEngineDB)
-	         ribdServiceHandler.PolicyUpdateApplyCh <- info
+			ribdServiceHandler.PolicyUpdateApplyCh <- info
 		case info := <-ribdServiceHandler.TrackReachabilityCh:
 			logger.Info("received message on TrackReachabilityCh channel")
 			ribdServiceHandler.TrackReachabilityStatus(info.IpAddr, info.Protocol, info.Op)
