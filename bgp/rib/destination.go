@@ -13,13 +13,13 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 // destination.go
 package server
@@ -159,22 +159,18 @@ func (d *Destination) getPathIdForPath(path *Path) (uint32, bool) {
 		}
 	}
 
-	d.logger.Err(fmt.Sprintf("Destination:getPathIdForPath - path id not found for path %v\n",
-		path))
+	d.logger.Err(fmt.Sprintf("Destination:getPathIdForPath - path id not found for path %v\n", path))
 	return 0, false
 }
 
 func (d *Destination) setUpdateAggPath(peerIP string, pathId uint32) {
 	pathMap, ok := d.peerPathMap[peerIP]
 	if !ok {
-		d.logger.Err(fmt.Sprintf("Destination:setUpdateAggPath - peer ip %s not",
-			"found in peer path map\n", peerIP))
+		d.logger.Err(fmt.Sprintf("setUpdateAggPath - peer ip %s not found in peer path map\n", peerIP))
 	} else {
 		path, ok := pathMap[pathId]
 		if !ok {
-			d.logger.Err(fmt.Sprintf("Destination:setUpdateAggPath - pathId %d",
-				"not found in peer %s path map\n",
-				pathId, peerIP))
+			d.logger.Err(fmt.Sprintf("setUpdateAggPath - pathId %d not found in peer %s path map\n", pathId, peerIP))
 		} else if d.LocRibPath == nil || path == d.LocRibPath ||
 			getRouteSource(d.LocRibPath.routeType) >= getRouteSource(path.routeType) {
 			d.recalculate = true
@@ -208,15 +204,12 @@ func (d *Destination) AddOrUpdatePath(peerIp string, pathId uint32, path *Path) 
 	}
 
 	if oldPath, ok := pathMap[pathId]; ok {
-		d.logger.Info(fmt.Sprintf("Update path for %s from %s, path id %d\n",
-			d.IPPrefix.Prefix.String(), peerIp, pathId))
+		d.logger.Info(fmt.Sprintf("Destination %s Update path from %s, id %d", d.IPPrefix.Prefix, peerIp, pathId))
 		if d.LocRibPath == oldPath {
-			d.LocRibPath = path
-			d.recalculate = true
+			d.LocRibPath = nil
 		}
 	} else {
-		d.logger.Info(fmt.Sprintf("Add new path for %s from %s, path id %d\n",
-			d.IPPrefix.Prefix.String(), peerIp, pathId))
+		d.logger.Info(fmt.Sprintf("Destination %s New path from %s, id %d", d.IPPrefix.Prefix, peerIp, pathId))
 		added = true
 	}
 
@@ -237,8 +230,7 @@ func (d *Destination) RemovePath(peerIP string, pathId uint32, path *Path) *Path
 	var oldPath *Path
 	ok := false
 	if pathMap, ok = d.peerPathMap[peerIP]; !ok {
-		d.logger.Err(fmt.Sprintln("Can't remove path", d.IPPrefix.Prefix.String(),
-			"Path not found from peer", peerIP))
+		d.logger.Err(fmt.Sprintf("Destination %s Path not found from peer %s", d.IPPrefix.Prefix.String(), peerIP))
 		return oldPath
 	}
 
@@ -246,13 +238,13 @@ func (d *Destination) RemovePath(peerIP string, pathId uint32, path *Path) *Path
 		for ecmpPath, _ := range d.ecmpPaths {
 			if ecmpPath == oldPath {
 				d.recalculate = true
-				d.LocRibPath = path
+				//d.LocRibPath = path
 			}
 		}
 
 		if d.LocRibPath == oldPath {
 			d.recalculate = true
-			d.LocRibPath = path
+			d.LocRibPath = nil
 		}
 
 		route := d.pathRouteMap[oldPath]
@@ -263,7 +255,7 @@ func (d *Destination) RemovePath(peerIP string, pathId uint32, path *Path) *Path
 			delete(d.peerPathMap, peerIP)
 		}
 	} else {
-		d.logger.Err(fmt.Sprintln("Can't remove path", d.IPPrefix.Prefix.String(),
+		d.logger.Err(fmt.Sprintln("Destination", d.IPPrefix.Prefix.String(),
 			"Path with path id", pathId, "not found from peer", peerIP))
 	}
 	return oldPath
@@ -274,14 +266,13 @@ func (d *Destination) RemoveAllPaths(peerIP string, path *Path) {
 	ok := false
 	if pathMap, ok = d.peerPathMap[peerIP]; !ok {
 		d.logger.Err(fmt.Sprintln("Can't remove paths for", d.IPPrefix.Prefix.String(),
-			"peer not found in map", peerIP))
+			"peer not found", peerIP))
 		return
 	}
 
-	d.logger.Info(fmt.Sprintln("Remove all paths for", d.IPPrefix.Prefix.String(),
-		"from peer", peerIP))
+	d.logger.Info(fmt.Sprintln("Remove all paths for", d.IPPrefix.Prefix.String(), "from peer", peerIP))
 	for pathId, _ := range pathMap {
-		d.logger.Err(fmt.Sprintln("Remove path id", pathId, "from peer", peerIP))
+		d.logger.Info(fmt.Sprintln("Remove path id", pathId, "from peer", peerIP))
 		d.RemovePath(peerIP, pathId, path)
 	}
 }
@@ -350,53 +341,48 @@ func (d *Destination) removeAndPrepend(pathsList *[][]*Path, item *Path) {
 	(*pathsList)[0] = paths
 }
 
-func (d *Destination) SelectRouteForLocRib(addPathCount int) (RouteAction, bool,
-	[]*Route, []*Route, []*Route) {
+func (d *Destination) SelectRouteForLocRib(addPathCount int) (RouteAction, bool, []*Route, []*Route, []*Route) {
 	updatedPaths := make([]*Path, 0)
 	removedPaths := make([]*Path, 0)
 	addedRoutes := make([]*Route, 0)
 	updatedRoutes := make([]*Route, 0)
 	deletedRoutes := make([]*Route, 0)
 	createRibRoutes := make([]*Path, 0)
-	maxPref := uint32(0)
 	routeSrc := RouteSrcUnknown
 	locRibAction := RouteActionNone
 	addPathsUpdated := false
 
-	d.logger.Info(fmt.Sprintf("Destination:SelectRouteForLocalRib - network %v,",
-		"peer path map = %v\n", d.IPPrefix.Prefix.String(), d.peerPathMap))
+	d.logger.Info(fmt.Sprintf("Destination - selecting best path for prefix %s", d.IPPrefix.Prefix))
 	if !d.recalculate {
 		return locRibAction, addPathsUpdated, addedRoutes, updatedRoutes, deletedRoutes
 	}
 	d.recalculate = false
 
-	locRibPathAdded := false
-	if d.LocRibPath != nil && !d.LocRibPath.IsWithdrawn() && !d.LocRibPath.IsUpdated() {
-		peerIP := d.gConf.RouterId.String()
+	if d.LocRibPath != nil {
+		var peerIP string
 		if d.LocRibPath.NeighborConf != nil {
 			peerIP = d.LocRibPath.NeighborConf.Neighbor.NeighborAddress.String()
+		} else {
+			peerIP = d.gConf.RouterId.String()
 		}
 		routeSrc = getRouteSource(d.LocRibPath.routeType)
-		maxPref = d.LocRibPath.GetPreference()
 		updatedPaths = append(updatedPaths, d.LocRibPath)
-		locRibPathAdded = true
-		d.logger.Info(fmt.Sprintf("Add loc rib path from %s to the list of",
-			"selected paths, pref=%d\n", peerIP, maxPref))
+		d.logger.Info(fmt.Sprintf("Destination %s Add loc rib path from %s to path selection, source=%d",
+			d.IPPrefix.Prefix, peerIP, routeSrc))
 	}
 
 	for peerIP, pathMap := range d.peerPathMap {
 		for _, path := range pathMap {
-			if !locRibPathAdded || d.LocRibPath != path {
-				if !path.IsLocal() && !path.IsReachable() {
-					d.logger.Info(fmt.Sprintf("peer %s, NEXT_HOP[%s] is",
-						"not reachable\n", peerIP, path.GetNextHop()))
+			if d.LocRibPath == nil || d.LocRibPath != path {
+				if !path.IsReachable() {
+					d.logger.Info(fmt.Sprintf("Destination %s peer %s, NEXT_HOP %s is not reachable",
+						d.IPPrefix.Prefix, peerIP, path.GetNextHop()))
 					continue
 				}
 
 				if path.HasASLoop() {
-					d.logger.Info(fmt.Sprintf("This path has AS loop [%d],",
-						"removing this path from the selection process\n",
-						path.NeighborConf.RunningConf.LocalAS))
+					d.logger.Info(fmt.Sprintf("Destination %s peer %s, path has AS %d loop", d.IPPrefix.Prefix,
+						peerIP, path.NeighborConf.RunningConf.LocalAS))
 					continue
 				}
 
@@ -416,45 +402,18 @@ func (d *Destination) SelectRouteForLocRib(addPathCount int) (RouteAction, bool,
 					} else {
 						updatedPaths = append(updatedPaths, path)
 					}
-					d.logger.Info(fmt.Sprintf("route from %s is from a better",
-						"source type, old type=%d, new type=%d, pref=%d\n",
-						peerIP, routeSrc, currPathSource, path.GetPreference()))
+					d.logger.Info(fmt.Sprintf("Destination %s route from %s is from a better source type, ",
+						"old type=%d, new type=%d\n", peerIP, routeSrc, currPathSource))
 					routeSrc = currPathSource
-					maxPref = path.GetPreference()
 					continue
-				}
-
-				currPref := path.GetPreference()
-				if currPref < maxPref {
-					removedPaths = append(removedPaths, path)
-				} else if currPref > maxPref {
-					if len(updatedPaths) > 0 {
-						removedPaths = append(removedPaths, updatedPaths...)
-						updatedPaths[0] = path
-						// For garbage collection
-						for i := 1; i < len(updatedPaths); i++ {
-							updatedPaths[i] = nil
-						}
-						updatedPaths = updatedPaths[:1]
-					} else {
-						updatedPaths = append(updatedPaths, path)
-					}
-					d.logger.Info(fmt.Sprintf("route from %s has more",
-						"preference, old pref=%d, new pref=%d\n",
-						peerIP, maxPref, currPref))
-					maxPref = currPref
-				} else if currPref == maxPref {
-					d.logger.Info(fmt.Sprintf("route from %s has same",
-						"preference, add to the list, pref=%d\n",
-						peerIP, maxPref))
-					updatedPaths = append(updatedPaths, path)
+				} else {
+					updatedPaths = append(updatedPaths)
 				}
 			}
 		}
 	}
 
-	d.logger.Info(fmt.Sprintln("Destination =", d.IPPrefix.Prefix.String(),
-		"ECMP routes =", d.ecmpPaths, "updated paths =", updatedPaths))
+	d.logger.Info(fmt.Sprintf("Destination %s, ECMP routes %v updated paths %v", d.IPPrefix.Prefix, d.ecmpPaths, updatedPaths))
 	if len(updatedPaths) > 0 {
 		var ecmpPaths [][]*Path
 		var addPaths []*Path
@@ -651,6 +610,57 @@ func (d *Destination) updateRoute(path *Path) {
 		}
 		d.rib.routeMgr.CreateRoute(&cfg)
 	}
+}
+
+func (d *Destination) getRoutesWithHighestPref(updatedPaths []*Path, prunedPaths []PathSortIface) ([]*Path,
+	[]PathSortIface) {
+	maxPref := uint32(0)
+	removedPaths := make([]*Path, 0)
+	n := len(updatedPaths)
+	idx := 0
+
+	for i := 0; i < n; i++ {
+		currPref := updatedPaths[i].GetPreference()
+		from := ""
+		if updatedPaths[i].NeighborConf != nil {
+			from = updatedPaths[i].NeighborConf.Neighbor.NeighborAddress.String()
+		} else {
+			from = d.gConf.RouterId.String()
+		}
+		d.logger.Info(fmt.Sprintf("Destination %s path pref %d from %s", d.IPPrefix.Prefix, currPref, from))
+		if currPref < maxPref {
+			removedPaths = append(removedPaths, updatedPaths[i])
+		} else if currPref > maxPref {
+			d.logger.Info(fmt.Sprintf("Destination %s route from %s has more preference, old pref=%d, new pref=%d",
+				d.IPPrefix.Prefix, from, maxPref, currPref))
+			removedPaths = append(removedPaths, updatedPaths[:idx]...)
+			maxPref = currPref
+			updatedPaths[0] = updatedPaths[i]
+			idx = 1
+		} else if currPref == maxPref {
+			d.logger.Info(fmt.Sprintf("Destination %s route from %s has same preference, pref=%d",
+				d.IPPrefix.Prefix, from, maxPref))
+			updatedPaths[idx] = updatedPaths[i]
+			idx++
+		}
+	}
+
+	if len(removedPaths) > 0 {
+		pathSortIface := PathSortIface{
+			paths: removedPaths,
+			iface: ByPref{removedPaths},
+		}
+		prunedPaths = append(prunedPaths, pathSortIface)
+	}
+
+	if idx > 0 {
+		for i := idx; i < n; i++ {
+			updatedPaths[i] = nil
+		}
+		updatedPaths = updatedPaths[:idx]
+	}
+
+	return updatedPaths, prunedPaths
 }
 
 func (d *Destination) getRoutesWithSmallestAS(updatedPaths []*Path,
@@ -989,50 +999,47 @@ func (d *Destination) calculateBestPath(updatedPaths, removedPaths []*Path,
 	prunedPaths := make([]PathSortIface, 0)
 	pathSortIface := PathSortIface{
 		paths: removedPaths,
-		iface: ByPref{removedPaths},
+		iface: ByRouteSrc{removedPaths},
 	}
 	prunedPaths = append(prunedPaths, pathSortIface)
 
 	if len(updatedPaths) > 1 {
-		d.logger.Info(fmt.Sprintln("calling getRoutesWithSmallestAS, update paths =",
-			updatedPaths))
+		d.logger.Info(fmt.Sprintln("calling getRoutesWithHighestPref, update paths =", updatedPaths))
+		updatedPaths, prunedPaths = d.getRoutesWithHighestPref(updatedPaths, prunedPaths)
+	}
+
+	if len(updatedPaths) > 1 {
+		d.logger.Info(fmt.Sprintln("calling getRoutesWithSmallestAS, update paths =", updatedPaths))
 		updatedPaths, prunedPaths = d.getRoutesWithSmallestAS(updatedPaths, prunedPaths)
 	}
 
 	if len(updatedPaths) > 1 {
-		d.logger.Info(fmt.Sprintln("calling getRoutesWithLowestOrigin, update paths =",
-			updatedPaths))
+		d.logger.Info(fmt.Sprintln("calling getRoutesWithLowestOrigin, update paths =", updatedPaths))
 		updatedPaths, prunedPaths = d.getRoutesWithLowestOrigin(updatedPaths, prunedPaths)
 	}
 
 	if (len(updatedPaths) > 1) && ebgpMultiPath && ibgpMultiPath {
 		ecmpPaths = d.getECMPPaths(updatedPaths)
-		d.logger.Info(fmt.Sprintln("calculateBestPath: IBGP & EBGP multi paths =",
-			ecmpPaths))
+		d.logger.Info(fmt.Sprintln("calculateBestPath: IBGP & EBGP multi paths =", ecmpPaths))
 	}
 
 	if len(updatedPaths) > 1 {
-		d.logger.Info(fmt.Sprintln("calling removeIBGPRoutesIfEBGPExist, update paths =",
-			updatedPaths))
-		updatedPaths, prunedPaths = d.removeIBGPRoutesIfEBGPExist(updatedPaths,
-			prunedPaths)
+		d.logger.Info(fmt.Sprintln("calling removeIBGPRoutesIfEBGPExist, update paths =", updatedPaths))
+		updatedPaths, prunedPaths = d.removeIBGPRoutesIfEBGPExist(updatedPaths, prunedPaths)
 	}
 
 	if len(updatedPaths) > 1 && ibgpMultiPath != ebgpMultiPath {
 		if ebgpMultiPath && d.isEBGPRoute(updatedPaths[0]) {
 			ecmpPaths = d.getECMPPaths(updatedPaths)
-			d.logger.Info(fmt.Sprintf("calculateBestPath: EBGP multi paths =",
-				ecmpPaths))
+			d.logger.Info(fmt.Sprintf("calculateBestPath: EBGP multi paths =", ecmpPaths))
 		} else if ibgpMultiPath && d.isIBGPRoute(updatedPaths[0]) {
 			ecmpPaths = d.getECMPPaths(updatedPaths)
-			d.logger.Info(fmt.Sprintf("calculateBestPath: IBGP multi paths =",
-				ecmpPaths))
+			d.logger.Info(fmt.Sprintf("calculateBestPath: IBGP multi paths =", ecmpPaths))
 		}
 	}
 
 	if len(updatedPaths) > 1 {
-		d.logger.Info(fmt.Sprintln("calling getRoutesWithLowestBGPId, update paths =",
-			updatedPaths))
+		d.logger.Info(fmt.Sprintln("calling getRoutesWithLowestBGPId, update paths =", updatedPaths))
 		updatedPaths, prunedPaths = d.getRoutesWithLowestBGPId(updatedPaths, prunedPaths)
 	}
 

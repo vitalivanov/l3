@@ -22,7 +22,7 @@
 //
 
 // policy.go
-package server
+package policy
 
 import (
 	"fmt"
