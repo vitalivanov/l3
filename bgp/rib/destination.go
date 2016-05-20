@@ -407,14 +407,14 @@ func (d *Destination) SelectRouteForLocRib(addPathCount int) (RouteAction, bool,
 					routeSrc = currPathSource
 					continue
 				} else {
-					updatedPaths = append(updatedPaths)
+					updatedPaths = append(updatedPaths, path)
 				}
 			}
 		}
 	}
 
 	d.logger.Info(fmt.Sprintf("Destination %s, ECMP routes %v updated paths %v", d.IPPrefix.Prefix, d.ecmpPaths, updatedPaths))
-    firstRoute := true
+	firstRoute := true
 	if len(updatedPaths) > 0 {
 		var ecmpPaths [][]*Path
 		var addPaths []*Path
@@ -509,7 +509,7 @@ func (d *Destination) SelectRouteForLocRib(addPathCount int) (RouteAction, bool,
 							int(path.reachabilityInfo.NextHopIfIdx)),
 					}
 					//d.rib.routeMgr.DeleteRoute(&cfg)
-					d.rib.routeMgr.UpdateRoute(&cfg,"remove")
+					d.rib.routeMgr.UpdateRoute(&cfg, "remove")
 					d.logger.Info(fmt.Sprintf("DeleteV4Route for ip=%s",
 						"nexthop=%s DONE\n", d.IPPrefix.Prefix.String(),
 						path.reachabilityInfo.NextHop))
@@ -541,7 +541,7 @@ func (d *Destination) SelectRouteForLocRib(addPathCount int) (RouteAction, bool,
 						int(path.reachabilityInfo.NextHopIfIdx)),
 				}
 				//d.rib.routeMgr.DeleteRoute(&cfg)
-				d.rib.routeMgr.UpdateRoute(&cfg,"remove")
+				d.rib.routeMgr.UpdateRoute(&cfg, "remove")
 				d.logger.Info(fmt.Sprintln("DeleteV4Route from ECMP paths, route =",
 					route, "ip =", d.IPPrefix.Prefix.String(),
 					"next hop =", path.reachabilityInfo.NextHop, "DONE"))
@@ -572,7 +572,7 @@ func (d *Destination) SelectRouteForLocRib(addPathCount int) (RouteAction, bool,
 			OutgoingInterface: strconv.Itoa(int(path.reachabilityInfo.NextHopIfIdx)),
 		}
 		if firstRoute {
-		    d.rib.routeMgr.CreateRoute(&cfg)
+			d.rib.routeMgr.CreateRoute(&cfg)
 			firstRoute = false
 		} else {
 			d.rib.routeMgr.UpdateRoute(&cfg, "add")
@@ -596,7 +596,7 @@ func (d *Destination) updateRoute(path *Path) {
 		NetworkMask:       constructNetmaskFromLen(int(d.IPPrefix.Length), 32).String(),
 		NextHopIp:         path.reachabilityInfo.NextHop}
 	//d.rib.routeMgr.DeleteRoute(&cfg)
-	d.rib.routeMgr.UpdateRoute(&cfg,"remove")
+	d.rib.routeMgr.UpdateRoute(&cfg, "remove")
 
 	if path.IsAggregate() || !path.IsLocal() {
 		var nextHop string
