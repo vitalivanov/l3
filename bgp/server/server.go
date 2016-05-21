@@ -112,9 +112,8 @@ type BGPServer struct {
 	bfdMgr   config.BfdMgrIntf
 }
 
-func NewBGPServer(logger *logging.Writer, policyEngine *bgppolicy.BGPPolicyEngine,
-	iMgr config.IntfStateMgrIntf, rMgr config.RouteMgrIntf,
-	bMgr config.BfdMgrIntf) *BGPServer {
+func NewBGPServer(logger *logging.Writer, policyEngine *bgppolicy.BGPPolicyEngine, iMgr config.IntfStateMgrIntf,
+	rMgr config.RouteMgrIntf, bMgr config.BfdMgrIntf) *BGPServer {
 	bgpServer := &BGPServer{}
 	bgpServer.logger = logger
 	bgpServer.bgpPE = policyEngine
@@ -968,7 +967,7 @@ func (server *BGPServer) listenChannelUpdates() {
 					}
 				}
 				server.logger.Info(fmt.Sprintln("Add neighbor, ip:", newPeer.NeighborAddress.String()))
-				peer = NewPeer(server, &server.BgpConfig.Global.Config, groupConfig, newPeer)
+				peer = NewPeer(server, server.AdjRib, &server.BgpConfig.Global.Config, groupConfig, newPeer)
 				if peer.NeighborConf.RunningConf.AuthPassword != "" {
 					err := netUtils.SetTCPListenerMD5(server.listener, newPeer.NeighborAddress.String(),
 						peer.NeighborConf.RunningConf.AuthPassword)
