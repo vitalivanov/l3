@@ -402,7 +402,7 @@ func (intf VXLANSnapClient) CreateVtep(vtep *vxlan.VtepDbEntry, vteplistener cha
 				// note if the thrift attribute id's change then
 				// this attr may need to be updated
 				attrset := []bool{false, true, false}
-				asicdclnt.ClientHdl.UpdateVlan(oldAsicdVlan, newAsicdVlan, attrset)
+				asicdclnt.ClientHdl.UpdateVlan(oldAsicdVlan, newAsicdVlan, attrset, "add")
 			} else {
 				v := PortVlanDb[vtep.VlanId][portExists]
 				v.refCnt++
@@ -471,7 +471,7 @@ func (intf VXLANSnapClient) DeleteVtep(vtep *vxlan.VtepDbEntry) {
 					// note if the thrift attribute id's change then
 					// this attr may need to be updated
 					attrset := []bool{false, true, false}
-					asicdclnt.ClientHdl.UpdateVlan(oldAsicdVlan, newAsicdVlan, attrset)
+					asicdclnt.ClientHdl.UpdateVlan(oldAsicdVlan, newAsicdVlan, attrset, "del")
 				}
 				// lets remove the vlan
 				if len(PortVlanDb[vtep.VlanId]) == 0 {

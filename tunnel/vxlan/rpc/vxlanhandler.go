@@ -178,7 +178,7 @@ func (v *VXLANDServiceHandler) DeleteVxlanVtepInstance(config *vxland.VxlanVtepI
 	return false, err
 }
 
-func (v *VXLANDServiceHandler) UpdateVxlanVtepInstance(origconfig *vxland.VxlanVtepInstance, newconfig *vxland.VxlanVtepInstance, attrset []bool) (bool, error) {
+func (v *VXLANDServiceHandler) UpdateVxlanVtepInstance(origconfig *vxland.VxlanVtepInstance, newconfig *vxland.VxlanVtepInstance, attrset []bool, op string) (bool, error) {
 	v.logger.Info(fmt.Sprintf("UpdateVxlanVtepInstance orig[%#v] new[%#v]", origconfig, newconfig))
 	oc, _ := vxlan.ConvertVxlanVtepInstanceToVtepConfig(origconfig)
 	nc, err := vxlan.ConvertVxlanVtepInstanceToVtepConfig(newconfig)

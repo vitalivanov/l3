@@ -210,7 +210,7 @@ func ConvertVxlanVtepInstanceToVtepConfig(c *vxland.VxlanVtepInstance) (*VtepCon
 		UDP:       uint16(c.DstUDP),
 		TTL:       uint16(c.TTL),
 		TOS:       uint16(c.TOS),
-		InnerVlanHandlingMode: ConvertInt32ToBool(c.InnerVlanHandlingMode),
+		InnerVlanHandlingMode: c.InnerVlanHandlingMode,
 		TunnelSrcIp:           ip,
 		TunnelDstIp:           net.ParseIP(c.DstIp),
 		VlanId:                uint16(c.VlanId),
