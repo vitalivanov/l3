@@ -9,6 +9,7 @@ import (
 	nanomsg "github.com/op/go-nanomsg"
 	vxlan "l3/tunnel/vxlan/protocol"
 	"net"
+	"strconv"
 	"strings"
 	"utils/commonDefs"
 )
@@ -78,8 +79,9 @@ func (intf VXLANSnapClient) ConstructPortConfigMap() {
 			for i := 0; i < objCount; i++ {
 				ifindex := bulkInfo.PortStateList[i].IfIndex
 				netMac, _ := net.ParseMAC(bulkCfgInfo.PortList[i].MacAddr)
+				PortNum, _ := strconv.Atoi(bulkInfo.PortStateList[i].IntfRef)
 				config := vxlan.PortConfig{
-					PortNum:      bulkInfo.PortStateList[i].PortNum,
+					PortNum:      int32(PortNum),
 					IfIndex:      ifindex,
 					Name:         bulkInfo.PortStateList[i].Name,
 					HardwareAddr: netMac,
@@ -526,8 +528,8 @@ func (intf VXLANSnapClient) GetIntfInfo(IfName string, intfchan chan<- vxlan.Mac
 			intfType := asicdCommonDefs.GetIntfTypeFromIfIndex(IfIndex)
 			switch intfType {
 			case commonDefs.IfTypePort:
-				portNum := asicdCommonDefs.GetIntfIdFromIfIndex(IfIndex)
-				phyIntfState, _ := asicdclnt.ClientHdl.GetPort(int32(portNum))
+				portNum := asicdCommonDefs.GetIntfIdFromIfIndex(int32(IfIndex))
+				phyIntfState, _ := asicdclnt.ClientHdl.GetPort(fmt.Sprintf("%d", portNum))
 				logger.Info(fmt.Sprintln("Return from GetPort", phyIntfState))
 				mac, _ = net.ParseMAC(phyIntfState.MacAddr)
 			//case IfTypeLag:

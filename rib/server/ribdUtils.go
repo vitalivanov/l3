@@ -400,41 +400,6 @@ func (m RIBDServer) RouteConfigValidationCheckForUpdate(oldcfg *ribd.IPv4Route, 
 */
 func (m RIBDServer) RouteConfigValidationCheck(cfg *ribd.IPv4Route, op string) (err error) {
 	logger.Debug(fmt.Sprintln("RouteConfigValidationCheck"))
-	/*
-	    op is to add new route
-	*/
-	if op == "add" {
-		/*
-		    check if route protocol type is valid
-		*/
-		_, ok := RouteProtocolTypeMapDB[cfg.Protocol]
-		if !ok {
-			logger.Err(fmt.Sprintln("route type ", cfg.Protocol, " invalid"))
-			err = errors.New("Invalid route protocol type")
-			return err
-		}
-		logger.Debug(fmt.Sprintln("Number of nexthops = ", len(cfg.NextHop)))
-		for i := 0; i < len(cfg.NextHop); i++ {
-			/*
-			    Check if the NextHop IP valid
-			*/
-			_, err = getIP(cfg.NextHop[i].NextHopIp)
-			if err != nil {
-				logger.Err(fmt.Sprintln("nextHopIpAddr invalid"))
-				return errors.New("Invalid next hop ip address")
-			}
-			logger.Debug(fmt.Sprintln("IntRef before : ", cfg.NextHop[i].NextHopIntRef))
-			/*
-			   Validate if nextHopIntRef is a valid L3 interface
-			*/
-			cfg.NextHop[i].NextHopIntRef, err = m.ConvertIntfStrToIfIndexStr(cfg.NextHop[i].NextHopIntRef)
-			if err != nil {
-				logger.Err(fmt.Sprintln("Invalid NextHop IntRef ", cfg.NextHop[i].NextHopIntRef))
-				return err
-			}
-			logger.Debug(fmt.Sprintln("IntRef after : ", cfg.NextHop[i].NextHopIntRef))
-		}
-	}
 	isCidr := strings.Contains(cfg.DestinationNw, "/")
 	if isCidr { 
 	    /*
@@ -480,20 +445,77 @@ func (m RIBDServer) RouteConfigValidationCheck(cfg *ribd.IPv4Route, op string) (
 	/*
 	    Check if route present.
 	*/
-    ok := RouteInfoMap.Match(destNet) 
-	if !ok && op == "del"{
+    routeInfoRecordItem := RouteInfoMap.Get(destNet) 
+	if routeInfoRecordItem == nil && op == "del"{
 	/*
 	    If delete operation, err if no route found
 	*/
         err = errors.New("No route found")
         return err
     }
-	if ok && op == "add" {
+	if routeInfoRecordItem != nil && op == "add" {
 	/*
-	    If add operation, err if the route exists
+	    If add operation, check if this is a valid route
 	*/
-       logger.Err("Duplicate entry")
-	   return errors.New("Duplicate entry")
+	   routeInfoRecordList := routeInfoRecordItem.(RouteInfoRecordList)
+	   routeInfoList:= routeInfoRecordList.routeInfoProtocolMap[cfg.Protocol]
+	   if routeInfoList != nil {
+		   /*
+		       There are routes of the same protocol type already configured
+		   */
+	       if cfg.Cost > int32(routeInfoList[0].metric) {
+			  /*
+			      Routes configured for this route type are of lower cost than the new route
+			  */
+               logger.Err("Duplicate entry")
+	           return errors.New("Duplicate entry")
+		  }
+	   }
+	}
+	/*
+	    op is to add new route
+	*/
+	if op == "add" {
+		/*
+		    check if route protocol type is valid
+		*/
+		_, ok := RouteProtocolTypeMapDB[cfg.Protocol]
+		if !ok {
+			logger.Err(fmt.Sprintln("route type ", cfg.Protocol, " invalid"))
+			err = errors.New("Invalid route protocol type")
+			return err
+		}
+		logger.Debug(fmt.Sprintln("Number of nexthops = ", len(cfg.NextHop)))
+		for i := 0; i < len(cfg.NextHop); i++ {
+			/*
+			    Check if the NextHop IP valid
+			*/
+			_, err = getIP(cfg.NextHop[i].NextHopIp)
+			if err != nil {
+				logger.Err(fmt.Sprintln("nextHopIpAddr invalid"))
+				return errors.New("Invalid next hop ip address")
+			}
+			logger.Debug(fmt.Sprintln("IntRef before : ", cfg.NextHop[i].NextHopIntRef))
+			/*
+			   Validate if nextHopIntRef is a valid L3 interface
+			*/
+			if cfg.NextHop[i].NextHopIntRef == "" {
+				logger.Info(fmt.Sprintln("NextHopIntRef not set"))
+				nhIntf,err := RouteServiceHandler.GetRouteReachabilityInfo(cfg.NextHop[i].NextHopIp)
+				if err != nil {
+					logger.Err(fmt.Sprintln("next hop ip ", cfg.NextHop[i].NextHopIp, " not reachable"))
+					return errors.New(fmt.Sprintln("next hop ip ", cfg.NextHop[i].NextHopIp, " not reachable"))
+				}
+				cfg.NextHop[i].NextHopIntRef = strconv.Itoa(int(nhIntf.NextHopIfIndex))
+			} else {
+			    cfg.NextHop[i].NextHopIntRef, err = m.ConvertIntfStrToIfIndexStr(cfg.NextHop[i].NextHopIntRef)
+			    if err != nil {
+				    logger.Err(fmt.Sprintln("Invalid NextHop IntRef ", cfg.NextHop[i].NextHopIntRef))
+				    return err
+			    }
+			}
+			logger.Debug(fmt.Sprintln("IntRef after : ", cfg.NextHop[i].NextHopIntRef))
+		}
 	}
 	return nil
 }
@@ -652,6 +674,9 @@ func getPolicyRouteMapIndex(entity policy.PolicyEngineFilterEntityParams, policy
 	logger.Info(fmt.Sprintln("Returning policyRouteIndex as : ", policyRouteIndex))
 	return policyRouteIndex
 }
+/*
+   Update routelist for policy
+*/
 func addPolicyRouteMap(route ribdInt.Routes, policyName string) {
 	logger.Println("addPolicyRouteMap")
 	ipPrefix, err := getNetowrkPrefixFromStrings(route.Ipaddr, route.Mask)
@@ -757,7 +782,7 @@ func addRoutePolicyState(route ribdInt.Routes, policy string, policyStmt string)
 		logger.Info(fmt.Sprintln("Unexpected - entry not found for prefix %v", destNet))
 		return
 	}
-	logger.Info(fmt.Sprintln("Adding policy ", policy, " to route %v", destNet))
+	logger.Info(fmt.Sprintln("Adding policy ", policy, " to route ", destNet))
 	routeInfoRecordList := routeInfoRecordListItem.(RouteInfoRecordList)
 	found := false
 	idx := 0
@@ -784,6 +809,7 @@ func addRoutePolicyState(route ribdInt.Routes, policy string, policyStmt string)
 	routeInfoRecordList.policyList = append(routeInfoRecordList.policyList, policy)
 	RouteInfoMap.Set(destNet, routeInfoRecordList)
 	//RouteServiceHandler.DBRouteAddCh <- RouteDBInfo{routeInfoRecordList.routeInfoProtocolMap[routeInfoRecordList.selectedRouteProtocol][0],routeInfoRecordList}
+	RouteServiceHandler.WriteIPv4RouteStateEntryToDB(RouteDBInfo{routeInfoRecordList.routeInfoProtocolMap[routeInfoRecordList.selectedRouteProtocol][0], routeInfoRecordList})
 	return
 }
 func deleteRoutePolicyState(ipPrefix patriciaDB.Prefix, policyName string) {
