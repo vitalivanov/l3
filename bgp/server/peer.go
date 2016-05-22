@@ -44,7 +44,7 @@ type Peer struct {
 	fsmManager   *fsm.FSMManager
 	ifIdx        int32
 	ribIn        map[string]map[uint32]*bgprib.RouteAndPolicy
-	ribOut       map[string]map[uint32]*bgprib.Path
+	ribOut       map[string]map[uint32]*bgprib.RouteAndPolicy
 }
 
 func NewPeer(server *BGPServer, adjRib *bgprib.AdjRib, globalConf *config.GlobalConfig,
@@ -55,7 +55,7 @@ func NewPeer(server *BGPServer, adjRib *bgprib.AdjRib, globalConf *config.Global
 		adjRib: adjRib,
 		ifIdx:  -1,
 		ribIn:  make(map[string]map[uint32]*bgprib.RouteAndPolicy),
-		ribOut: make(map[string]map[uint32]*bgprib.Path),
+		ribOut: make(map[string]map[uint32]*bgprib.RouteAndPolicy),
 	}
 
 	peer.NeighborConf = base.NewNeighborConf(peer.logger, globalConf, peerGroup, peerConf)
@@ -211,7 +211,7 @@ func (p *Peer) ReceiveUpdate(msg *packet.BGPMessage) {
 	}
 
 	for _, nlri := range update.WithdrawnRoutes {
-		ip := nlri.GetPrefix().Prefix.String()
+		ip := nlri.GetPrefix().String()
 		if pathIdRouteMap, ok = p.ribIn[ip]; !ok {
 			p.logger.Err(fmt.Sprintf("Neighbor %s: Withdraw Prefix %s not found in RIB-In",
 				p.NeighborConf.Neighbor.NeighborAddress, ip))
@@ -233,7 +233,7 @@ func (p *Peer) ReceiveUpdate(msg *packet.BGPMessage) {
 	if len(update.NLRI) > 0 {
 		path := bgprib.NewPath(p.adjRib, p.NeighborConf, update.PathAttributes, false, true, bgprib.RouteTypeEGP)
 		for _, nlri := range update.NLRI {
-			ip := nlri.GetPrefix().Prefix.String()
+			ip := nlri.GetPrefix().String()
 			if _, ok = p.ribIn[ip]; !ok {
 				p.ribIn[ip] = make(map[uint32]*bgprib.RouteAndPolicy)
 			}
@@ -333,12 +333,12 @@ func (p *Peer) calculateAddPathsAdvertisements(dest *bgprib.Destination, path *b
 	newUpdated map[*bgprib.Path][]packet.NLRI, withdrawList []packet.NLRI, addPathsTx int) (
 	map[*bgprib.Path][]packet.NLRI, []packet.NLRI) {
 	pathIdMap := make(map[uint32]*bgprib.Path)
-	ip := dest.IPPrefix.Prefix.String()
+	ip := dest.NLRI.GetPrefix().String()
 
 	if _, ok := p.ribOut[ip]; !ok {
 		p.logger.Info(fmt.Sprintf("Neighbor %s: calculateAddPathsAdvertisements - processing updates, dest %s not",
 			"found in rib out", p.NeighborConf.Neighbor.NeighborAddress, ip))
-		p.ribOut[ip] = make(map[uint32]*bgprib.Path)
+		p.ribOut[ip] = make(map[uint32]*bgprib.RouteAndPolicy)
 	}
 
 	if p.isAdvertisable(path) {
@@ -347,7 +347,7 @@ func (p *Peer) calculateAddPathsAdvertisements(dest *bgprib.Destination, path *b
 			if _, ok := newUpdated[path]; !ok {
 				newUpdated[path] = make([]packet.NLRI, 0)
 			}
-			nlri := packet.NewExtNLRI(route.OutPathId, *dest.IPPrefix)
+			nlri := packet.NewExtNLRI(route.OutPathId, dest.NLRI.GetIPPrefix())
 			newUpdated[path] = append(newUpdated[path], nlri)
 		} else {
 			path = dest.LocRibPath
@@ -363,20 +363,20 @@ func (p *Peer) calculateAddPathsAdvertisements(dest *bgprib.Destination, path *b
 	}
 
 	ribPathMap, _ := p.ribOut[ip]
-	for ribPathId, ribPath := range ribPathMap {
+	for ribPathId, ribRoute := range ribPathMap {
 		if path, ok := pathIdMap[ribPathId]; !ok {
-			nlri := packet.NewExtNLRI(ribPathId, *dest.IPPrefix)
+			nlri := packet.NewExtNLRI(ribPathId, dest.NLRI.GetIPPrefix())
 			withdrawList = append(withdrawList, nlri)
 			delete(p.ribOut[ip], ribPathId)
-		} else if ribPath == path {
+		} else if ribRoute.Path == path {
 			delete(pathIdMap, ribPathId)
-		} else if ribPath != path {
+		} else if ribRoute.Path != path {
 			if _, ok := newUpdated[path]; !ok {
 				newUpdated[path] = make([]packet.NLRI, 0)
 			}
-			nlri := packet.NewExtNLRI(ribPathId, *dest.IPPrefix)
+			nlri := packet.NewExtNLRI(ribPathId, dest.NLRI.GetIPPrefix())
 			newUpdated[path] = append(newUpdated[path], nlri)
-			p.ribOut[ip][ribPathId] = path
+			p.ribOut[ip][ribPathId] = bgprib.NewRouteAndPolicy(nlri, path, ribPathId)
 			delete(pathIdMap, ribPathId)
 		}
 	}
@@ -385,9 +385,9 @@ func (p *Peer) calculateAddPathsAdvertisements(dest *bgprib.Destination, path *b
 		if _, ok := newUpdated[path]; !ok {
 			newUpdated[path] = make([]packet.NLRI, 0)
 		}
-		nlri := packet.NewExtNLRI(pathId, *dest.IPPrefix)
+		nlri := packet.NewExtNLRI(pathId, dest.NLRI.GetIPPrefix())
 		newUpdated[path] = append(newUpdated[path], nlri)
-		p.ribOut[ip][pathId] = path
+		p.ribOut[ip][pathId] = bgprib.NewRouteAndPolicy(nlri, path, pathId)
 		delete(pathIdMap, pathId)
 	}
 
@@ -411,7 +411,7 @@ func (p *Peer) SendUpdate(updated map[*bgprib.Path][]*bgprib.Destination,
 	if len(withdrawn) > 0 {
 		for _, dest := range withdrawn {
 			if dest != nil {
-				ip := dest.IPPrefix.Prefix.String()
+				ip := dest.NLRI.GetPrefix().String()
 				if addPathsTx > 0 {
 					pathIdMap, ok := p.ribOut[ip]
 					if !ok {
@@ -420,12 +420,12 @@ func (p *Peer) SendUpdate(updated map[*bgprib.Path][]*bgprib.Destination,
 						continue
 					}
 					for pathId, _ := range pathIdMap {
-						nlri := packet.NewExtNLRI(pathId, *dest.IPPrefix)
+						nlri := packet.NewExtNLRI(pathId, dest.NLRI.GetIPPrefix())
 						withdrawList = append(withdrawList, nlri)
 					}
 					delete(p.ribOut, ip)
 				} else {
-					withdrawList = append(withdrawList, dest.IPPrefix)
+					withdrawList = append(withdrawList, dest.NLRI)
 					delete(p.ribOut, ip)
 				}
 			}
@@ -435,33 +435,33 @@ func (p *Peer) SendUpdate(updated map[*bgprib.Path][]*bgprib.Destination,
 	for path, destinations := range updated {
 		for _, dest := range destinations {
 			if dest != nil {
-				ip := dest.IPPrefix.Prefix.String()
+				ip := dest.NLRI.GetPrefix().String()
 				if addPathsTx > 0 {
 					newUpdated, withdrawList =
 						p.calculateAddPathsAdvertisements(dest, path, newUpdated, withdrawList, addPathsTx)
 				} else {
 					if !p.isAdvertisable(path) {
-						withdrawList = append(withdrawList, dest.IPPrefix)
+						withdrawList = append(withdrawList, dest.NLRI)
 						delete(p.ribOut, ip)
 					} else {
 						route := dest.LocRibPathRoute
 						pathId := route.OutPathId
 						if _, ok := p.ribOut[ip]; !ok {
-							p.ribOut[ip] = make(map[uint32]*bgprib.Path)
+							p.ribOut[ip] = make(map[uint32]*bgprib.RouteAndPolicy)
 						}
 						for ribPathId, _ := range p.ribOut[ip] {
 							if pathId != ribPathId {
 								delete(p.ribOut[ip], ribPathId)
 							}
 						}
-						if ribPath, ok := p.ribOut[ip][pathId]; !ok ||
-							ribPath != path {
+						if ribRoute, ok := p.ribOut[ip][pathId]; !ok ||
+							ribRoute.Path != path {
 							if _, ok := newUpdated[path]; !ok {
 								newUpdated[path] = make([]packet.NLRI, 0)
 							}
-							newUpdated[path] = append(newUpdated[path], dest.IPPrefix)
+							newUpdated[path] = append(newUpdated[path], dest.NLRI)
 						}
-						p.ribOut[ip][pathId] = path
+						p.ribOut[ip][pathId] = bgprib.NewRouteAndPolicy(dest.NLRI.GetIPPrefix(), path, pathId)
 					}
 				}
 			}

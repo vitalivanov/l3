@@ -53,8 +53,8 @@ type Route struct {
 func NewRoute(dest *Destination, path *Path, action RouteAction, inPathId, outPathId uint32) *Route {
 	currTime := time.Now()
 	bgpRoute := &bgpd.BGPRouteState{
-		Network:     dest.IPPrefix.Prefix.String(),
-		CIDRLen:     int16(dest.IPPrefix.Length),
+		Network:     dest.NLRI.GetPrefix().String(),
+		CIDRLen:     int16(dest.NLRI.GetLength()),
 		NextHop:     path.GetNextHop().String(),
 		Metric:      int32(path.MED),
 		LocalPref:   int32(path.LocalPref),

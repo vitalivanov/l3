@@ -13,13 +13,13 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 // bgp.go
 package packet
@@ -859,7 +859,9 @@ type NLRI interface {
 	Encode() ([]byte, error)
 	Decode([]byte) error
 	Len() uint32
-	GetPrefix() *IPPrefix
+	GetIPPrefix() *IPPrefix
+	GetPrefix() net.IP
+	GetLength() uint8
 	GetPathId() uint32
 }
 
@@ -906,8 +908,16 @@ func (ip *IPPrefix) Len() uint32 {
 	return uint32(((ip.Length + 7) / 8) + 1)
 }
 
-func (ip *IPPrefix) GetPrefix() *IPPrefix {
+func (ip *IPPrefix) GetIPPrefix() *IPPrefix {
 	return ip
+}
+
+func (ip *IPPrefix) GetPrefix() net.IP {
+	return ip.Prefix
+}
+
+func (ip *IPPrefix) GetLength() uint8 {
+	return ip.Length
 }
 
 func (ip *IPPrefix) GetPathId() uint32 {
@@ -922,14 +932,14 @@ func NewIPPrefix(prefix net.IP, length uint8) *IPPrefix {
 }
 
 type ExtNLRI struct {
-	IPPrefix
+	*IPPrefix
 	PathId uint32
 }
 
 func (n *ExtNLRI) Clone() NLRI {
 	x := *n
 	prefix := n.IPPrefix.Clone()
-	x.IPPrefix = *prefix.(*IPPrefix)
+	x.IPPrefix = prefix.(*IPPrefix)
 	return &x
 }
 
@@ -954,20 +964,12 @@ func (n *ExtNLRI) Decode(pkt []byte) error {
 	}
 	n.PathId = binary.BigEndian.Uint32(pkt[:4])
 
-	n.IPPrefix = IPPrefix{}
+	n.IPPrefix = &IPPrefix{}
 	err := n.IPPrefix.Decode(pkt[4:])
 	return err
 }
 
-func (n *ExtNLRI) GetPrefix() *IPPrefix {
-	return &n.IPPrefix
-}
-
-func (n *ExtNLRI) GetPathId() uint32 {
-	return n.PathId
-}
-
-func NewExtNLRI(pathId uint32, prefix IPPrefix) *ExtNLRI {
+func NewExtNLRI(pathId uint32, prefix *IPPrefix) *ExtNLRI {
 	return &ExtNLRI{
 		IPPrefix: prefix,
 		PathId:   pathId,
