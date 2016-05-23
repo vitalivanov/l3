@@ -13,13 +13,13 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 // server.go
 package rpc
@@ -49,17 +49,17 @@ type PeerConfigCommands struct {
 type BGPHandler struct {
 	PeerCommandCh chan PeerConfigCommands
 	server        *server.BGPServer
-	bgpPE         *bgppolicy.BGPPolicyEngine
+	bgpPolicyMgr  *bgppolicy.BGPPolicyManager
 	logger        *logging.Writer
 	dbUtil        *dbutils.DBUtil
 }
 
-func NewBGPHandler(server *server.BGPServer, policy *bgppolicy.BGPPolicyEngine, logger *logging.Writer,
+func NewBGPHandler(server *server.BGPServer, policyMgr *bgppolicy.BGPPolicyManager, logger *logging.Writer,
 	dbUtil *dbutils.DBUtil, filePath string) *BGPHandler {
 	h := new(BGPHandler)
 	h.PeerCommandCh = make(chan PeerConfigCommands)
 	h.server = server
-	h.bgpPE = policy
+	h.bgpPolicyMgr = policyMgr
 	h.logger = logger
 	h.dbUtil = dbUtil
 	h.readConfigFromDB(filePath)
@@ -258,7 +258,7 @@ func (h *BGPHandler) handlePolicyConditions() error {
 			convertModelToPolicyConditionConfig(conditionList[idx].(models.BGPPolicyCondition))
 		h.logger.Info(fmt.Sprintln("handlePolicyConditions - create policy condition",
 			policyCondCfg.Name))
-		h.bgpPE.ConditionCfgCh <- *policyCondCfg
+		h.bgpPolicyMgr.ConditionCfgCh <- *policyCondCfg
 	}
 	return nil
 }
@@ -287,7 +287,7 @@ func (h *BGPHandler) handlePolicyActions() error {
 			convertModelToPolicyActionConfig(actionList[idx].(models.BGPPolicyAction))
 		h.logger.Info(fmt.Sprintln("handlePolicyActions - create policy action",
 			policyActionCfg.Name))
-		h.bgpPE.ActionCfgCh <- *policyActionCfg
+		h.bgpPolicyMgr.ActionCfgCh <- *policyActionCfg
 	}
 	return nil
 }
@@ -315,7 +315,7 @@ func (h *BGPHandler) handlePolicyStmts() error {
 		policyStmtCfg := convertModelToPolicyStmtConfig(stmtList[idx].(models.BGPPolicyStmt))
 		h.logger.Info(fmt.Sprintln("handlePolicyStmts - create policy statement",
 			policyStmtCfg.Name))
-		h.bgpPE.StmtCfgCh <- *policyStmtCfg
+		h.bgpPolicyMgr.StmtCfgCh <- *policyStmtCfg
 	}
 	return nil
 }
@@ -354,7 +354,7 @@ func (h *BGPHandler) handlePolicyDefinitions() error {
 			definitionList[idx].(models.BGPPolicyDefinition))
 		h.logger.Info(fmt.Sprintln("handlePolicyDefinitions - create policy definition",
 			policyDefCfg.Name))
-		h.bgpPE.DefinitionCfgCh <- *policyDefCfg
+		h.bgpPolicyMgr.DefinitionCfgCh <- *policyDefCfg
 	}
 	return nil
 }
@@ -848,7 +848,7 @@ func (h *BGPHandler) CreateBGPPolicyCondition(cfg *bgpd.BGPPolicyCondition) (val
 	case "MatchDstIpPrefix":
 		policyCfg := convertThriftToPolicyConditionConfig(cfg)
 		val = true
-		h.bgpPE.ConditionCfgCh <- *policyCfg
+		h.bgpPolicyMgr.ConditionCfgCh <- *policyCfg
 		break
 	default:
 		h.logger.Info(fmt.Sprintln("Unknown condition type ", cfg.ConditionType))
@@ -875,7 +875,7 @@ func (h *BGPHandler) UpdateBGPPolicyCondition(origC *bgpd.BGPPolicyCondition,
 }
 
 func (h *BGPHandler) DeleteBGPPolicyCondition(cfg *bgpd.BGPPolicyCondition) (val bool, err error) {
-	h.bgpPE.ConditionDelCh <- cfg.Name
+	h.bgpPolicyMgr.ConditionDelCh <- cfg.Name
 	return val, err
 }
 
@@ -894,7 +894,7 @@ func (h *BGPHandler) CreateBGPPolicyAction(cfg *bgpd.BGPPolicyAction) (val bool,
 	case "Aggregate":
 		actionCfg := convertThriftToPolicyActionConfig(cfg)
 		val = true
-		h.bgpPE.ActionCfgCh <- *actionCfg
+		h.bgpPolicyMgr.ActionCfgCh <- *actionCfg
 		break
 	default:
 		h.logger.Info(fmt.Sprintln("Unknown action type ", cfg.ActionType))
@@ -920,7 +920,7 @@ func (h *BGPHandler) UpdateBGPPolicyAction(origC *bgpd.BGPPolicyAction, updatedC
 }
 
 func (h *BGPHandler) DeleteBGPPolicyAction(cfg *bgpd.BGPPolicyAction) (val bool, err error) {
-	h.bgpPE.ActionDelCh <- cfg.Name
+	h.bgpPolicyMgr.ActionDelCh <- cfg.Name
 	return val, err
 }
 
@@ -937,7 +937,7 @@ func (h *BGPHandler) CreateBGPPolicyStmt(cfg *bgpd.BGPPolicyStmt) (val bool, err
 	h.logger.Info(fmt.Sprintln("CreatePolicyStmt"))
 	val = true
 	stmtCfg := convertThriftToPolicyStmtConfig(cfg)
-	h.bgpPE.StmtCfgCh <- *stmtCfg
+	h.bgpPolicyMgr.StmtCfgCh <- *stmtCfg
 	return val, err
 }
 
@@ -960,7 +960,7 @@ func (h *BGPHandler) UpdateBGPPolicyStmt(origC *bgpd.BGPPolicyStmt,
 
 func (h *BGPHandler) DeleteBGPPolicyStmt(cfg *bgpd.BGPPolicyStmt) (val bool, err error) {
 	//return policy.DeleteBGPPolicyStmt(name)
-	h.bgpPE.StmtDelCh <- cfg.Name
+	h.bgpPolicyMgr.StmtDelCh <- cfg.Name
 	return true, nil
 }
 
@@ -987,7 +987,7 @@ func (h *BGPHandler) CreateBGPPolicyDefinition(cfg *bgpd.BGPPolicyDefinition) (v
 	h.logger.Info(fmt.Sprintln("CreatePolicyDefinition"))
 	val = true
 	definitionCfg := convertThriftToPolicyDefintionConfig(cfg)
-	h.bgpPE.DefinitionCfgCh <- *definitionCfg
+	h.bgpPolicyMgr.DefinitionCfgCh <- *definitionCfg
 	return val, err
 }
 
@@ -1009,6 +1009,6 @@ func (h *BGPHandler) UpdateBGPPolicyDefinition(origC *bgpd.BGPPolicyDefinition,
 }
 
 func (h *BGPHandler) DeleteBGPPolicyDefinition(cfg *bgpd.BGPPolicyDefinition) (val bool, err error) {
-	h.bgpPE.DefinitionDelCh <- cfg.Name
+	h.bgpPolicyMgr.DefinitionDelCh <- cfg.Name
 	return val, err
 }

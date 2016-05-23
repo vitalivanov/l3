@@ -90,15 +90,14 @@ func main() {
 
 		// starting bgp policy engine...
 		logger.Info(fmt.Sprintln("Starting BGP policy engine..."))
-		bgpPolicyEng := bgppolicy.NewBGPPolicyEngine(logger, pMgr)
-		go bgpPolicyEng.StartPolicyEngine()
+		bgpPolicyMgr := bgppolicy.NewPolicyManager(logger, pMgr)
+		go bgpPolicyMgr.StartPolicyEngine()
 
-		bgpServer := server.NewBGPServer(logger, bgpPolicyEng, iMgr,
-			rMgr, bMgr)
+		bgpServer := server.NewBGPServer(logger, bgpPolicyMgr, iMgr, rMgr, bMgr)
 		go bgpServer.StartServer()
 
 		logger.Info(fmt.Sprintln("Starting config listener..."))
-		confIface := rpc.NewBGPHandler(bgpServer, bgpPolicyEng, logger, dbUtil, fileName)
+		confIface := rpc.NewBGPHandler(bgpServer, bgpPolicyMgr, logger, dbUtil, fileName)
 		dbUtil.Disconnect()
 
 		// create and start ovsdb handler
@@ -135,22 +134,22 @@ func main() {
 		}
 		// starting bgp policy engine...
 		logger.Info(fmt.Sprintln("Starting BGP policy engine..."))
-		bgpPolicyEng := bgppolicy.NewBGPPolicyEngine(logger, pMgr)
-		go bgpPolicyEng.StartPolicyEngine()
+		bgpPolicyMgr := bgppolicy.NewPolicyManager(logger, pMgr)
+		go bgpPolicyMgr.StartPolicyEngine()
 
 		logger.Info(fmt.Sprintln("Starting BGP Server..."))
 
-		bgpServer := server.NewBGPServer(logger, bgpPolicyEng, iMgr, rMgr, bMgr)
+		bgpServer := server.NewBGPServer(logger, bgpPolicyMgr, iMgr, rMgr, bMgr)
 		go bgpServer.StartServer()
 
-		api.InitPolicy(bgpPolicyEng)
+		api.InitPolicy(bgpPolicyMgr)
 		api.Init(bgpServer)
 
 		// Start keepalive routine
 		go keepalive.InitKeepAlive("bgpd", fileName)
 
 		logger.Info(fmt.Sprintln("Starting config listener..."))
-		confIface := rpc.NewBGPHandler(bgpServer, bgpPolicyEng, logger, dbUtil, fileName)
+		confIface := rpc.NewBGPHandler(bgpServer, bgpPolicyMgr, logger, dbUtil, fileName)
 		dbUtil.Disconnect()
 
 		rpc.StartServer(logger, confIface, fileName)

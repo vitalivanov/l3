@@ -74,7 +74,10 @@ type PolicyParams struct {
 
 type BGPServer struct {
 	logger           *logging.Writer
-	bgpPE            *bgppolicy.BGPPolicyEngine
+	policyManager    *bgppolicy.BGPPolicyManager
+	locRibPE         *bgppolicy.LocRibPolicyEngine
+	ribInPE          *bgppolicy.AdjRibPPolicyEngine
+	ribOutPE         *bgppolicy.AdjRibPPolicyEngine
 	listener         *net.TCPListener
 	ifaceMgr         *utils.InterfaceMgr
 	BgpConfig        config.Bgp
@@ -112,11 +115,11 @@ type BGPServer struct {
 	bfdMgr   config.BfdMgrIntf
 }
 
-func NewBGPServer(logger *logging.Writer, policyEngine *bgppolicy.BGPPolicyEngine, iMgr config.IntfStateMgrIntf,
+func NewBGPServer(logger *logging.Writer, policyManager *bgppolicy.BGPPolicyManager, iMgr config.IntfStateMgrIntf,
 	rMgr config.RouteMgrIntf, bMgr config.BfdMgrIntf) *BGPServer {
 	bgpServer := &BGPServer{}
 	bgpServer.logger = logger
-	bgpServer.bgpPE = policyEngine
+	bgpServer.policyManager = policyManager
 	bgpServer.ifaceMgr = utils.NewInterfaceMgr(logger)
 	bgpServer.BgpConfig = config.Bgp{}
 	bgpServer.GlobalCfgDone = false
@@ -155,12 +158,13 @@ func NewBGPServer(logger *logging.Writer, policyEngine *bgppolicy.BGPPolicyEngin
 
 	bgpServer.actionFuncMap[policyCommonDefs.PolicyActionTypeAggregate] = aggrActionFunc
 
+	locRibPE := bgppolicy.NewLocRibPolicyEngine(logger)
 	bgpServer.logger.Info(fmt.Sprintf("BGPServer: actionfuncmap=%v", bgpServer.actionFuncMap))
-	bgpServer.bgpPE.SetEntityUpdateFunc(bgpServer.UpdateRouteAndPolicyDB)
-	bgpServer.bgpPE.SetIsEntityPresentFunc(bgpServer.DoesRouteExist)
-	bgpServer.bgpPE.SetActionFuncs(bgpServer.actionFuncMap)
-	bgpServer.bgpPE.SetTraverseFuncs(bgpServer.TraverseAndApplyBGPRib,
-		bgpServer.TraverseAndReverseBGPRib)
+	locRibPE.SetEntityUpdateFunc(bgpServer.UpdateRouteAndPolicyDB)
+	locRibPE.SetIsEntityPresentFunc(bgpServer.DoesRouteExist)
+	locRibPE.SetActionFuncs(bgpServer.actionFuncMap)
+	locRibPE.SetTraverseFuncs(bgpServer.TraverseAndApplyBGPRib, bgpServer.TraverseAndReverseBGPRib)
+	bgpServer.locRibPE = locRibPE
 
 	return bgpServer
 }
@@ -508,7 +512,7 @@ func (server *BGPServer) CheckForAggregation(updated map[*bgprib.Path][]*bgprib.
 			withdrawn:       &withdrawn,
 			updatedAddPaths: &updatedAddPaths,
 		}
-		server.bgpPE.PolicyEngine.PolicyEngineFilter(peEntity, policyCommonDefs.PolicyPath_Export, callbackInfo)
+		server.locRibPE.PolicyEngine.PolicyEngineFilter(peEntity, policyCommonDefs.PolicyPath_Export, callbackInfo)
 	}
 
 	for _, destinations := range updated {
@@ -536,7 +540,7 @@ func (server *BGPServer) CheckForAggregation(updated map[*bgprib.Path][]*bgprib.
 					withdrawn:       &withdrawn,
 					updatedAddPaths: &updatedAddPaths,
 				}
-				server.bgpPE.PolicyEngine.PolicyEngineFilter(peEntity, policyCommonDefs.PolicyPath_Export, callbackInfo)
+				server.locRibPE.PolicyEngine.PolicyEngineFilter(peEntity, policyCommonDefs.PolicyPath_Export, callbackInfo)
 				server.logger.Info(fmt.Sprintf("BGPServer:checkForAggregate - update dest %s policylist %v hit %v ",
 					"after applying create policy\n", dest.NLRI.GetPrefix().String(), route.PolicyList,
 					route.PolicyHitCounter))
@@ -562,7 +566,7 @@ func (server *BGPServer) UpdateRouteAndPolicyDB(policyDetails utilspolicy.Policy
 		}
 		policyParams.route.PolicyHitCounter++
 	}
-	server.bgpPE.UpdatePolicyRouteMap(policyParams.route, policyDetails.Policy, op)
+	server.locRibPE.UpdatePolicyRouteMap(policyParams.route, policyDetails.Policy, op)
 }
 
 func (server *BGPServer) TraverseAndApplyBGPRib(data interface{}, updateFunc utilspolicy.PolicyApplyfunc) {
@@ -639,9 +643,9 @@ func (server *BGPServer) TraverseAndReverseBGPRib(policyData interface{}) {
 			server.logger.Info(fmt.Sprintln("Invalid route ", ipPrefix))
 			continue
 		}
-		server.bgpPE.PolicyEngine.PolicyEngineUndoPolicyForEntity(peEntity, policy, callbackInfo)
-		server.bgpPE.DeleteRoutePolicyState(route, policy.Name)
-		server.bgpPE.PolicyEngine.DeletePolicyEntityMapEntry(peEntity, policy.Name)
+		server.locRibPE.PolicyEngine.PolicyEngineUndoPolicyForEntity(peEntity, policy, callbackInfo)
+		server.locRibPE.DeleteRoutePolicyState(route, policy.Name)
+		server.locRibPE.PolicyEngine.DeletePolicyEntityMapEntry(peEntity, policy.Name)
 	}
 }
 

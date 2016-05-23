@@ -176,7 +176,7 @@ func GetNetworkPrefixFromCIDR(ipAddr string) (ipPrefix patriciaDB.Prefix, err er
 	return patriciaDB.Prefix(destNet), err
 }
 
-func (eng *BGPPolicyEngine) DeleteRoutePolicyState(route *bgprib.Route, policyName string) {
+func (eng *LocRibPolicyEngine) DeleteRoutePolicyState(route *bgprib.Route, policyName string) {
 	utils.Logger.Info(fmt.Sprintln("deleteRoutePolicyState"))
 	found := false
 	idx := 0
@@ -233,7 +233,7 @@ func UpdateRoutePolicyState(route *bgprib.Route, op int, policy string, policySt
 	}
 }
 
-func (eng *BGPPolicyEngine) addPolicyRouteMap(route *bgprib.Route, policy string) {
+func (eng *LocRibPolicyEngine) addPolicyRouteMap(route *bgprib.Route, policy string) {
 	utils.Logger.Info(fmt.Sprintln("addPolicyRouteMap"))
 	//policy.hitCounter++
 	//ipPrefix, err := getNetowrkPrefixFromStrings(route.Network, route.Mask)
@@ -291,7 +291,7 @@ func deletePolicyRouteMap(route *bgprib.Route, policy string) {
 	fmt.Println("deletePolicyRouteMap")
 }
 
-func (eng *BGPPolicyEngine) UpdatePolicyRouteMap(route *bgprib.Route, policy string, op int) {
+func (eng *LocRibPolicyEngine) UpdatePolicyRouteMap(route *bgprib.Route, policy string, op int) {
 	utils.Logger.Info(fmt.Sprintln("updatePolicyRouteMap"))
 	if op == Add {
 		eng.addPolicyRouteMap(route, policy)

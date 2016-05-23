@@ -30,7 +30,7 @@ import (
 )
 
 type PolicyApiLayer struct {
-	policyEngine *bgppolicy.BGPPolicyEngine
+	policyManager *bgppolicy.BGPPolicyManager
 }
 
 var bgppolicyapi *PolicyApiLayer = nil
@@ -48,17 +48,17 @@ func getPolicyInstance() *PolicyApiLayer {
 /*  Initialize bgp api layer with the channels that will be used for communicating
  *  with the policy engine server
  */
-func InitPolicy(policyEngine *bgppolicy.BGPPolicyEngine) {
+func InitPolicy(policyEngine *bgppolicy.BGPPolicyManager) {
 	bgppolicyapi = getPolicyInstance()
-	bgppolicyapi.policyEngine = policyEngine
+	bgppolicyapi.policyManager = policyEngine
 }
 
 func AddPolicyCondition(condition utilspolicy.PolicyConditionConfig) {
-	bgppolicyapi.policyEngine.ConditionCfgCh <- condition
+	bgppolicyapi.policyManager.ConditionCfgCh <- condition
 }
 
 func RemovePolicyCondition(conditionName string) {
-	bgppolicyapi.policyEngine.ConditionDelCh <- conditionName
+	bgppolicyapi.policyManager.ConditionDelCh <- conditionName
 }
 
 func UpdatePolicyCondition(condition utilspolicy.PolicyConditionConfig) {
@@ -66,11 +66,11 @@ func UpdatePolicyCondition(condition utilspolicy.PolicyConditionConfig) {
 }
 
 func AddPolicyStmt(stmt utilspolicy.PolicyStmtConfig) {
-	bgppolicyapi.policyEngine.StmtCfgCh <- stmt
+	bgppolicyapi.policyManager.StmtCfgCh <- stmt
 }
 
 func RemovePolicyStmt(stmtName string) {
-	bgppolicyapi.policyEngine.StmtDelCh <- stmtName
+	bgppolicyapi.policyManager.StmtDelCh <- stmtName
 }
 
 func UpdatePolicyStmt(stmt utilspolicy.PolicyStmtConfig) {
@@ -78,11 +78,11 @@ func UpdatePolicyStmt(stmt utilspolicy.PolicyStmtConfig) {
 }
 
 func AddPolicyDefinition(definition utilspolicy.PolicyDefinitionConfig) {
-	bgppolicyapi.policyEngine.DefinitionCfgCh <- definition
+	bgppolicyapi.policyManager.DefinitionCfgCh <- definition
 }
 
 func RemovePolicyDefinition(definitionName string) {
-	bgppolicyapi.policyEngine.DefinitionDelCh <- definitionName
+	bgppolicyapi.policyManager.DefinitionDelCh <- definitionName
 }
 
 func UpdatePolicyDefinition(definition utilspolicy.PolicyDefinitionConfig) {
