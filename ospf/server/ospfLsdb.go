@@ -71,6 +71,7 @@ const (
 )
 
 var lsdbTickerCh *time.Timer
+var lsdbRefreshTickerCh *time.Timer
 
 func (server *OSPFServer) initLSDatabase(areaId uint32) {
 	lsdbKey := LsdbKey{
@@ -93,60 +94,6 @@ func (server *OSPFServer) initLSDatabase(areaId uint32) {
 
 }
 
-func (server *OSPFServer) lsdbStateRefresh() {
-	var lsdbStateRefFunc func()
-	lsdbStateRefFunc = func() {
-		server.logger.Info("Inside lsdbStateRefFunc()")
-		server.logger.Info(fmt.Sprintln("The old Lsdb Slice after refresh", server.LsdbSlice))
-		server.LsdbSlice = []LsdbSliceEnt{}
-		for lsdbkey, lsdbEnt := range server.AreaLsdb {
-			for lsakey, _ := range lsdbEnt.RouterLsaMap {
-				var val LsdbSliceEnt
-				val.AreaId = lsdbkey.AreaId
-				val.LSType = lsakey.LSType
-				val.LSId = lsakey.LSId
-				val.AdvRtr = lsakey.AdvRouter
-				server.LsdbSlice = append(server.LsdbSlice, val)
-			}
-			for lsakey, _ := range lsdbEnt.NetworkLsaMap {
-				var val LsdbSliceEnt
-				val.AreaId = lsdbkey.AreaId
-				val.LSType = lsakey.LSType
-				val.LSId = lsakey.LSId
-				val.AdvRtr = lsakey.AdvRouter
-				server.LsdbSlice = append(server.LsdbSlice, val)
-			}
-			for lsakey, _ := range lsdbEnt.Summary3LsaMap {
-				var val LsdbSliceEnt
-				val.AreaId = lsdbkey.AreaId
-				val.LSType = lsakey.LSType
-				val.LSId = lsakey.LSId
-				val.AdvRtr = lsakey.AdvRouter
-				server.LsdbSlice = append(server.LsdbSlice, val)
-			}
-			for lsakey, _ := range lsdbEnt.Summary4LsaMap {
-				var val LsdbSliceEnt
-				val.AreaId = lsdbkey.AreaId
-				val.LSType = lsakey.LSType
-				val.LSId = lsakey.LSId
-				val.AdvRtr = lsakey.AdvRouter
-				server.LsdbSlice = append(server.LsdbSlice, val)
-			}
-			for lsakey, _ := range lsdbEnt.ASExternalLsaMap {
-				var val LsdbSliceEnt
-				val.AreaId = lsdbkey.AreaId
-				val.LSType = lsakey.LSType
-				val.LSId = lsakey.LSId
-				val.AdvRtr = lsakey.AdvRouter
-				server.LsdbSlice = append(server.LsdbSlice, val)
-			}
-		}
-		server.logger.Info(fmt.Sprintln("The new Lsdb Slice after refresh", server.LsdbSlice))
-		server.LsdbStateTimer.Reset(server.RefreshDuration)
-	}
-	server.LsdbStateTimer = time.AfterFunc(server.RefreshDuration, lsdbStateRefFunc)
-}
-
 func (server *OSPFServer) StartLSDatabase() {
 	server.logger.Info("Initializing LSA Database")
 	for key, _ := range server.AreaConfMap {
@@ -158,12 +105,14 @@ func (server *OSPFServer) StartLSDatabase() {
 	maxAgeLsaMap = make(map[LsaKey][]byte)
 	// start LSDB aging ticker
 	lsdbTickerCh = time.NewTimer(time.Second * 1)
+	lsdbRefreshTickerCh = time.NewTimer(time.Second * time.Duration(config.LSRefreshTime))
 	go server.processLSDatabaseUpdates()
 	return
 }
 
 func (server *OSPFServer) StopLSDatabase() {
 	lsdbTickerCh.Stop()
+	lsdbRefreshTickerCh.Stop()
 }
 
 func (server *OSPFServer) compareSummaryLsa(lsdbKey LsdbKey, lsaKey LsaKey, lsaEnt SummaryLsa) bool {
@@ -497,7 +446,7 @@ func (server *OSPFServer) constructStubLinkP2P(ent IntfConf, likType config.IfTy
 	linkDetail.LinkData = netmask
 	linkDetail.LinkType = StubLink
 	linkDetail.NumOfTOS = 0
-	linkDetail.LinkMetric = 10
+	linkDetail.LinkMetric = uint16(ent.IfCost)
 
 	return linkDetail
 }
@@ -528,7 +477,7 @@ func (server *OSPFServer) generateRouterLSA(areaId uint32) {
 				linkDetail.LinkType = StubLink
 				/* Todo: Need to handle IfMetricConf */
 				linkDetail.NumOfTOS = 0
-				linkDetail.LinkMetric = 10
+				linkDetail.LinkMetric = uint16(ent.IfCost)
 			} else { // Transit Network
 				server.logger.Info("Transit Network")
 				linkDetail.LinkId = convertIPv4ToUint32(ent.IfDRIp)
@@ -539,7 +488,7 @@ func (server *OSPFServer) generateRouterLSA(areaId uint32) {
 				linkDetail.LinkType = TransitLink
 				/* Todo: Need to handle IfMetricConf */
 				linkDetail.NumOfTOS = 0
-				linkDetail.LinkMetric = 10
+				linkDetail.LinkMetric = uint16(ent.IfCost)
 				server.logger.Info(fmt.Sprintln("LinkDetail: linkid ", ent.IfDRIp,
 					" linkdata ", ent.IfIpAddr))
 			}
@@ -577,7 +526,7 @@ func (server *OSPFServer) generateRouterLSA(areaId uint32) {
 			linkDetail.LinkData = convertAreaOrRouterIdUint32(ent.IfIpAddr.String())
 			linkDetail.LinkType = P2PLink
 			linkDetail.NumOfTOS = 0
-			linkDetail.LinkMetric = 10
+			linkDetail.LinkMetric = uint16(ent.IfCost)
 
 		case config.UnnumberedP2P:
 			stub_link := server.constructStubLinkP2P(ent, config.UnnumberedP2P)
@@ -597,7 +546,7 @@ func (server *OSPFServer) generateRouterLSA(areaId uint32) {
 			linkDetail.LinkData = uint32(key.IntfIdx)
 			linkDetail.LinkType = P2PLink
 			linkDetail.NumOfTOS = 0
-			linkDetail.LinkMetric = 10
+			linkDetail.LinkMetric = uint16(ent.IfCost)
 		}
 		linkDetails = append(linkDetails, linkDetail)
 	}
@@ -738,6 +687,35 @@ func (server *OSPFServer) generateASExternalLsa(route RouteMdata) LsaKey {
 	return lsaKey
 }
 
+func (server *OSPFServer) updateAsExternalLSA(lsdbKey LsdbKey, lsaKey LsaKey) error {
+        lsDbEnt, exist := server.AreaLsdb[lsdbKey]
+        if exist {
+                ent, valid := lsDbEnt.ASExternalLsaMap[lsaKey]
+                if !valid {
+                        server.logger.Warning(fmt.Sprintln("LSDB: AS external LSA doesnt exist lsdb ", lsdbKey, lsaKey))
+                        return nil
+                }
+                LsaEnc := encodeASExternalLsa(ent, lsaKey)
+                checksumOffset := uint16(14)
+                ent.LsaMd.LSChecksum = computeFletcherChecksum(LsaEnc[2:], checksumOffset)
+                LSAge := 0
+                ent.LsaMd.LSAge = uint16(LSAge)
+                lsDbEnt.ASExternalLsaMap[lsaKey] = ent
+                server.AreaLsdb[lsdbKey] = lsDbEnt
+
+                //update db entry
+                var val LsdbSliceEnt
+                val.AreaId = lsdbKey.AreaId
+                val.LSType = lsaKey.LSType
+                val.LSId = lsaKey.LSId
+                val.AdvRtr = lsaKey.AdvRouter
+                server.LsdbSlice = append(server.LsdbSlice, val)
+                server.AddLsdbEntry(val)
+        }
+        return nil
+}
+
+
 func (server *OSPFServer) processDeleteRouterLsa(data []byte, areaId uint32) bool {
 	lsakey := NewLsaKey()
 	routerLsa := NewRouterLsa()
@@ -871,18 +849,18 @@ func (server *OSPFServer) processRecvdNetworkLsa(data []byte, areaId uint32) boo
 
 func (server *OSPFServer) processDeleteSummaryLsa(data []byte, areaId uint32, lsaType uint8) bool {
 	lsakey := NewLsaKey()
-        var val LsdbSliceEnt
+	var val LsdbSliceEnt
 	summaryLsa := NewSummaryLsa()
 	lsdbKey := LsdbKey{
 		AreaId: areaId,
 	}
-        val.AreaId = lsdbKey.AreaId
-        
+	val.AreaId = lsdbKey.AreaId
+
 	decodeSummaryLsa(data, summaryLsa, lsakey)
 
-        val.LSType = lsakey.LSType
-        val.LSId = lsakey.LSId
-        val.AdvRtr = lsakey.AdvRouter
+	val.LSType = lsakey.LSType
+	val.LSId = lsakey.LSId
+	val.AdvRtr = lsakey.AdvRouter
 
 	lsDbEnt, _ := server.AreaLsdb[lsdbKey]
 	if lsaType == Summary3LSA {
@@ -892,7 +870,7 @@ func (server *OSPFServer) processDeleteSummaryLsa(data []byte, areaId uint32, ls
 	}
 	server.AreaLsdb[lsdbKey] = lsDbEnt
 	server.printRouterLsa()
-        server.DelLsdbEntry(val)
+	server.DelLsdbEntry(val)
 	return true
 }
 
@@ -959,7 +937,7 @@ func (server *OSPFServer) processRecvdSummaryLsa(data []byte, areaId uint32, lsa
 
 func (server *OSPFServer) processDeleteASExternalLsa(data []byte, areaId uint32) bool {
 	lsakey := NewLsaKey()
-        var val LsdbSliceEnt
+	var val LsdbSliceEnt
 	asExtLsa := NewASExternalLsa()
 	lsdbKey := LsdbKey{
 		AreaId: areaId,
@@ -968,15 +946,15 @@ func (server *OSPFServer) processDeleteASExternalLsa(data []byte, areaId uint32)
 	lsDbEnt, _ := server.AreaLsdb[lsdbKey]
 	delete(lsDbEnt.ASExternalLsaMap, *lsakey)
 	server.AreaLsdb[lsdbKey] = lsDbEnt
-        
-        val.AreaId = lsdbKey.AreaId 
- val.LSType = lsakey.LSType
-val.LSId = lsakey.LSId
- val.AdvRtr = lsakey.AdvRouter
-err := server.DelLsdbEntry(val)
-if err != nil {
-	server.logger.Info(fmt.Sprintln("DB: Failed to delete entry from db ", lsakey))
-}
+
+	val.AreaId = lsdbKey.AreaId
+	val.LSType = lsakey.LSType
+	val.LSId = lsakey.LSId
+	val.AdvRtr = lsakey.AdvRouter
+	err := server.DelLsdbEntry(val)
+	if err != nil {
+		server.logger.Info(fmt.Sprintln("DB: Failed to delete entry from db ", lsakey))
+	}
 	return true
 }
 
@@ -1142,16 +1120,21 @@ func (server *OSPFServer) processLSDatabaseUpdates() {
 				server.installSummaryLsa()
 			}
 
-		case msg := <-server.ExternalRouteNotif:
+		case msg := <-server.ExternalRouteNotif: //Generate external LSA
 			server.processExtRouteUpd(msg)
 
-		case msg := <-server.maxAgeLsaCh:
+		case msg := <-server.maxAgeLsaCh: //Flood MaxAge LSA
 			server.processMaxAgeLsaMsg(msg)
 
-		case <-lsdbTickerCh.C:
+		case <-lsdbTickerCh.C: //Increment LSA AGE
 			lsdbTickerCh.Stop()
 			server.processLSDatabaseTicker()
 			lsdbTickerCh.Reset(time.Duration(1) * time.Second)
+
+		case <-lsdbRefreshTickerCh.C: //Regenerate LSA
+			lsdbRefreshTickerCh.Stop()
+			server.lsdbSelfLsaRefresh()
+			lsdbRefreshTickerCh.Reset(time.Duration(config.LSRefreshTime) * time.Second)
 		}
 	}
 }
@@ -1182,7 +1165,7 @@ func (server *OSPFServer) processNeighborFullEvent(msg ospfNbrMdata) {
 	intConf := server.IntfConfMap[msg.intf]
 	server.logger.Info(fmt.Sprintln("LSDB: Nbr full. Generate router and network LSA  area id  ",
 		msg.areaId, " intf ", intConf.IfIpAddr))
-	if intConf.IfDRtrId == rtr_id  && intConf.IfType == config.Broadcast {
+	if intConf.IfDRtrId == rtr_id && intConf.IfType == config.Broadcast {
 		server.logger.Info(fmt.Sprintln("Generate network LSA ", msg.intf))
 		server.generateNetworkLSA(msg.areaId, msg.intf, true)
 	}
@@ -1219,28 +1202,4 @@ func (server *OSPFServer) processDrBdrChangeMsg(msg DrChangeMsg) {
 	server.generateRouterLSA(msg.areaId)
 	server.sendLsdbToNeighborEvent(msg.intfKey, nbr, msg.areaId, 0, 0, lsaKey, LSAFLOOD)
 
-}
-
-/* @processLSDatabaseTicker
-Visited every time ticker is fired to
-check expired LSAs and send message to
-flood LSA
-*/
-func (server *OSPFServer) processLSDatabaseTicker() {
-	/* scan through LSDB. Flood expired LSAs and
-	   delete from LSDB */
-	for lsdbKey, lsDbEnt := range server.AreaLsdb {
-		server.processMaxAgeLSA(lsdbKey, lsDbEnt)
-
-	}
-
-}
-
-func (server *OSPFServer) processMaxAgeLsaMsg(msg maxAgeLsaMsg) {
-	switch msg.msg_type {
-	case addMaxAgeLsa:
-		maxAgeLsaMap[msg.lsaKey] = msg.pkt
-	case delMaxAgeLsa:
-		delete(maxAgeLsaMap, msg.lsaKey)
-	}
 }
