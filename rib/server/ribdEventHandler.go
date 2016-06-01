@@ -143,12 +143,16 @@ func (ribdServiceHandler *RIBDServer) ProcessAsicdEvents(sub *nanomsg.SubSocket)
 			cfg.NextHop = make([]*ribd.NextHopInfo, 0)
 			cfg.NextHop = append(cfg.NextHop, &nextHop)
 
-			_, err = ribdServiceHandler.ProcessRouteCreateConfig(&cfg) //ipAddrStr, ipMaskStr, 0, "0.0.0.0", ribd.Int(asicdCommonDefs.GetIntfTypeFromIfIndex(msg.IfIndex)), ribd.Int(asicdCommonDefs.GetIntfIdFromIfIndex(msg.IfIndex)), "CONNECTED")
+	         ribdServiceHandler.RouteConfCh <- RIBdServerConfig{
+	                                   OrigConfigObject:&cfg,
+	                                   Op : "add",
+	         }
+			//_, err = ribdServiceHandler.ProcessRouteCreateConfig(&cfg) //ipAddrStr, ipMaskStr, 0, "0.0.0.0", ribd.Int(asicdCommonDefs.GetIntfTypeFromIfIndex(msg.IfIndex)), ribd.Int(asicdCommonDefs.GetIntfIdFromIfIndex(msg.IfIndex)), "CONNECTED")
 			//_, err = createV4Route(ipAddrStr, ipMaskStr, 0, "0.0.0.0", ribd.Int(asicdCommonDefs.GetIntfTypeFromIfIndex(msg.IfIndex)), ribd.Int(asicdCommonDefs.GetIntfIdFromIfIndex(msg.IfIndex)), ribdCommonDefs.CONNECTED, FIBAndRIB, ribdCommonDefs.RoutePolicyStateChangetoValid,ribd.Int(len(destNetSlice)))
-			if err != nil {
+			/*if err != nil {
 				ribdServiceHandler.Logger.Info(fmt.Sprintln("Route create failed with err %s\n", err))
 				return
-			}
+			}*/
 			break
 		case asicdCommonDefs.NOTIFY_IPV4INTF_DELETE:
 			ribdServiceHandler.Logger.Info("NOTIFY_IPV4INTF_DELETE  event")
@@ -181,11 +185,15 @@ func (ribdServiceHandler *RIBDServer) ProcessAsicdEvents(sub *nanomsg.SubSocket)
 			}
 			cfg.NextHop = make([]*ribd.NextHopInfo, 0)
 			cfg.NextHop = append(cfg.NextHop, &nextHop)
-			_, err = ribdServiceHandler.ProcessRouteDeleteConfig(&cfg) //ipAddrStr, ipMaskStr, 0, "0.0.0.0", ribd.Int(asicdCommonDefs.GetIntfTypeFromIfIndex(msg.IfIndex)), ribd.Int(asicdCommonDefs.GetIntfIdFromIfIndex(msg.IfIndex)), "CONNECTED")
+	         ribdServiceHandler.RouteConfCh <- RIBdServerConfig{
+	                                  OrigConfigObject: &cfg,
+	                                   Op : "del",
+	         }
+			/*_, err = ribdServiceHandler.ProcessRouteDeleteConfig(&cfg) //ipAddrStr, ipMaskStr, 0, "0.0.0.0", ribd.Int(asicdCommonDefs.GetIntfTypeFromIfIndex(msg.IfIndex)), ribd.Int(asicdCommonDefs.GetIntfIdFromIfIndex(msg.IfIndex)), "CONNECTED")
 			if err != nil {
 				ribdServiceHandler.Logger.Info(fmt.Sprintln("Route delete failed with err %s\n", err))
 				return
-			}
+			}*/
 			break
 		}
 	}
