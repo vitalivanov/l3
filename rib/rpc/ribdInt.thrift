@@ -1,3 +1,26 @@
+//
+//Copyright [2016] [SnapRoute Inc]
+//
+//Licensed under the Apache License, Version 2.0 (the "License");
+//you may not use this file except in compliance with the License.
+//You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+//	 Unless required by applicable law or agreed to in writing, software
+//	 distributed under the License is distributed on an "AS IS" BASIS,
+//	 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//	 See the License for the specific language governing permissions and
+//	 limitations under the License.
+//
+// _______   __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
+// |  |__   |  |     |  |__   \  V  /     |   (----  \   \/    \/   /  |  |  ---|  |---- |  ,---- |  |__|  | 
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
+//                                                                                                           
+
 namespace go ribdInt
 typedef i32 int
 struct NextHopInfo {
@@ -81,6 +104,11 @@ struct ConditionInfo {
 	3 : string IpPrefix
 	4 : string MasklengthRange 
 }
+struct PatchOpInfo {
+    1 : string Op
+    2 : string Path
+    3 : list<map<string,string>> Value
+}
 
 service RIBDINTServices 
 {
@@ -94,7 +122,7 @@ service RIBDINTServices
 	Routes getRoute(1: string destNetIp, 2:string networkMask);
 	oneway void OnewayCreateBulkIPv4Route(1: list<IPv4Route> config);
 	bool CreatePolicyAction(1: PolicyAction config);
-	bool UpdatePolicyAction(1: PolicyAction origconfig, 2: PolicyAction newconfig, 3: list<bool> attrset, 4: string op);
+	bool UpdatePolicyAction(1: PolicyAction origconfig, 2: PolicyAction newconfig, 3: list<bool> attrset, 4: list<PatchOpInfo> op);
 	bool DeletePolicyAction(1: PolicyAction config);
 	void ApplyPolicy(1: string source, 2: string policy, 3: string action, 4: list<ConditionInfo>conditions)
 	void UpdateApplyPolicy(1: string source, 2: string policy, 3: string action, 4: list<ConditionInfo>conditions)

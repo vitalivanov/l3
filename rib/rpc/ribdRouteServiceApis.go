@@ -28,6 +28,8 @@ import (
 	"fmt"
 	"l3/rib/server"
 	"ribd"
+	"models"
+	"errors"
 	"ribdInt"
 )
 
@@ -35,7 +37,7 @@ import (
  */
 
 func (m RIBDServicesHandler) CreateIPv4Route(cfg *ribd.IPv4Route) (val bool, err error) {
-	logger.Info(fmt.Sprintln("Received create route request for ip", cfg.DestinationNw, " mask ", cfg.NetworkMask, "cfg.NextHopIntRef: ", cfg.NextHop[0].NextHopIntRef))
+	logger.Info(fmt.Sprintln("Received create route request for ip", cfg.DestinationNw, " mask ", cfg.NetworkMask))
     /* Validate Route config parameters for "add" operation
     */
 	err = m.server.RouteConfigValidationCheck(cfg, "add")
@@ -113,33 +115,25 @@ func (m RIBDServicesHandler) OnewayDeleteIPv4Route(cfg *ribd.IPv4Route) (err err
 /*
     Update route
 */
-func (m RIBDServicesHandler) UpdateIPv4Route(origconfig *ribd.IPv4Route, newconfig *ribd.IPv4Route, attrset []bool, op string) (val bool, err error) { //[]*ribd.PatchOpInfo) (val bool, err error) {
+func (m RIBDServicesHandler) UpdateIPv4Route(origconfig *ribd.IPv4Route, newconfig *ribd.IPv4Route, attrset []bool, op []*ribd.PatchOpInfo) (val bool, err error) { //[]*ribd.PatchOpInfo) (val bool, err error) {
 	logger.Println("UpdateIPv4Route: Received update route request")
 	/*
 	    validate route config parameters for update operation
 	*/
-/*	if op == nil {
+	if op == nil || len(op) == 0 {
 	    err = m.server.RouteConfigValidationCheckForUpdate(origconfig, newconfig, attrset)
 	    if err != nil {
 		    logger.Err(fmt.Sprintln("validation check failed with error ", err))
 		    return false, err
 	    }
-	    routeUpdateConfig := server.UpdateRouteInfo{origconfig, newconfig, attrset}
-	    m.server.RouteUpdateConfCh <- routeUpdateConfig
-        return true,nil
-	}
-	err = m.server.RouteConfigValidationCheckForPatchUpdate(origconfig, newconfig,op)
-	if err != nil {
-		logger.Err(fmt.Sprintln("validation check failed with error ", err))
-		return false, err
-	}
-	routePatchUpdateConfig := server.PatchUpdateRouteInfo{origconfig, newconfig, op}
-	m.server.RoutePatchUpdateConfCh <- routePatchUpdateConfig
-	*/
-	err = m.server.RouteConfigValidationCheckForUpdate(origconfig, newconfig, attrset,op)
-	if err != nil {
-		logger.Err(fmt.Sprintln("validation check failed with error ", err))
-		return false, err
+	} else {
+	    logger.Debug(fmt.Sprintln("cfg.NextHop before: ", newconfig.NextHop, " newConfig:", newconfig))
+        err = m.server.RouteConfigValidationCheckForPatchUpdate(origconfig, newconfig,op)
+	    logger.Debug(fmt.Sprintln("cfg.NextHop after ", newconfig.NextHop))
+        if err != nil {
+            logger.Err(fmt.Sprintln("validation check failed with error ", err))
+            return false, err
+	    }
 	}
 	m.server.RouteConfCh <- server.RIBdServerConfig{
 	                                   OrigConfigObject: origconfig,
@@ -148,6 +142,7 @@ func (m RIBDServicesHandler) UpdateIPv4Route(origconfig *ribd.IPv4Route, newconf
 	                                   Op              : "update",
 									PatchOp         : op,
 	                              }
+	
 	return true, nil
 }
 
@@ -156,7 +151,7 @@ func (m RIBDServicesHandler) UpdateIPv4Route(origconfig *ribd.IPv4Route, newconf
 */
 func (m RIBDServicesHandler) OnewayUpdateIPv4Route(origconfig *ribd.IPv4Route, newconfig *ribd.IPv4Route, attrset []bool) (err error) {
 	logger.Println("OneWayUpdateIPv4Route: Received update route request")
-	m.UpdateIPv4Route(origconfig, newconfig, attrset,"replace")
+	m.UpdateIPv4Route(origconfig, newconfig, attrset,nil)
 	return err
 }
 /*
@@ -181,8 +176,40 @@ func (m RIBDServicesHandler) GetIPv4RouteState(destNw string) (*ribd.IPv4RouteSt
 }
 
 func (m RIBDServicesHandler) GetBulkIPv4RouteState(fromIndex ribd.Int, rcount ribd.Int) (routes *ribd.IPv4RouteStateGetInfo, err error) {
-	ret, err := m.server.GetBulkIPv4RouteState(fromIndex, rcount)
-	return ret, err
+	logger.Debug("GetBulkIPv4RouteState")
+    returnRoutes := make([]*ribd.IPv4RouteState,0)
+	var returnRouteGetInfo ribd.IPv4RouteStateGetInfo
+	routes = &returnRouteGetInfo
+	if m.server.DbHdl == nil {
+		logger.Err("DbHdl not initialized")
+		return routes,errors.New("DBHdl not initialized")
+	}
+    var routeObj models.IPv4RouteState
+    var routeObjtemp models.IPv4RouteState
+    err, objCount, nextMarker, more, objs :=  m.server.DbHdl.GetBulkObjFromDb(routeObj, int64(fromIndex), int64(rcount))
+	logger.Debug(fmt.Sprintln("objCount = ", objCount, " len(obj) ", len(objs), " more ", more, " nextMarker: ", nextMarker))
+    var tempRoute []ribd.IPv4RouteState = make([]ribd.IPv4RouteState,len(objs))
+    if err == nil {
+		for i := 0;i<len(objs);i++ {
+			routeObjtemp = objs[i].(models.IPv4RouteState)
+			logger.Debug(fmt.Sprintln("obj ", i, routeObjtemp.DestinationNw , " ", routeObjtemp.NextHopList))
+			models.ConvertribdIPv4RouteStateObjToThrift(&routeObjtemp,&tempRoute[i])
+			returnRoutes = append(returnRoutes,&tempRoute[i])
+		}
+	    routes.IPv4RouteStateList = returnRoutes
+	    routes.StartIdx = fromIndex
+	    routes.EndIdx = ribd.Int(nextMarker)
+	    routes.More = more
+	    routes.Count = ribd.Int(objCount)
+/*		if routes.Count > 0 {
+			fmt.Println(" DestinationNw  NextHop")
+		}
+		for _,rt := range routes.IPv4RouteStateList {
+			fmt.Println(rt.DestinationNw , " ", rt.NextHopList)
+		}*/
+        return routes,err
+    }
+	return routes, err
 }
 
 func (m RIBDServicesHandler) GetIPv4EventState(index int32) (*ribd.IPv4EventState, error) {
@@ -202,8 +229,9 @@ func (m RIBDServicesHandler) GetBulkRouteDistanceState(fromIndex ribd.Int, rcoun
 }
 func (m RIBDServicesHandler) GetRouteDistanceState(protocol string) (*ribd.RouteDistanceState, error) {
 	logger.Info("Get state for RouteDistanceState")
-	route := ribd.NewRouteDistanceState()
-	return route, nil
+	state := ribd.NewRouteDistanceState()
+	state,err := m.server.GetRouteDistanceState(protocol)
+	return state,err
 }
 func (m RIBDServicesHandler) GetNextHopIfTypeStr(nextHopIfType ribdInt.Int) (nextHopIfTypeStr string, err error) {
 	nhStr, err := m.server.GetNextHopIfTypeStr(nextHopIfType)
