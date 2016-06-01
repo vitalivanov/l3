@@ -57,7 +57,7 @@ type RIBdServerConfig struct {
 	OrigConfigObject interface{}
 	NewConfigObject  interface{}
 	AttrSet          []bool
-	Op               string   //"add"/"del"/"update"
+	Op               string   //"add"/"del"/"update/get"
 	PatchOp          []*ribd.PatchOpInfo
 }
 /*type PatchUpdateRouteInfo struct {
