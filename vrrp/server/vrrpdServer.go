@@ -1,7 +1,30 @@
+//
+//Copyright [2016] [SnapRoute Inc]
+//
+//Licensed under the Apache License, Version 2.0 (the "License");
+//you may not use this file except in compliance with the License.
+//You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+//	 Unless required by applicable law or agreed to in writing, software
+//	 distributed under the License is distributed on an "AS IS" BASIS,
+//	 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//	 See the License for the specific language governing permissions and
+//	 limitations under the License.
+//
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
+//                                                                                                           
+
 package vrrpServer
 
 import (
-	"asicd/asicdConstDefs"
+	"asicd/asicdCommonDefs"
 	"asicdServices"
 	"encoding/json"
 	"errors"
@@ -270,7 +293,7 @@ func (svr *VrrpServer) VrrpMapIfIndexToLinuxIfIndex(IfIndex int32) {
 	if found {
 		return
 	}
-	vlanId := asicdConstDefs.GetIntfIdFromIfIndex(IfIndex)
+	vlanId := asicdCommonDefs.GetIntfIdFromIfIndex(IfIndex)
 	vlanName, ok := svr.vrrpVlanId2Name[vlanId]
 	if ok == false {
 		svr.logger.Err(fmt.Sprintln("no mapping for vlan", vlanId))
@@ -494,7 +517,7 @@ func VrrpNewServer(log *logging.Writer) *VrrpServer {
 
 func (svr *VrrpServer) VrrpValidateIntfConfig(IfIndex int32) error {
 	// Check Vlan is created
-	vlanId := asicdConstDefs.GetIntfIdFromIfIndex(IfIndex)
+	vlanId := asicdCommonDefs.GetIntfIdFromIfIndex(IfIndex)
 	_, created := svr.vrrpVlanId2Name[vlanId]
 	if !created {
 		return errors.New(VRRP_VLAN_NOT_CREATED)

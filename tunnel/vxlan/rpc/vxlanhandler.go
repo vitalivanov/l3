@@ -1,12 +1,35 @@
+//
+//Copyright [2016] [SnapRoute Inc]
+//
+//Licensed under the Apache License, Version 2.0 (the "License");
+//you may not use this file except in compliance with the License.
+//You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+//	 Unless required by applicable law or agreed to in writing, software
+//	 distributed under the License is distributed on an "AS IS" BASIS,
+//	 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//	 See the License for the specific language governing permissions and
+//	 limitations under the License.
+//
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
+
 // lahandler
 package rpc
 
 import (
-	"database/sql"
+	//"database/sql"
 	"errors"
 	"fmt"
 	"git.apache.org/thrift.git/lib/go/thrift"
-	_ "github.com/mattn/go-sqlite3"
+	//_ "github.com/mattn/go-sqlite3"
 	vxlan "l3/tunnel/vxlan/protocol"
 	"utils/logging"
 	"vxland"
@@ -31,7 +54,7 @@ func NewVXLANDServiceHandler(server *vxlan.VXLANServer, logger *logging.Writer) 
 	}
 
 	// lets read the current config and re-play the config
-	handler.ReadConfigFromDB()
+	//handler.ReadConfigFromDB()
 
 	return handler
 }
@@ -86,7 +109,7 @@ func (v *VXLANDServiceHandler) DeleteVxlanInstance(config *vxland.VxlanInstance)
 	return false, err
 }
 
-func (v *VXLANDServiceHandler) UpdateVxlanInstance(origconfig *vxland.VxlanInstance, newconfig *vxland.VxlanInstance, attrset []bool) (bool, error) {
+func (v *VXLANDServiceHandler) UpdateVxlanInstance(origconfig *vxland.VxlanInstance, newconfig *vxland.VxlanInstance, attrset []bool, op []*vxland.PatchOpInfo) (bool, error) {
 	v.logger.Info(fmt.Sprintf("UpdateVxlanConfigInstance orig[%#v] new[%#v]", origconfig, newconfig))
 	oc, _ := v.server.ConvertVxlanInstanceToVxlanConfig(origconfig)
 	nc, err := v.server.ConvertVxlanInstanceToVxlanConfig(newconfig)
@@ -126,7 +149,7 @@ func (v *VXLANDServiceHandler) DeleteVxlanVtepInstances(config *vxland.VxlanVtep
 	return false, err
 }
 
-func (v *VXLANDServiceHandler) UpdateVxlanVtepInstances(origconfig *vxland.VxlanVtepInstances, newconfig *vxland.VxlanVtepInstances, attrset []bool) (bool, error) {
+func (v *VXLANDServiceHandler) UpdateVxlanVtepInstances(origconfig *vxland.VxlanVtepInstances, newconfig *vxland.VxlanVtepInstances, attrset []bool, op []*vxland.PatchOpInfo) (bool, error) {
 	v.logger.Info(fmt.Sprintf("UpdateVxlanVtepInstances orig[%#v] new[%#v]", origconfig, newconfig))
 	oc, _ := v.server.ConvertVxlanVtepInstanceToVtepConfig(origconfig)
 	nc, err := v.server.ConvertVxlanVtepInstanceToVtepConfig(newconfig)
@@ -143,6 +166,7 @@ func (v *VXLANDServiceHandler) UpdateVxlanVtepInstances(origconfig *vxland.Vxlan
 	return false, err
 }
 
+/*
 func (v *VXLANDServiceHandler) HandleDbReadVxlanInstance(dbHdl *sql.DB) error {
 	dbCmd := "select * from VxlanInstance"
 	rows, err := dbHdl.Query(dbCmd)
@@ -217,3 +241,4 @@ func (v *VXLANDServiceHandler) ReadConfigFromDB() error {
 
 	return nil
 }
+*/
