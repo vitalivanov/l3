@@ -33,7 +33,8 @@ import (
 
 func (ribdServiceHandler *RIBDServer) UpdateRoutesFromDB() (err error) {
 	logger.Debug(fmt.Sprintln("UpdateRoutesFromDB"))
-	dbHdl := ribdServiceHandler.DbHdl
+	ribdServiceHandler.DBRouteCh <- RIBdServerConfig{Op:"fetch"}
+/*	dbHdl := ribdServiceHandler.DbHdl
 	if dbHdl != nil {
 		var dbObjCfg models.IPv4Route
 		objList, err := dbHdl.GetAllObjFromDb(dbObjCfg)
@@ -56,7 +57,7 @@ func (ribdServiceHandler *RIBDServer) UpdateRoutesFromDB() (err error) {
 		} else {
 			logger.Err("DB Query failed during IPv4Route query: RIBd init")
 		}
-	}
+	}*/
 	return err
 }
 

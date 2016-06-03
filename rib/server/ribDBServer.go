@@ -49,7 +49,7 @@ func (m RIBDServer) WriteIPv4RouteStateEntryToDB(dbInfo RouteDBInfo) error {
 		nextHopIfTypeStr, _ := m.GetNextHopIfTypeStr(ribdInt.Int(entry.nextHopIfType))
 		obj.OutgoingIntfType = nextHopIfTypeStr
 		obj.OutgoingInterface = strconv.Itoa(int(entry.nextHopIfIndex))*/
-	obj.Protocol = ReverseRouteProtoTypeMapDB[int(entry.protocol)]
+	obj.Protocol = routeList.selectedRouteProtocol//ReverseRouteProtoTypeMapDB[int(entry.protocol)]
 	obj.NextHopList = make([]*ribd.NextHopInfo, 0)
 	routeInfoList := routeList.routeInfoProtocolMap[routeList.selectedRouteProtocol]
 	logger.Info(fmt.Sprintln("len of routeInfoList - ", len(routeInfoList), "selected route protocol = ", routeList.selectedRouteProtocol, " route Protocol: ", entry.protocol, " route nwAddr: ", entry.networkAddr))
@@ -122,8 +122,41 @@ func (m RIBDServer) DelIPv4RouteStateEntryFromDB(dbInfo RouteDBInfo) error {
 	return nil
 }
 
+func (m RIBDServer) ReadAndUpdateRoutesFromDB() {
+	logger.Debug("ReadAndUpdateRoutesFromDB")
+	var dbObjCfg models.IPv4Route
+	dbRead := false
+	objList, err := m.DbHdl.GetAllObjFromDb(dbObjCfg)
+	if err == nil {
+		logger.Debug(fmt.Sprintln("Number of routes from DB: ", len((objList))))
+		dbRead = true
+		for idx := 0; idx < len(objList); idx++ {
+			obj := ribd.NewIPv4Route()
+			dbObj := objList[idx].(models.IPv4Route)
+			models.ConvertribdIPv4RouteObjToThrift(&dbObj, obj)
+			err = m.RouteConfigValidationCheck(obj, "add")
+			if err != nil {
+				logger.Err("Route validation failed when reading from db")
+				continue
+			}
+			m.RouteConfCh <- RIBdServerConfig {
+				OrigConfigObject : obj,
+				Op               : "add",
+			}
+			/*rv, _ := ribdServiceHandler.ProcessRouteCreateConfig(obj)
+			if rv == false {
+				logger.Err("IPv4Route create failed during init")
+			}*/
+		}
+	} else {
+		logger.Err("DB Query failed during IPv4Route query: RIBd init")
+	}
+	logger.Debug(fmt.Sprintln("Signalling dbread to be ", dbRead))
+	m.DBReadDone <- dbRead
+}
+
 func (ribdServiceHandler *RIBDServer) StartDBServer() {
-	logger.Info("Starting the arpdserver loop")
+	logger.Info("Starting the DB update server loop")
 	for {
 		select {
 		case info := <-ribdServiceHandler.DBRouteCh:
@@ -132,6 +165,8 @@ func (ribdServiceHandler *RIBDServer) StartDBServer() {
 				ribdServiceHandler.WriteIPv4RouteStateEntryToDB(info.OrigConfigObject.(RouteDBInfo))
 			} else if info.Op == "del" {
 				ribdServiceHandler.DelIPv4RouteStateEntryFromDB(info.OrigConfigObject.(RouteDBInfo))
+			} else if info.Op == "fetch" {
+				ribdServiceHandler.ReadAndUpdateRoutesFromDB()
 			}
 		}
 	}
