@@ -672,6 +672,7 @@ func UpdateRouteReachabilityStatus(prefix patriciaDB.Prefix, //prefix of the nod
 					v[i].resolvedNextHopIpIntf.IsReachable = false
 					rmapInfoRecordList.routeInfoProtocolMap[k] = v
 					RouteInfoMap.Set(prefix, rmapInfoRecordList)
+	                 logger.Debug("Adding to DBRouteCh from updateRouteReachability case 1")
 					RouteServiceHandler.DBRouteCh <- RIBdServerConfig{
 						OrigConfigObject : RouteDBInfo { v[i], rmapInfoRecordList},
 						Op               : "add",
@@ -692,6 +693,7 @@ func UpdateRouteReachabilityStatus(prefix patriciaDB.Prefix, //prefix of the nod
 					v[i].resolvedNextHopIpIntf.IsReachable = true
 					rmapInfoRecordList.routeInfoProtocolMap[k] = v
 					RouteInfoMap.Set(prefix, rmapInfoRecordList)
+	                 logger.Debug("Adding to DBRouteCh from updateRouteReachability case 2")
 					RouteServiceHandler.DBRouteCh <- RIBdServerConfig{
 						OrigConfigObject : RouteDBInfo { v[i], rmapInfoRecordList},
 						Op               : "add",
@@ -976,6 +978,7 @@ func addNewRoute(destNetPrefix patriciaDB.Prefix,
 	}
 	logger.Debug("This is a selected route, so install and parse through export policy engine")
 
+	logger.Debug("Adding to DBRouteCh from addRoute")
 	RouteServiceHandler.DBRouteCh <- RIBdServerConfig{
 		OrigConfigObject : RouteDBInfo { routeInfoRecord, routeInfoRecordList},
 		Op               : "add",
@@ -1126,6 +1129,7 @@ func deleteRoute(destNetPrefix patriciaDB.Prefix, //route prefix of the route be
 				    delete the route in state db and routeInfoMap
 				*/
 				//RouteServiceHandler.DelIPv4RouteStateEntryFromDB(RouteDBInfo{routeInfoRecord, routeInfoRecordList})
+	            logger.Debug("Adding to DBRouteCh from deleteRoute in node delete case")
 	             RouteServiceHandler.DBRouteCh <- RIBdServerConfig{
 		             OrigConfigObject : RouteDBInfo { routeInfoRecord, routeInfoRecordList},
 		             Op               : "del",
@@ -1136,6 +1140,7 @@ func deleteRoute(destNetPrefix patriciaDB.Prefix, //route prefix of the route be
 		}
 		if !nodeDeleted {
 			logger.Debug(fmt.Sprintln("node not deleted, write the updated list of len ", len(routeInfoRecordList.routeInfoProtocolMap[ReverseRouteProtoTypeMapDB[int(routeInfoRecord.protocol)]])))
+			logger.Debug("Adding to DBRouteCh from deleteRoute node not deleted case")
 	         RouteServiceHandler.DBRouteCh <- RIBdServerConfig{
 		        OrigConfigObject : RouteDBInfo { routeInfoRecord, routeInfoRecordList},
 		        Op               : "add",
@@ -1172,6 +1177,7 @@ func deleteRoute(destNetPrefix patriciaDB.Prefix, //route prefix of the route be
 				updateNextHopMap(NextHopInfoKey{string(nhPrefix)}, del)
 			}
 		}
+	    logger.Debug("Adding to DBRouteCh from deletev4Route")
 	    RouteServiceHandler.DBRouteCh <- RIBdServerConfig{
 		    OrigConfigObject : RouteDBInfo { routeInfoRecord, routeInfoRecordList},
 		    Op               : "add",
@@ -1376,6 +1382,7 @@ func createV4Route(destNetIp string,
 			//update the ref count for the resolved next hop ip
 			updateNextHopMap(NextHopInfoKey{routeInfoRecord.resolvedNextHopIpIntf.NextHopIp}, add)
 		}
+	    logger.Debug("Adding to DBRouteCh from createv4Route")
 	    RouteServiceHandler.DBRouteCh <- RIBdServerConfig{
 		    OrigConfigObject : RouteDBInfo { routeInfoRecord, newRouteInfoRecordList},
 		    Op               : "add",
@@ -1710,6 +1717,7 @@ func (m RIBDServer) ProcessRouteUpdateConfig(origconfig *ribd.IPv4Route, newconf
 		}
 		routeInfoRecordList.routeInfoProtocolMap[origconfig.Protocol][index] = routeInfoRecord
 		RouteInfoMap.Set(destNet, routeInfoRecordList)
+	    logger.Debug("Adding to DBRouteCh from processRouteUpdateConfig")
 	    RouteServiceHandler.DBRouteCh <- RIBdServerConfig{
 		    OrigConfigObject : RouteDBInfo { routeInfoRecord, routeInfoRecordList},
 		    Op               : "add",

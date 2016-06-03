@@ -310,7 +310,7 @@ func (m RIBDServer) RouteConfigValidationCheckForPatchUpdate(oldcfg *ribd.IPv4Ro
 		return errors.New("Invalid destination ip address")
 	}
     for idx := 0;idx < len(op);idx++ {
-		logger.Debug(fmt.Sprintln("Add operation in update"))
+		logger.Debug(fmt.Sprintln("patch update"))
 		switch op[idx].Path {
 			case "NextHop":
 			    logger.Debug("Patch update for next hop")
@@ -765,11 +765,12 @@ func addRoutePolicyState(route ribdInt.Routes, policy string, policyStmt string)
 	    routeInfoRecordList.policyList[policy] = policyStmtList*/
 	routeInfoRecordList.policyList = append(routeInfoRecordList.policyList, policy)
 	RouteInfoMap.Set(destNet, routeInfoRecordList)
+	logger.Debug("Adding to DBRouteCh from addRoutePolicyState")
 	RouteServiceHandler.DBRouteCh <- RIBdServerConfig{
 		OrigConfigObject : RouteDBInfo { routeInfoRecordList.routeInfoProtocolMap[routeInfoRecordList.selectedRouteProtocol][0], routeInfoRecordList},
 		Op               : "add",
 	}
-	RouteServiceHandler.WriteIPv4RouteStateEntryToDB(RouteDBInfo{routeInfoRecordList.routeInfoProtocolMap[routeInfoRecordList.selectedRouteProtocol][0], routeInfoRecordList})
+	//RouteServiceHandler.WriteIPv4RouteStateEntryToDB(RouteDBInfo{routeInfoRecordList.routeInfoProtocolMap[routeInfoRecordList.selectedRouteProtocol][0], routeInfoRecordList})
 	return
 }
 func deleteRoutePolicyState(ipPrefix patriciaDB.Prefix, policyName string) {

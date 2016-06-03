@@ -49,7 +49,7 @@ func (m RIBDServer) WriteIPv4RouteStateEntryToDB(dbInfo RouteDBInfo) error {
 		nextHopIfTypeStr, _ := m.GetNextHopIfTypeStr(ribdInt.Int(entry.nextHopIfType))
 		obj.OutgoingIntfType = nextHopIfTypeStr
 		obj.OutgoingInterface = strconv.Itoa(int(entry.nextHopIfIndex))*/
-	obj.Protocol = ReverseRouteProtoTypeMapDB[int(entry.protocol)]
+	obj.Protocol = routeList.selectedRouteProtocol//ReverseRouteProtoTypeMapDB[int(entry.protocol)]
 	obj.NextHopList = make([]*ribd.NextHopInfo, 0)
 	routeInfoList := routeList.routeInfoProtocolMap[routeList.selectedRouteProtocol]
 	logger.Info(fmt.Sprintln("len of routeInfoList - ", len(routeInfoList), "selected route protocol = ", routeList.selectedRouteProtocol, " route Protocol: ", entry.protocol, " route nwAddr: ", entry.networkAddr))

@@ -351,6 +351,7 @@ func (ribdServiceHandler *RIBDServer) AcceptConfigActions() {
 	getIntfInfo()
 	getConnectedRoutes()
 	//ribdServiceHandler.UpdateRoutesFromDB()
+	//update dbRouteCh to fetch route data
 	ribdServiceHandler.DBRouteCh <- RIBdServerConfig{Op:"fetch"}
 	dbRead := <- ribdServiceHandler.DBReadDone
 	logger.Debug(fmt.Sprintln("Received dbread: ", dbRead))

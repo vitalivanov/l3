@@ -40,19 +40,20 @@ func (ribdServiceHandler *RIBDServer) ProcessAsicdEvents(sub *nanomsg.SubSocket)
 	ribdServiceHandler.Logger.Info("in process Asicd events")
 	ribdServiceHandler.Logger.Info(fmt.Sprintln(" asicdCommonDefs.NOTIFY_IPV4INTF_CREATE = ", asicdCommonDefs.NOTIFY_IPV4INTF_CREATE, "asicdCommonDefs.asicdCommonDefs.NOTIFY_IPV4INTF_DELETE: ", asicdCommonDefs.NOTIFY_IPV4INTF_DELETE))
 	for {
-		ribdServiceHandler.Logger.Info("In for loop")
+		ribdServiceHandler.Logger.Info("In for loop Asicd events")
 		rcvdMsg, err := sub.Recv(0)
 		if err != nil {
 			ribdServiceHandler.Logger.Info(fmt.Sprintln("Error in receiving ", err))
 			return
 		}
-		ribdServiceHandler.Logger.Info(fmt.Sprintln("After recv rcvdMsg buf", rcvdMsg))
+		ribdServiceHandler.Logger.Info(fmt.Sprintln("After recv rcvdMsg buf", string(rcvdMsg), " getting Notif Info"))
 		Notif := asicdCommonDefs.AsicdNotification{}
 		err = json.Unmarshal(rcvdMsg, &Notif)
 		if err != nil {
 			ribdServiceHandler.Logger.Info("Error in Unmarshalling rcvdMsg Json")
 			return
 		}
+		ribdServiceHandler.Logger.Debug(fmt.Sprintln("Switch msgtype ",Notif.MsgType))
 		switch Notif.MsgType {
 		case asicdCommonDefs.NOTIFY_LOGICAL_INTF_CREATE:
 			ribdServiceHandler.Logger.Info("NOTIFY_LOGICAL_INTF_CREATE received")
@@ -195,6 +196,8 @@ func (ribdServiceHandler *RIBDServer) ProcessAsicdEvents(sub *nanomsg.SubSocket)
 				return
 			}*/
 			break
+		default:
+		    logger.Debug("Received unknown event ")
 		}
 	}
 }
