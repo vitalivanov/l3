@@ -31,6 +31,9 @@ import (
 	"utils/dbutils"
 	"utils/keepalive"
 	"utils/logging"
+	"os"
+	"os/signal"
+	"syscall"
 )
 
 func main() {
@@ -60,6 +63,11 @@ func main() {
 		logger.Println("routeServer nil")
 		return
 	}
+	sigChan := make(chan os.Signal, 1)
+	signalList := []os.Signal{syscall.SIGHUP}
+	signal.Notify(sigChan, signalList...)
+	go routeServer.SigHandler(sigChan)
+	go routeServer.StartRouteProcessServer()
 	go routeServer.StartDBServer()
 	go routeServer.StartPolicyServer()
 	go routeServer.NotificationServer()
