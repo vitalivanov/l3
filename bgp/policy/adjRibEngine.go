@@ -21,7 +21,7 @@
 // |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
 //
 
-// policy.go
+// adjRibEngine.go
 package policy
 
 import (
@@ -42,11 +42,13 @@ type AdjRibPPolicyEngine struct {
 
 func NewAdjRibPolicyEngine(logger *logging.Writer) *AdjRibPPolicyEngine {
 	policyEngine := &AdjRibPPolicyEngine{
-		BasePolicyEngine: BasePolicyEngine{
-			logger:       logger,
-			PolicyEngine: utilspolicy.NewPolicyEngineDB(logger),
-		},
+		BasePolicyEngine: NewBasePolicyEngine(logger, utilspolicy.NewPolicyEngineDB(logger)),
 	}
 	policyEngine.SetGetPolicyEntityMapIndexFunc(getPolicyEnityKey)
 	return policyEngine
+}
+
+func (eng *AdjRibPPolicyEngine) CreatePolicyDefinition(defCfg utilspolicy.PolicyDefinitionConfig) {
+	defCfg.Extensions = AdjRibPolicyExtensions{}
+	eng.PolicyEngine.CreatePolicyDefinition(defCfg)
 }

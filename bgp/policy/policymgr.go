@@ -74,61 +74,48 @@ func (eng *BGPPolicyManager) StartPolicyEngine() {
 		case condCfg := <-eng.ConditionCfgCh:
 			eng.logger.Info(fmt.Sprintln("BGPPolicyEngine - create condition", condCfg.Name))
 			for _, pe := range eng.policyEngines {
-				//eng.PolicyEngine.CreatePolicyDstIpMatchPrefixSetCondition(condCfg)
 				pe.CreatePolicyCondition(condCfg)
 			}
 
 		case actionCfg := <-eng.ActionCfgCh:
 			eng.logger.Info(fmt.Sprintln("BGPPolicyEngine - create action", actionCfg.Name))
 			for _, pe := range eng.policyEngines {
-				//eng.PolicyEngine.CreatePolicyAggregateAction(actionCfg)
 				pe.CreatePolicyAction(actionCfg)
 			}
 
 		case stmtCfg := <-eng.StmtCfgCh:
 			eng.logger.Info(fmt.Sprintln("BGPPolicyEngine - create statement", stmtCfg.Name))
 			for _, pe := range eng.policyEngines {
-				//eng.PolicyEngine.CreatePolicyStatement(stmtCfg)
 				pe.CreatePolicyStmt(stmtCfg)
 			}
 
 		case defCfg := <-eng.DefinitionCfgCh:
 			eng.logger.Info(fmt.Sprintln("BGPPolicyEngine - create policy", defCfg.Name))
-			defCfg.Extensions = PolicyExtensions{}
 			for _, pe := range eng.policyEngines {
-				//eng.PolicyEngine.CreatePolicyDefinition(defCfg)
 				pe.CreatePolicyDefinition(defCfg)
 			}
 
 		case conditionName := <-eng.ConditionDelCh:
 			eng.logger.Info(fmt.Sprintln("BGPPolicyEngine - delete condition", conditionName))
 			for _, pe := range eng.policyEngines {
-				//conditionCfg := utilspolicy.PolicyConditionConfig{Name: conditionName}
-				//eng.PolicyEngine.DeletePolicyCondition(conditionCfg)
 				pe.DeletePolicyCondition(conditionName)
 			}
 
 		case actionName := <-eng.ActionDelCh:
 			eng.logger.Info(fmt.Sprintln("BGPPolicyEngine - delete action", actionName))
 			for _, pe := range eng.policyEngines {
-				//actionCfg := utilspolicy.PolicyActionConfig{Name: actionName}
-				//eng.PolicyEngine.DeletePolicyAction(actionCfg)
 				pe.DeletePolicyAction(actionName)
 			}
 
 		case stmtName := <-eng.StmtDelCh:
 			eng.logger.Info(fmt.Sprintln("BGPPolicyEngine - delete statment", stmtName))
 			for _, pe := range eng.policyEngines {
-				//stmtCfg := utilspolicy.PolicyStmtConfig{Name: stmtName}
-				//eng.PolicyEngine.DeletePolicyStatement(stmtCfg)
 				pe.DeletePolicyStmt(stmtName)
 			}
 
 		case policyName := <-eng.DefinitionDelCh:
 			eng.logger.Info(fmt.Sprintln("BGPPolicyEngine - delete statment", policyName))
 			for _, pe := range eng.policyEngines {
-				//policyCfg := utilspolicy.PolicyDefinitionConfig{Name: policyName}
-				//eng.PolicyEngine.DeletePolicyDefinition(policyCfg)
 				pe.DeletePolicyDefinition(policyName)
 			}
 		}

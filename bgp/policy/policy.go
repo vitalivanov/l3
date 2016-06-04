@@ -56,6 +56,13 @@ type BasePolicyEngine struct {
 	PolicyEngine *utilspolicy.PolicyEngineDB
 }
 
+func NewBasePolicyEngine(logger *logging.Writer, policyEngine *utilspolicy.PolicyEngineDB) BasePolicyEngine {
+	return BasePolicyEngine{
+		logger:       logger,
+		PolicyEngine: policyEngine,
+	}
+}
+
 func (eng *BasePolicyEngine) SetTraverseFuncs(traverseApplyFunc utilspolicy.EntityTraverseAndApplyPolicyfunc,
 	traverseReverseFunc utilspolicy.EntityTraverseAndReversePolicyfunc) {
 	eng.logger.Info(fmt.Sprintln("BasePolicyEngine:SetTraverseFunc traverse apply func %v", traverseApplyFunc))
@@ -102,26 +109,34 @@ func (eng *BasePolicyEngine) SetGetPolicyEntityMapIndexFunc(policyEntityKeyFunc 
 	}
 }
 
-func (eng *BasePolicyEngine) CreatePolicyCondition(utilspolicy.PolicyConditionConfig) {
+func (eng *BasePolicyEngine) CreatePolicyCondition(condCfg utilspolicy.PolicyConditionConfig) {
+	eng.PolicyEngine.CreatePolicyDstIpMatchPrefixSetCondition(condCfg)
 }
 
-func (eng *BasePolicyEngine) CreatePolicyStmt(utilspolicy.PolicyStmtConfig) {
+func (eng *BasePolicyEngine) CreatePolicyStmt(stmtCfg utilspolicy.PolicyStmtConfig) {
+	eng.PolicyEngine.CreatePolicyStatement(stmtCfg)
 }
 
-func (eng *BasePolicyEngine) CreatePolicyDefinition(utilspolicy.PolicyDefinitionConfig) {
+func (eng *BasePolicyEngine) CreatePolicyAction(actionCfg utilspolicy.PolicyActionConfig) {
+	eng.PolicyEngine.CreatePolicyAggregateAction(actionCfg)
 }
 
-func (eng *BasePolicyEngine) CreatePolicyAction(utilspolicy.PolicyActionConfig) {
+func (eng *BasePolicyEngine) DeletePolicyCondition(conditionName string) {
+	conditionCfg := utilspolicy.PolicyConditionConfig{Name: conditionName}
+	eng.PolicyEngine.DeletePolicyCondition(conditionCfg)
 }
 
-func (eng *BasePolicyEngine) DeletePolicyCondition(string) {
+func (eng *BasePolicyEngine) DeletePolicyStmt(stmtName string) {
+	stmtCfg := utilspolicy.PolicyStmtConfig{Name: stmtName}
+	eng.PolicyEngine.DeletePolicyStatement(stmtCfg)
 }
 
-func (eng *BasePolicyEngine) DeletePolicyStmt(string) {
+func (eng *BasePolicyEngine) DeletePolicyDefinition(policyName string) {
+	policyCfg := utilspolicy.PolicyDefinitionConfig{Name: policyName}
+	eng.PolicyEngine.DeletePolicyDefinition(policyCfg)
 }
 
-func (eng *BasePolicyEngine) DeletePolicyDefinition(string) {
-}
-
-func (eng *BasePolicyEngine) DeletePolicyAction(string) {
+func (eng *BasePolicyEngine) DeletePolicyAction(actionName string) {
+	actionCfg := utilspolicy.PolicyActionConfig{Name: actionName}
+	eng.PolicyEngine.DeletePolicyAction(actionCfg)
 }

@@ -42,11 +42,13 @@ type LocRibPolicyEngine struct {
 
 func NewLocRibPolicyEngine(logger *logging.Writer) *LocRibPolicyEngine {
 	policyEngine := &LocRibPolicyEngine{
-		BasePolicyEngine: BasePolicyEngine{
-			logger:       logger,
-			PolicyEngine: utilspolicy.NewPolicyEngineDB(logger),
-		},
+		BasePolicyEngine: NewBasePolicyEngine(logger, utilspolicy.NewPolicyEngineDB(logger)),
 	}
 	policyEngine.SetGetPolicyEntityMapIndexFunc(getPolicyEnityKey)
 	return policyEngine
+}
+
+func (eng *LocRibPolicyEngine) CreatePolicyDefinition(defCfg utilspolicy.PolicyDefinitionConfig) {
+	defCfg.Extensions = PolicyExtensions{}
+	eng.PolicyEngine.CreatePolicyDefinition(defCfg)
 }
