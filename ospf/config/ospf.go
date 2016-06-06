@@ -124,6 +124,14 @@ const (
 	PointToMultipoint IfType = 5
 )
 
+var IfTypeList = [] string {
+"Undefined",
+"Broadcast",
+"Nbma",
+"NumberedP2P",
+"UnnumberedP2P",
+"PointToMultipoint"}
+
 type MulticastForwarding int
 
 const (
@@ -197,6 +205,17 @@ const (
 	NbrLoading       NbrState = 7
 	NbrFull          NbrState = 8
 )
+
+var NbrStateList = []string {
+"Undef",
+"NbrDown",
+"NbrAttempt",
+"NbrInit",
+"NbrTwoWay",
+"NbrExchangeStart",
+"NbrExchange",
+"NbrLoading",
+"NbrFull"}
 
 type NbrEvent int
 
@@ -415,7 +434,7 @@ type NeighborState struct {
 	NbrRtrId                   string
 	NbrOptions                 int
 	NbrPriority                uint8
-	NbrState                   NbrState
+	NbrState                   string
 	NbrEvents                  int
 	NbrLsRetransQLen           int
 	NbmaNbrPermanence          int
