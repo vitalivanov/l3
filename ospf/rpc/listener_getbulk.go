@@ -91,7 +91,7 @@ func (h *OSPFHandler) convertNbrEntryStateToThrift(nbr config.NeighborState) *os
 	nbrEntry.NbrAddressLessIndex = int32(nbr.NbrAddressLessIndex)
 	nbrEntry.NbrRtrId = string(nbr.NbrRtrId)
 	nbrEntry.NbrOptions = int32(nbr.NbrOptions)
-	nbrEntry.NbrState = int32(nbr.NbrState)
+	nbrEntry.NbrState = string(nbr.NbrState)
 	nbrEntry.NbrEvents = int32(nbr.NbrEvents)
 	nbrEntry.NbrHelloSuppressed = bool(nbr.NbrHelloSuppressed)
 

@@ -13,13 +13,13 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 package server
 
@@ -563,6 +563,10 @@ func (server *OSPFServer) ProcessNbrStateMachine() {
 			server.logger.Info(fmt.Sprintln("NBREVENT: DBD received  ", nbrDbPkt))
 			server.processDBDEvent(nbrDbPkt.ospfNbrConfKey, nbrDbPkt.ospfNbrDBDData)
 
+		case intfKey := <-(server.neighborIntfEventCh):
+			server.logger.Info(fmt.Sprintln("NBREVENT: Interface down ", intfKey))
+			server.processIntfDownEvent(intfKey)
+
 		case state := <-server.neighborFSMCtrlCh:
 			if state == false {
 				return
@@ -984,4 +988,34 @@ func (server *OSPFServer) processNeighborDeadEvent(nbrKey NeighborConfKey, intfK
 	intfConf := server.IntfConfMap[intfKey]
 	intfConf.NbrStateChangeCh <- nbrStateChangeData
 	server.logger.Info(fmt.Sprintln("DEAD: end processing nbr dead ", nbrKey))
+}
+
+/*@fn processIntfDownEvent
+ This API takes care of interface down/delete event
+1) Clear all lists.
+2) send delete message for neighbor struct.
+*/
+func (server *OSPFServer) processIntfDownEvent(intfKey IntfConfKey) {
+	server.logger.Info(fmt.Sprintln("DEAD: Intf down ", intfKey))
+	_, exist := server.IntfConfMap[intfKey]
+	if !exist {
+		server.logger.Info(fmt.Sprintln("DEAD: Intf map doesnt exist ", intfKey))
+		return
+	}
+	nbrMdata, valid := ospfIntfToNbrMap[intfKey]
+	if !valid {
+		server.logger.Info(fmt.Sprintln("DEAD: Intf deleted but intf-to-nbr map doesnt exist. ", intfKey))
+		return
+	}
+	for _, nbr := range nbrMdata.nbrList { // delete all lists
+		updateLSALists(nbr)
+		nbrConfMsg := ospfNeighborConfMsg{
+			ospfNbrConfKey: nbr,
+			nbrMsgType:     NBRDEL,
+		}
+		server.neighborConfCh <- nbrConfMsg
+	}
+	//delete interface to nbr mapping.
+	delete(ospfIntfToNbrMap, intfKey)
+
 }
