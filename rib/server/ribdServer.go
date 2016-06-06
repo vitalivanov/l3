@@ -30,6 +30,8 @@ import (
 	//	"database/sql"
 	"encoding/json"
 	"fmt"
+	"os"
+	"syscall"
 	"git.apache.org/thrift.git/lib/go/thrift"
 	"github.com/op/go-nanomsg"
 	"io/ioutil"
@@ -57,7 +59,7 @@ type RIBdServerConfig struct {
 	OrigConfigObject interface{}
 	NewConfigObject  interface{}
 	AttrSet          []bool
-	Op               string   //"add"/"del"/"update"
+	Op               string   //"add"/"del"/"update/get"
 	PatchOp          []*ribd.PatchOpInfo
 }
 /*type PatchUpdateRouteInfo struct {
@@ -101,6 +103,7 @@ type RIBDServer struct {
 	DBRouteCh                    chan RIBdServerConfig
 	AcceptConfig                 bool
 	ServerUpCh                   chan bool
+	DBReadDone                   chan bool
 	DbHdl                        *dbutils.DBUtil
 	//RouteInstallCh                 chan RouteParams
 }
@@ -347,7 +350,14 @@ func (ribdServiceHandler *RIBDServer) AcceptConfigActions() {
 	RouteServiceHandler.AcceptConfig = true
 	getIntfInfo()
 	getConnectedRoutes()
-	ribdServiceHandler.UpdateRoutesFromDB()
+	//ribdServiceHandler.UpdateRoutesFromDB()
+	//update dbRouteCh to fetch route data
+	ribdServiceHandler.DBRouteCh <- RIBdServerConfig{Op:"fetch"}
+	dbRead := <- ribdServiceHandler.DBReadDone
+	logger.Debug(fmt.Sprintln("Received dbread: ", dbRead))
+	if dbRead != true {
+		logger.Err("DB read failed")
+	}
 	go ribdServiceHandler.SetupEventHandler(AsicdSub, asicdCommonDefs.PUB_SOCKET_ADDR, SUB_ASICD)
 	logger.Info("All set to signal start the RIBd server")
 	ribdServiceHandler.ServerUpCh <- true
@@ -509,6 +519,7 @@ func NewRIBDServicesHandler(dbHdl *dbutils.DBUtil, loggerC *logging.Writer) *RIB
 	ribdServicesHandler.PolicyUpdateApplyCh = make(chan ApplyPolicyInfo, 100)
 	ribdServicesHandler.DBRouteCh = make(chan RIBdServerConfig)
 	ribdServicesHandler.ServerUpCh = make(chan bool)
+	ribdServicesHandler.DBReadDone = make(chan bool)
 	ribdServicesHandler.DbHdl = dbHdl
 	RouteServiceHandler = ribdServicesHandler
 	//ribdServicesHandler.RouteInstallCh = make(chan RouteParams)
@@ -537,19 +548,6 @@ func (ribdServiceHandler *RIBDServer) StartServer(paramsDir string) {
 			continue
 		}
 		select {
-		case routeConf := <-ribdServiceHandler.RouteConfCh:
-			logger.Debug(fmt.Sprintln("received message on RouteConfCh channel, op: ", routeConf.Op))
-			if routeConf.Op == "add" {
-			    ribdServiceHandler.ProcessRouteCreateConfig(routeConf.OrigConfigObject.(*ribd.IPv4Route))
-			} else if routeConf.Op == "del" {
-				ribdServiceHandler.ProcessRouteDeleteConfig(routeConf.OrigConfigObject.(*ribd.IPv4Route))
-			} else if routeConf.Op == "update" {
-				if routeConf.PatchOp == nil || len(routeConf.PatchOp) == 0 {
-                      ribdServiceHandler.ProcessRouteUpdateConfig(routeConf.OrigConfigObject.(*ribd.IPv4Route), routeConf.NewConfigObject.(*ribd.IPv4Route), routeConf.AttrSet)
-				} else {
-                     ribdServiceHandler.ProcessRoutePatchUpdateConfig(routeConf.OrigConfigObject.(*ribd.IPv4Route), routeConf.NewConfigObject.(*ribd.IPv4Route), routeConf.PatchOp)
-				}
-			}
 		case info := <-ribdServiceHandler.PolicyApplyCh:
 			logger.Debug("received message on PolicyApplyCh channel")
 			//update the local policyEngineDB
@@ -559,5 +557,21 @@ func (ribdServiceHandler *RIBDServer) StartServer(paramsDir string) {
 			logger.Debug("received message on TrackReachabilityCh channel")
 			ribdServiceHandler.TrackReachabilityStatus(info.IpAddr, info.Protocol, info.Op)
 		}
+	}
+}
+
+func (ribdServiceHandler *RIBDServer) SigHandler(sigChan <-chan os.Signal) {
+	logger.Debug("Inside sigHandler....")
+	signal := <-sigChan
+	switch signal {
+	case syscall.SIGHUP:
+		logger.Debug("Received SIGHUP signal")
+		logger.Debug("Closing DB handler")
+		if ribdServiceHandler.DbHdl != nil {
+			ribdServiceHandler.DbHdl.Disconnect()
+		}
+		os.Exit(0)
+	default:
+		logger.Err(fmt.Sprintln("Unhandled signal : ", signal))
 	}
 }

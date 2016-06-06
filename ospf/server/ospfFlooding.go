@@ -13,13 +13,13 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 package server
 
@@ -235,6 +235,25 @@ func (server *OSPFServer) processFloodMsg(lsa_data ospfFloodMsg) {
 
 		}
 
+	case LSAROUTERFLOOD: // Flood router LSA.
+		server.logger.Info(fmt.Sprintln("FLOOD: Flood for interface event ",
+			lsa_data.intfKey))
+		for key, intf := range server.IntfConfMap {
+			ifAreaId := convertIPv4ToUint32(intf.IfAreaId)
+			flood_lsa := server.interfaceFloodCheck(key)
+			if !flood_lsa || ifAreaId != lsa_data.areaId {
+				continue
+			}
+			lsa_upd_pkt := server.SendRouterLsa(lsa_data.areaId, lsa_data.intfKey, lsa_data.lsaKey)
+			lsa_pkt_len := len(lsa_upd_pkt)
+			if lsa_pkt_len == 0 {
+				return
+			}
+			pkt := server.BuildLsaUpdPkt(key, intf,
+				dstMac, dstIp, lsa_pkt_len, lsa_upd_pkt)
+			server.SendOspfPkt(key, pkt)
+		}
+
 	case LSASUMMARYFLOOD:
 		server.logger.Info(fmt.Sprintln("Flood: Summary LSA flood msg received."))
 		server.processSummaryLSAFlood(lsa_data.areaId, lsa_data.lsaKey)
@@ -249,7 +268,51 @@ func (server *OSPFServer) processFloodMsg(lsa_data ospfFloodMsg) {
 	}
 }
 
-/*@fn constructAndSendLsaAgeFlood 
+/*@fn sendRouterLsa
+At the event of interface down need to flood
+updated router LSA.
+*/
+func (server *OSPFServer) SendRouterLsa(areaId uint32, intfKey IntfConfKey,
+	lsaKey LsaKey) []byte {
+
+	ospfLsaPkt := newospfNeighborLSAUpdPkt()
+	var lsaEncPkt []byte
+	LsaEnc := []byte{}
+
+	pktLen := 0
+	total_len := 0
+	ospfLsaPkt.no_lsas = 0
+	entry, exist := server.getRouterLsaFromLsdb(areaId, lsaKey)
+	if exist == LsdbEntryNotFound {
+		return nil
+	}
+	LsaEnc = encodeRouterLsa(entry, lsaKey)
+	checksumOffset := uint16(14)
+	checkSum := computeFletcherChecksum(LsaEnc[2:], checksumOffset)
+	binary.BigEndian.PutUint16(LsaEnc[16:18], checkSum)
+	pktLen = len(LsaEnc)
+	binary.BigEndian.PutUint16(LsaEnc[18:20], uint16(pktLen))
+	lsaid := convertUint32ToIPv4(lsaKey.LSId)
+	server.logger.Info(fmt.Sprintln("Flood: router  LSA = ", lsaid))
+	ospfLsaPkt.lsa = append(ospfLsaPkt.lsa, LsaEnc...)
+	ospfLsaPkt.no_lsas++
+	total_len += pktLen
+	lsa_pkt_len := total_len + OSPF_NO_OF_LSA_FIELD
+	//server.logger.Info(fmt.Sprintln("Flood: Total length ", lsa_pkt_len, "total lsas ", ospfLsaPkt.no_lsas))
+	if lsa_pkt_len == OSPF_NO_OF_LSA_FIELD {
+		server.logger.Info(fmt.Sprintln("Flood: No LSA to send"))
+		return nil
+	}
+	lsas_enc := make([]byte, 4)
+
+	binary.BigEndian.PutUint32(lsas_enc, ospfLsaPkt.no_lsas)
+	lsaEncPkt = append(lsaEncPkt, lsas_enc...)
+	lsaEncPkt = append(lsaEncPkt, ospfLsaPkt.lsa...)
+
+	return lsaEncPkt
+}
+
+/*@fn constructAndSendLsaAgeFlood
 Flood LSAs which reached max age.
 */
 func (server *OSPFServer) constructAndSendLsaAgeFlood() {
