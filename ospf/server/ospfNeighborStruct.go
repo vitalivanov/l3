@@ -13,13 +13,13 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 package server
 
@@ -53,6 +53,7 @@ const (
 	LSAAGE          = 3 // flood aged LSAs.
 	LSASUMMARYFLOOD = 4 //flood summary LSAs in different areas.
 	LSAEXTFLOOD     = 5 //flood AS External summary LSA
+	LSAROUTERFLOOD  = 6 //flood only router LSA
 )
 
 type NeighborConfKey struct {
@@ -194,6 +195,12 @@ func (server *OSPFServer) UpdateNeighborConf() {
 		case nbrMsg := <-(server.neighborConfCh):
 			var nbrConf OspfNeighborEntry
 			//server.logger.Info(fmt.Sprintln("Update neighbor conf.  received"))
+			if nbrMsg.nbrMsgType == NBRDEL {
+				delete(server.NeighborConfigMap, nbrMsg.ospfNbrConfKey)
+				server.logger.Info(fmt.Sprintln("DELETE neighbor with nbr id - ",
+					nbrMsg.ospfNbrConfKey.IPAddr, nbrMsg.ospfNbrConfKey.IntfIdx))
+				continue
+			}
 			if nbrMsg.nbrMsgType == NBRUPD {
 				nbrConf = server.NeighborConfigMap[nbrMsg.ospfNbrConfKey]
 			}
@@ -244,11 +251,6 @@ func (server *OSPFServer) UpdateNeighborConf() {
 				server.NeighborConfigMap[nbrMsg.ospfNbrConfKey] = nbrConf
 				nbrConf.NbrDeadTimer.Stop()
 				nbrConf.NbrDeadTimer.Reset(nbrMsg.ospfNbrEntry.OspfNbrDeadTimer)
-			}
-			if nbrMsg.nbrMsgType == NBRDEL {
-				delete(server.NeighborConfigMap, nbrMsg.ospfNbrConfKey)
-				server.logger.Info(fmt.Sprintln("DELETE neighbor with nbr id - ",
-					nbrMsg.ospfNbrEntry.OspfNbrRtrId))
 			}
 
 			//rtr_id := convertUint32ToIPv4(nbrMsg.ospfNbrEntry.OspfNbrRtrId)
@@ -330,7 +332,7 @@ func (server *OSPFServer) resetNeighborLists(nbr NeighborConfKey, intf IntfConfK
 	updateLSALists(nbr)
 	nbrMdata, exists := ospfIntfToNbrMap[intf]
 	if !exists {
-		server.logger.Info(fmt.Sprintln("DEAD: Nbr dead but if to nbr map doesnt exist. ", nbr))
+		server.logger.Info(fmt.Sprintln("DEAD: Nbr dead but intf-to-nbr map doesnt exist. ", nbr))
 		return
 	}
 	newList := []NeighborConfKey{}
