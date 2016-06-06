@@ -256,6 +256,7 @@ func (server *OSPFServer) GetBulkOspfNbrEntryState(idx int, cnt int) (int, int, 
 		server.logger.Err("Ospf is busy refreshing the cache")
 		return nextIdx, count, nil
 	} */
+        NbrStateLen := len(config.NbrStateList)
 	length := len(server.neighborBulkSlice)
 	if idx+cnt > length {
 		count = length - idx
@@ -275,7 +276,7 @@ func (server *OSPFServer) GetBulkOspfNbrEntryState(idx int, cnt int) (int, int, 
 			result[i].NbrRtrId = convertUint32ToIPv4(ent.OspfNbrRtrId)
 			result[i].NbrOptions = ent.OspfNbrOptions
 			result[i].NbrPriority = uint8(ent.OspfRtrPrio)
-			result[i].NbrState = ent.OspfNbrState
+			result[i].NbrState = config.NbrStateList[int(ent.OspfNbrState)%NbrStateLen]
 			result[i].NbrEvents = int(ent.nbrEvent)
 			result[i].NbrLsRetransQLen = 0
 			result[i].NbmaNbrPermanence = 0
