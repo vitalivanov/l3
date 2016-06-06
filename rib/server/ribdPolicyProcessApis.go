@@ -397,6 +397,7 @@ func (m RIBDServer) GetBulkPolicyDefinitionState(fromIndex ribd.Int, rcount ribd
             apply - type bool - whether to apply the policy
 */
 func (m RIBDServer) UpdateApplyPolicy(info ApplyPolicyInfo, apply bool, db *policy.PolicyEngineDB) {
+	logger.Debug(fmt.Sprintln("UpdateApplyPolicy with apply set to ", apply))
 	var err error
 	conditionName := ""
 	source := info.Source
@@ -424,7 +425,7 @@ func (m RIBDServer) UpdateApplyPolicy(info ApplyPolicyInfo, apply bool, db *poli
 		switch conditions[j].ConditionType {
 		case "MatchProtocol":
 			logger.Debug(fmt.Sprintln(conditions[j].Protocol))
-			conditionName := "Match" + conditions[j].Protocol
+			conditionName = "Match" + conditions[j].Protocol
 			ok := policyConditionsDB.Match(patriciaDB.Prefix(conditionName))
 			if !ok {
 				logger.Debug(fmt.Sprintln("Define condition ", conditionName))
@@ -436,6 +437,7 @@ func (m RIBDServer) UpdateApplyPolicy(info ApplyPolicyInfo, apply bool, db *poli
 			logger.Debug(fmt.Sprintln("IpPrefix:", conditions[j].IpPrefix, "MasklengthRange:", conditions[j].MasklengthRange))
 		}
 		if err == nil {
+			logger.Debug(fmt.Sprintln("Adding condition ", conditionName, " to conditionNameList"))
 			conditionNameList = append(conditionNameList, conditionName)
 		}
 	}
@@ -452,6 +454,7 @@ func (m RIBDServer) UpdateApplyPolicy(info ApplyPolicyInfo, apply bool, db *poli
 	/*
 	   Call the policy library updateApplyPolicy function
 	*/
+	logger.Debug(fmt.Sprintln("Calling applypolicy with conditionNameList: ", conditionNameList))
 	db.UpdateApplyPolicy(policy.ApplyPolicyInfo{node, policyAction, conditionNameList}, apply)
 	return
 }
