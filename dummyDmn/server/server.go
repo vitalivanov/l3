@@ -66,7 +66,7 @@ func NewDummyServer(dmn dmnBase.L3Daemon) *DummyServer {
 	dummyServer := &DummyServer{}
 	dummyServer.Dmn = dmn
     dummyServer.ServerStartedCh = make(chan bool)
-	dmn.NewServer("dmnd", "DUMMY")
+	dmn.NewServer()
 	return dummyServer
 }
 func (d *DummyServer) InitServer() {
