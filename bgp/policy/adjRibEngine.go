@@ -33,7 +33,7 @@ import (
 type AdjRibPolicyExtensions struct {
 	HitCounter    int
 	RouteList     []string
-	RouteInfoList []*bgprib.RouteAndPolicy
+	RouteInfoList []*bgprib.AdjRIBRoute
 }
 
 type AdjRibPPolicyEngine struct {

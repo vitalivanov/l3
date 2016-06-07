@@ -28,25 +28,19 @@ import (
 	"l3/bgp/packet"
 )
 
-type RIBInOutRoute struct {
-	NLRI   packet.NLRI
-	Path   *Path
-	PathId uint32
-}
-
-type RouteAndPolicy struct {
-	RIBInOutRoute
+type AdjRIBRoute struct {
+	NLRI             packet.NLRI
+	Path             *Path
+	PathId           uint32
 	PolicyList       []string
 	PolicyHitCounter int
 }
 
-func NewRouteAndPolicy(nlri packet.NLRI, path *Path, pathId uint32) *RouteAndPolicy {
-	return &RouteAndPolicy{
-		RIBInOutRoute: RIBInOutRoute{
-			NLRI:   nlri,
-			Path:   path,
-			PathId: pathId,
-		},
+func NewAdjRIBRoute(nlri packet.NLRI, path *Path, pathId uint32) *AdjRIBRoute {
+	return &AdjRIBRoute{
+		NLRI:             nlri,
+		Path:             path,
+		PathId:           pathId,
 		PolicyList:       make([]string, 0),
 		PolicyHitCounter: 0,
 	}

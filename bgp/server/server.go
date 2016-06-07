@@ -213,12 +213,6 @@ func (server *BGPServer) SendUpdate(updated map[*bgprib.Path][]*bgprib.Destinati
 	}
 }
 
-type ActionCbInfo struct {
-	dest      *bgprib.Destination
-	updated   *(map[*bgprib.Path][]*bgprib.Destination)
-	withdrawn *([]*bgprib.Destination)
-}
-
 func (server *BGPServer) DoesRouteExist(params interface{}) bool {
 	policyParams := params.(PolicyParams)
 	dest := policyParams.dest
