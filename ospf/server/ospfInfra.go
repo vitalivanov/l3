@@ -189,7 +189,7 @@ func (server *OSPFServer) getBulkPortState() {
 	currMarker := asicdServices.Int(asicdCommonDefs.MIN_SYS_PORTS)
 	if server.asicdClient.IsConnected {
 		server.logger.Info("Calling asicd for getting port state")
-		count := 10
+		count := 100
 		for {
 			bulkInfo, _ := server.asicdClient.ClientHdl.GetBulkPortState(asicdServices.Int(currMarker), asicdServices.Int(count))
 			if bulkInfo == nil {
@@ -215,7 +215,7 @@ func (server *OSPFServer) getBulkPortConfig() {
 	currMarker := asicdServices.Int(asicdCommonDefs.MIN_SYS_PORTS)
 	if server.asicdClient.IsConnected {
 		server.logger.Info("Calling asicd for getting the Port Config")
-		count := 10
+		count := 100
 		for {
 			bulkInfo, _ := server.asicdClient.ClientHdl.GetBulkPort(asicdServices.Int(currMarker), asicdServices.Int(count))
 			if bulkInfo == nil {
@@ -255,9 +255,14 @@ func (server *OSPFServer) getIntfCost(ifId uint16, ifType uint8) (ifCost uint32,
 		ifCost = DEFAULT_VLAN_COST
 	} else if ifType == commonDefs.IfTypePort { // PHY
 		speed := server.portPropertyMap[int32(ifId)].Speed
-		ifCost = server.ospfGlobalConf.ReferenceBandwidth / speed
+		if speed != 0 {
+			ifCost = server.ospfGlobalConf.ReferenceBandwidth / speed
+		} else {
+			server.logger.Err(fmt.Sprintln("Port Speed for port = ", server.portPropertyMap[int32(ifId)].Name, " is zero, so something wrong"))
+			ifCost = 0xff00
+		}
 	} else {
-		ifCost = 0
+		ifCost = 0xff00
 		err = errors.New("Invalid Interface Type")
 	}
 	return ifCost, err
