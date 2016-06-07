@@ -25,13 +25,12 @@ package server
 
 import (
 	"fmt"
-	//"github.com/garyburd/redigo/redis"
 	"models"
 	"ospfd"
-	//"strconv"
 	"errors"
 	"l3/ospf/config"
 	"utils/dbutils"
+	"strings"
 )
 
 func (server *OSPFServer) InitializeDB() error {
@@ -150,7 +149,6 @@ func (server *OSPFServer) applyOspfIntfConf(conf *ospfd.OspfIfEntry) error {
 		IfIpAddress:       config.IpAddress(conf.IfIpAddress),
 		AddressLessIf:     config.InterfaceIndexOrZero(conf.AddressLessIf),
 		IfAreaId:          config.AreaId(conf.IfAreaId),
-		IfType:            config.IfType(conf.IfType),
 		IfRtrPriority:     config.DesignatedRouterPriority(conf.IfRtrPriority),
 		IfTransitDelay:    config.UpToMaxAge(conf.IfTransitDelay),
 		IfRetransInterval: config.UpToMaxAge(conf.IfRetransInterval),
@@ -160,6 +158,13 @@ func (server *OSPFServer) applyOspfIntfConf(conf *ospfd.OspfIfEntry) error {
 		IfAuthKey:         conf.IfAuthKey,
 		IfAuthType:        config.AuthType(conf.IfAuthType),
 	}
+
+	for index, ifName := range config.IfTypeList {
+	    if strings.EqualFold(conf.IfType, ifName) {
+	        ifConf.IfType = config.IfType(index)
+                break
+            }
+        }
 
 	err := server.processIntfConfig(ifConf)
 	if err != nil {
