@@ -27,6 +27,7 @@ import (
 	"utils/dmnBase"
 	"fmt"
 	"asicdServices"
+	"l3/rib/ribdCommonDefs"
 )
 
 type DummyServer struct{
@@ -93,7 +94,8 @@ func (d *DummyServer) InitServer() {
 func (d *DummyServer)StartServer() {
 
     d.InitServer()
-    d.Dmn.InitSubscribers()	
+	ribdSubscriberList := []string{ribdCommonDefs.PUB_SOCKET_ADDR, ribdCommonDefs.PUB_SOCKET_POLICY_ADDR}
+    d.Dmn.InitSubscribers(ribdSubscriberList)	
 
 	d.ServerStartedCh <- true
 
