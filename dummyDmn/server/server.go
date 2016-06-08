@@ -66,7 +66,7 @@ func NewDummyServer(dmn dmnBase.L3Daemon) *DummyServer {
 	dummyServer := &DummyServer{}
 	dummyServer.Dmn = dmn
     dummyServer.ServerStartedCh = make(chan bool)
-	dmn.NewServer()
+	dummyServer.Dmn.NewServer()
 	return dummyServer
 }
 func (d *DummyServer) InitServer() {
@@ -93,15 +93,13 @@ func (d *DummyServer) InitServer() {
 func (d *DummyServer)StartServer() {
 
     d.InitServer()
-    err := d.Dmn.InitSubscribers()	
-	if err != nil {
-		d.Dmn.Logger.Err("Asicd Subscriber init failed")
-		return
-	}
+    d.Dmn.InitSubscribers()	
+
 	d.ServerStartedCh <- true
 
 	// Now, wait on below channels to process
 	for {
+		d.Dmn.Logger.Info("In for loop")
 		select {
 		case <-d.Dmn.AsicdSubSocketCh:
 		    d.Dmn.Logger.Info("Received message on AsicdSubSocketCh")
