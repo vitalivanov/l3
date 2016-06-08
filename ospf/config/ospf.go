@@ -122,6 +122,7 @@ const (
 	NumberedP2P       IfType = 3
 	UnnumberedP2P     IfType = 4
 	PointToMultipoint IfType = 5
+	Stub              IfType = 6
 )
 
 var IfTypeList = [] string {
@@ -130,7 +131,8 @@ var IfTypeList = [] string {
 "Nbma",
 "NumberedP2P",
 "UnnumberedP2P",
-"PointToMultipoint"}
+"PointToMultipoint",
+"Stub"}
 
 type MulticastForwarding int
 

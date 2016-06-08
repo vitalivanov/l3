@@ -195,8 +195,21 @@ func (server *OSPFServer) GenerateSummaryLsa() {
 			// If DestType == ASBdrRouter
 			// If Routing Table Entry Describes the preferred path to
 			// AS Boundary Router
-			if rKey.DestType == ASAreaBdrRouter ||
-				rKey.DestType == ASBdrRouter {
+			/*
+							RFC 2328 section 12.4.3
+							if the destination of this route is an AS boundary
+			                router, a summary-LSA should be originated if and only
+			                if the routing table entry describes the preferred path
+			                to the AS boundary router (see Step 3 of Section 16.4).
+			                If so, a Type 4 summary-LSA is originated for the
+			                destination, with Link State ID equal to the AS boundary
+			                router's Router ID and metric equal to the routing table
+			                entry's cost. Note: these LSAs should not be generated
+			                if Area A has been configured as a stub area.
+			*/
+			isStub := server.isStubArea(aKey.AreaId)
+			if (rKey.DestType == ASAreaBdrRouter ||
+				rKey.DestType == ASBdrRouter) && !isStub {
 				lsaKey, summaryLsa := server.GenerateType4SummaryLSA(rKey, rEnt, lsDbKey)
 				sEnt[lsaKey] = summaryLsa
 			}
