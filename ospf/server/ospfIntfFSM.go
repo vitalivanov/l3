@@ -33,8 +33,9 @@ import (
 func (server *OSPFServer) StartOspfIntfFSM(key IntfConfKey) {
 	ent, _ := server.IntfConfMap[key]
 	areaId := convertIPv4ToUint32(ent.IfAreaId)
-	msg := LSAChangeMsg{
+	msg := NetworkLSAChangeMsg{
 		areaId: areaId,
+		intfKey: key,
 	}
 
 	server.logger.Info("Sending msg for router LSA generation")
@@ -494,22 +495,6 @@ func (server *OSPFServer) createAndSendEventsIntfFSM(key IntfConfKey,
 		newstate: newState,
 	}
 
-	/*
-		server.logger.Info("1. Sending msg for router LSA generation")
-		server.IntfStateChangeCh <- msg
-	*/
-	/*
-		if oldState != newState {
-			if newState == config.DesignatedRouter {
-				// Construct Network LSA
-				server.logger.Info("1. Sending msg for Network LSA generation")
-			} else if oldState == config.DesignatedRouter {
-				// Flush Network LSA
-				server.logger.Info("2. Sending msg for Network LSA generation")
-			}
-			server.NetworkDRChangeCh<-msg1
-			server.logger.Info(fmt.Sprintln("oldState", oldState, " != newState", newState))
-		} */
 	server.logger.Info("DRBDR changed. Sending message for router/network LSA generation")
 	server.NetworkDRChangeCh <- msg1
 	server.logger.Info(fmt.Sprintln("oldState", oldState, " newState", newState))

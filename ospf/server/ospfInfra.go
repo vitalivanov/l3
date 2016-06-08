@@ -13,13 +13,13 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 package server
 
@@ -34,8 +34,9 @@ import (
 )
 
 type PortProperty struct {
-	Name string
-	Mtu  int32
+	Name  string
+	Mtu   int32
+	Speed uint32 //Unit Mbps
 }
 
 type VlanProperty struct {
@@ -61,6 +62,7 @@ type IPIntfProperty struct {
 	MacAddr net.HardwareAddr
 	NetMask []byte
 	Mtu     int32
+	Cost    uint32
 }
 
 func (server *OSPFServer) computeMinMTU(msg IPv4IntfNotifyMsg) int32 {
@@ -187,7 +189,7 @@ func (server *OSPFServer) getBulkPortState() {
 	currMarker := asicdServices.Int(asicdCommonDefs.MIN_SYS_PORTS)
 	if server.asicdClient.IsConnected {
 		server.logger.Info("Calling asicd for getting port state")
-		count := 10
+		count := 100
 		for {
 			bulkInfo, _ := server.asicdClient.ClientHdl.GetBulkPortState(asicdServices.Int(currMarker), asicdServices.Int(count))
 			if bulkInfo == nil {
@@ -213,7 +215,7 @@ func (server *OSPFServer) getBulkPortConfig() {
 	currMarker := asicdServices.Int(asicdCommonDefs.MIN_SYS_PORTS)
 	if server.asicdClient.IsConnected {
 		server.logger.Info("Calling asicd for getting the Port Config")
-		count := 10
+		count := 100
 		for {
 			bulkInfo, _ := server.asicdClient.ClientHdl.GetBulkPort(asicdServices.Int(currMarker), asicdServices.Int(count))
 			if bulkInfo == nil {
@@ -226,6 +228,7 @@ func (server *OSPFServer) getBulkPortConfig() {
 				ifIndex := bulkInfo.PortList[i].IfIndex
 				ent := server.portPropertyMap[ifIndex]
 				ent.Mtu = bulkInfo.PortList[i].Mtu
+				ent.Speed = uint32(bulkInfo.PortList[i].Speed)
 				server.portPropertyMap[ifIndex] = ent
 			}
 			if more == false {
@@ -245,6 +248,24 @@ func (server *OSPFServer) getLinuxIntfName(ifId uint16, ifType uint8) (ifName st
 		err = errors.New("Invalid Interface Type")
 	}
 	return ifName, err
+}
+
+func (server *OSPFServer) getIntfCost(ifId uint16, ifType uint8) (ifCost uint32, err error) {
+	if ifType == commonDefs.IfTypeVlan { // Vlan
+		ifCost = DEFAULT_VLAN_COST
+	} else if ifType == commonDefs.IfTypePort { // PHY
+		speed := server.portPropertyMap[int32(ifId)].Speed
+		if speed != 0 {
+			ifCost = server.ospfGlobalConf.ReferenceBandwidth / speed
+		} else {
+			server.logger.Err(fmt.Sprintln("Port Speed for port = ", server.portPropertyMap[int32(ifId)].Name, " is zero, so something wrong"))
+			ifCost = 0xff00
+		}
+	} else {
+		ifCost = 0xff00
+		err = errors.New("Invalid Interface Type")
+	}
+	return ifCost, err
 }
 
 func getMacAddrIntfName(ifName string) (macAddr net.HardwareAddr, err error) {

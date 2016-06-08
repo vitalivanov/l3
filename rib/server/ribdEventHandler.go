@@ -40,19 +40,20 @@ func (ribdServiceHandler *RIBDServer) ProcessAsicdEvents(sub *nanomsg.SubSocket)
 	ribdServiceHandler.Logger.Info("in process Asicd events")
 	ribdServiceHandler.Logger.Info(fmt.Sprintln(" asicdCommonDefs.NOTIFY_IPV4INTF_CREATE = ", asicdCommonDefs.NOTIFY_IPV4INTF_CREATE, "asicdCommonDefs.asicdCommonDefs.NOTIFY_IPV4INTF_DELETE: ", asicdCommonDefs.NOTIFY_IPV4INTF_DELETE))
 	for {
-		ribdServiceHandler.Logger.Info("In for loop")
+		ribdServiceHandler.Logger.Info("In for loop Asicd events")
 		rcvdMsg, err := sub.Recv(0)
 		if err != nil {
 			ribdServiceHandler.Logger.Info(fmt.Sprintln("Error in receiving ", err))
 			return
 		}
-		ribdServiceHandler.Logger.Info(fmt.Sprintln("After recv rcvdMsg buf", rcvdMsg))
+		ribdServiceHandler.Logger.Info(fmt.Sprintln("After recv rcvdMsg buf", string(rcvdMsg), " getting Notif Info"))
 		Notif := asicdCommonDefs.AsicdNotification{}
 		err = json.Unmarshal(rcvdMsg, &Notif)
 		if err != nil {
 			ribdServiceHandler.Logger.Info("Error in Unmarshalling rcvdMsg Json")
 			return
 		}
+		ribdServiceHandler.Logger.Debug(fmt.Sprintln("Switch msgtype ",Notif.MsgType))
 		switch Notif.MsgType {
 		case asicdCommonDefs.NOTIFY_LOGICAL_INTF_CREATE:
 			ribdServiceHandler.Logger.Info("NOTIFY_LOGICAL_INTF_CREATE received")
@@ -143,12 +144,16 @@ func (ribdServiceHandler *RIBDServer) ProcessAsicdEvents(sub *nanomsg.SubSocket)
 			cfg.NextHop = make([]*ribd.NextHopInfo, 0)
 			cfg.NextHop = append(cfg.NextHop, &nextHop)
 
-			_, err = ribdServiceHandler.ProcessRouteCreateConfig(&cfg) //ipAddrStr, ipMaskStr, 0, "0.0.0.0", ribd.Int(asicdCommonDefs.GetIntfTypeFromIfIndex(msg.IfIndex)), ribd.Int(asicdCommonDefs.GetIntfIdFromIfIndex(msg.IfIndex)), "CONNECTED")
+	         ribdServiceHandler.RouteConfCh <- RIBdServerConfig{
+	                                   OrigConfigObject:&cfg,
+	                                   Op : "add",
+	         }
+			//_, err = ribdServiceHandler.ProcessRouteCreateConfig(&cfg) //ipAddrStr, ipMaskStr, 0, "0.0.0.0", ribd.Int(asicdCommonDefs.GetIntfTypeFromIfIndex(msg.IfIndex)), ribd.Int(asicdCommonDefs.GetIntfIdFromIfIndex(msg.IfIndex)), "CONNECTED")
 			//_, err = createV4Route(ipAddrStr, ipMaskStr, 0, "0.0.0.0", ribd.Int(asicdCommonDefs.GetIntfTypeFromIfIndex(msg.IfIndex)), ribd.Int(asicdCommonDefs.GetIntfIdFromIfIndex(msg.IfIndex)), ribdCommonDefs.CONNECTED, FIBAndRIB, ribdCommonDefs.RoutePolicyStateChangetoValid,ribd.Int(len(destNetSlice)))
-			if err != nil {
+			/*if err != nil {
 				ribdServiceHandler.Logger.Info(fmt.Sprintln("Route create failed with err %s\n", err))
 				return
-			}
+			}*/
 			break
 		case asicdCommonDefs.NOTIFY_IPV4INTF_DELETE:
 			ribdServiceHandler.Logger.Info("NOTIFY_IPV4INTF_DELETE  event")
@@ -181,12 +186,18 @@ func (ribdServiceHandler *RIBDServer) ProcessAsicdEvents(sub *nanomsg.SubSocket)
 			}
 			cfg.NextHop = make([]*ribd.NextHopInfo, 0)
 			cfg.NextHop = append(cfg.NextHop, &nextHop)
-			_, err = ribdServiceHandler.ProcessRouteDeleteConfig(&cfg) //ipAddrStr, ipMaskStr, 0, "0.0.0.0", ribd.Int(asicdCommonDefs.GetIntfTypeFromIfIndex(msg.IfIndex)), ribd.Int(asicdCommonDefs.GetIntfIdFromIfIndex(msg.IfIndex)), "CONNECTED")
+	         ribdServiceHandler.RouteConfCh <- RIBdServerConfig{
+	                                  OrigConfigObject: &cfg,
+	                                   Op : "del",
+	         }
+			/*_, err = ribdServiceHandler.ProcessRouteDeleteConfig(&cfg) //ipAddrStr, ipMaskStr, 0, "0.0.0.0", ribd.Int(asicdCommonDefs.GetIntfTypeFromIfIndex(msg.IfIndex)), ribd.Int(asicdCommonDefs.GetIntfIdFromIfIndex(msg.IfIndex)), "CONNECTED")
 			if err != nil {
 				ribdServiceHandler.Logger.Info(fmt.Sprintln("Route delete failed with err %s\n", err))
 				return
-			}
+			}*/
 			break
+		default:
+		    logger.Debug("Received unknown event ")
 		}
 	}
 }

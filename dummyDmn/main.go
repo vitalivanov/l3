@@ -21,21 +21,30 @@
 // |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
 //                                                                                                           
 
-package rpc
+package main
 
 import (
-	"dhcpd"
+	"utils/dmnBase"
+	"l3/dummyDmn/server"
 	"fmt"
 )
+var DummyDmn dmnBase.L3Daemon
 
-func (h *DHCPHandler) UpdateDhcpGlobalConfig(origConf *dhcpd.DhcpGlobalConfig, newConf *dhcpd.DhcpGlobalConfig, attrset []bool, op []*dhcpd.PatchOpInfo) (bool, error) {
-	h.logger.Info(fmt.Sprintln("Original Dhcp global config attrs:", origConf))
-	h.logger.Info(fmt.Sprintln("New Dhcp gloabl config attrs:", newConf))
-	return true, nil
-}
+func main() {
+	status := DummyDmn.Init("dmnd", "DUMMY")
+	DummyDmn.Logger.Info(fmt.Sprintln("Init done with status", status))
+	if status == false {
+		fmt.Println("Init failed")
+		return
+	}
+	dummyServer := server.NewDummyServer(DummyDmn)
 
-func (h *DHCPHandler) UpdateDhcpIntfConfig(origConf *dhcpd.DhcpIntfConfig, newConf *dhcpd.DhcpIntfConfig, attrset []bool, op []*dhcpd.PatchOpInfo) (bool, error) {
-	h.logger.Info(fmt.Sprintln("Original Dhcp Intf config attrs:", origConf))
-	h.logger.Info(fmt.Sprintln("New Dhcp Intf config attrs:", newConf))
-	return true, nil
+	dummyServer.StartServer()
+    <-dummyServer.ServerStartedCh
+	
+	DummyDmn.Logger.Info("Dummy server started")
+	
+	// Start keepalive routine
+	DummyDmn.Logger.Println("Starting KeepAlive")
+	DummyDmn.StartKeepAlive()
 }

@@ -21,21 +21,31 @@
 // |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
 //                                                                                                           
 
-package rpc
+// ribdRouteServer.go
+package server
 
 import (
-	"dhcpd"
+	"ribd"
 	"fmt"
 )
 
-func (h *DHCPHandler) UpdateDhcpGlobalConfig(origConf *dhcpd.DhcpGlobalConfig, newConf *dhcpd.DhcpGlobalConfig, attrset []bool, op []*dhcpd.PatchOpInfo) (bool, error) {
-	h.logger.Info(fmt.Sprintln("Original Dhcp global config attrs:", origConf))
-	h.logger.Info(fmt.Sprintln("New Dhcp gloabl config attrs:", newConf))
-	return true, nil
-}
-
-func (h *DHCPHandler) UpdateDhcpIntfConfig(origConf *dhcpd.DhcpIntfConfig, newConf *dhcpd.DhcpIntfConfig, attrset []bool, op []*dhcpd.PatchOpInfo) (bool, error) {
-	h.logger.Info(fmt.Sprintln("Original Dhcp Intf config attrs:", origConf))
-	h.logger.Info(fmt.Sprintln("New Dhcp Intf config attrs:", newConf))
-	return true, nil
+func (ribdServiceHandler *RIBDServer) StartRouteProcessServer() {
+	logger.Info("Starting the routeserver loop")
+	for {
+		select {
+		case routeConf := <-ribdServiceHandler.RouteConfCh:
+			logger.Debug(fmt.Sprintln("received message on RouteConfCh channel, op: ", routeConf.Op))
+			if routeConf.Op == "add" {
+			    ribdServiceHandler.ProcessRouteCreateConfig(routeConf.OrigConfigObject.(*ribd.IPv4Route))
+			} else if routeConf.Op == "del" {
+				ribdServiceHandler.ProcessRouteDeleteConfig(routeConf.OrigConfigObject.(*ribd.IPv4Route))
+			} else if routeConf.Op == "update" {
+				if routeConf.PatchOp == nil || len(routeConf.PatchOp) == 0 {
+                      ribdServiceHandler.ProcessRouteUpdateConfig(routeConf.OrigConfigObject.(*ribd.IPv4Route), routeConf.NewConfigObject.(*ribd.IPv4Route), routeConf.AttrSet)
+				} else {
+                     ribdServiceHandler.ProcessRoutePatchUpdateConfig(routeConf.OrigConfigObject.(*ribd.IPv4Route), routeConf.NewConfigObject.(*ribd.IPv4Route), routeConf.PatchOp)
+				}
+			}
+		}
+	}
 }
