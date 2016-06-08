@@ -67,11 +67,13 @@ func (m RIBDServer) WriteIPv4RouteStateEntryToDB(dbInfo RouteDBInfo) error {
 		logger.Debug(fmt.Sprintln("IntfRef = ", nextHopInfo[i].NextHopIntRef))
 		nextHopInfo[i].Weight = int32(routeInfoList[sel].weight)
 		obj.NextHopList = append(obj.NextHopList, &nextHopInfo[i])
+		if routeInfoList[sel].protocol == int8(RouteProtocolTypeMapDB[routeList.selectedRouteProtocol]) {
+			obj.IsNetworkReachable = routeInfoList[sel].resolvedNextHopIpIntf.IsReachable
+		}
 		i++
 	}
 	obj.RouteCreatedTime = entry.routeCreatedTime
 	obj.RouteUpdatedTime = entry.routeUpdatedTime
-	obj.IsNetworkReachable = entry.resolvedNextHopIpIntf.IsReachable
 	obj.PolicyList = make([]string, 0)
 	routePolicyListInfo := ""
 	if routeList.policyList != nil {

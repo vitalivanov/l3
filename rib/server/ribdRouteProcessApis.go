@@ -739,12 +739,12 @@ func ResolveNextHop(ipAddr string) (nextHopIntf ribdInt.NextHopInfo, resolvedNex
 			first = false
 			logger.Debug(fmt.Sprintln("First nexthop network is : ", nextHopIntf.Ipaddr))
 		}
-		logger.Debug(fmt.Sprintln("intf.nextHopIp ", intf.NextHopIp, " intf.Ipaddr:", intf.Ipaddr))
+		logger.Debug(fmt.Sprintln("intf.nextHopIp ", intf.NextHopIp, " intf.Ipaddr:", intf.Ipaddr, " intf.IsReachable:", intf.IsReachable))
 		if intf.NextHopIp == "0.0.0.0" {
 			logger.Debug(fmt.Sprintln("Marking ip ", ip, " as reachable"))
 			intf.NextHopIp = intf.Ipaddr
-			intf.IsReachable = true
-			prev_intf.IsReachable = true
+			//intf.IsReachable = true
+			prev_intf.IsReachable = intf.IsReachable
 			return nextHopIntf, prev_intf, err //*intf,err
 		}
 		ip = intf.NextHopIp
@@ -1156,6 +1156,7 @@ func deleteRoute(destNetPrefix patriciaDB.Prefix, //route prefix of the route be
 		/*
 		    Mark the network not reachable
 		*/
+		routeInfoRecord.resolvedNextHopIpIntf.IsReachable = false
 		routeInfoList := routeInfoRecordList.routeInfoProtocolMap[ReverseRouteProtoTypeMapDB[int(routeInfoRecord.protocol)]]
 		for i := 0; i < len(routeInfoList); i++ {
 			routeInfoList[i].resolvedNextHopIpIntf.IsReachable = false
@@ -1335,7 +1336,7 @@ func createV4Route(destNetIp string,
 
 	nhIntf, resolvedNextHopIntf, res_err := ResolveNextHop(routeInfoRecord.nextHopIp.String())
 	routeInfoRecord.resolvedNextHopIpIntf = resolvedNextHopIntf
-	logger.Info(fmt.Sprintln("nhIntf ipaddr/mask: ", nhIntf.Ipaddr, ":", nhIntf.Mask, " resolvedNex ", resolvedNextHopIntf.NextHopIp, " nexthop ", nextHopIp))
+	logger.Info(fmt.Sprintln("nhIntf ipaddr/mask: ", nhIntf.Ipaddr, ":", nhIntf.Mask, " resolvedNex ", resolvedNextHopIntf.NextHopIp, " nexthop ", nextHopIp, " reachable:", resolvedNextHopIntf.IsReachable))
 
 	routeInfoRecord.routeCreatedTime = time.Now().String()
 
