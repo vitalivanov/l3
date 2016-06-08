@@ -74,6 +74,7 @@ var lsdbTickerCh *time.Timer
 var lsdbRefreshTickerCh *time.Timer
 
 func (server *OSPFServer) initLSDatabase(areaId uint32) {
+	server.logger.Info(fmt.Sprintln("LSDB: Initialise LSDB for area id ", areaId))
 	lsdbKey := LsdbKey{
 		AreaId: areaId,
 	}
@@ -557,7 +558,11 @@ func (server *OSPFServer) generateRouterLSA(areaId uint32) {
 	lsdbKey := LsdbKey{
 		AreaId: areaId,
 	}
-	lsDbEnt, _ := server.AreaLsdb[lsdbKey]
+	lsDbEnt, lsdbExist := server.AreaLsdb[lsdbKey]
+	if !lsdbExist {
+		server.logger.Err(fmt.Sprintln("LSDB: Area LSDB doesnt exist. No router LSA will be generated .. ", lsdbKey))
+		return
+	}
 	selfOrigLsaEnt, _ := server.AreaSelfOrigLsa[lsdbKey]
 
 	if numOfLinks == 0 {
@@ -1146,14 +1151,14 @@ interface up/down add/delete events.
 func (server *OSPFServer) processInterfaceChangeMsg(msg NetworkLSAChangeMsg) {
 	server.neighborIntfEventCh <- msg.intfKey
 	nbr := NeighborConfKey{}
-        LSType := RouterLSA
-        LSId := convertIPv4ToUint32(server.ospfGlobalConf.RouterId)
-        AdvRouter := convertIPv4ToUint32(server.ospfGlobalConf.RouterId)
-        lsaKey := LsaKey{
-                LSType:    LSType,
-                LSId:      LSId,
-                AdvRouter: AdvRouter,
-        }
+	LSType := RouterLSA
+	LSId := convertIPv4ToUint32(server.ospfGlobalConf.RouterId)
+	AdvRouter := convertIPv4ToUint32(server.ospfGlobalConf.RouterId)
+	lsaKey := LsaKey{
+		LSType:    LSType,
+		LSId:      LSId,
+		AdvRouter: AdvRouter,
+	}
 
 	// send message for flooding.
 	server.sendLsdbToNeighborEvent(msg.intfKey, nbr, msg.areaId, 0, 0, lsaKey, LSAROUTERFLOOD)
