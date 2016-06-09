@@ -27,6 +27,7 @@ import (
 	"utils/dmnBase"
 	"fmt"
 	"asicdServices"
+	"l3/rib/ribdCommonDefs"
 )
 
 type DummyServer struct{
@@ -66,7 +67,7 @@ func NewDummyServer(dmn dmnBase.L3Daemon) *DummyServer {
 	dummyServer := &DummyServer{}
 	dummyServer.Dmn = dmn
     dummyServer.ServerStartedCh = make(chan bool)
-	dmn.NewServer()
+	dummyServer.Dmn.NewServer()
 	return dummyServer
 }
 func (d *DummyServer) InitServer() {
@@ -93,15 +94,14 @@ func (d *DummyServer) InitServer() {
 func (d *DummyServer)StartServer() {
 
     d.InitServer()
-    err := d.Dmn.InitSubscribers()	
-	if err != nil {
-		d.Dmn.Logger.Err("Asicd Subscriber init failed")
-		return
-	}
+	ribdSubscriberList := []string{ribdCommonDefs.PUB_SOCKET_ADDR, ribdCommonDefs.PUB_SOCKET_POLICY_ADDR}
+    d.Dmn.InitSubscribers(ribdSubscriberList)	
+
 	d.ServerStartedCh <- true
 
 	// Now, wait on below channels to process
 	for {
+		d.Dmn.Logger.Info("In for loop")
 		select {
 		case <-d.Dmn.AsicdSubSocketCh:
 		    d.Dmn.Logger.Info("Received message on AsicdSubSocketCh")
