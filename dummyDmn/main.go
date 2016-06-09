@@ -39,7 +39,7 @@ func main() {
 	}
 	dummyServer := server.NewDummyServer(DummyDmn)
 
-	dummyServer.StartServer()
+	go dummyServer.StartServer()
     <-dummyServer.ServerStartedCh
 	
 	DummyDmn.Logger.Info("Dummy server started")
@@ -47,4 +47,8 @@ func main() {
 	// Start keepalive routine
 	DummyDmn.Logger.Println("Starting KeepAlive")
 	DummyDmn.StartKeepAlive()
+	
+	//simulate rpc.StartServer()
+	for {
+	}
 }

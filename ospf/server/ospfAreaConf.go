@@ -38,8 +38,8 @@ type AreaConf struct {
 	AuthType                            config.AuthType
 	ImportAsExtern                      config.ImportAsExtern
 	AreaSummary                         config.AreaSummary
+	StubDefaultCost                     int32
 	AreaNssaTranslatorRole              config.NssaTranslatorRole
-	AreaNssaTranslatorStabilityInterval config.PositiveInteger
 	TransitCapability                   bool
 	IntfListMap                         map[IntfConfKey]bool
 }
@@ -63,6 +63,7 @@ func (server *OSPFServer) processAreaConfig(areaConf config.AreaConf) error {
 	ent.AuthType = areaConf.AuthType
 	ent.ImportAsExtern = areaConf.ImportAsExtern
 	ent.AreaSummary = areaConf.AreaSummary
+	ent.StubDefaultCost = areaConf.StubDefaultCost
 	ent.AreaNssaTranslatorRole = areaConf.AreaNssaTranslatorRole
 	ent.IntfListMap = make(map[IntfConfKey]bool)
 	server.AreaConfMap[areaConfKey] = ent
@@ -83,8 +84,8 @@ func (server *OSPFServer) initAreaConfDefault() {
 		ent.AuthType = config.NoAuth
 		ent.ImportAsExtern = config.ImportExternal
 		ent.AreaSummary = config.NoAreaSummary
+		ent.StubDefaultCost = 20
 		ent.AreaNssaTranslatorRole = config.Candidate
-		ent.AreaNssaTranslatorStabilityInterval = config.PositiveInteger(40)
 		ent.IntfListMap = make(map[IntfConfKey]bool)
 		server.AreaConfMap[areaConfKey] = ent
 	}

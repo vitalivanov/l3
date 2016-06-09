@@ -996,7 +996,7 @@ func validateNetworkPrefix(ipAddr string, mask string) (destNet patriciaDB.Prefi
 		numbytes++
 	}
 	destNet = make([]byte, numbytes)
-	for i := 0; i < numbytes; i++ {
+	for i := 0; i < numbytes && i < len(netIp); i++ {
 		destNet[i] = netIp[i]
 	}
 	return destNet, err
@@ -1015,7 +1015,7 @@ func getNetworkPrefix(destNetIp net.IP, networkMask net.IP) (destNet patriciaDB.
 		numbytes++
 	}
 	destNet = make([]byte, numbytes)
-	for i := 0; i < numbytes; i++ {
+	for i := 0; i < numbytes && i < len(netIp); i++ {
 		destNet[i] = netIp[i]
 	}
 	return destNet, err
