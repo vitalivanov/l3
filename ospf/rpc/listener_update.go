@@ -44,12 +44,6 @@ func (h *OSPFHandler) UpdateOspfAreaEntry(origConf *ospfd.OspfAreaEntry, newConf
 	return true, nil
 }
 
-func (h *OSPFHandler) UpdateOspfStubAreaEntry(origConf *ospfd.OspfStubAreaEntry, newConf *ospfd.OspfStubAreaEntry, attrset []bool, op []*ospfd.PatchOpInfo) (bool, error) {
-	h.logger.Info(fmt.Sprintln("Original stub area config attrs:", origConf))
-	h.logger.Info(fmt.Sprintln("New stub area config attrs:", newConf))
-	return true, nil
-}
-
 func (h *OSPFHandler) UpdateOspfIfEntry(origConf *ospfd.OspfIfEntry, newConf *ospfd.OspfIfEntry, attrset []bool, op []*ospfd.PatchOpInfo) (bool, error) {
 	h.logger.Info(fmt.Sprintln("Original interface config attrs:", origConf))
 	h.logger.Info(fmt.Sprintln("New interface config attrs:", newConf))
