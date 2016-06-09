@@ -45,6 +45,16 @@ func (ribdServiceHandler *RIBDServer) StartRouteProcessServer() {
 				} else {
                      ribdServiceHandler.ProcessRoutePatchUpdateConfig(routeConf.OrigConfigObject.(*ribd.IPv4Route), routeConf.NewConfigObject.(*ribd.IPv4Route), routeConf.PatchOp)
 				}
+			} else if routeConf.Op == "addv6" {
+				//create ipv6 route
+			} else if routeConf.Op == "delv6" {
+				//delete ipv6 route
+			} else if routeConf.Op == "updatev6" {
+				//update ipv6 route
+				if routeConf.PatchOp == nil || len(routeConf.PatchOp) == 0 {
+			    } else {
+				//patch update
+			    }
 			}
 		}
 	}
