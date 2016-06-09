@@ -35,13 +35,18 @@ import (
 	"utils/commonDefs"
 )
 
+const (
+	PACKET_QUEUE_SIZE = 128
+	MAX_NUM_SESSIONS  = 1024
+)
+
 func (server *BFDServer) StartSessionHandler() error {
 	server.CreateSessionCh = make(chan BfdSessionMgmt)
 	server.DeleteSessionCh = make(chan BfdSessionMgmt)
 	server.AdminUpSessionCh = make(chan BfdSessionMgmt)
 	server.AdminDownSessionCh = make(chan BfdSessionMgmt)
-	server.CreatedSessionCh = make(chan int32)
-	server.FailedSessionClientCh = make(chan int32)
+	server.CreatedSessionCh = make(chan int32, MAX_NUM_SESSIONS)
+	server.FailedSessionClientCh = make(chan int32, MAX_NUM_SESSIONS)
 	server.tobeCreatedSessions = make(map[string]BfdSessionMgmt)
 	go server.StartBfdSesionServer()
 	go server.StartBfdSesionServerQueuer()
@@ -92,7 +97,7 @@ func (server *BFDServer) DispatchReceivedBfdPacket(ipAddr string, bfdPacket *Bfd
 }
 
 func (server *BFDServer) StartBfdSesionServerQueuer() error {
-	server.BfdPacketRecvCh = make(chan RecvedBfdPacket, 10)
+	server.BfdPacketRecvCh = make(chan RecvedBfdPacket, PACKET_QUEUE_SIZE)
 	for {
 		select {
 		case packet := <-server.BfdPacketRecvCh:
@@ -154,7 +159,7 @@ func (server *BFDServer) StartBfdSessionRxTx() error {
 			if session != nil {
 				session.SessionStopClientCh = make(chan bool)
 				session.SessionStopServerCh = make(chan bool)
-				session.ReceivedPacketCh = make(chan *BfdControlPacket, 10)
+				session.ReceivedPacketCh = make(chan *BfdControlPacket, PACKET_QUEUE_SIZE)
 				if session.state.PerLinkSession {
 					server.logger.Info(fmt.Sprintln("Starting PerLink server for session ", createdSessionId))
 					go session.StartPerLinkSessionServer(server)
