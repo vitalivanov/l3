@@ -425,21 +425,6 @@ func (server *OSPFServer) constructStubLinkP2P(ent IntfConf, likType config.IfTy
 
 	*/
 
-	/*
-		var nbrIp uint32
-		nbrIp = 0
-		for key, _ := range ent.NeighborMap {
-			nbrIp = convertAreaOrRouterIdUint32(string(key.IPAddr))
-			break
-		}
-
-		linkDetail.LinkId = uint32(nbrIp)
-		linkDetail.LinkData = 0xffffffff
-		linkDetail.LinkType = StubLink
-		linkDetail.NumOfTOS = 0
-		linkDetail.LinkMetric = 10
-	*/
-
 	ipAddr := convertAreaOrRouterIdUint32(ent.IfIpAddr.String())
 	netmask := convertIPv4ToUint32(ent.IfNetmask)
 	linkDetail.LinkId = ipAddr & netmask
@@ -688,33 +673,32 @@ func (server *OSPFServer) generateASExternalLsa(route RouteMdata) LsaKey {
 }
 
 func (server *OSPFServer) updateAsExternalLSA(lsdbKey LsdbKey, lsaKey LsaKey) error {
-        lsDbEnt, exist := server.AreaLsdb[lsdbKey]
-        if exist {
-                ent, valid := lsDbEnt.ASExternalLsaMap[lsaKey]
-                if !valid {
-                        server.logger.Warning(fmt.Sprintln("LSDB: AS external LSA doesnt exist lsdb ", lsdbKey, lsaKey))
-                        return nil
-                }
-                LsaEnc := encodeASExternalLsa(ent, lsaKey)
-                checksumOffset := uint16(14)
-                ent.LsaMd.LSChecksum = computeFletcherChecksum(LsaEnc[2:], checksumOffset)
-                LSAge := 0
-                ent.LsaMd.LSAge = uint16(LSAge)
-                lsDbEnt.ASExternalLsaMap[lsaKey] = ent
-                server.AreaLsdb[lsdbKey] = lsDbEnt
+	lsDbEnt, exist := server.AreaLsdb[lsdbKey]
+	if exist {
+		ent, valid := lsDbEnt.ASExternalLsaMap[lsaKey]
+		if !valid {
+			server.logger.Warning(fmt.Sprintln("LSDB: AS external LSA doesnt exist lsdb ", lsdbKey, lsaKey))
+			return nil
+		}
+		LsaEnc := encodeASExternalLsa(ent, lsaKey)
+		checksumOffset := uint16(14)
+		ent.LsaMd.LSChecksum = computeFletcherChecksum(LsaEnc[2:], checksumOffset)
+		LSAge := 0
+		ent.LsaMd.LSAge = uint16(LSAge)
+		lsDbEnt.ASExternalLsaMap[lsaKey] = ent
+		server.AreaLsdb[lsdbKey] = lsDbEnt
 
-                //update db entry
-                var val LsdbSliceEnt
-                val.AreaId = lsdbKey.AreaId
-                val.LSType = lsaKey.LSType
-                val.LSId = lsaKey.LSId
-                val.AdvRtr = lsaKey.AdvRouter
-                server.LsdbSlice = append(server.LsdbSlice, val)
-                server.AddLsdbEntry(val)
-        }
-        return nil
+		//update db entry
+		var val LsdbSliceEnt
+		val.AreaId = lsdbKey.AreaId
+		val.LSType = lsaKey.LSType
+		val.LSId = lsaKey.LSId
+		val.AdvRtr = lsaKey.AdvRouter
+		server.LsdbSlice = append(server.LsdbSlice, val)
+		server.AddLsdbEntry(val)
+	}
+	return nil
 }
-
 
 func (server *OSPFServer) processDeleteRouterLsa(data []byte, areaId uint32) bool {
 	lsakey := NewLsaKey()
@@ -1090,6 +1074,7 @@ func (server *OSPFServer) processLSDatabaseUpdates() {
 			server.StartCalcSPFCh <- true
 			spfStatus := <-server.DoneCalcSPFCh
 			server.logger.Info(fmt.Sprintln("SPF Calculation Return Status", spfStatus))
+			server.processInterfaceChangeMsg(msg)
 			if server.ospfGlobalConf.AreaBdrRtrStatus == true {
 				server.installSummaryLsa()
 			}
@@ -1150,6 +1135,28 @@ func (server *OSPFServer) processExtRouteUpd(msg RouteMdata) {
 	if !msg.isDel {
 		server.sendLsdbToNeighborEvent(ifkey, nbr, 0, 0, 0, lsaKey, LSAEXTFLOOD)
 	}
+}
+
+/*
+@fn processIntfStateEventNbr
+- Cleaning for neighbor data structures.
+-Flood nw/router lsas based on
+interface up/down add/delete events.
+*/
+func (server *OSPFServer) processInterfaceChangeMsg(msg NetworkLSAChangeMsg) {
+	server.neighborIntfEventCh <- msg.intfKey
+	nbr := NeighborConfKey{}
+        LSType := RouterLSA
+        LSId := convertIPv4ToUint32(server.ospfGlobalConf.RouterId)
+        AdvRouter := convertIPv4ToUint32(server.ospfGlobalConf.RouterId)
+        lsaKey := LsaKey{
+                LSType:    LSType,
+                LSId:      LSId,
+                AdvRouter: AdvRouter,
+        }
+
+	// send message for flooding.
+	server.sendLsdbToNeighborEvent(msg.intfKey, nbr, msg.areaId, 0, 0, lsaKey, LSAROUTERFLOOD)
 }
 
 /* @fn processNeighborFullEvent
