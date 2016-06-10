@@ -13,13 +13,13 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 // ribDBServer.go
 package server
@@ -27,7 +27,7 @@ package server
 import (
 	"errors"
 	"fmt"
-	"models"
+	"models/objects"
 	"ribd"
 	"strconv"
 )
@@ -42,14 +42,14 @@ func (m RIBDServer) WriteIPv4RouteStateEntryToDB(dbInfo RouteDBInfo) error {
 	entry := dbInfo.entry
 	routeList := dbInfo.routeList
 	m.DelIPv4RouteStateEntryFromDB(dbInfo)
-	var dbObj models.IPv4RouteState
+	var dbObj objects.IPv4RouteState
 	obj := ribd.NewIPv4RouteState()
 	obj.DestinationNw = entry.networkAddr
 	/*	obj.NextHopIp = entry.nextHopIp.String()
 		nextHopIfTypeStr, _ := m.GetNextHopIfTypeStr(ribdInt.Int(entry.nextHopIfType))
 		obj.OutgoingIntfType = nextHopIfTypeStr
 		obj.OutgoingInterface = strconv.Itoa(int(entry.nextHopIfIndex))*/
-	obj.Protocol = routeList.selectedRouteProtocol//ReverseRouteProtoTypeMapDB[int(entry.protocol)]
+	obj.Protocol = routeList.selectedRouteProtocol //ReverseRouteProtoTypeMapDB[int(entry.protocol)]
 	obj.NextHopList = make([]*ribd.NextHopInfo, 0)
 	routeInfoList := routeList.routeInfoProtocolMap[routeList.selectedRouteProtocol]
 	logger.Info(fmt.Sprintln("len of routeInfoList - ", len(routeInfoList), "selected route protocol = ", routeList.selectedRouteProtocol, " route Protocol: ", entry.protocol, " route nwAddr: ", entry.networkAddr))
@@ -59,7 +59,7 @@ func (m RIBDServer) WriteIPv4RouteStateEntryToDB(dbInfo RouteDBInfo) error {
 		logger.Info(fmt.Sprintln("nextHop ", sel, " weight = ", routeInfoList[sel].weight, " ip ", routeInfoList[sel].nextHopIp, " intref ", routeInfoList[sel].nextHopIfIndex))
 		nextHopInfo[i].NextHopIp = routeInfoList[sel].nextHopIp.String()
 		nextHopInfo[i].NextHopIntRef = strconv.Itoa(int(routeInfoList[sel].nextHopIfIndex))
-		intfEntry,ok := IntfIdNameMap[int32(routeInfoList[sel].nextHopIfIndex)]
+		intfEntry, ok := IntfIdNameMap[int32(routeInfoList[sel].nextHopIfIndex)]
 		if ok {
 			logger.Debug(fmt.Sprintln("Map foud for ifndex : ", routeInfoList[sel].nextHopIfIndex, "Name = ", intfEntry.name))
 			nextHopInfo[i].NextHopIntRef = intfEntry.name
@@ -100,7 +100,7 @@ func (m RIBDServer) WriteIPv4RouteStateEntryToDB(dbInfo RouteDBInfo) error {
 			obj.PolicyList = append(obj.PolicyList, routePolicyListInfo)
 		}
 	}
-	models.ConvertThriftToribdIPv4RouteStateObj(obj, &dbObj)
+	objects.ConvertThriftToribdIPv4RouteStateObj(obj, &dbObj)
 	err := dbObj.StoreObjectInDb(m.DbHdl)
 	if err != nil {
 		logger.Err(fmt.Sprintln("Failed to store IPv4RouteState entry in DB, err - ", err))
@@ -113,10 +113,10 @@ func (m RIBDServer) WriteIPv4RouteStateEntryToDB(dbInfo RouteDBInfo) error {
 func (m RIBDServer) DelIPv4RouteStateEntryFromDB(dbInfo RouteDBInfo) error {
 	logger.Info(fmt.Sprintln("DelIPv4RouteStateEntryFromDB"))
 	entry := dbInfo.entry
-	var dbObj models.IPv4RouteState
+	var dbObj objects.IPv4RouteState
 	obj := ribd.NewIPv4RouteState()
 	obj.DestinationNw = entry.networkAddr
-	models.ConvertThriftToribdIPv4RouteStateObj(obj, &dbObj)
+	objects.ConvertThriftToribdIPv4RouteStateObj(obj, &dbObj)
 	err := dbObj.DeleteObjectFromDb(m.DbHdl)
 	if err != nil {
 		return errors.New(fmt.Sprintln("Failed to delete IPv4RouteState from state db : ", entry))
@@ -126,7 +126,7 @@ func (m RIBDServer) DelIPv4RouteStateEntryFromDB(dbInfo RouteDBInfo) error {
 
 func (m RIBDServer) ReadAndUpdateRoutesFromDB() {
 	logger.Debug("ReadAndUpdateRoutesFromDB")
-	var dbObjCfg models.IPv4Route
+	var dbObjCfg objects.IPv4Route
 	dbRead := false
 	objList, err := m.DbHdl.GetAllObjFromDb(dbObjCfg)
 	if err == nil {
@@ -134,16 +134,16 @@ func (m RIBDServer) ReadAndUpdateRoutesFromDB() {
 		dbRead = true
 		for idx := 0; idx < len(objList); idx++ {
 			obj := ribd.NewIPv4Route()
-			dbObj := objList[idx].(models.IPv4Route)
-			models.ConvertribdIPv4RouteObjToThrift(&dbObj, obj)
+			dbObj := objList[idx].(objects.IPv4Route)
+			objects.ConvertribdIPv4RouteObjToThrift(&dbObj, obj)
 			err = m.RouteConfigValidationCheck(obj, "add")
 			if err != nil {
 				logger.Err("Route validation failed when reading from db")
 				continue
 			}
-			m.RouteConfCh <- RIBdServerConfig {
-				OrigConfigObject : obj,
-				Op               : "add",
+			m.RouteConfCh <- RIBdServerConfig{
+				OrigConfigObject: obj,
+				Op:               "add",
 			}
 			/*rv, _ := ribdServiceHandler.ProcessRouteCreateConfig(obj)
 			if rv == false {
