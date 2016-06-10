@@ -115,7 +115,7 @@ func (m RIBDServer) WriteIPv6RouteStateEntryToDB(dbInfo RouteDBInfo) error {
 	entry := dbInfo.entry
 	routeList := dbInfo.routeList
 	m.DelIPv6RouteStateEntryFromDB(dbInfo)
-	var dbObj models.IPv6RouteState
+	var dbObj objects.IPv6RouteState
 	obj := ribd.NewIPv6RouteState()
 	obj.DestinationNw = entry.networkAddr
 	/*	obj.NextHopIp = entry.nextHopIp.String()
@@ -173,7 +173,7 @@ func (m RIBDServer) WriteIPv6RouteStateEntryToDB(dbInfo RouteDBInfo) error {
 			obj.PolicyList = append(obj.PolicyList, routePolicyListInfo)
 		}
 	}
-	models.ConvertThriftToribdIPv6RouteStateObj(obj, &dbObj)
+	objects.ConvertThriftToribdIPv6RouteStateObj(obj, &dbObj)
 	err := dbObj.StoreObjectInDb(m.DbHdl)
 	if err != nil {
 		logger.Err(fmt.Sprintln("Failed to store IPv6RouteState entry in DB, err - ", err))
@@ -200,10 +200,10 @@ func (m RIBDServer) DelIPv4RouteStateEntryFromDB(dbInfo RouteDBInfo) error {
 func (m RIBDServer) DelIPv6RouteStateEntryFromDB(dbInfo RouteDBInfo) error {
 	logger.Info(fmt.Sprintln("DelIPv6RouteStateEntryFromDB"))
 	entry := dbInfo.entry
-	var dbObj models.IPv6RouteState
+	var dbObj objects.IPv6RouteState
 	obj := ribd.NewIPv6RouteState()
 	obj.DestinationNw = entry.networkAddr
-	models.ConvertThriftToribdIPv6RouteStateObj(obj, &dbObj)
+	objects.ConvertThriftToribdIPv6RouteStateObj(obj, &dbObj)
 	err := dbObj.DeleteObjectFromDb(m.DbHdl)
 	if err != nil {
 		return errors.New(fmt.Sprintln("Failed to delete IPv6RouteState from state db : ", entry))
@@ -242,14 +242,14 @@ func (m RIBDServer) ReadAndUpdateRoutesFromDB() {
 }
 func (m RIBDServer) ReadAndUpdatev6RoutesFromDB() {
 	logger.Debug("ReadAndUpdatev6RoutesFromDB")
-	var dbObjCfg models.IPv6Route
+	var dbObjCfg objects.IPv6Route
 	objList, err := m.DbHdl.GetAllObjFromDb(dbObjCfg)
 	if err == nil {
 		logger.Debug(fmt.Sprintln("Number of v6 routes from DB: ", len((objList))))
 		for idx := 0; idx < len(objList); idx++ {
 			obj := ribd.NewIPv6Route()
-			dbObj := objList[idx].(models.IPv6Route)
-			models.ConvertribdIPv6RouteObjToThrift(&dbObj, obj)
+			dbObj := objList[idx].(objects.IPv6Route)
+			objects.ConvertribdIPv6RouteObjToThrift(&dbObj, obj)
 			err = m.IPv6RouteConfigValidationCheck(obj, "add")
 			if err != nil {
 				logger.Err("Route validation failed when reading from db")
