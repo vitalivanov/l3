@@ -13,13 +13,13 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 // peer.go
 package fsm
@@ -105,7 +105,7 @@ func NewFSMManager(logger *logging.Writer, neighborConf *base.NeighborConf, bgpP
 	mgr.StopFSMCh = make(chan string)
 	mgr.CommandCh = make(chan PeerFSMCommand, 5)
 	mgr.activeFSM = uint8(config.ConnDirInvalid)
-	mgr.newConnCh = make(chan PeerFSMConnState)
+	mgr.newConnCh = make(chan PeerFSMConnState, 2)
 	mgr.fsmMutex = sync.RWMutex{}
 	return &mgr
 }
@@ -138,8 +138,10 @@ func (mgr *FSMManager) Init() {
 					}
 				}
 				if !foundInConn {
-					for _, fsm = range mgr.fsms {
+					for fsmId, fsm = range mgr.fsms {
 						if fsm != nil {
+							mgr.logger.Info(fmt.Sprintf("Neighbor %s: Send inConn message to FSM %d",
+								mgr.pConf.NeighborAddress, fsmId))
 							fsm.inConnCh <- inConn
 						}
 					}
