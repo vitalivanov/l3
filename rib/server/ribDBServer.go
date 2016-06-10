@@ -214,7 +214,6 @@ func (m RIBDServer) DelIPv6RouteStateEntryFromDB(dbInfo RouteDBInfo) error {
 func (m RIBDServer) ReadAndUpdateRoutesFromDB() {
 	logger.Debug("ReadAndUpdateRoutesFromDB")
 	var dbObjCfg objects.IPv4Route
-	dbRead := false
 	objList, err := m.DbHdl.GetAllObjFromDb(dbObjCfg)
 	if err == nil {
 		logger.Debug(fmt.Sprintln("Number of routes from DB: ", len((objList))))
