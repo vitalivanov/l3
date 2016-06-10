@@ -47,6 +47,7 @@ type PolicyRouteIndex struct {
     data-structure used to communicate with policy engine
 */
 type RouteParams struct {
+	ipType      IPType
 	destNetIp      string
 	networkMask    string
 	nextHopIp      string
@@ -332,7 +333,7 @@ func policyEngineUpdateRoute(prefix patriciaDB.Prefix, item patriciaDB.Item, han
 	cfg.NextHop = append(cfg.NextHop, &nextHop)
 	//Even though we could potentially have multiple selected routes, calling update once for this prefix should suffice
 	//routeServiceHandler.UpdateIPv4Route(&cfg, nil, nil)
-	RouteServiceHandler.ProcessRouteUpdateConfig(&cfg, &cfg, nil)
+	RouteServiceHandler.ProcessRouteUpdateConfig(&cfg, &cfg, nil,selectedRouteInfoRecord.ipType)
 	return err
 }
 func policyEngineTraverseAndUpdate() {
@@ -342,7 +343,7 @@ func policyEngineTraverseAndUpdate() {
 func policyEngineActionAcceptRoute(params interface{}) {
 	routeInfo := params.(RouteParams)
 	logger.Info(fmt.Sprintln("policyEngineActionAcceptRoute for ip ", routeInfo.destNetIp, " and mask ", routeInfo.networkMask))
-	_, err := createV4Route(routeInfo.destNetIp, routeInfo.networkMask, routeInfo.metric, routeInfo.weight, routeInfo.nextHopIp, routeInfo.nextHopIfIndex, routeInfo.routeType, routeInfo.createType, ribdCommonDefs.RoutePolicyStateChangetoValid, routeInfo.sliceIdx)
+	_, err := createRoute(routeInfo.ipType, routeInfo.destNetIp, routeInfo.networkMask, routeInfo.metric, routeInfo.weight, routeInfo.nextHopIp, routeInfo.nextHopIfIndex, routeInfo.routeType, routeInfo.createType, ribdCommonDefs.RoutePolicyStateChangetoValid, routeInfo.sliceIdx)
 	//_, err := routeServiceHandler.InstallRoute(routeInfo)
 	if err != nil {
 		logger.Info(fmt.Sprintln("creating v4 route failed with err ", err))
