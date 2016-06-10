@@ -325,16 +325,16 @@ func (m RIBDServicesHandler) GetBulkIPv6RouteState(fromIndex ribd.Int, rcount ri
 		logger.Err("DbHdl not initialized")
 		return routes, errors.New("DBHdl not initialized")
 	}
-	var routeObj models.IPv6RouteState
-	var routeObjtemp models.IPv6RouteState
+	var routeObj objects.IPv6RouteState
+	var routeObjtemp objects.IPv6RouteState
 	err, objCount, nextMarker, more, objs := m.server.DbHdl.GetBulkObjFromDb(routeObj, int64(fromIndex), int64(rcount))
 	logger.Debug(fmt.Sprintln("objCount = ", objCount, " len(obj) ", len(objs), " more ", more, " nextMarker: ", nextMarker))
 	var tempRoute []ribd.IPv6RouteState = make([]ribd.IPv6RouteState, len(objs))
 	if err == nil {
 		for i := 0; i < len(objs); i++ {
-			routeObjtemp = objs[i].(models.IPv6RouteState)
+			routeObjtemp = objs[i].(objects.IPv6RouteState)
 			logger.Debug(fmt.Sprintln("obj ", i, routeObjtemp.DestinationNw, " ", routeObjtemp.NextHopList))
-			models.ConvertribdIPv6RouteStateObjToThrift(&routeObjtemp, &tempRoute[i])
+			objects.ConvertribdIPv6RouteStateObjToThrift(&routeObjtemp, &tempRoute[i])
 			returnRoutes = append(returnRoutes, &tempRoute[i])
 		}
 		routes.IPv6RouteStateList = returnRoutes
