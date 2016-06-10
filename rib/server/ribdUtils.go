@@ -39,11 +39,14 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"utils/netUtils"
 	"utils/patriciaDB"
 	"utils/policy"
 )
-
+type IPType int
+const  (
+	ipv4 IPType = iota
+	ipv6 
+)
 type RouteDistanceConfig struct {
 	defaultDistance    int
 	configuredDistance int
@@ -825,7 +828,7 @@ func findElement(list []string, element string) int {
 func buildPolicyEntityFromRoute(route ribdInt.Routes, params interface{}) (entity policy.PolicyEngineFilterEntityParams, err error) {
 	routeInfo := params.(RouteParams)
 	logger.Info(fmt.Sprintln("buildPolicyEntityFromRoute: createType: ", routeInfo.createType, " delete type: ", routeInfo.deleteType))
-	destNetIp, err := netUtils.GetCIDR(route.Ipaddr, route.Mask)
+	destNetIp, err := getCIDR(route.Ipaddr, route.Mask)
 	if err != nil {
 		logger.Info(fmt.Sprintln("error getting CIDR address for ", route.Ipaddr, ":", route.Mask))
 		return entity, err
@@ -861,6 +864,28 @@ func BuildRouteParamsFromribdIPv4Route(cfg *ribd.IPv4Route, createType int, dele
 	}
 	nextHopIntRef, _ := strconv.Atoi(cfg.NextHop[0].NextHopIntRef)
 	params := RouteParams{destNetIp: cfg.DestinationNw,
+	    ipType     :    ipv4,
+		networkMask:    cfg.NetworkMask,
+		nextHopIp:      nextHopIp,
+		nextHopIfIndex: ribd.Int(nextHopIntRef),
+		weight:         ribd.Int(cfg.NextHop[0].Weight),
+		metric:         ribd.Int(cfg.Cost),
+		routeType:      ribd.Int(RouteProtocolTypeMapDB[cfg.Protocol]),
+		sliceIdx:       ribd.Int(sliceIdx),
+		createType:     ribd.Int(createType),
+		deleteType:     ribd.Int(deleteType),
+	}
+	return params
+}
+func BuildRouteParamsFromribdIPv6Route(cfg *ribd.IPv6Route, createType int, deleteType int, sliceIdx int) RouteParams {
+	nextHopIp := cfg.NextHop[0].NextHopIp
+	if cfg.NullRoute == true { //commonDefs.IfTypeNull {
+		logger.Info("null route create request")
+		//nextHopIp = "255.255.255.255"  //TBD: mask IP for null route next hop
+	}
+	nextHopIntRef, _ := strconv.Atoi(cfg.NextHop[0].NextHopIntRef)
+	params := RouteParams{destNetIp: cfg.DestinationNw,
+	    ipType     :    ipv6,
 		networkMask:    cfg.NetworkMask,
 		nextHopIp:      nextHopIp,
 		nextHopIfIndex: ribd.Int(nextHopIntRef),
@@ -881,6 +906,25 @@ func BuildPolicyRouteFromribdIPv4Route(cfg *ribd.IPv4Route) (policyRoute ribdInt
 	}
 	nextHopIntRef, _ := strconv.Atoi(cfg.NextHop[0].NextHopIntRef)
 	policyRoute = ribdInt.Routes{Ipaddr: cfg.DestinationNw,
+	    IPAddrType     :    ribdInt.Int(ipv4),
+		Mask:      cfg.NetworkMask,
+		NextHopIp: nextHopIp,
+		IfIndex:   ribdInt.Int(nextHopIntRef), //cfg.NextHopInfp[0].NextHopIntRef,
+		Weight:    ribdInt.Int(cfg.NextHop[0].Weight),
+		Metric:    ribdInt.Int(cfg.Cost),
+		Prototype: ribdInt.Int(RouteProtocolTypeMapDB[cfg.Protocol]),
+	}
+	return policyRoute
+}
+func BuildPolicyRouteFromribdIPv6Route(cfg *ribd.IPv6Route) (policyRoute ribdInt.Routes) {
+	nextHopIp := cfg.NextHop[0].NextHopIp
+	if cfg.NullRoute == true { //commonDefs.IfTypeNull {
+		logger.Info("null route create request")
+		//nextHopIp = "255.255.255.255"  //TBD: mask IP for null route next hop
+	}
+	nextHopIntRef, _ := strconv.Atoi(cfg.NextHop[0].NextHopIntRef)
+	policyRoute = ribdInt.Routes{Ipaddr: cfg.DestinationNw,
+	    IPAddrType     :    ribdInt.Int(ipv6),
 		Mask:      cfg.NetworkMask,
 		NextHopIp: nextHopIp,
 		IfIndex:   ribdInt.Int(nextHopIntRef), //cfg.NextHopInfp[0].NextHopIntRef,
@@ -1236,7 +1280,7 @@ func RouteReachabilityStatusUpdate(targetProtocol string, info RouteReachability
 }
 func getIPInt(ip net.IP) (ipInt int, err error) {
 	if ip == nil {
-		logger.Info(fmt.Sprintf("ip address %v invalid\n", ip))
+		logger.Info(fmt.Sprintln("ip address invalid", ip))
 		return ipInt, errors.New("Invalid destination network IP Address")
 	}
 	ip = ip.To4()
@@ -1246,23 +1290,51 @@ func getIPInt(ip net.IP) (ipInt int, err error) {
 }
 
 func getIP(ipAddr string) (ip net.IP, err error) {
+	logger.Debug(fmt.Sprintln("getIP for ipAddr:", ipAddr))
 	ip = net.ParseIP(ipAddr)
 	if ip == nil {
 		return ip, errors.New("Invalid destination network IP Address")
 	}
-	ip = ip.To4()
+	//ip = ip.To4()
+	//logger.Debug(fmt.Sprintln("ip after ip.to4():", ip))
 	return ip, nil
+}
+func isZeros(p net.IP) bool {
+	for i := 0; i < len(p); i++ {
+		if p[i] != 0 {
+			return false
+		}
+	}
+	return true
+}
+func isIPv4Mask (mask net.IP ) bool {
+    if ( isZeros(mask[0:10]) && 
+        mask[10] == 0xff &&
+		mask[11] == 0xff) {
+			fmt.Println("iv4Mask")
+			return true
+	}
+    return false
 }
 
 func getPrefixLen(networkMask net.IP) (prefixLen int, err error) {
-	ipInt, err := getIPInt(networkMask)
+	logger.Debug(fmt.Sprintln("getPrefixLen for networkMask: ", networkMask))
+/*	ipInt, err := getIPInt(networkMask)
 	if err != nil {
 		return -1, err
 	}
 	for prefixLen = 0; ipInt != 0; ipInt >>= 1 {
 		prefixLen += ipInt & 1
+	}*/
+	mask := net.IPMask(networkMask)
+	if isIPv4Mask(net.IP(mask)) {
+		prefixLen, _ = mask[12:16].Size()
+	} else {
+	    prefixLen,_ = mask.Size()
 	}
-	return prefixLen, nil
+	//	prefixLen,bits := mask.Size()
+	logger.Debug(fmt.Sprintln("prefixLen = ", prefixLen))
+	return prefixLen, err
 }
 func validateNetworkPrefix(ipAddr string, mask string) (destNet patriciaDB.Prefix, err error) {
 	logger.Debug(fmt.Sprintln("validateNetworkPrefix for ip ", ipAddr, " mask: ", mask))
@@ -1281,7 +1353,7 @@ func validateNetworkPrefix(ipAddr string, mask string) (destNet patriciaDB.Prefi
 		logger.Err(fmt.Sprintln("err when getting prefixLen, err= ", err))
 		return destNet, errors.New(fmt.Sprintln("Invalid networkmask ", networkMask))
 	}
-	vdestMask := net.IPv4Mask(networkMask[0], networkMask[1], networkMask[2], networkMask[3])
+	vdestMask := net.IPMask(networkMask)//net.IPv4Mask(networkMask[0], networkMask[1], networkMask[2], networkMask[3])
 	netIp := destNetIp.Mask(vdestMask)
 	logger.Debug(fmt.Sprintln("netIP: ", netIp, " destNetIp ", destNetIp))
 	if ! ( bytes.Equal(destNetIp, netIp)) {
@@ -1305,15 +1377,25 @@ func getNetworkPrefix(destNetIp net.IP, networkMask net.IP) (destNet patriciaDB.
 		logger.Err(fmt.Sprintln("err when getting prefixLen, err= ", err))
 		return destNet, errors.New(fmt.Sprintln("Invalid networkmask ", networkMask))
 	}
-	vdestMask := net.IPv4Mask(networkMask[0], networkMask[1], networkMask[2], networkMask[3])
-	netIp := destNetIp.Mask(vdestMask)
+	var netIp net.IP
+	vdestMask := net.IPMask(networkMask)
+	logger.Debug(fmt.Sprintln("vdestMask:", vdestMask))
+	if isIPv4Mask(net.IP(vdestMask)) {
+		netIp = destNetIp.Mask(vdestMask[12:16])
+		logger.Debug(fmt.Sprintln("ipv4 case, netIp = ", netIp, " vdestMask:", vdestMask[12:16]))
+	} else {
+		netIp = destNetIp.Mask(vdestMask)
+		logger.Debug(fmt.Sprintln("ipv6 case, netIp = ", netIp, " vdestMask:", vdestMask))
+	}
 	numbytes := prefixLen / 8
 	if (prefixLen % 8) != 0 {
 		numbytes++
 	}
+	logger.Debug(fmt.Sprintln("getNetworkPrefix: prefixLen  = ", prefixLen, " netIp:", netIp, " numbytes:", numbytes, " len(netIp):", len(netIp)))
 	destNet = make([]byte, numbytes)
-	for i := 0; i < numbytes && i < len(netIp); i++ {
+	for i := 0; i < numbytes; i++ {
 		destNet[i] = netIp[i]
+		logger.Debug(fmt.Sprintln("destnet[i]:", destNet[i], " netIp[i]:", netIp[i]))
 	}
 	return destNet, err
 }
@@ -1324,6 +1406,7 @@ func getNetowrkPrefixFromStrings(ipAddr string, mask string) (prefix patriciaDB.
 		logger.Info(fmt.Sprintln("destNetIpAddr ", ipAddr, " invalid"))
 		return prefix, err
 	}
+	logger.Debug(fmt.Sprintln("getNetworkPrefixFrmStrings:destNetIpAddr:", destNetIpAddr))
 	networkMaskAddr, err := getIP(mask)
 	if err != nil {
 		logger.Println("networkMaskAddr invalid")
@@ -1342,10 +1425,34 @@ func getNetworkPrefixFromCIDR(ipAddr string) (ipPrefix patriciaDB.Prefix, err er
 	if err != nil {
 		return ipPrefix, err
 	}
-	ipMask = make(net.IP, 4)
+	fmt.Println("ip = ", ip, " ipNet = ", ipNet, " ip.String():", ip.String())
+	ipMask = make(net.IP, 16)
 	copy(ipMask, ipNet.Mask)
 	ipAddrStr := ip.String()
 	ipMaskStr := net.IP(ipMask).String()
 	ipPrefix, err = getNetowrkPrefixFromStrings(ipAddrStr, ipMaskStr)
 	return ipPrefix, err
+}
+func getCIDR(ipAddr string, mask string) (addr string, err error) {
+	destNetIpAddr, err := getIP(ipAddr)
+	if err != nil {
+		fmt.Println("destNetIpAddr invalid")
+		return addr, err
+	}
+	maskIP,err:=getIP(mask)
+	if err != nil {
+       fmt.Println("err in getting mask IP for mask string", mask)
+	   return addr, err
+	}
+	prefixLen,err := getPrefixLen(maskIP)
+	if err != nil {
+	   fmt.Println("err in getting prefix len for mask string", mask)
+	   return addr, err
+	}
+	addr = (destNetIpAddr.Mask(net.IPMask(maskIP))).String() + "/" + strconv.Itoa(prefixLen)
+	if isIPv4Mask(maskIP) {
+		addr = (destNetIpAddr.Mask(net.IPMask(maskIP[12:16]))).String() + "/" + strconv.Itoa(prefixLen)
+		logger.Debug(fmt.Sprintln("ipv4 case, addr = ", addr, " maskIP:", maskIP[12:16]))
+	}
+	return addr, err
 }
