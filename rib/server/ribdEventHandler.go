@@ -13,13 +13,13 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 // ribdEventHandler.go
 package server
@@ -53,7 +53,7 @@ func (ribdServiceHandler *RIBDServer) ProcessAsicdEvents(sub *nanomsg.SubSocket)
 			ribdServiceHandler.Logger.Info("Error in Unmarshalling rcvdMsg Json")
 			return
 		}
-		ribdServiceHandler.Logger.Debug(fmt.Sprintln("Switch msgtype ",Notif.MsgType))
+		ribdServiceHandler.Logger.Debug(fmt.Sprintln("Switch msgtype ", Notif.MsgType))
 		switch Notif.MsgType {
 		case asicdCommonDefs.NOTIFY_LOGICAL_INTF_CREATE:
 			ribdServiceHandler.Logger.Info("NOTIFY_LOGICAL_INTF_CREATE received")
@@ -130,7 +130,7 @@ func (ribdServiceHandler *RIBDServer) ProcessAsicdEvents(sub *nanomsg.SubSocket)
 			copy(ipMask, ipNet.Mask)
 			ipAddrStr := ip.String()
 			ipMaskStr := net.IP(ipMask).String()
-			ribdServiceHandler.Logger.Info(fmt.Sprintln("Calling createv4Route with ipaddr ", ipAddrStr, " mask ", ipMaskStr, " nextHopIntRef: ",strconv.Itoa(int(msg.IfIndex) )))
+			ribdServiceHandler.Logger.Info(fmt.Sprintln("Calling createv4Route with ipaddr ", ipAddrStr, " mask ", ipMaskStr, " nextHopIntRef: ", strconv.Itoa(int(msg.IfIndex))))
 			cfg := ribd.IPv4Route{
 				DestinationNw: ipAddrStr,
 				Protocol:      "CONNECTED",
@@ -144,10 +144,10 @@ func (ribdServiceHandler *RIBDServer) ProcessAsicdEvents(sub *nanomsg.SubSocket)
 			cfg.NextHop = make([]*ribd.NextHopInfo, 0)
 			cfg.NextHop = append(cfg.NextHop, &nextHop)
 
-	         ribdServiceHandler.RouteConfCh <- RIBdServerConfig{
-	                                   OrigConfigObject:&cfg,
-	                                   Op : "add",
-	         }
+			ribdServiceHandler.RouteConfCh <- RIBdServerConfig{
+				OrigConfigObject: &cfg,
+				Op:               "add",
+			}
 			//_, err = ribdServiceHandler.ProcessRouteCreateConfig(&cfg) //ipAddrStr, ipMaskStr, 0, "0.0.0.0", ribd.Int(asicdCommonDefs.GetIntfTypeFromIfIndex(msg.IfIndex)), ribd.Int(asicdCommonDefs.GetIntfIdFromIfIndex(msg.IfIndex)), "CONNECTED")
 			//_, err = createV4Route(ipAddrStr, ipMaskStr, 0, "0.0.0.0", ribd.Int(asicdCommonDefs.GetIntfTypeFromIfIndex(msg.IfIndex)), ribd.Int(asicdCommonDefs.GetIntfIdFromIfIndex(msg.IfIndex)), ribdCommonDefs.CONNECTED, FIBAndRIB, ribdCommonDefs.RoutePolicyStateChangetoValid,ribd.Int(len(destNetSlice)))
 			/*if err != nil {
@@ -186,10 +186,10 @@ func (ribdServiceHandler *RIBDServer) ProcessAsicdEvents(sub *nanomsg.SubSocket)
 			}
 			cfg.NextHop = make([]*ribd.NextHopInfo, 0)
 			cfg.NextHop = append(cfg.NextHop, &nextHop)
-	         ribdServiceHandler.RouteConfCh <- RIBdServerConfig{
-	                                  OrigConfigObject: &cfg,
-	                                   Op : "del",
-	         }
+			ribdServiceHandler.RouteConfCh <- RIBdServerConfig{
+				OrigConfigObject: &cfg,
+				Op:               "del",
+			}
 			/*_, err = ribdServiceHandler.ProcessRouteDeleteConfig(&cfg) //ipAddrStr, ipMaskStr, 0, "0.0.0.0", ribd.Int(asicdCommonDefs.GetIntfTypeFromIfIndex(msg.IfIndex)), ribd.Int(asicdCommonDefs.GetIntfIdFromIfIndex(msg.IfIndex)), "CONNECTED")
 			if err != nil {
 				ribdServiceHandler.Logger.Info(fmt.Sprintln("Route delete failed with err %s\n", err))
@@ -197,7 +197,7 @@ func (ribdServiceHandler *RIBDServer) ProcessAsicdEvents(sub *nanomsg.SubSocket)
 			}*/
 			break
 		default:
-		    logger.Debug("Received unknown event ")
+			logger.Debug("Received unknown event ")
 		}
 	}
 }

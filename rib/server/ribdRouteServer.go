@@ -13,20 +13,20 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 // ribdRouteServer.go
 package server
 
 import (
-	"ribd"
 	"fmt"
+	"ribd"
 )
 
 func (ribdServiceHandler *RIBDServer) StartRouteProcessServer() {
@@ -36,26 +36,27 @@ func (ribdServiceHandler *RIBDServer) StartRouteProcessServer() {
 		case routeConf := <-ribdServiceHandler.RouteConfCh:
 			logger.Debug(fmt.Sprintln("received message on RouteConfCh channel, op: ", routeConf.Op))
 			if routeConf.Op == "add" {
-			    ribdServiceHandler.ProcessV4RouteCreateConfig(routeConf.OrigConfigObject.(*ribd.IPv4Route))
+				ribdServiceHandler.ProcessV4RouteCreateConfig(routeConf.OrigConfigObject.(*ribd.IPv4Route))
 			} else if routeConf.Op == "del" {
 				ribdServiceHandler.ProcessRouteDeleteConfig(routeConf.OrigConfigObject.(*ribd.IPv4Route))
 			} else if routeConf.Op == "update" {
 				if routeConf.PatchOp == nil || len(routeConf.PatchOp) == 0 {
-                      ribdServiceHandler.ProcessRouteUpdateConfig(routeConf.OrigConfigObject.(*ribd.IPv4Route), routeConf.NewConfigObject.(*ribd.IPv4Route), routeConf.AttrSet, ipv4)
+					ribdServiceHandler.ProcessRouteUpdateConfig(routeConf.OrigConfigObject.(*ribd.IPv4Route), routeConf.NewConfigObject.(*ribd.IPv4Route), routeConf.AttrSet, ipv4)
 				} else {
-                     ribdServiceHandler.ProcessRoutePatchUpdateConfig(routeConf.OrigConfigObject.(*ribd.IPv4Route), routeConf.NewConfigObject.(*ribd.IPv4Route), routeConf.PatchOp, ipv4)
+					ribdServiceHandler.ProcessRoutePatchUpdateConfig(routeConf.OrigConfigObject.(*ribd.IPv4Route), routeConf.NewConfigObject.(*ribd.IPv4Route), routeConf.PatchOp, ipv4)
 				}
 			} else if routeConf.Op == "addv6" {
 				//create ipv6 route
-			    ribdServiceHandler.ProcessV6RouteCreateConfig(routeConf.OrigConfigObject.(*ribd.IPv6Route))
+				ribdServiceHandler.ProcessV6RouteCreateConfig(routeConf.OrigConfigObject.(*ribd.IPv6Route))
 			} else if routeConf.Op == "delv6" {
 				//delete ipv6 route
+				ribdServiceHandler.ProcessV6RouteDeleteConfig(routeConf.OrigConfigObject.(*ribd.IPv6Route))
 			} else if routeConf.Op == "updatev6" {
 				//update ipv6 route
 				if routeConf.PatchOp == nil || len(routeConf.PatchOp) == 0 {
-			    } else {
-				//patch update
-			    }
+				} else {
+					//patch update
+				}
 			}
 		}
 	}

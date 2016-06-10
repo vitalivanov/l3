@@ -13,13 +13,13 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 // ribdAsicdServer.go
 package server
@@ -67,9 +67,9 @@ func (ribdServiceHandler *RIBDServer) StartAsicdServer() {
 		case route := <-ribdServiceHandler.AsicdRouteCh:
 			logger.Debug(fmt.Sprintln(" received message on AsicdRouteCh, op:", route.Op))
 			if route.Op == "add" {
-			    addAsicdRoute(route.OrigConfigObject.(RouteInfoRecord))
+				addAsicdRoute(route.OrigConfigObject.(RouteInfoRecord))
 			} else if route.Op == "del" {
-			    delAsicdRoute(route.OrigConfigObject.(RouteInfoRecord))
+				delAsicdRoute(route.OrigConfigObject.(RouteInfoRecord))
 			}
 		}
 	}

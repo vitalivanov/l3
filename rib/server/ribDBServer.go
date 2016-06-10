@@ -269,11 +269,31 @@ func (ribdServiceHandler *RIBDServer) StartDBServer() {
 	for {
 		select {
 		case info := <-ribdServiceHandler.DBRouteCh:
-			logger.Info(fmt.Sprintln(" received message on DBRouteCh, op: ", info.Op))
+			if info.Op == "add" {
+				dbInfo := info.OrigConfigObject.(RouteDBInfo)
+				routeList := dbInfo.routeList
+				routeInfoList := routeList.routeInfoProtocolMap[routeList.selectedRouteProtocol]
+				for sel := 0; sel < len(routeInfoList); sel++ {
+					if routeInfoList[sel].protocol == int8(RouteProtocolTypeMapDB[routeList.selectedRouteProtocol]) {
+						logger.Debug(fmt.Sprintln("add case iptype = ", routeInfoList[sel].ipType))
+						if routeInfoList[sel].ipType == ipv6 {
+							info.Op = "addv6"
+						}
+					}
+				}
+			} else if info.Op == "del" {
+				logger.Debug("MADHAVI!! del case")
+				dbInfo := info.OrigConfigObject.(RouteDBInfo)
+				entry := dbInfo.entry
+				logger.Debug(fmt.Sprintln("del case iptype = ", entry.ipType))
+				if entry.ipType == ipv6 {
+					info.Op = "delv6"
+				}
+			}
+			logger.Info(fmt.Sprintln(" received message on DBRouteCh, op:", info.Op))
 			if info.Op == "add" {
 				ribdServiceHandler.WriteIPv4RouteStateEntryToDB(info.OrigConfigObject.(RouteDBInfo))
 			} else if info.Op == "addv6" {
-				logger.Info("ipv6 route db write")
 				ribdServiceHandler.WriteIPv6RouteStateEntryToDB(info.OrigConfigObject.(RouteDBInfo))
 			} else if info.Op == "del" {
 				ribdServiceHandler.DelIPv4RouteStateEntryFromDB(info.OrigConfigObject.(RouteDBInfo))
