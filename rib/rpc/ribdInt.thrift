@@ -46,11 +46,12 @@ struct Routes {
     12: 	bool IsPolicyBasedStateValid,
 	13: string RouteCreated,
 	14: string RouteUpdated,
-	15: string RoutePrototypeString
-	16: string DestNetIp
-	17: bool NetworkStatement
-	18: string RouteOrigin
-	19: int Weight
+	15: string RoutePrototypeString,
+	16: string DestNetIp,
+	17: bool NetworkStatement,
+	18: string RouteOrigin,
+	19: int Weight,
+	20: int IPAddrType
 }
 struct RoutesGetInfo {
 	1: int StartIdx,

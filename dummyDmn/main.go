@@ -25,14 +25,13 @@ package main
 
 import (
 	"utils/dmnBase"
-	"utils/keepalive"
 	"l3/dummyDmn/server"
 	"fmt"
 )
 var DummyDmn dmnBase.L3Daemon
 
 func main() {
-	status := DummyDmn.Init()
+	status := DummyDmn.Init("dmnd", "DUMMY")
 	DummyDmn.Logger.Info(fmt.Sprintln("Init done with status", status))
 	if status == false {
 		fmt.Println("Init failed")
@@ -40,12 +39,16 @@ func main() {
 	}
 	dummyServer := server.NewDummyServer(DummyDmn)
 
-	dummyServer.StartServer()
+	go dummyServer.StartServer()
     <-dummyServer.ServerStartedCh
 	
 	DummyDmn.Logger.Info("Dummy server started")
 	
 	// Start keepalive routine
-	go keepalive.InitKeepAlive("dmnd", DummyDmn.FSDaemon.ParamsDir)
-	DummyDmn.Logger.Println("keepalive started")
+	DummyDmn.Logger.Println("Starting KeepAlive")
+	DummyDmn.StartKeepAlive()
+	
+	//simulate rpc.StartServer()
+	for {
+	}
 }

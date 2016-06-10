@@ -454,6 +454,7 @@ func (server *OSPFServer) floodSummaryLsa(pkt []byte, areaid uint32) {
 			continue
 		}
 		ifArea := convertIPv4ToUint32(intf.IfAreaId)
+		//isStub := server.isStubArea(areaid)
 		if ifArea == areaid {
 			// flood to your own area
 			nbrMdata, ok := ospfIntfToNbrMap[key]
@@ -513,7 +514,12 @@ func (server *OSPFServer) floodASExternalLsa(pkt []byte) {
 		if !ok {
 			continue
 		}
-		// TODO check for stub area
+		areaId := config.AreaId(convertIPInByteToString(intf.IfAreaId))
+		isStub := server.isStubArea(areaId)
+		if isStub {
+			server.logger.Info(fmt.Sprintln("ASBR: Dont flood AS external as area is stub ", areaId))
+			continue
+		}
 		nbrMdata, ok := ospfIntfToNbrMap[key]
 		if ok && len(nbrMdata.nbrList) > 0 {
 			send_pkt := server.BuildLsaUpdPkt(key, intf, dstMac, dstIp, len(pkt), pkt)
