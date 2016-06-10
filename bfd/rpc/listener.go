@@ -13,13 +13,13 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 package rpc
 
@@ -28,7 +28,7 @@ import (
 	"fmt"
 	"github.com/garyburd/redigo/redis"
 	"l3/bfd/server"
-	"models"
+	"models/objects"
 	"utils/logging"
 )
 
@@ -47,7 +47,7 @@ func NewBFDHandler(logger *logging.Writer, server *server.BFDServer) *BFDHandler
 func (h *BFDHandler) ReadGlobalConfigFromDB(dbHdl redis.Conn) error {
 	h.logger.Info("Reading BfdGlobal")
 	if dbHdl != nil {
-		var dbObj models.BfdGlobal
+		var dbObj objects.BfdGlobal
 		objList, err := dbObj.GetAllObjFromDb(dbHdl)
 		if err != nil {
 			h.logger.Err("DB query failed for global config")
@@ -55,8 +55,8 @@ func (h *BFDHandler) ReadGlobalConfigFromDB(dbHdl redis.Conn) error {
 		}
 		for idx := 0; idx < len(objList); idx++ {
 			obj := bfdd.NewBfdGlobal()
-			dbObject := objList[idx].(models.BfdGlobal)
-			models.ConvertbfddBfdGlobalObjToThrift(&dbObject, obj)
+			dbObject := objList[idx].(objects.BfdGlobal)
+			objects.ConvertbfddBfdGlobalObjToThrift(&dbObject, obj)
 			rv, _ := h.CreateBfdGlobal(obj)
 			if rv == false {
 				h.logger.Err("BfdGlobal create failed")
@@ -69,7 +69,7 @@ func (h *BFDHandler) ReadGlobalConfigFromDB(dbHdl redis.Conn) error {
 func (h *BFDHandler) ReadSessionParamConfigFromDB(dbHdl redis.Conn) error {
 	h.logger.Info("Reading BfdSessionParam")
 	if dbHdl != nil {
-		var dbObj models.BfdSessionParam
+		var dbObj objects.BfdSessionParam
 		objList, err := dbObj.GetAllObjFromDb(dbHdl)
 		if err != nil {
 			h.logger.Err("DB query failed for session param config")
@@ -77,8 +77,8 @@ func (h *BFDHandler) ReadSessionParamConfigFromDB(dbHdl redis.Conn) error {
 		}
 		for idx := 0; idx < len(objList); idx++ {
 			obj := bfdd.NewBfdSessionParam()
-			dbObject := objList[idx].(models.BfdSessionParam)
-			models.ConvertbfddBfdSessionParamObjToThrift(&dbObject, obj)
+			dbObject := objList[idx].(objects.BfdSessionParam)
+			objects.ConvertbfddBfdSessionParamObjToThrift(&dbObject, obj)
 			rv, _ := h.CreateBfdSessionParam(obj)
 			if rv == false {
 				h.logger.Err(fmt.Sprintln("BfdSessionParam create failed for ", dbObject.Name))
@@ -91,7 +91,7 @@ func (h *BFDHandler) ReadSessionParamConfigFromDB(dbHdl redis.Conn) error {
 func (h *BFDHandler) ReadSessionConfigFromDB(dbHdl redis.Conn) error {
 	h.logger.Info("Reading BfdSession")
 	if dbHdl != nil {
-		var dbObj models.BfdSession
+		var dbObj objects.BfdSession
 		objList, err := dbObj.GetAllObjFromDb(dbHdl)
 		if err != nil {
 			h.logger.Err("DB query failed for session config")
@@ -99,8 +99,8 @@ func (h *BFDHandler) ReadSessionConfigFromDB(dbHdl redis.Conn) error {
 		}
 		for idx := 0; idx < len(objList); idx++ {
 			obj := bfdd.NewBfdSession()
-			dbObject := objList[idx].(models.BfdSession)
-			models.ConvertbfddBfdSessionObjToThrift(&dbObject, obj)
+			dbObject := objList[idx].(objects.BfdSession)
+			objects.ConvertbfddBfdSessionObjToThrift(&dbObject, obj)
 			rv, _ := h.CreateBfdSession(obj)
 			if rv == false {
 				h.logger.Err(fmt.Sprintln("BfdSession create failed for ", dbObject.IpAddr))

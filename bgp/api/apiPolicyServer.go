@@ -13,20 +13,20 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 package api
 
 import (
-	"models"
-	utilspolicy "utils/policy"
+	"models/objects"
 	"sync"
+	utilspolicy "utils/policy"
 )
 
 type PolicyApiLayer struct {
@@ -50,16 +50,16 @@ func getPolicyInstance() *PolicyApiLayer {
  *  with the policy engine server
  */
 func InitPolicy(conditionAddCh chan utilspolicy.PolicyConditionConfig,
-                conditionDelCh chan string) {
+	conditionDelCh chan string) {
 	bgppolicyapi = getPolicyInstance()
 	bgppolicyapi.conditionAddCh = conditionAddCh
 	bgppolicyapi.conditionDelCh = conditionDelCh
 }
 func convertModelsToPolicyConditionConfig(
-	cfg *models.PolicyCondition) utilspolicy.PolicyConditionConfig {
+	cfg *objects.PolicyCondition) utilspolicy.PolicyConditionConfig {
 	condition := utilspolicy.PolicyConditionConfig{}
 	if cfg == nil {
-		return  condition
+		return condition
 	}
 	destIPMatch := utilspolicy.PolicyDstIpMatchPrefixSetCondition{
 		Prefix: utilspolicy.PolicyPrefix{
@@ -74,8 +74,8 @@ func convertModelsToPolicyConditionConfig(
 	}
 }
 
-func SendPolicyConditionNotification(add *models.PolicyCondition, remove *models.PolicyCondition, update *models.PolicyCondition) {
-    if add != nil {  //conditionAdd
+func SendPolicyConditionNotification(add *objects.PolicyCondition, remove *objects.PolicyCondition, update *objects.PolicyCondition) {
+	if add != nil { //conditionAdd
 		bgppolicyapi.conditionAddCh <- convertModelsToPolicyConditionConfig(add)
 	} else if remove != nil {
 		bgppolicyapi.conditionDelCh <- (convertModelsToPolicyConditionConfig(remove)).Name
