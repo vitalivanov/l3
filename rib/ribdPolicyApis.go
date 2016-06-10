@@ -13,13 +13,13 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 // policyApis.go
 package main
@@ -53,7 +53,7 @@ func (m RIBDServicesHandler) ProcessPolicyStmtConfigCreate(cfg *ribd.PolicyStmt)
 	logger.Info(fmt.Sprintln("ProcessPolicyStatementCreate:CreatePolicyStatement"))
 	newPolicyStmt := policy.PolicyStmtConfig{Name: cfg.Name, MatchConditions: cfg.MatchConditions}
 	newPolicyStmt.Actions = make([]string, 0)
-	newPolicyStmt.Actions = append(newPolicyStmt.Actions,cfg.Action)
+	newPolicyStmt.Actions = append(newPolicyStmt.Actions, cfg.Action)
 	newPolicyStmt.Conditions = make([]string, 0)
 	for i := 0; i < len(cfg.Conditions); i++ {
 		newPolicyStmt.Conditions = append(newPolicyStmt.Conditions, cfg.Conditions[i])
