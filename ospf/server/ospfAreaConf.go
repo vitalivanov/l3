@@ -13,13 +13,13 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 package server
 
@@ -38,8 +38,8 @@ type AreaConf struct {
 	AuthType                            config.AuthType
 	ImportAsExtern                      config.ImportAsExtern
 	AreaSummary                         config.AreaSummary
+	StubDefaultCost                     int32
 	AreaNssaTranslatorRole              config.NssaTranslatorRole
-	AreaNssaTranslatorStabilityInterval config.PositiveInteger
 	TransitCapability                   bool
 	IntfListMap                         map[IntfConfKey]bool
 }
@@ -63,8 +63,8 @@ func (server *OSPFServer) processAreaConfig(areaConf config.AreaConf) error {
 	ent.AuthType = areaConf.AuthType
 	ent.ImportAsExtern = areaConf.ImportAsExtern
 	ent.AreaSummary = areaConf.AreaSummary
+	ent.StubDefaultCost = areaConf.StubDefaultCost
 	ent.AreaNssaTranslatorRole = areaConf.AreaNssaTranslatorRole
-	ent.AreaNssaTranslatorStabilityInterval = areaConf.AreaNssaTranslatorStabilityInterval
 	ent.IntfListMap = make(map[IntfConfKey]bool)
 	server.AreaConfMap[areaConfKey] = ent
 	server.initAreaStateSlice(areaConfKey)
@@ -84,8 +84,8 @@ func (server *OSPFServer) initAreaConfDefault() {
 		ent.AuthType = config.NoAuth
 		ent.ImportAsExtern = config.ImportExternal
 		ent.AreaSummary = config.NoAreaSummary
+		ent.StubDefaultCost = 20
 		ent.AreaNssaTranslatorRole = config.Candidate
-		ent.AreaNssaTranslatorStabilityInterval = config.PositiveInteger(40)
 		ent.IntfListMap = make(map[IntfConfKey]bool)
 		server.AreaConfMap[areaConfKey] = ent
 	}
@@ -95,7 +95,7 @@ func (server *OSPFServer) initAreaConfDefault() {
 
 func (server *OSPFServer) initAreaStateSlice(key AreaConfKey) {
 	//server.AreaStateMutex.Lock()
-	server.logger.Info("Initializing area slice")
+	server.logger.Info(fmt.Sprintln("Initializing area slice", key))
 	ent, exist := server.AreaStateMap[key]
 	ent.SpfRuns = 0
 	ent.AreaBdrRtrCount = 0
@@ -204,4 +204,20 @@ func (server *OSPFServer) updateIfABR() {
 		server.ospfGlobalConf.isABR = false
 		server.ospfGlobalConf.AreaBdrRtrStatus = false
 	}
+}
+
+func (server *OSPFServer) isStubArea(areaid config.AreaId) bool {
+
+	areaConfKey := AreaConfKey{
+		AreaId: areaid,
+	}
+
+	conf, exist := server.AreaConfMap[areaConfKey]
+	if !exist {
+		return false
+	}
+	if conf.ImportAsExtern == config.ImportNoExternal {
+		return true
+	}
+	return false
 }
