@@ -28,9 +28,7 @@ import (
 	"fmt"
 	"l3/ospf/config"
 	"ospfd"
-	//    "l3/ospf/server"
-	//    "utils/logging"
-	//    "net"
+	"strings"
 )
 
 func (h *OSPFHandler) SendOspfGlobal(ospfGlobalConf *ospfd.OspfGlobal) error {
@@ -54,7 +52,6 @@ func (h *OSPFHandler) SendOspfIfConf(ospfIfConf *ospfd.OspfIfEntry) error {
 		IfIpAddress:       config.IpAddress(ospfIfConf.IfIpAddress),
 		AddressLessIf:     config.InterfaceIndexOrZero(ospfIfConf.AddressLessIf),
 		IfAreaId:          config.AreaId(ospfIfConf.IfAreaId),
-		IfType:            config.IfType(ospfIfConf.IfType),
 		IfAdminStat:       config.Status(ospfIfConf.IfAdminStat),
 		IfRtrPriority:     config.DesignatedRouterPriority(ospfIfConf.IfRtrPriority),
 		IfTransitDelay:    config.UpToMaxAge(ospfIfConf.IfTransitDelay),
@@ -66,6 +63,12 @@ func (h *OSPFHandler) SendOspfIfConf(ospfIfConf *ospfd.OspfIfEntry) error {
 		IfAuthType:        config.AuthType(ospfIfConf.IfAuthType),
 	}
 
+	for index, ifName := range config.IfTypeList {
+		if strings.EqualFold(ospfIfConf.IfType, ifName) {
+			ifConf.IfType = config.IfType(index)
+			break
+		}
+	}
 	h.server.IntfConfigCh <- ifConf
 
 	//retMsg := <-h.server.IntfConfigRetCh
@@ -80,6 +83,7 @@ func (h *OSPFHandler) SendOspfAreaConf(ospfAreaConf *ospfd.OspfAreaEntry) error 
 		AuthType:               config.AuthType(ospfAreaConf.AuthType),
 		ImportAsExtern:         config.ImportAsExtern(ospfAreaConf.ImportAsExtern),
 		AreaSummary:            config.AreaSummary(ospfAreaConf.AreaSummary),
+		StubDefaultCost:        ospfAreaConf.StubDefaultCost,
 		AreaNssaTranslatorRole: config.NssaTranslatorRole(ospfAreaConf.AreaNssaTranslatorRole),
 	}
 
@@ -125,11 +129,6 @@ func (h *OSPFHandler) CreateOspfAreaEntry(ospfAreaConf *ospfd.OspfAreaEntry) (bo
 	if err != nil {
 		return false, err
 	}
-	return true, nil
-}
-
-func (h *OSPFHandler) CreateOspfStubAreaEntry(ospfStubAreaConf *ospfd.OspfStubAreaEntry) (bool, error) {
-	h.logger.Info(fmt.Sprintln("Create Stub Area config attrs:", ospfStubAreaConf))
 	return true, nil
 }
 

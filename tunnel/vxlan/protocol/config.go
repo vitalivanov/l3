@@ -104,25 +104,12 @@ func (s *VXLANServer) ConvertVxlanInstanceToVxlanConfig(c *vxland.VxlanInstance)
 func (s *VXLANServer) ConvertVxlanVtepInstanceToVtepConfig(c *vxland.VxlanVtepInstances) (*VtepConfig, error) {
 
 	DstNetMac, _ := net.ParseMAC(c.DstMac)
-
-	var mac net.HardwareAddr
-	var ip net.IP
-	var name string
-	var ok bool
-	if c.SrcIp == "" || c.SrcMac == "" {
-		ok, name, mac, ip = s.getLoopbackInfo()
-		if !ok {
-			errorstr := "VTEP: Src Tunnel Info not provisioned yet, loopback intf needed"
-			s.logger.Info(errorstr)
-			return &VtepConfig{}, errors.New(errorstr)
-		}
-		if c.SrcMac == "" {
-			mac, _ = net.ParseMAC(c.SrcMac)
-		}
-		if c.SrcIp == "" {
-			ip = net.ParseIP(c.SrcIp)
-		}
-
+ 
+	ok, name, mac, ip := s.getLoopbackInfo()       
+	if !ok {
+               errorstr := "VTEP: Src Tunnel Info not provisioned yet, loopback intf needed"
+               s.logger.Info(errorstr)
+               return &VtepConfig{}, errors.New(errorstr)
 	}
 
 	srcName := s.getLinuxIfName(c.SrcIfIndex)
@@ -137,10 +124,6 @@ func (s *VXLANServer) ConvertVxlanVtepInstanceToVtepConfig(c *vxland.VxlanVtepIn
 		TTL:       uint16(c.TTL),
 		TOS:       uint16(c.TOS),
 		InnerVlanHandlingMode: ConvertInt32ToBool(c.InnerVlanHandlingMode),
-		Learning:              c.Learning,
-		Rsc:                   c.Rsc,
-		L2miss:                c.L2miss,
-		L3miss:                c.L3miss,
 		TunnelSrcIp:           ip,
 		TunnelDstIp:           net.ParseIP(c.DstIp),
 		VlanId:                uint16(c.VlanId),
