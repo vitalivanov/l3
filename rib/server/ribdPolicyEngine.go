@@ -13,13 +13,13 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 // ribdPolicyEngine.go
 package server
@@ -35,8 +35,9 @@ import (
 	"utils/policy"
 	"utils/policy/policyCommonDefs"
 )
+
 /*
-    Index of policy entity
+   Index of policy entity
 */
 type PolicyRouteIndex struct {
 	destNetIP string //CIDR format
@@ -44,10 +45,10 @@ type PolicyRouteIndex struct {
 }
 
 /*
-    data-structure used to communicate with policy engine
+   data-structure used to communicate with policy engine
 */
 type RouteParams struct {
-	ipType      IPType
+	ipType         IPType
 	destNetIp      string
 	networkMask    string
 	nextHopIp      string
@@ -333,7 +334,7 @@ func policyEngineUpdateRoute(prefix patriciaDB.Prefix, item patriciaDB.Item, han
 	cfg.NextHop = append(cfg.NextHop, &nextHop)
 	//Even though we could potentially have multiple selected routes, calling update once for this prefix should suffice
 	//routeServiceHandler.UpdateIPv4Route(&cfg, nil, nil)
-	RouteServiceHandler.ProcessRouteUpdateConfig(&cfg, &cfg, nil,selectedRouteInfoRecord.ipType)
+	RouteServiceHandler.ProcessRouteUpdateConfig(&cfg, &cfg, nil, selectedRouteInfoRecord.ipType)
 	return err
 }
 func policyEngineTraverseAndUpdate() {
