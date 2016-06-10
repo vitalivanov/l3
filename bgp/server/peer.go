@@ -90,7 +90,6 @@ func (p *Peer) Init() {
 	}
 
 	go p.fsmManager.Init()
-	p.ProcessBfd(true)
 }
 
 func (p *Peer) Cleanup() {
@@ -233,6 +232,7 @@ func (p *Peer) PeerConnEstablished(conn *net.Conn) {
 	p.NeighborConf.Neighbor.Transport.Config.LocalAddress = net.ParseIP(host)
 	p.NeighborConf.PeerConnEstablished()
 	p.clearRibOut()
+	p.ProcessBfd(true)
 	//p.Server.PeerConnEstCh <- p.Neighbor.NeighborAddress.String()
 }
 
