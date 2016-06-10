@@ -268,7 +268,7 @@ func (session *BfdSession) ProcessBfdPacket(bfdPacket *BfdControlPacket) error {
 		session.server.logger.Info(fmt.Sprintln("Can't process received bfd packet for session ", session.state.SessionId))
 		return nil
 	}
-	if session.state.SessionState == STATE_UP || session.state.RemoteSessionState == STATE_UP {
+	if session.state.SessionState == STATE_UP && session.state.RemoteSessionState == STATE_UP {
 		session.rxInterval = (int32(bfdPacket.DesiredMinTxInterval) * int32(bfdPacket.DetectMult)) / 1000
 	} else {
 		session.rxInterval = (STARTUP_RX_INTERVAL * int32(bfdPacket.DetectMult)) / 1000
@@ -276,13 +276,13 @@ func (session *BfdSession) ProcessBfdPacket(bfdPacket *BfdControlPacket) error {
 	session.CheckAnyRemoteParamChanged(bfdPacket)
 	session.RemoteChangedDemandMode(bfdPacket)
 	session.ProcessPollSequence(bfdPacket)
-	if session.rxInterval == 0 {
+	if session.rxInterval == 0 ||
+		session.state.SessionState == STATE_ADMIN_DOWN ||
+		session.state.RemoteSessionState == STATE_ADMIN_DOWN {
 		session.sessionTimer.Stop()
 	} else {
-		if session.state.SessionState != STATE_ADMIN_DOWN &&
-			session.state.RemoteSessionState != STATE_ADMIN_DOWN {
-			session.sessionTimer.Reset(time.Duration(session.rxInterval) * time.Millisecond)
-		}
+		session.sessionTimer.Reset(time.Duration(session.rxInterval) * time.Millisecond)
+		//session.server.logger.Info(fmt.Sprintln("Reset rxtimer for session ", session.state.SessionId, " to ", session.rxInterval))
 	}
 	switch session.state.RemoteSessionState {
 	case STATE_DOWN:
@@ -548,6 +548,7 @@ func (session *BfdSession) SendPeriodicControlPackets() {
 		session.txInterval = session.state.DesiredMinTxInterval / 1000
 	}
 	txTimer := session.ApplyTxJitter()
+	//session.server.logger.Info(fmt.Sprintln("Reset txtimer for session ", session.state.SessionId, " to ", txTimer))
 	session.txTimer.Reset(time.Duration(txTimer) * time.Millisecond)
 }
 
