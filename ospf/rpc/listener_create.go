@@ -64,10 +64,10 @@ func (h *OSPFHandler) SendOspfIfConf(ospfIfConf *ospfd.OspfIfEntry) error {
 	}
 
 	for index, ifName := range config.IfTypeList {
-	if strings.EqualFold(ospfIfConf.IfType, ifName) {
-		ifConf.IfType = config.IfType(index)
-		break
-	    }
+		if strings.EqualFold(ospfIfConf.IfType, ifName) {
+			ifConf.IfType = config.IfType(index)
+			break
+		}
 	}
 	h.server.IntfConfigCh <- ifConf
 
@@ -83,6 +83,7 @@ func (h *OSPFHandler) SendOspfAreaConf(ospfAreaConf *ospfd.OspfAreaEntry) error 
 		AuthType:               config.AuthType(ospfAreaConf.AuthType),
 		ImportAsExtern:         config.ImportAsExtern(ospfAreaConf.ImportAsExtern),
 		AreaSummary:            config.AreaSummary(ospfAreaConf.AreaSummary),
+		StubDefaultCost:        ospfAreaConf.StubDefaultCost,
 		AreaNssaTranslatorRole: config.NssaTranslatorRole(ospfAreaConf.AreaNssaTranslatorRole),
 	}
 
@@ -128,11 +129,6 @@ func (h *OSPFHandler) CreateOspfAreaEntry(ospfAreaConf *ospfd.OspfAreaEntry) (bo
 	if err != nil {
 		return false, err
 	}
-	return true, nil
-}
-
-func (h *OSPFHandler) CreateOspfStubAreaEntry(ospfStubAreaConf *ospfd.OspfStubAreaEntry) (bool, error) {
-	h.logger.Info(fmt.Sprintln("Create Stub Area config attrs:", ospfStubAreaConf))
 	return true, nil
 }
 

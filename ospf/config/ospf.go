@@ -125,14 +125,14 @@ const (
 	Stub              IfType = 6
 )
 
-var IfTypeList = [] string {
-"Undefined",
-"Broadcast",
-"Nbma",
-"NumberedP2P",
-"UnnumberedP2P",
-"PointToMultipoint",
-"Stub"}
+var IfTypeList = []string{
+	"Undefined",
+	"Broadcast",
+	"Nbma",
+	"NumberedP2P",
+	"UnnumberedP2P",
+	"PointToMultipoint",
+	"Stub"}
 
 type MulticastForwarding int
 
@@ -208,16 +208,16 @@ const (
 	NbrFull          NbrState = 8
 )
 
-var NbrStateList = []string {
-"Undef",
-"NbrDown",
-"NbrAttempt",
-"NbrInit",
-"NbrTwoWay",
-"NbrExchangeStart",
-"NbrExchange",
-"NbrLoading",
-"NbrFull"}
+var NbrStateList = []string{
+	"Undef",
+	"NbrDown",
+	"NbrAttempt",
+	"NbrInit",
+	"NbrTwoWay",
+	"NbrExchangeStart",
+	"NbrExchange",
+	"NbrLoading",
+	"NbrFull"}
 
 type NbrEvent int
 
@@ -274,12 +274,12 @@ type GlobalState struct {
 
 // Indexed By AreaId
 type AreaConf struct {
-	AreaId                              AreaId
-	AuthType                            AuthType
-	ImportAsExtern                      ImportAsExtern
-	AreaSummary                         AreaSummary
-	AreaNssaTranslatorRole              NssaTranslatorRole
-	AreaNssaTranslatorStabilityInterval PositiveInteger
+	AreaId                 AreaId
+	AuthType               AuthType
+	ImportAsExtern         ImportAsExtern
+	AreaSummary            AreaSummary
+	StubDefaultCost        int32
+	AreaNssaTranslatorRole NssaTranslatorRole
 }
 
 type AreaState struct {
