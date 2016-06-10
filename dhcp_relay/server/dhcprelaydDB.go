@@ -13,20 +13,20 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 package relayServer
 
 import (
 	"dhcprelayd"
 	"fmt"
-	"models"
+	"models/objects"
 	"utils/dbutils"
 )
 
@@ -51,7 +51,7 @@ func DhcpRelayAgentReadDB() {
 	}
 	/*  First reading Dhcp Relay Global Config
 	 */
-	var dbObj models.DhcpRelayGlobal
+	var dbObj objects.DhcpRelayGlobal
 	objList, err := dbObj.GetAllObjFromDb(dhcprelayDbHdl)
 	if err != nil {
 		logger.Warning("DB querry failed for Dhcp Relay Global Config")
@@ -59,8 +59,8 @@ func DhcpRelayAgentReadDB() {
 	}
 	for idx := 0; idx < len(objList); idx++ {
 		obj := dhcprelayd.NewDhcpRelayGlobal()
-		dbObject := objList[idx].(models.DhcpRelayGlobal)
-		models.ConvertdhcprelaydDhcpRelayGlobalObjToThrift(&dbObject, obj)
+		dbObject := objList[idx].(objects.DhcpRelayGlobal)
+		objects.ConvertdhcprelaydDhcpRelayGlobalObjToThrift(&dbObject, obj)
 		DhcpRelayGlobalInit(bool(obj.Enable))
 	}
 
@@ -68,7 +68,7 @@ func DhcpRelayAgentReadDB() {
 	 *  As we are using redis DB, we will get the server ip list automatically..
 	 */
 	readIfIndex := make([]int32, 0)
-	var intfDbObj models.DhcpRelayIntf
+	var intfDbObj objects.DhcpRelayIntf
 	objList, err = intfDbObj.GetAllObjFromDb(dhcprelayDbHdl)
 	if err != nil {
 		logger.Warning("DB querry failed for Dhcp Relay Intf Config")
@@ -76,8 +76,8 @@ func DhcpRelayAgentReadDB() {
 	}
 	for idx := 0; idx < len(objList); idx++ {
 		obj := dhcprelayd.NewDhcpRelayIntf()
-		dbObject := objList[idx].(models.DhcpRelayIntf)
-		models.ConvertdhcprelaydDhcpRelayIntfObjToThrift(&dbObject, obj)
+		dbObject := objList[idx].(objects.DhcpRelayIntf)
+		objects.ConvertdhcprelaydDhcpRelayIntfObjToThrift(&dbObject, obj)
 		IfIndex := int32(obj.IfIndex)
 		Enable := bool(obj.Enable)
 		DhcpRelayAgentInitGblHandling(IfIndex, Enable)

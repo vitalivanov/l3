@@ -443,13 +443,13 @@ func (p *Peer) SendUpdate(updated map[*bgprib.Path][]*bgprib.Destination,
 		p.logger.Info(fmt.Sprintf("Neighbor %s: Send update message withdraw routes:%+v",
 			p.NeighborConf.Neighbor.NeighborAddress, withdrawList))
 		updateMsg := packet.NewBGPUpdateMessage(withdrawList, nil, nil)
-		p.sendUpdateMsg(updateMsg.Clone(), withdrawPath)
+		p.sendUpdateMsg(updateMsg.Clone(), nil)
 		withdrawList = withdrawList[:0]
 	}
 
 	for path, nlriList := range newUpdated {
-		p.logger.Info(fmt.Sprintf("Neighbor %s: Send update message valid routes:%+v",
-			p.NeighborConf.Neighbor.NeighborAddress, nlriList))
+		p.logger.Info(fmt.Sprintf("Neighbor %s: Send update message valid routes:%+v, path attrs:%+v",
+			p.NeighborConf.Neighbor.NeighborAddress, nlriList, path.PathAttrs))
 		updateMsg := packet.NewBGPUpdateMessage(make([]packet.NLRI, 0), path.PathAttrs, nlriList)
 		p.sendUpdateMsg(updateMsg.Clone(), path)
 	}

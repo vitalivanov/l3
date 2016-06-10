@@ -13,13 +13,13 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 // ribdPolicyServer.go
 package server
@@ -29,17 +29,18 @@ import (
 	"fmt"
 	"github.com/op/go-nanomsg"
 	"l3/rib/ribdCommonDefs"
-	"models"
+	"models/objects"
 	"ribd"
 )
+
 /*
-    Function to send PolicyCondition Notification
+   Function to send PolicyCondition Notification
 */
 func (ribdServiceHandler *RIBDServer) PolicyConditionNotificationSend(PUB *nanomsg.PubSocket, cfg ribd.PolicyCondition, evt int) {
 	logger.Println("PolicyConditionNotificationSend")
-	msgBuf := models.PolicyCondition{}
-	models.ConvertThriftToribdPolicyConditionObj(&cfg, &msgBuf)
-	/*	msgBuf := models.PolicyConditionConfig{
+	msgBuf := objects.PolicyCondition{}
+	objects.ConvertThriftToribdPolicyConditionObj(&cfg, &msgBuf)
+	/*	msgBuf := objects.PolicyConditionConfig{
 				Name : cfg.Name,
 				ConditionType   :cfg.ConditionType,
 				Protocol        : cfg.Protocol,
@@ -65,13 +66,13 @@ func (ribdServiceHandler *RIBDServer) PolicyConditionNotificationSend(PUB *nanom
 }
 
 /*
-    Function to send PolicyStmt Notification
+   Function to send PolicyStmt Notification
 */
 func (ribdServiceHandler *RIBDServer) PolicyStmtNotificationSend(PUB *nanomsg.PubSocket, cfg ribd.PolicyStmt, evt int) {
 	logger.Println("PolicyStmtNotificationSend")
-	msgBuf := models.PolicyStmt{}
-	models.ConvertThriftToribdPolicyStmtObj(&cfg, &msgBuf)
-	/*	msgBuf := models.PolicyStmtConfig{
+	msgBuf := objects.PolicyStmt{}
+	objects.ConvertThriftToribdPolicyStmtObj(&cfg, &msgBuf)
+	/*	msgBuf := objects.PolicyStmtConfig{
 					Name               : cfg.Name,
 					MatchConditions    : cfg.MatchConditions,
 					Action             : cfg.Action
@@ -99,13 +100,13 @@ func (ribdServiceHandler *RIBDServer) PolicyStmtNotificationSend(PUB *nanomsg.Pu
 }
 
 /*
-    Function to send PolicyDefinition Notification
+   Function to send PolicyDefinition Notification
 */
 func (ribdServiceHandler *RIBDServer) PolicyDefinitionNotificationSend(PUB *nanomsg.PubSocket, cfg ribd.PolicyDefinition, evt int) {
 	logger.Println("PolicyDefinitionNotificationSend")
-	msgBuf := models.PolicyDefinition{}
-	models.ConvertThriftToribdPolicyDefinitionObj(&cfg, &msgBuf)
-	/*	msgBuf := models.PolicyDefinitionConfig{
+	msgBuf := objects.PolicyDefinition{}
+	objects.ConvertThriftToribdPolicyDefinitionObj(&cfg, &msgBuf)
+	/*	msgBuf := objects.PolicyDefinitionConfig{
 					Name        : cfg.Name,
 					Priority    : cfg.Priority,
 					MatchType             : cfg.MatchType,
@@ -135,6 +136,7 @@ func (ribdServiceHandler *RIBDServer) PolicyDefinitionNotificationSend(PUB *nano
 	logger.Debug(fmt.Sprintln("Adding ", evtStr, " to notification channel"))
 	ribdServiceHandler.NotificationChannel <- NotificationMsg{PUB, buf, eventInfo}
 }
+
 /*
    Handles all policy object config based server updates. The flow is:
                                                policyChannels
@@ -142,8 +144,8 @@ func (ribdServiceHandler *RIBDServer) PolicyDefinitionNotificationSend(PUB *nano
                                                                  |
                                                               policy objects updated in RIB's GlobalpolicyEngine
 													      send events to applications about these object configs
-														 policy objects updated in RIB's local policy engine which 
-														 functions as filter		 																
+														 policy objects updated in RIB's local policy engine which
+														 functions as filter
 */
 func (ribdServiceHandler *RIBDServer) StartPolicyServer() {
 	logger.Debug("Starting the policy server loop")
@@ -152,51 +154,51 @@ func (ribdServiceHandler *RIBDServer) StartPolicyServer() {
 		case condConf := <-ribdServiceHandler.PolicyConditionConfCh:
 			logger.Debug(fmt.Sprintln("received message on PolicyConditionConfCh channel, op: ", condConf.Op))
 			if condConf.Op == "add" {
-			    _, err := ribdServiceHandler.ProcessPolicyConditionConfigCreate(condConf.OrigConfigObject.(*ribd.PolicyCondition), ribdServiceHandler.GlobalPolicyEngineDB)
-			    if err == nil {
-				    ribdServiceHandler.PolicyConditionNotificationSend(RIBD_POLICY_PUB, *(condConf.OrigConfigObject.(*ribd.PolicyCondition)), ribdCommonDefs.NOTIFY_POLICY_CONDITION_CREATED)
-				    ribdServiceHandler.ProcessPolicyConditionConfigCreate(condConf.OrigConfigObject.(*ribd.PolicyCondition), ribdServiceHandler.PolicyEngineDB)
-			    }
+				_, err := ribdServiceHandler.ProcessPolicyConditionConfigCreate(condConf.OrigConfigObject.(*ribd.PolicyCondition), ribdServiceHandler.GlobalPolicyEngineDB)
+				if err == nil {
+					ribdServiceHandler.PolicyConditionNotificationSend(RIBD_POLICY_PUB, *(condConf.OrigConfigObject.(*ribd.PolicyCondition)), ribdCommonDefs.NOTIFY_POLICY_CONDITION_CREATED)
+					ribdServiceHandler.ProcessPolicyConditionConfigCreate(condConf.OrigConfigObject.(*ribd.PolicyCondition), ribdServiceHandler.PolicyEngineDB)
+				}
 			} else if condConf.Op == "del" {
-			    _, err := ribdServiceHandler.ProcessPolicyConditionConfigDelete(condConf.OrigConfigObject.(*ribd.PolicyCondition), ribdServiceHandler.GlobalPolicyEngineDB)
-			    if err == nil {
-				    ribdServiceHandler.PolicyConditionNotificationSend(RIBD_POLICY_PUB, *(condConf.OrigConfigObject.(*ribd.PolicyCondition)), ribdCommonDefs.NOTIFY_POLICY_CONDITION_DELETED)
-				    ribdServiceHandler.ProcessPolicyConditionConfigDelete(condConf.OrigConfigObject.(*ribd.PolicyCondition), ribdServiceHandler.PolicyEngineDB)
-			    }
+				_, err := ribdServiceHandler.ProcessPolicyConditionConfigDelete(condConf.OrigConfigObject.(*ribd.PolicyCondition), ribdServiceHandler.GlobalPolicyEngineDB)
+				if err == nil {
+					ribdServiceHandler.PolicyConditionNotificationSend(RIBD_POLICY_PUB, *(condConf.OrigConfigObject.(*ribd.PolicyCondition)), ribdCommonDefs.NOTIFY_POLICY_CONDITION_DELETED)
+					ribdServiceHandler.ProcessPolicyConditionConfigDelete(condConf.OrigConfigObject.(*ribd.PolicyCondition), ribdServiceHandler.PolicyEngineDB)
+				}
 			}
 		case stmtConf := <-ribdServiceHandler.PolicyStmtConfCh:
 			logger.Debug(fmt.Sprintln("received message on PolicyStmtConfCh channel, op: ", stmtConf.Op))
 			if stmtConf.Op == "add" {
-			    err := ribdServiceHandler.ProcessPolicyStmtConfigCreate(stmtConf.OrigConfigObject.(*ribd.PolicyStmt), GlobalPolicyEngineDB)
-			    if err == nil {
-				    ribdServiceHandler.PolicyStmtNotificationSend(RIBD_POLICY_PUB, *(stmtConf.OrigConfigObject.(*ribd.PolicyStmt)), ribdCommonDefs.NOTIFY_POLICY_STMT_CREATED)
-				    ribdServiceHandler.ProcessPolicyStmtConfigCreate(stmtConf.OrigConfigObject.(*ribd.PolicyStmt), ribdServiceHandler.PolicyEngineDB)
-			    }
+				err := ribdServiceHandler.ProcessPolicyStmtConfigCreate(stmtConf.OrigConfigObject.(*ribd.PolicyStmt), GlobalPolicyEngineDB)
+				if err == nil {
+					ribdServiceHandler.PolicyStmtNotificationSend(RIBD_POLICY_PUB, *(stmtConf.OrigConfigObject.(*ribd.PolicyStmt)), ribdCommonDefs.NOTIFY_POLICY_STMT_CREATED)
+					ribdServiceHandler.ProcessPolicyStmtConfigCreate(stmtConf.OrigConfigObject.(*ribd.PolicyStmt), ribdServiceHandler.PolicyEngineDB)
+				}
 			} else if stmtConf.Op == "del" {
-			    err := ribdServiceHandler.ProcessPolicyStmtConfigDelete(stmtConf.OrigConfigObject.(*ribd.PolicyStmt), GlobalPolicyEngineDB)
-			    if err == nil {
-				    ribdServiceHandler.PolicyStmtNotificationSend(RIBD_POLICY_PUB, *(stmtConf.OrigConfigObject.(*ribd.PolicyStmt)), ribdCommonDefs.NOTIFY_POLICY_STMT_DELETED)
-				    ribdServiceHandler.ProcessPolicyStmtConfigDelete(stmtConf.OrigConfigObject.(*ribd.PolicyStmt), ribdServiceHandler.PolicyEngineDB)
-			    }
+				err := ribdServiceHandler.ProcessPolicyStmtConfigDelete(stmtConf.OrigConfigObject.(*ribd.PolicyStmt), GlobalPolicyEngineDB)
+				if err == nil {
+					ribdServiceHandler.PolicyStmtNotificationSend(RIBD_POLICY_PUB, *(stmtConf.OrigConfigObject.(*ribd.PolicyStmt)), ribdCommonDefs.NOTIFY_POLICY_STMT_DELETED)
+					ribdServiceHandler.ProcessPolicyStmtConfigDelete(stmtConf.OrigConfigObject.(*ribd.PolicyStmt), ribdServiceHandler.PolicyEngineDB)
+				}
 			}
 		case policyConf := <-ribdServiceHandler.PolicyDefinitionConfCh:
 			logger.Debug(fmt.Sprintln("received message on PolicyDefinitionConfCh channel, op:", policyConf.Op))
 			if policyConf.Op == "add" {
-			    err := ribdServiceHandler.ProcessPolicyDefinitionConfigCreate(policyConf.OrigConfigObject.(*ribd.PolicyDefinition), GlobalPolicyEngineDB)
-			    if err == nil {
-				    ribdServiceHandler.PolicyDefinitionNotificationSend(RIBD_POLICY_PUB, *(policyConf.OrigConfigObject.(*ribd.PolicyDefinition)), ribdCommonDefs.NOTIFY_POLICY_DEFINITION_CREATED)
-				    ribdServiceHandler.ProcessPolicyDefinitionConfigCreate(policyConf.OrigConfigObject.(*ribd.PolicyDefinition), ribdServiceHandler.PolicyEngineDB)
-			    }
+				err := ribdServiceHandler.ProcessPolicyDefinitionConfigCreate(policyConf.OrigConfigObject.(*ribd.PolicyDefinition), GlobalPolicyEngineDB)
+				if err == nil {
+					ribdServiceHandler.PolicyDefinitionNotificationSend(RIBD_POLICY_PUB, *(policyConf.OrigConfigObject.(*ribd.PolicyDefinition)), ribdCommonDefs.NOTIFY_POLICY_DEFINITION_CREATED)
+					ribdServiceHandler.ProcessPolicyDefinitionConfigCreate(policyConf.OrigConfigObject.(*ribd.PolicyDefinition), ribdServiceHandler.PolicyEngineDB)
+				}
 			} else if policyConf.Op == "del" {
-			    err := ribdServiceHandler.ProcessPolicyDefinitionConfigDelete(policyConf.OrigConfigObject.(*ribd.PolicyDefinition), GlobalPolicyEngineDB)
-			    if err == nil {
-				    ribdServiceHandler.PolicyDefinitionNotificationSend(RIBD_POLICY_PUB, *(policyConf.OrigConfigObject.(*ribd.PolicyDefinition)), ribdCommonDefs.NOTIFY_POLICY_DEFINITION_DELETED)
-				    ribdServiceHandler.ProcessPolicyDefinitionConfigDelete(policyConf.OrigConfigObject.(*ribd.PolicyDefinition), ribdServiceHandler.PolicyEngineDB)
-			    }
+				err := ribdServiceHandler.ProcessPolicyDefinitionConfigDelete(policyConf.OrigConfigObject.(*ribd.PolicyDefinition), GlobalPolicyEngineDB)
+				if err == nil {
+					ribdServiceHandler.PolicyDefinitionNotificationSend(RIBD_POLICY_PUB, *(policyConf.OrigConfigObject.(*ribd.PolicyDefinition)), ribdCommonDefs.NOTIFY_POLICY_DEFINITION_DELETED)
+					ribdServiceHandler.ProcessPolicyDefinitionConfigDelete(policyConf.OrigConfigObject.(*ribd.PolicyDefinition), ribdServiceHandler.PolicyEngineDB)
+				}
 			}
 		case info := <-ribdServiceHandler.PolicyUpdateApplyCh:
-		     /*
-			     This channel update/processing occurs when an application applies a policy.
+			/*
+			   This channel update/processing occurs when an application applies a policy.
 			*/
 			logger.Debug("received message on PolicyUpdateApplyCh channel")
 			//update the global policyEngineDB
