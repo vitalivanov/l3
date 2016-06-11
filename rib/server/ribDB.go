@@ -13,68 +13,68 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 // ribDB.go
 package server
 
 import (
 	"fmt"
-	"models"
+	"models/objects"
 	"ribd"
 	"utils/dbutils"
 )
 
 func (ribdServiceHandler *RIBDServer) UpdateRoutesFromDB() (err error) {
 	logger.Debug(fmt.Sprintln("UpdateRoutesFromDB"))
-	ribdServiceHandler.DBRouteCh <- RIBdServerConfig{Op:"fetch"}
-/*	dbHdl := ribdServiceHandler.DbHdl
-	if dbHdl != nil {
-		var dbObjCfg models.IPv4Route
-		objList, err := dbHdl.GetAllObjFromDb(dbObjCfg)
-		if err == nil {
-			logger.Debug(fmt.Sprintln("Number of routes from DB: ", len((objList))))
-			for idx := 0; idx < len(objList); idx++ {
-				obj := ribd.NewIPv4Route()
-				dbObj := objList[idx].(models.IPv4Route)
-				models.ConvertribdIPv4RouteObjToThrift(&dbObj, obj)
-				err = ribdServiceHandler.RouteConfigValidationCheck(obj, "add")
-				if err != nil {
-					logger.Err("Route validation failed when reading from db")
-					continue
+	ribdServiceHandler.DBRouteCh <- RIBdServerConfig{Op: "fetch"}
+	/*	dbHdl := ribdServiceHandler.DbHdl
+		if dbHdl != nil {
+			var dbObjCfg objects.IPv4Route
+			objList, err := dbHdl.GetAllObjFromDb(dbObjCfg)
+			if err == nil {
+				logger.Debug(fmt.Sprintln("Number of routes from DB: ", len((objList))))
+				for idx := 0; idx < len(objList); idx++ {
+					obj := ribd.NewIPv4Route()
+					dbObj := objList[idx].(objects.IPv4Route)
+					objects.ConvertribdIPv4RouteObjToThrift(&dbObj, obj)
+					err = ribdServiceHandler.RouteConfigValidationCheck(obj, "add")
+					if err != nil {
+						logger.Err("Route validation failed when reading from db")
+						continue
+					}
+					rv, _ := ribdServiceHandler.ProcessRouteCreateConfig(obj)
+					if rv == false {
+						logger.Err("IPv4Route create failed during init")
+					}
 				}
-				rv, _ := ribdServiceHandler.ProcessRouteCreateConfig(obj)
-				if rv == false {
-					logger.Err("IPv4Route create failed during init")
-				}
+			} else {
+				logger.Err("DB Query failed during IPv4Route query: RIBd init")
 			}
-		} else {
-			logger.Err("DB Query failed during IPv4Route query: RIBd init")
-		}
-	}*/
+		}*/
 	return err
 }
 
 func (ribdServiceHandler *RIBDServer) UpdateGlobalPolicyConditionsFromDB(dbHdl *dbutils.DBUtil) (err error) {
 	logger.Debug(fmt.Sprintln("UpdateGlobalPolicyConditionsFromDB"))
 	if dbHdl != nil {
-		var dbObjCfg models.PolicyCondition
+		var dbObjCfg objects.PolicyCondition
 		objList, err := dbHdl.GetAllObjFromDb(dbObjCfg)
 		if err == nil {
 			for idx := 0; idx < len(objList); idx++ {
 				obj := ribd.NewPolicyCondition()
-				dbObj := objList[idx].(models.PolicyCondition)
-				models.ConvertribdPolicyConditionObjToThrift(&dbObj, obj)
-	             ribdServiceHandler.PolicyConditionConfCh <-RIBdServerConfig {
-	                                   OrigConfigObject:obj,
-	                                   Op : "add",
-	                              }
+				dbObj := objList[idx].(objects.PolicyCondition)
+				objects.ConvertribdPolicyConditionObjToThrift(&dbObj, obj)
+				ribdServiceHandler.PolicyConditionConfCh <- RIBdServerConfig{
+					OrigConfigObject: obj,
+					Op:               "add",
+				}
 			}
 		} else {
 			logger.Err("DB Query failed during PolicyCondition query: RIBd init")
@@ -85,17 +85,17 @@ func (ribdServiceHandler *RIBDServer) UpdateGlobalPolicyConditionsFromDB(dbHdl *
 func (ribdServiceHandler *RIBDServer) UpdateGlobalPolicyStmtsFromDB(dbHdl *dbutils.DBUtil) (err error) {
 	logger.Debug(fmt.Sprintln("UpdateGlobalPolicyStmtsFromDB"))
 	if dbHdl != nil {
-		var dbObjCfg models.PolicyStmt
+		var dbObjCfg objects.PolicyStmt
 		objList, err := dbHdl.GetAllObjFromDb(dbObjCfg)
 		if err == nil {
 			for idx := 0; idx < len(objList); idx++ {
 				obj := ribd.NewPolicyStmt()
-				dbObj := objList[idx].(models.PolicyStmt)
-				models.ConvertribdPolicyStmtObjToThrift(&dbObj, obj)
-	            ribdServiceHandler.PolicyStmtConfCh <- RIBdServerConfig {
-	                                   OrigConfigObject:obj,
-	                                   Op : "add",
-	                              }
+				dbObj := objList[idx].(objects.PolicyStmt)
+				objects.ConvertribdPolicyStmtObjToThrift(&dbObj, obj)
+				ribdServiceHandler.PolicyStmtConfCh <- RIBdServerConfig{
+					OrigConfigObject: obj,
+					Op:               "add",
+				}
 			}
 		} else {
 			logger.Err("DB Query failed during PolicyStmt query: RIBd init")
@@ -106,17 +106,17 @@ func (ribdServiceHandler *RIBDServer) UpdateGlobalPolicyStmtsFromDB(dbHdl *dbuti
 func (ribdServiceHandler *RIBDServer) UpdateGlobalPolicyFromDB(dbHdl *dbutils.DBUtil) (err error) {
 	logger.Debug(fmt.Sprintln("UpdateGlobalPolicyFromDB"))
 	if dbHdl != nil {
-		var dbObjCfg models.PolicyDefinition
+		var dbObjCfg objects.PolicyDefinition
 		objList, err := dbHdl.GetAllObjFromDb(dbObjCfg)
 		if err == nil {
 			for idx := 0; idx < len(objList); idx++ {
 				obj := ribd.NewPolicyDefinition()
-				dbObj := objList[idx].(models.PolicyDefinition)
-				models.ConvertribdPolicyDefinitionObjToThrift(&dbObj, obj)
-	             ribdServiceHandler.PolicyDefinitionConfCh <- RIBdServerConfig{
-	                                   OrigConfigObject:obj,
-	                                   Op : "add",
-	                              }
+				dbObj := objList[idx].(objects.PolicyDefinition)
+				objects.ConvertribdPolicyDefinitionObjToThrift(&dbObj, obj)
+				ribdServiceHandler.PolicyDefinitionConfCh <- RIBdServerConfig{
+					OrigConfigObject: obj,
+					Op:               "add",
+				}
 			}
 		} else {
 			logger.Err("DB Query failed during PolicyDefinition query: RIBd init")

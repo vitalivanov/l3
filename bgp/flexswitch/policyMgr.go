@@ -13,24 +13,24 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 package FSMgr
 
 import (
-	"encoding/json"
 	"bytes"
+	"encoding/json"
 	"fmt"
-	"l3/rib/ribdCommonDefs"
 	nanomsg "github.com/op/go-nanomsg"
-	"models"
 	"l3/bgp/api"
+	"l3/rib/ribdCommonDefs"
+	"models/objects"
 	"utils/logging"
 )
 
@@ -39,12 +39,13 @@ import (
 func NewFSPolicyMgr(logger *logging.Writer, fileName string) *FSPolicyMgr {
 
 	mgr := &FSPolicyMgr{
-		plugin:     "ovsdb",
-		logger:     logger,
+		plugin: "ovsdb",
+		logger: logger,
 	}
 
 	return mgr
 }
+
 /*  Start nano msg socket with ribd
  */
 func (mgr *FSPolicyMgr) Start() {
@@ -83,7 +84,7 @@ func (mgr *FSPolicyMgr) setupSubSocket(address string) (*nanomsg.SubSocket, erro
 	return socket, nil
 }
 func (mgr *FSPolicyMgr) handlePolicyConditionUpdates(msg ribdCommonDefs.RibdNotifyMsg) {
-	policyCondition := models.PolicyCondition{}
+	policyCondition := objects.PolicyCondition{}
 	updateMsg := "Add"
 	if msg.MsgType == ribdCommonDefs.NOTIFY_POLICY_CONDITION_DELETED {
 		updateMsg = "Remove"
@@ -97,11 +98,11 @@ func (mgr *FSPolicyMgr) handlePolicyConditionUpdates(msg ribdCommonDefs.RibdNoti
 	}
 	mgr.logger.Info(fmt.Sprintln(updateMsg, "Policy Condition ", policyCondition.Name, " type: ", policyCondition.ConditionType))
 	if msg.MsgType == ribdCommonDefs.NOTIFY_POLICY_CONDITION_CREATED {
-		api.SendPolicyConditionNotification(&policyCondition,nil,nil)
+		api.SendPolicyConditionNotification(&policyCondition, nil, nil)
 	} else if msg.MsgType == ribdCommonDefs.NOTIFY_POLICY_CONDITION_DELETED {
-		api.SendPolicyConditionNotification(nil,&policyCondition,nil)
+		api.SendPolicyConditionNotification(nil, &policyCondition, nil)
 	} else if msg.MsgType == ribdCommonDefs.NOTIFY_POLICY_CONDITION_UPDATED {
-		api.SendPolicyConditionNotification(nil,nil,&policyCondition)
+		api.SendPolicyConditionNotification(nil, nil, &policyCondition)
 	}
 }
 func (mgr *FSPolicyMgr) handlePolicyUpdates(rxBuf []byte) {
@@ -109,17 +110,17 @@ func (mgr *FSPolicyMgr) handlePolicyUpdates(rxBuf []byte) {
 	decoder := json.NewDecoder(reader)
 	msg := ribdCommonDefs.RibdNotifyMsg{}
 	err := decoder.Decode(&msg)
-    if err != nil {
+	if err != nil {
 		mgr.logger.Err(fmt.Sprintln("Error while decoding msg"))
 		return
 	}
 	switch msg.MsgType {
-		case ribdCommonDefs.NOTIFY_POLICY_CONDITION_CREATED, ribdCommonDefs.NOTIFY_POLICY_CONDITION_DELETED, 
-		      ribdCommonDefs.NOTIFY_POLICY_CONDITION_UPDATED:
-		    mgr.handlePolicyConditionUpdates(msg)
-		default:
-			mgr.logger.Err(fmt.Sprintf("**** Received Policy update with ",
-				"unknown type %d ****", msg.MsgType))
+	case ribdCommonDefs.NOTIFY_POLICY_CONDITION_CREATED, ribdCommonDefs.NOTIFY_POLICY_CONDITION_DELETED,
+		ribdCommonDefs.NOTIFY_POLICY_CONDITION_UPDATED:
+		mgr.handlePolicyConditionUpdates(msg)
+	default:
+		mgr.logger.Err(fmt.Sprintf("**** Received Policy update with ",
+			"unknown type %d ****", msg.MsgType))
 	}
 }
 

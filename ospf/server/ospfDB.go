@@ -24,11 +24,12 @@
 package server
 
 import (
-	"fmt"
-	"models"
-	"ospfd"
 	"errors"
+	"fmt"
 	"l3/ospf/config"
+	"models/objects"
+	"ospfd"
+	"strings"
 	"utils/dbutils"
 	"strings"
 )
@@ -51,7 +52,7 @@ func (server *OSPFServer) ReadOspfCfgFromDB() {
 
 func (server *OSPFServer) readGlobalConfFromDB() {
 	server.logger.Info("Reading global object from DB")
-	var dbObj models.OspfGlobal
+	var dbObj objects.OspfGlobal
 
 	objList, err := server.dbHdl.GetAllObjFromDb(dbObj)
 	if err != nil {
@@ -60,8 +61,8 @@ func (server *OSPFServer) readGlobalConfFromDB() {
 	}
 	for idx := 0; idx < len(objList); idx++ {
 		obj := ospfd.NewOspfGlobal()
-		dbObject := objList[idx].(models.OspfGlobal)
-		models.ConvertospfdOspfGlobalObjToThrift(&dbObject, obj)
+		dbObject := objList[idx].(objects.OspfGlobal)
+		objects.ConvertospfdOspfGlobalObjToThrift(&dbObject, obj)
 		err := server.applyOspfGlobalConf(obj)
 		if err != nil {
 			server.logger.Err("Error applying Ospf Global Configuration")
@@ -89,7 +90,7 @@ func (server *OSPFServer) applyOspfGlobalConf(conf *ospfd.OspfGlobal) error {
 
 func (server *OSPFServer) readAreaConfFromDB() {
 	server.logger.Info("Reading area object from DB")
-	var dbObj models.OspfAreaEntry
+	var dbObj objects.OspfAreaEntry
 
 	objList, err := server.dbHdl.GetAllObjFromDb(dbObj)
 	if err != nil {
@@ -98,8 +99,8 @@ func (server *OSPFServer) readAreaConfFromDB() {
 	}
 	for idx := 0; idx < len(objList); idx++ {
 		obj := ospfd.NewOspfAreaEntry()
-		dbObject := objList[idx].(models.OspfAreaEntry)
-		models.ConvertospfdOspfAreaEntryObjToThrift(&dbObject, obj)
+		dbObject := objList[idx].(objects.OspfAreaEntry)
+		objects.ConvertospfdOspfAreaEntryObjToThrift(&dbObject, obj)
 		err := server.applyOspfAreaConf(obj)
 		if err != nil {
 			server.logger.Err("Error applying Ospf Area Configuration")
@@ -126,7 +127,7 @@ func (server *OSPFServer) applyOspfAreaConf(conf *ospfd.OspfAreaEntry) error {
 
 func (server *OSPFServer) readIntfConfFromDB() {
 	server.logger.Info("Reading interface object from DB")
-	var dbObj models.OspfIfEntry
+	var dbObj objects.OspfIfEntry
 
 	objList, err := server.dbHdl.GetAllObjFromDb(dbObj)
 	if err != nil {
@@ -135,8 +136,8 @@ func (server *OSPFServer) readIntfConfFromDB() {
 	}
 	for idx := 0; idx < len(objList); idx++ {
 		obj := ospfd.NewOspfIfEntry()
-		dbObject := objList[idx].(models.OspfIfEntry)
-		models.ConvertospfdOspfIfEntryObjToThrift(&dbObject, obj)
+		dbObject := objList[idx].(objects.OspfIfEntry)
+		objects.ConvertospfdOspfIfEntryObjToThrift(&dbObject, obj)
 		err := server.applyOspfIntfConf(obj)
 		if err != nil {
 			server.logger.Err("Error applying Ospf Area Configuration")
@@ -160,11 +161,11 @@ func (server *OSPFServer) applyOspfIntfConf(conf *ospfd.OspfIfEntry) error {
 	}
 
 	for index, ifName := range config.IfTypeList {
-	    if strings.EqualFold(conf.IfType, ifName) {
-	        ifConf.IfType = config.IfType(index)
-                break
-            }
-        }
+		if strings.EqualFold(conf.IfType, ifName) {
+			ifConf.IfType = config.IfType(index)
+			break
+		}
+	}
 
 	err := server.processIntfConfig(ifConf)
 	if err != nil {
@@ -183,7 +184,7 @@ func (server *OSPFServer) AddIPv4RoutesState(entry RoutingTblEntryKey) error {
 		server.logger.Info(fmt.Sprintln("DB: Routing table entry doesnt exist key ", entry))
 		return nil
 	}
-	var dbObj models.OspfIPv4Routes
+	var dbObj objects.OspfIPv4Routes
 	obj := ospfd.NewOspfIPv4Routes()
 	/* Fill in obj values */
 	obj.DestId = convertUint32ToIPv4(entry.DestId)
@@ -200,12 +201,12 @@ func (server *OSPFServer) AddIPv4RoutesState(entry RoutingTblEntryKey) error {
 	nh_list := make([]ospfd.OspfNextHop, len(nh_local))
 	index := 0
 	/*
-	    type OspfNextHop struct {
-		IfIPAddr  string `DESCRIPTION: O/P interface IP address`
-		IfIdx     uint32 `DESCRIPTION: Interface index `
-		NextHopIP string `DESCRIPTION: Nexthop ip address`
-		AdvRtr    string `DESCRIPTION: Advertising router id`
-	}
+		    type OspfNextHop struct {
+			IfIPAddr  string `DESCRIPTION: O/P interface IP address`
+			IfIdx     uint32 `DESCRIPTION: Interface index `
+			NextHopIP string `DESCRIPTION: Nexthop ip address`
+			AdvRtr    string `DESCRIPTION: Advertising router id`
+		}
 	*/
 	for nh_val, _ := range nh_local {
 		nh_list[index].IfIPAddr = convertUint32ToIPv4(nh_val.IfIPAddr)
@@ -220,7 +221,7 @@ func (server *OSPFServer) AddIPv4RoutesState(entry RoutingTblEntryKey) error {
 	obj.LSOrigin.LSId = int32(rEntry.RoutingTblEnt.LSOrigin.LSId)
 	obj.LSOrigin.AdvRouter = int32(rEntry.RoutingTblEnt.LSOrigin.AdvRouter)
 
-	models.ConvertThriftToospfdOspfIPv4RoutesObj(obj, &dbObj)
+	objects.ConvertThriftToospfdOspfIPv4RoutesObj(obj, &dbObj)
 	err := dbObj.StoreObjectInDb(server.dbHdl)
 	if err != nil {
 		server.logger.Err(fmt.Sprintln("DB: Failed to add object in db , err ", err))
@@ -233,7 +234,7 @@ func (server *OSPFServer) AddIPv4RoutesState(entry RoutingTblEntryKey) error {
 func (server *OSPFServer) DelIPv4RoutesState(entry RoutingTblEntryKey) error {
 	server.logger.Info(fmt.Sprintln("DB: Delete IPv4 entry from db ", entry))
 
-	var dbObj models.OspfIPv4Routes
+	var dbObj objects.OspfIPv4Routes
 	obj := ospfd.NewOspfIPv4Routes()
 
 	obj.LSOrigin = &ospfd.OspfLsaKey{}
@@ -241,7 +242,7 @@ func (server *OSPFServer) DelIPv4RoutesState(entry RoutingTblEntryKey) error {
 	obj.AddrMask = convertUint32ToIPv4(entry.AddrMask)
 	obj.DestType = string(entry.DestType)
 
-	models.ConvertThriftToospfdOspfIPv4RoutesObj(obj, &dbObj)
+	objects.ConvertThriftToospfdOspfIPv4RoutesObj(obj, &dbObj)
 	err := dbObj.DeleteObjectFromDb(server.dbHdl)
 	if err != nil {
 		server.logger.Err(fmt.Sprintln("DB: Failed to add object in db , err ", err))
@@ -255,7 +256,7 @@ func (server *OSPFServer) AddLsdbEntry(entry LsdbSliceEnt) error {
 	var lsaEnc []byte
 	var lsaMd LsaMetadata
 
-	var dbObj models.OspfLsdbEntryState
+	var dbObj objects.OspfLsdbEntryState
 	//  var obj *ospfd.OspfLsdbEntryState
 	obj := ospfd.NewOspfLsdbEntryState()
 	lsdbKey := LsdbKey{
@@ -319,7 +320,7 @@ func (server *OSPFServer) AddLsdbEntry(entry LsdbSliceEnt) error {
 	obj.LsdbChecksum = int32(lsaMd.LSChecksum)
 	obj.LsdbAdvertisement = adv
 
-	models.ConvertThriftToospfdOspfLsdbEntryStateObj(obj, &dbObj)
+	objects.ConvertThriftToospfdOspfLsdbEntryStateObj(obj, &dbObj)
 	server.logger.Info(fmt.Sprintln("DB: Db obj received ", dbObj))
 	err := dbObj.StoreObjectInDb(server.dbHdl)
 	if err != nil {
@@ -333,7 +334,7 @@ func (server *OSPFServer) AddLsdbEntry(entry LsdbSliceEnt) error {
 func (server *OSPFServer) DelLsdbEntry(entry LsdbSliceEnt) error {
 	server.logger.Info(fmt.Sprintln("DB: Delete LSDB entry from db ", entry))
 
-	var dbObj models.OspfLsdbEntryState
+	var dbObj objects.OspfLsdbEntryState
 	obj := ospfd.NewOspfLsdbEntryState()
 
 	obj.LsdbAreaId = convertUint32ToIPv4(entry.AreaId)
@@ -341,7 +342,7 @@ func (server *OSPFServer) DelLsdbEntry(entry LsdbSliceEnt) error {
 	obj.LsdbLsid = convertUint32ToIPv4(entry.LSId)
 	obj.LsdbRouterId = convertUint32ToIPv4(entry.AdvRtr)
 
-	models.ConvertThriftToospfdOspfLsdbEntryStateObj(obj, &dbObj)
+	objects.ConvertThriftToospfdOspfLsdbEntryStateObj(obj, &dbObj)
 	err := dbObj.DeleteObjectFromDb(server.dbHdl)
 	if err != nil {
 		server.logger.Err(fmt.Sprintln("DB: LSDB Failed to delete object in db , err ", err))
