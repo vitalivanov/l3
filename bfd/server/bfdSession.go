@@ -280,9 +280,6 @@ func (session *BfdSession) ProcessBfdPacket(bfdPacket *BfdControlPacket) error {
 		session.state.SessionState == STATE_ADMIN_DOWN ||
 		session.state.RemoteSessionState == STATE_ADMIN_DOWN {
 		session.sessionTimer.Stop()
-	} else {
-		session.sessionTimer.Reset(time.Duration(session.rxInterval) * time.Millisecond)
-		//session.server.logger.Info(fmt.Sprintln("Reset rxtimer for session ", session.state.SessionId, " to ", session.rxInterval))
 	}
 	switch session.state.RemoteSessionState {
 	case STATE_DOWN:
@@ -501,13 +498,7 @@ func (session *BfdSession) MoveToUpState() error {
 }
 
 func (session *BfdSession) ApplyTxJitter() int32 {
-	var txInterval int32
-	if session.state.RemoteDetectionMultiplier == 1 {
-		txInterval = int32(float32(session.txInterval) * (1 - float32(session.txJitter)/100))
-	} else {
-		txInterval = int32(float32(session.txInterval) * (1 + float32(session.txJitter)/100))
-	}
-	return txInterval
+	return (int32(float32(session.txInterval) * (1 - float32(session.txJitter)/100)))
 }
 
 func (session *BfdSession) NeedBfdPacketUpdate() bool {
@@ -548,7 +539,6 @@ func (session *BfdSession) SendPeriodicControlPackets() {
 		session.txInterval = session.state.DesiredMinTxInterval / 1000
 	}
 	txTimer := session.ApplyTxJitter()
-	//session.server.logger.Info(fmt.Sprintln("Reset txtimer for session ", session.state.SessionId, " to ", txTimer))
 	session.txTimer.Reset(time.Duration(txTimer) * time.Millisecond)
 }
 
@@ -597,13 +587,11 @@ func (session *BfdSession) ProcessPollSequence(bfdPacket *BfdControlPacket) erro
 			session.server.logger.Info(fmt.Sprintln("Received packet with poll bit for session ", session.state.SessionId))
 			session.pollSequenceFinal = true
 			session.pollChanged = true
-			session.txTimer.Reset(0)
 		}
 		if bfdPacket.Final {
 			session.server.logger.Info(fmt.Sprintln("Received packet with final bit for session ", session.state.SessionId))
 			session.pollSequence = false
 			session.pollChanged = true
-			session.txTimer.Reset(0)
 		}
 	}
 	return nil

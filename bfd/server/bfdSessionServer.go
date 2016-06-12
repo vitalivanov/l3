@@ -27,6 +27,9 @@ import (
 	"asicd/asicdCommonDefs"
 	"errors"
 	"fmt"
+	//"github.com/google/gopacket"
+	//"github.com/google/gopacket/layers"
+	//"github.com/google/gopacket/pcap"
 	"l3/bfd/bfddCommonDefs"
 	"math/rand"
 	"net"
@@ -49,7 +52,6 @@ func (server *BFDServer) StartSessionHandler() error {
 	server.FailedSessionClientCh = make(chan int32, MAX_NUM_SESSIONS)
 	server.tobeCreatedSessions = make(map[string]BfdSessionMgmt)
 	go server.StartBfdSesionServer()
-	go server.StartBfdSesionServerQueuer()
 	go server.StartBfdSessionRxTx()
 	go server.StartSessionRetryHandler()
 	for {
@@ -96,29 +98,70 @@ func (server *BFDServer) DispatchReceivedBfdPacket(ipAddr string, bfdPacket *Bfd
 	return nil
 }
 
-func (server *BFDServer) StartBfdSesionServerQueuer() error {
-	server.BfdPacketRecvCh = make(chan RecvedBfdPacket, PACKET_QUEUE_SIZE)
+/*
+ * TODO: PCAP
+func (server *BFDServer) StartBfdSesionServer(ifIndex unit32) error {
+	var err error
+	var myMacAddr net.HardwareAddr
+	var ifName string
+	ifName, err = server.getLinuxIntfName(ifindex)
+	if err != nil {
+		server.logger.Info(fmt.Sprintln("Failed to get ifname for ", session.state.InterfaceId))
+		return err
+	}
+	server.logger.Info(fmt.Sprintln("Starting session server on ", ifName))
+	myMacAddr, err = server.getMacAddrFromIntfName(ifName)
+	if err != nil {
+		server.logger.Info(fmt.Sprintln("Unable to get the MAC addr of ", ifName, err))
+		return err
+	}
+	server.logger.Info(fmt.Sprintln("MAC is  ", myMacAddr, " on ", ifName))
+	recvPcapHandle, err := pcap.OpenLive(ifName, bfdSnapshotLen, bfdPromiscuous, 0)
+	if recvPcapHandle == nil {
+		server.logger.Info(fmt.Sprintln("Failed to open recvPcapHandle for ", ifName, err))
+		return err
+	} else {
+		bfdPcapFilter += fmt.Sprintf("not ether src %s", myMacAddr)
+		err = recvPcapHandle.SetBPFFilter(bfdPcapFilter)
+		if err != nil {
+			server.logger.Info(fmt.Sprintln("Unable to set filter on", ifName, err))
+			return err
+		}
+	}
+	bfdPacketSrc := gopacket.NewPacketSource(recvPcapHandle, layers.LayerTypeEthernet)
+	defer recvPcapHandle.Close()
+	packetRecvCh := bfdPacketSrc.Packets()
 	for {
 		select {
-		case packet := <-server.BfdPacketRecvCh:
-			ipAddr := packet.IpAddr
-			length := packet.Len
-			buf := packet.PacketBuf
-			if length >= DEFAULT_CONTROL_PACKET_LEN {
-				bfdPacket, err := DecodeBfdControlPacket(buf[0:length])
-				if err != nil {
-					server.logger.Info(fmt.Sprintln("Failed to decode packet - ", err))
-				} else {
-					err = server.DispatchReceivedBfdPacket(ipAddr, bfdPacket)
-					if err != nil {
-						server.logger.Info(fmt.Sprintln("Failed to dispatch received packet"))
-					}
+		case packet := <-packetRecvCh:
+
+			nwLayer := receivedPacket.Layer(layers.LayerTypeIPv4)
+			ipPacket, _ := nwLayer.(*layers.IPv4)
+			bfdServer.logger.Info(fmt.Sprintln("Network ", ipPacket.SrcIP, ipPacket.DstIP))
+			transLayer := receivedPacket.Layer(layers.LayerTypeUDP)
+			udpPacket, _ := transLayer.(*layers.UDP)
+			bfdServer.logger.Info(fmt.Sprintln("Transport ", udpPacket.SrcPort, udpPacket.DstPort))
+			buf := transLayer.LayerPayload()
+
+			server.logger.Info(fmt.Sprintln("Received packet from ", ipPacket.SrcIp, " : ", udpPacket.DstPort))
+			session, exist := server.bfdGlobal.SessionsByIp[ipPacket.SrcIp]
+			if exist {
+				if session.rxInterval != 0 {
+					session.sessionTimer.Reset(time.Duration(session.rxInterval) * time.Millisecond)
+					server.logger.Info(fmt.Sprintln("Reset rxtimer for session ", session.state.SessionId, " to ", session.rxInterval))
 				}
+				packet := RecvedBfdPacket{
+					IpAddr:    ipAddr,
+					Len:       int32(length),
+					PacketBuf: buf[0:length],
+				}
+				server.BfdPacketRecvCh <- packet
 			}
 		}
 	}
 	return nil
 }
+*/
 
 func (server *BFDServer) StartBfdSesionServer() error {
 	destAddr := ":" + strconv.Itoa(DEST_PORT)
@@ -140,12 +183,24 @@ func (server *BFDServer) StartBfdSesionServer() error {
 		if err != nil {
 			server.logger.Info(fmt.Sprintln("Failed to read from ", ServerAddr))
 		} else {
-			packet := RecvedBfdPacket{
-				IpAddr:    udpAddr.IP.String(),
-				Len:       int32(length),
-				PacketBuf: buf[0:length],
+			ipAddr := udpAddr.IP.String()
+			session, exist := server.bfdGlobal.SessionsByIp[ipAddr]
+			if exist {
+				if session.rxInterval != 0 {
+					session.sessionTimer.Reset(time.Duration(session.rxInterval) * time.Millisecond)
+				}
+				if length >= DEFAULT_CONTROL_PACKET_LEN {
+					bfdPacket, err := DecodeBfdControlPacket(buf[0:length])
+					if err != nil {
+						server.logger.Info(fmt.Sprintln("Failed to decode packet - ", err))
+					} else {
+						err = server.DispatchReceivedBfdPacket(ipAddr, bfdPacket)
+						if err != nil {
+							server.logger.Info(fmt.Sprintln("Failed to dispatch received packet"))
+						}
+					}
+				}
 			}
-			server.BfdPacketRecvCh <- packet
 		}
 	}
 	return nil
@@ -345,6 +400,7 @@ func (server *BFDServer) NewNormalBfdSession(IfIndex int32, DestIp string, Param
 	bfdSession.server = server
 	bfdSession.bfdPacket = NewBfdControlPacketDefault()
 	server.bfdGlobal.Sessions[sessionId] = bfdSession
+	server.bfdGlobal.SessionsByIp[DestIp] = bfdSession
 	server.bfdGlobal.NumSessions++
 	server.bfdGlobal.SessionsIdSlice = append(server.bfdGlobal.SessionsIdSlice, sessionId)
 	server.logger.Info(fmt.Sprintln("New session : ", sessionId, " created on : ", IfIndex))
@@ -503,6 +559,7 @@ func (server *BFDServer) SessionDeleteHandler(session *BfdSession, Protocol bfdd
 		server.bfdGlobal.SessionParams[session.state.ParamName].state.NumSessions--
 		server.bfdGlobal.NumSessions--
 		delete(server.bfdGlobal.Sessions, sessionId)
+		delete(server.bfdGlobal.SessionsByIp, session.state.IpAddr)
 		for i = 0; i < len(server.bfdGlobal.SessionsIdSlice); i++ {
 			if server.bfdGlobal.SessionsIdSlice[i] == sessionId {
 				break
