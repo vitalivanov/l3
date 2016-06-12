@@ -13,13 +13,13 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 package server
 
@@ -268,7 +268,7 @@ func (session *BfdSession) ProcessBfdPacket(bfdPacket *BfdControlPacket) error {
 		session.server.logger.Info(fmt.Sprintln("Can't process received bfd packet for session ", session.state.SessionId))
 		return nil
 	}
-	if session.state.SessionState == STATE_UP || session.state.RemoteSessionState == STATE_UP {
+	if session.state.SessionState == STATE_UP && session.state.RemoteSessionState == STATE_UP {
 		session.rxInterval = (int32(bfdPacket.DesiredMinTxInterval) * int32(bfdPacket.DetectMult)) / 1000
 	} else {
 		session.rxInterval = (STARTUP_RX_INTERVAL * int32(bfdPacket.DetectMult)) / 1000
@@ -276,6 +276,11 @@ func (session *BfdSession) ProcessBfdPacket(bfdPacket *BfdControlPacket) error {
 	session.CheckAnyRemoteParamChanged(bfdPacket)
 	session.RemoteChangedDemandMode(bfdPacket)
 	session.ProcessPollSequence(bfdPacket)
+	if session.rxInterval == 0 ||
+		session.state.SessionState == STATE_ADMIN_DOWN ||
+		session.state.RemoteSessionState == STATE_ADMIN_DOWN {
+		session.sessionTimer.Stop()
+	}
 	switch session.state.RemoteSessionState {
 	case STATE_DOWN:
 		event = REMOTE_DOWN
@@ -296,14 +301,6 @@ func (session *BfdSession) ProcessBfdPacket(bfdPacket *BfdControlPacket) error {
 		event = REMOTE_ADMIN_DOWN
 	}
 	session.EventHandler(event)
-	if session.rxInterval == 0 {
-		session.sessionTimer.Stop()
-	} else {
-		if session.state.SessionState != STATE_ADMIN_DOWN &&
-			session.state.RemoteSessionState != STATE_ADMIN_DOWN {
-			session.sessionTimer.Reset(time.Duration(session.rxInterval) * time.Millisecond)
-		}
-	}
 	return nil
 }
 
@@ -501,13 +498,7 @@ func (session *BfdSession) MoveToUpState() error {
 }
 
 func (session *BfdSession) ApplyTxJitter() int32 {
-	var txInterval int32
-	if session.state.RemoteDetectionMultiplier == 1 {
-		txInterval = int32(float32(session.txInterval) * (1 - float32(session.txJitter)/100))
-	} else {
-		txInterval = int32(float32(session.txInterval) * (1 + float32(session.txJitter)/100))
-	}
-	return txInterval
+	return (int32(float32(session.txInterval) * (1 - float32(session.txJitter)/100)))
 }
 
 func (session *BfdSession) NeedBfdPacketUpdate() bool {
@@ -596,13 +587,11 @@ func (session *BfdSession) ProcessPollSequence(bfdPacket *BfdControlPacket) erro
 			session.server.logger.Info(fmt.Sprintln("Received packet with poll bit for session ", session.state.SessionId))
 			session.pollSequenceFinal = true
 			session.pollChanged = true
-			session.txTimer.Reset(0)
 		}
 		if bfdPacket.Final {
 			session.server.logger.Info(fmt.Sprintln("Received packet with final bit for session ", session.state.SessionId))
 			session.pollSequence = false
 			session.pollChanged = true
-			session.txTimer.Reset(0)
 		}
 	}
 	return nil
