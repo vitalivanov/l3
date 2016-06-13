@@ -41,9 +41,9 @@ func (ribdServiceHandler *RIBDServer) StartRouteProcessServer() {
 				ribdServiceHandler.ProcessRouteDeleteConfig(routeConf.OrigConfigObject.(*ribd.IPv4Route))
 			} else if routeConf.Op == "update" {
 				if routeConf.PatchOp == nil || len(routeConf.PatchOp) == 0 {
-					ribdServiceHandler.ProcessRouteUpdateConfig(routeConf.OrigConfigObject.(*ribd.IPv4Route), routeConf.NewConfigObject.(*ribd.IPv4Route), routeConf.AttrSet, ipv4)
+					ribdServiceHandler.ProcessRouteUpdateConfig(routeConf.OrigConfigObject.(*ribd.IPv4Route), routeConf.NewConfigObject.(*ribd.IPv4Route), routeConf.AttrSet)
 				} else {
-					ribdServiceHandler.ProcessRoutePatchUpdateConfig(routeConf.OrigConfigObject.(*ribd.IPv4Route), routeConf.NewConfigObject.(*ribd.IPv4Route), routeConf.PatchOp, ipv4)
+					ribdServiceHandler.ProcessRoutePatchUpdateConfig(routeConf.OrigConfigObject.(*ribd.IPv4Route), routeConf.NewConfigObject.(*ribd.IPv4Route), routeConf.PatchOp)
 				}
 			} else if routeConf.Op == "addv6" {
 				//create ipv6 route
@@ -54,8 +54,9 @@ func (ribdServiceHandler *RIBDServer) StartRouteProcessServer() {
 			} else if routeConf.Op == "updatev6" {
 				//update ipv6 route
 				if routeConf.PatchOp == nil || len(routeConf.PatchOp) == 0 {
+					ribdServiceHandler.Processv6RouteUpdateConfig(routeConf.OrigConfigObject.(*ribd.IPv6Route), routeConf.NewConfigObject.(*ribd.IPv6Route), routeConf.AttrSet)
 				} else {
-					//patch update
+					ribdServiceHandler.Processv6RoutePatchUpdateConfig(routeConf.OrigConfigObject.(*ribd.IPv6Route), routeConf.NewConfigObject.(*ribd.IPv6Route), routeConf.PatchOp)
 				}
 			}
 		}

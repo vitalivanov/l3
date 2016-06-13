@@ -560,10 +560,12 @@ func (m RIBDServer) GetRouteReachabilityInfo(destNet string) (nextHopIntf *ribdI
 		return nextHopIntf, errors.New("Invalid dest ip address")
 	}
 	logger.Debug(fmt.Sprintln("destNetIP after getIP:", destNetIp))
-	destNetIp = destNetIp.To4()
-	if destNetIp == nil {
-		destNetIp = destNetIp.To16()
+	lookupIp := destNetIp
+	lookupIp = destNetIp.To4()
+	if lookupIp == nil {
+		lookupIp = destNetIp.To16()
 	}
+	destNetIp = lookupIp
 	logger.Debug(fmt.Sprintln("destNetIP after net.To func:", destNetIp))
 	rmapInfoListItem := RouteInfoMap.GetLongestPrefixNode(patriciaDB.Prefix(destNetIp))
 	if rmapInfoListItem != nil {
@@ -1527,35 +1529,6 @@ func (m RIBDServer) ProcessV4RouteCreateConfig(cfg *ribd.IPv4Route) (val bool, e
 	return true, err
 }
 
-func (m RIBDServer) ProcessV6RouteCreateConfig(cfg *ribd.IPv6Route) (val bool, err error) {
-	logger.Debug(fmt.Sprintln("ProcessV6RouteCreate: Received create route request for ip: ", cfg.DestinationNw, " mask ", cfg.NetworkMask, " number of next hops: ", len(cfg.NextHop)))
-	newCfg := ribd.IPv6Route{
-		DestinationNw: cfg.DestinationNw,
-		NetworkMask:   cfg.NetworkMask,
-		Protocol:      cfg.Protocol,
-		Cost:          cfg.Cost,
-		NullRoute:     cfg.NullRoute,
-	}
-	for i := 0; i < len(cfg.NextHop); i++ {
-		logger.Debug(fmt.Sprintln("nexthop info: ip: ", cfg.NextHop[i].NextHopIp, " intref: ", cfg.NextHop[i].NextHopIntRef))
-		nh := ribd.NextHopInfo{
-			NextHopIp:     cfg.NextHop[i].NextHopIp,
-			NextHopIntRef: cfg.NextHop[i].NextHopIntRef,
-			Weight:        cfg.NextHop[i].Weight,
-		}
-		newCfg.NextHop = make([]*ribd.NextHopInfo, 0)
-		newCfg.NextHop = append(newCfg.NextHop, &nh)
-	}
-
-	policyRoute := BuildPolicyRouteFromribdIPv6Route(&newCfg)
-	params := BuildRouteParamsFromribdIPv6Route(&newCfg, FIBAndRIB, Invalid, len(destNetSlice))
-
-	logger.Debug(fmt.Sprintln("createType = ", params.createType, "deleteType = ", params.deleteType))
-	PolicyEngineFilter(policyRoute, policyCommonDefs.PolicyPath_Import, params)
-
-	return true, err
-}
-
 /**
    This function is called when:
    -  a user/protocol deletes a route - delType = FIBAndRIB
@@ -1640,20 +1613,7 @@ func (m RIBDServer) ProcessRouteDeleteConfig(cfg *ribd.IPv4Route) (val bool, err
 	return true, err
 }
 
-func (m RIBDServer) ProcessV6RouteDeleteConfig(cfg *ribd.IPv6Route) (val bool, err error) {
-	logger.Debug(fmt.Sprintln("ProcessRoutev6DeleteConfig:Received Route Delete request for ", cfg.DestinationNw, ":", cfg.NetworkMask, "number of nextHops:", len(cfg.NextHop), "Protocol ", cfg.Protocol))
-	if !RouteServiceHandler.AcceptConfig {
-		logger.Debug("Not ready to accept config")
-		//return 0,err
-	}
-	for i := 0; i < len(cfg.NextHop); i++ {
-		logger.Debug(fmt.Sprintln("nexthop info: ip: ", cfg.NextHop[i].NextHopIp, " intref: ", cfg.NextHop[i].NextHopIntRef))
-		_, err = deleteIPRoute(cfg.DestinationNw, cfg.NetworkMask, cfg.Protocol, cfg.NextHop[i].NextHopIp, FIBAndRIB, ribdCommonDefs.RoutePolicyStateChangetoInValid)
-	}
-	return true, err
-}
-
-func (m RIBDServer) ProcessRoutePatchUpdateConfig(origconfig *ribd.IPv4Route, newconfig *ribd.IPv4Route, op []*ribd.PatchOpInfo, ipType IPType) (ret bool, err error) {
+func (m RIBDServer) ProcessRoutePatchUpdateConfig(origconfig *ribd.IPv4Route, newconfig *ribd.IPv4Route, op []*ribd.PatchOpInfo) (ret bool, err error) {
 	logger.Debug(fmt.Sprintln("ProcessRoutePatchUpdateConfig:Received update route request with number of patch ops: ", len(op)))
 	if !RouteServiceHandler.AcceptConfig {
 		logger.Debug("Not ready to accept config")
@@ -1715,7 +1675,7 @@ func (m RIBDServer) ProcessRoutePatchUpdateConfig(origconfig *ribd.IPv4Route, ne
 	return ret, err
 }
 
-func (m RIBDServer) ProcessRouteUpdateConfig(origconfig *ribd.IPv4Route, newconfig *ribd.IPv4Route, attrset []bool, ipType IPType) (val bool, err error) {
+func (m RIBDServer) ProcessRouteUpdateConfig(origconfig *ribd.IPv4Route, newconfig *ribd.IPv4Route, attrset []bool) (val bool, err error) {
 	logger.Debug(fmt.Sprintln("ProcessRouteUpdateConfig:Received update route request "))
 	if !RouteServiceHandler.AcceptConfig {
 		logger.Debug("Not ready to accept config")

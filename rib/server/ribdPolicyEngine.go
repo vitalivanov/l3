@@ -320,21 +320,37 @@ func policyEngineUpdateRoute(prefix patriciaDB.Prefix, item patriciaDB.Item, han
 	selectedRouteInfoRecord := routeInfoList[0]
 	//route := ribdInt.Routes{Ipaddr:selectedRouteInfoRecord.destNetIp.String() , Mask: selectedRouteInfoRecord.networkMask.String(), NextHopIp: selectedRouteInfoRecord.nextHopIp.String(), NextHopIfType: ribdInt.Int(selectedRouteInfoRecord.nextHopIfType), IfIndex: ribdInt.Int(selectedRouteInfoRecord.nextHopIfIndex), Metric: ribdInt.Int(selectedRouteInfoRecord.metric), Prototype: ribdInt.Int(selectedRouteInfoRecord.protocol), IsPolicyBasedStateValid: rmapInfoRecordList.isPolicyBasedStateValid}
 	nextHopIf := strconv.Itoa(int(selectedRouteInfoRecord.nextHopIfIndex))
-	cfg := ribd.IPv4Route{
-		DestinationNw: selectedRouteInfoRecord.destNetIp.String(),
-		Protocol:      ReverseRouteProtoTypeMapDB[int(selectedRouteInfoRecord.protocol)],
-		Cost:          int32(selectedRouteInfoRecord.metric),
-		NetworkMask:   selectedRouteInfoRecord.networkMask.String(),
-	}
-	nextHop := ribd.NextHopInfo{
-		NextHopIp:     selectedRouteInfoRecord.nextHopIp.String(),
-		NextHopIntRef: nextHopIf,
-	}
-	cfg.NextHop = make([]*ribd.NextHopInfo, 0)
-	cfg.NextHop = append(cfg.NextHop, &nextHop)
 	//Even though we could potentially have multiple selected routes, calling update once for this prefix should suffice
 	//routeServiceHandler.UpdateIPv4Route(&cfg, nil, nil)
-	RouteServiceHandler.ProcessRouteUpdateConfig(&cfg, &cfg, nil, selectedRouteInfoRecord.ipType)
+	if selectedRouteInfoRecord.ipType == ipv4 {
+		cfg := ribd.IPv4Route{
+			DestinationNw: selectedRouteInfoRecord.destNetIp.String(),
+			Protocol:      ReverseRouteProtoTypeMapDB[int(selectedRouteInfoRecord.protocol)],
+			Cost:          int32(selectedRouteInfoRecord.metric),
+			NetworkMask:   selectedRouteInfoRecord.networkMask.String(),
+		}
+		nextHop := ribd.NextHopInfo{
+			NextHopIp:     selectedRouteInfoRecord.nextHopIp.String(),
+			NextHopIntRef: nextHopIf,
+		}
+		cfg.NextHop = make([]*ribd.NextHopInfo, 0)
+		cfg.NextHop = append(cfg.NextHop, &nextHop)
+		RouteServiceHandler.ProcessRouteUpdateConfig(&cfg, &cfg, nil)
+	} else if selectedRouteInfoRecord.ipType == ipv6 {
+		cfg := ribd.IPv6Route{
+			DestinationNw: selectedRouteInfoRecord.destNetIp.String(),
+			Protocol:      ReverseRouteProtoTypeMapDB[int(selectedRouteInfoRecord.protocol)],
+			Cost:          int32(selectedRouteInfoRecord.metric),
+			NetworkMask:   selectedRouteInfoRecord.networkMask.String(),
+		}
+		nextHop := ribd.NextHopInfo{
+			NextHopIp:     selectedRouteInfoRecord.nextHopIp.String(),
+			NextHopIntRef: nextHopIf,
+		}
+		cfg.NextHop = make([]*ribd.NextHopInfo, 0)
+		cfg.NextHop = append(cfg.NextHop, &nextHop)
+		RouteServiceHandler.Processv6RouteUpdateConfig(&cfg, &cfg, nil)
+	}
 	return err
 }
 func policyEngineTraverseAndUpdate() {
