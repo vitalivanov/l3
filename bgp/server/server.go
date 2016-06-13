@@ -971,7 +971,6 @@ func (server *BGPServer) listenChannelUpdates() {
 				server.addPeerToList(peer)
 				server.NeighborMutex.Unlock()
 			}
-			peer.ProcessBfd(true)
 			peer.Init()
 
 		case remPeer := <-server.RemPeerCh:
@@ -987,7 +986,6 @@ func (server *BGPServer) listenChannelUpdates() {
 			server.NeighborMutex.Unlock()
 			delete(server.PeerMap, remPeer)
 			peer.Cleanup()
-			peer.ProcessBfd(false)
 			server.ProcessRemoveNeighbor(remPeer, peer)
 
 		case groupUpdate := <-server.AddPeerGroupCh:
