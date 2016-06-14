@@ -210,10 +210,12 @@ func (m RIBDServer) RouteConfigValidationCheckForUpdate(oldcfg *ribd.IPv4Route, 
 			return errors.New("Invalid destination ip/network Mask")
 		}
 		cfg.DestinationNw = ip.String()
+		oldcfg.DestinationNw = ip.String()
 		ipMask := make(net.IP, 4)
 		copy(ipMask, ipNet.Mask)
 		ipMaskStr := net.IP(ipMask).String()
 		cfg.NetworkMask = ipMaskStr
+		oldcfg.NetworkMask = ipMaskStr
 	}
 	_, err = validateNetworkPrefix(cfg.DestinationNw, cfg.NetworkMask)
 	if err != nil {
@@ -306,10 +308,12 @@ func (m RIBDServer) RouteConfigValidationCheckForPatchUpdate(oldcfg *ribd.IPv4Ro
 			return errors.New("Invalid destination ip/network Mask")
 		}
 		cfg.DestinationNw = ip.String()
+		oldcfg.DestinationNw = ip.String()
 		ipMask := make(net.IP, 4)
 		copy(ipMask, ipNet.Mask)
 		ipMaskStr := net.IP(ipMask).String()
 		cfg.NetworkMask = ipMaskStr
+		oldcfg.NetworkMask = ipMaskStr
 	}
 	_, err = validateNetworkPrefix(cfg.DestinationNw, cfg.NetworkMask)
 	if err != nil {
@@ -602,10 +606,12 @@ func (m RIBDServer) IPv6RouteConfigValidationCheckForPatchUpdate(oldcfg *ribd.IP
 			return errors.New("Invalid destination ip/network Mask")
 		}
 		cfg.DestinationNw = ip.String()
+		oldcfg.DestinationNw = ip.String()
 		ipMask := make(net.IP, 16)
 		copy(ipMask, ipNet.Mask)
 		ipMaskStr := net.IP(ipMask).String()
 		cfg.NetworkMask = ipMaskStr
+		oldcfg.NetworkMask = ipMaskStr
 	}
 	_, err = validateNetworkPrefix(cfg.DestinationNw, cfg.NetworkMask)
 	if err != nil {
@@ -649,10 +655,20 @@ func (m RIBDServer) IPv6RouteConfigValidationCheckForPatchUpdate(oldcfg *ribd.IP
 					   Check if the next hop ref is valid L3 interface for add operation
 					*/
 					logger.Debug(fmt.Sprintln("IntRef before : ", val.NextHopIntRef))
-					val.NextHopIntRef, err = m.ConvertIntfStrToIfIndexStr(val.NextHopIntRef)
-					if err != nil {
-						logger.Err(fmt.Sprintln("Invalid NextHop IntRef ", val.NextHopIntRef))
-						return errors.New("Invalid NextHop Intref")
+					if val.NextHopIntRef == "" {
+						logger.Info(fmt.Sprintln("NextHopIntRef not set"))
+						nhIntf, err := RouteServiceHandler.GetRouteReachabilityInfo(val.NextHopIp)
+						if err != nil {
+							logger.Err(fmt.Sprintln("next hop ip ", val.NextHopIp, " not reachable"))
+							return errors.New(fmt.Sprintln("next hop ip ", val.NextHopIp, " not reachable"))
+						}
+						val.NextHopIntRef = strconv.Itoa(int(nhIntf.NextHopIfIndex))
+					} else {
+						val.NextHopIntRef, err = m.ConvertIntfStrToIfIndexStr(val.NextHopIntRef)
+						if err != nil {
+							logger.Err(fmt.Sprintln("Invalid NextHop IntRef ", val.NextHopIntRef))
+							return err
+						}
 					}
 					logger.Debug(fmt.Sprintln("IntRef after : ", val.NextHopIntRef))
 				case "remove":
