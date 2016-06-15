@@ -510,10 +510,12 @@ func (m RIBDServer) IPv6RouteConfigValidationCheckForUpdate(oldcfg *ribd.IPv6Rou
 			return errors.New("Invalid destination ip/network Mask")
 		}
 		cfg.DestinationNw = ip.String()
+		oldcfg.DestinationNw = ip.String()
 		ipMask := make(net.IP, 16)
 		copy(ipMask, ipNet.Mask)
 		ipMaskStr := net.IP(ipMask).String()
 		cfg.NetworkMask = ipMaskStr
+		oldcfg.NetworkMask = ipMaskStr
 	}
 	_, err = validateNetworkPrefix(cfg.DestinationNw, cfg.NetworkMask)
 	if err != nil {
@@ -530,7 +532,7 @@ func (m RIBDServer) IPv6RouteConfigValidationCheckForUpdate(oldcfg *ribd.IPv6Rou
 		for i := 0; i < objTyp.NumField(); i++ {
 			objName := objTyp.Field(i).Name
 			if attrset[i] {
-				logger.Debug(fmt.Sprintf("ProcessRouteUpdateConfig (server): changed ", objName))
+				logger.Debug(fmt.Sprintf("Processv6RouteUpdateConfig (server validation): changed ", objName))
 				if objName == "Protocol" {
 					/*
 					   Updating route protocol type is not allowed
@@ -593,6 +595,7 @@ func (m RIBDServer) IPv6RouteConfigValidationCheckForPatchUpdate(oldcfg *ribd.IP
 	logger.Info(fmt.Sprintln("IPv6RouteConfigValidationCheckForPatchUpdate"))
 	isCidr := strings.Contains(cfg.DestinationNw, "/")
 	if isCidr {
+		logger.Debug("cidr address")
 		/*
 		   the given address is in CIDR format
 		*/
@@ -605,6 +608,7 @@ func (m RIBDServer) IPv6RouteConfigValidationCheckForPatchUpdate(oldcfg *ribd.IP
 		if err != nil {
 			return errors.New("Invalid destination ip/network Mask")
 		}
+		logger.Debug(fmt.Sprintln("At the beginning oldcfg.destinationnw:", oldcfg.DestinationNw, " cfg.DesinationNw:", cfg.DestinationNw))
 		cfg.DestinationNw = ip.String()
 		oldcfg.DestinationNw = ip.String()
 		ipMask := make(net.IP, 16)
@@ -612,6 +616,7 @@ func (m RIBDServer) IPv6RouteConfigValidationCheckForPatchUpdate(oldcfg *ribd.IP
 		ipMaskStr := net.IP(ipMask).String()
 		cfg.NetworkMask = ipMaskStr
 		oldcfg.NetworkMask = ipMaskStr
+		logger.Debug(fmt.Sprintln("After conversion oldcfg.destinationnw:", oldcfg.DestinationNw, " cfg.DesinationNw:", cfg.DestinationNw))
 	}
 	_, err = validateNetworkPrefix(cfg.DestinationNw, cfg.NetworkMask)
 	if err != nil {

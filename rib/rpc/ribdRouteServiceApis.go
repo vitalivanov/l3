@@ -219,11 +219,13 @@ func (m RIBDServicesHandler) UpdateIPv6Route(origconfig *ribd.IPv6Route, newconf
 	   validate route config parameters for update operation
 	*/
 	if op == nil || len(op) == 0 {
+		logger.Debug(fmt.Sprintln("UpdateIPv6Route:At the beginning origconfig.destinationnw:", origconfig.DestinationNw, " newconfig.DesinationNw:", newconfig.DestinationNw))
 		err = m.server.IPv6RouteConfigValidationCheckForUpdate(origconfig, newconfig, attrset)
 		if err != nil {
 			logger.Err(fmt.Sprintln("validation check failed with error ", err))
 			return false, err
 		}
+		logger.Debug(fmt.Sprintln("UpdateIPv6Route:At the end origconfig.destinationnw:", origconfig.DestinationNw, " newconfig.DesinationNw:", newconfig.DestinationNw))
 	} else {
 		err = m.server.IPv6RouteConfigValidationCheckForPatchUpdate(origconfig, newconfig, op)
 		if err != nil {
@@ -231,6 +233,7 @@ func (m RIBDServicesHandler) UpdateIPv6Route(origconfig *ribd.IPv6Route, newconf
 			return false, err
 		}
 	}
+	logger.Debug(fmt.Sprintln("UpdateIPv6Route:Call routeconfch origconfig.destinationnw:", origconfig.DestinationNw, " newconfig.DesinationNw:", newconfig.DestinationNw))
 	m.server.RouteConfCh <- server.RIBdServerConfig{
 		OrigConfigObject: origconfig,
 		NewConfigObject:  newconfig,

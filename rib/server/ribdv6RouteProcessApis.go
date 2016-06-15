@@ -92,10 +92,20 @@ func (m RIBDServer) Processv6RoutePatchUpdateConfig(origconfig *ribd.IPv6Route, 
 				logger.Debug(fmt.Sprintln("nextHop info: ip - ", val.NextHopIp, " intf: ", val.NextHopIntRef, " wt:", val.Weight))
 				//wt,_ := strconv.Atoi((op[idx].Value[j]["Weight"]))
 				logger.Debug(fmt.Sprintln("IntRef before : ", val.NextHopIntRef))
-				val.NextHopIntRef, err = m.ConvertIntfStrToIfIndexStr(val.NextHopIntRef)
-				if err != nil {
-					logger.Err(fmt.Sprintln("Invalid NextHop IntRef ", val.NextHopIntRef))
-					return ret, errors.New("Invalid NextHop Intref")
+				if val.NextHopIntRef == "" {
+					logger.Info(fmt.Sprintln("NextHopIntRef not set"))
+					nhIntf, err := RouteServiceHandler.GetRouteReachabilityInfo(val.NextHopIp)
+					if err != nil {
+						logger.Err(fmt.Sprintln("next hop ip ", val.NextHopIp, " not reachable"))
+						return ret,errors.New(fmt.Sprintln("next hop ip ", val.NextHopIp, " not reachable"))
+					}
+					val.NextHopIntRef = strconv.Itoa(int(nhIntf.NextHopIfIndex))
+				} else {
+					val.NextHopIntRef, err = m.ConvertIntfStrToIfIndexStr(val.NextHopIntRef)
+					if err != nil {
+						logger.Err(fmt.Sprintln("Invalid NextHop IntRef ", val.NextHopIntRef))
+						return ret, err
+					}
 				}
 				logger.Debug(fmt.Sprintln("IntRef after : ", val.NextHopIntRef))
 				nh := ribd.NextHopInfo{
@@ -121,7 +131,7 @@ func (m RIBDServer) Processv6RoutePatchUpdateConfig(origconfig *ribd.IPv6Route, 
 }
 
 func (m RIBDServer) Processv6RouteUpdateConfig(origconfig *ribd.IPv6Route, newconfig *ribd.IPv6Route, attrset []bool) (val bool, err error) {
-	logger.Debug(fmt.Sprintln("Processv6RouteUpdateConfig:Received update route request "))
+	logger.Debug(fmt.Sprintln("Processv6RouteUpdateConfig:Received update route request origconfig.DestinationNw:", origconfig.DestinationNw, " newconfig.DestinationNw:", newconfig.DestinationNw))
 	if !RouteServiceHandler.AcceptConfig {
 		logger.Debug("Not ready to accept config")
 		//return err
@@ -153,7 +163,7 @@ func (m RIBDServer) Processv6RouteUpdateConfig(origconfig *ribd.IPv6Route, newco
 		for i := 0; i < objTyp.NumField(); i++ {
 			objName := objTyp.Field(i).Name
 			if attrset[i] {
-				logger.Debug(fmt.Sprintf("ProcessRouteUpdateConfig (server): changed ", objName))
+				logger.Debug(fmt.Sprintf("Processv6RouteUpdateConfig (server): changed ", objName))
 				if objName == "NextHop" {
 					if len(newconfig.NextHop) == 0 {
 						logger.Err("Must specify next hop")
