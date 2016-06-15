@@ -13,13 +13,13 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 // rib.go
 package server
@@ -33,6 +33,7 @@ import (
 	"net"
 	"sync"
 	"time"
+	"utils/dbutils"
 	"utils/logging"
 )
 
@@ -64,11 +65,13 @@ type AdjRib struct {
 	destPathMap      map[string]*Destination
 	reachabilityMap  map[string]*ReachabilityInfo
 	unreachablePaths map[string]map[*Path]map[*Destination][]uint32
-	routeList        []*Route
+	routeList        []*Destination
 	routeMutex       sync.RWMutex
 	routeListDirty   bool
 	activeGet        bool
 	timer            *time.Timer
+	dbUtil           *dbutils.DBUtil
+	routeStateCh     chan RouteInfo
 }
 
 func NewAdjRib(logger *logging.Writer, rMgr config.RouteMgrIntf,
@@ -80,14 +83,25 @@ func NewAdjRib(logger *logging.Writer, rMgr config.RouteMgrIntf,
 		destPathMap:      make(map[string]*Destination),
 		reachabilityMap:  make(map[string]*ReachabilityInfo),
 		unreachablePaths: make(map[string]map[*Path]map[*Destination][]uint32),
-		routeList:        make([]*Route, 0),
+		routeList:        make([]*Destination, 0),
 		routeListDirty:   false,
 		activeGet:        false,
 		routeMutex:       sync.RWMutex{},
+		routeStateCh:     make(chan RouteInfo, 100),
 	}
 
 	rib.timer = time.AfterFunc(time.Duration(100)*time.Second, rib.ResetRouteList)
 	rib.timer.Stop()
+
+	// Start DB Util
+	dbUtil := dbutils.NewDBUtil(logger)
+	err := dbUtil.Connect()
+	if err != nil {
+		logger.Err(fmt.Sprintf("RIB - DB connect failed with error %s. Exiting!!", err))
+		return nil
+	}
+	rib.dbUtil = dbUtil
+
 	return rib
 }
 
@@ -140,19 +154,22 @@ func (adjRib *AdjRib) GetDest(nlri packet.NLRI, createIfNotExist bool) (*Destina
 	if !ok && createIfNotExist {
 		dest = NewDestination(adjRib, nlri.GetPrefix(), adjRib.gConf)
 		adjRib.destPathMap[nlri.GetPrefix().Prefix.String()] = dest
+		adjRib.addRoutesToRouteList(dest)
 	}
 
 	return dest, ok
 }
 
 func (adjRib *AdjRib) updateRouteList(addedRoutes, updatedRoutes, deletedRoutes []*Route) {
-	if len(addedRoutes) > 0 {
-		adjRib.addRoutesToRouteList(addedRoutes)
-	}
+	/*
+		if len(addedRoutes) > 0 {
+			adjRib.addRoutesToRouteList(addedRoutes)
+		}
 
-	if len(deletedRoutes) > 0 {
-		adjRib.removeRoutesFromRouteList(deletedRoutes)
-	}
+		if len(deletedRoutes) > 0 {
+			adjRib.removeRoutesFromRouteList(deletedRoutes)
+		}
+	*/
 }
 
 func (adjRib *AdjRib) updateRibOutInfo(action RouteAction, addPathsMod bool, addRoutes,
@@ -167,7 +184,7 @@ func (adjRib *AdjRib) updateRibOutInfo(action RouteAction, addPathsMod bool, add
 		updatedAddPaths = append(updatedAddPaths, dest)
 	}
 
-	adjRib.updateRouteList(addRoutes, updRoutes, delRoutes)
+	//adjRib.updateRouteList(addRoutes, updRoutes, delRoutes)
 	return withdrawn, updated, updatedAddPaths
 }
 
@@ -191,6 +208,7 @@ func (adjRib *AdjRib) ProcessRoutes(peerIP string, add []packet.NLRI, addPath *P
 					nlri.GetPrefix().Prefix.String()))
 				continue
 			}
+			op := LocRIBStateUpdate
 			oldPath := dest.RemovePath(peerIP, nlri.GetPathId(), remPath)
 			if oldPath != nil && !oldPath.IsReachable() {
 				nextHopStr := oldPath.GetNextHop().String()
@@ -239,9 +257,12 @@ func (adjRib *AdjRib) ProcessRoutes(peerIP string, add []packet.NLRI, addPath *P
 			}
 			if action == RouteActionDelete {
 				if dest.IsEmpty() {
+					op = LocRIBStateDelete
+					adjRib.removeRoutesFromRouteList(dest)
 					delete(adjRib.destPathMap, nlri.GetPrefix().Prefix.String())
 				}
 			}
+			adjRib.routeStateCh <- RouteInfo{op, dest.GetBGPRoute()}
 		} else {
 			adjRib.logger.Info(fmt.Sprintln("Can't withdraw destination",
 				nlri.GetPrefix().Prefix.String(),
@@ -257,7 +278,11 @@ func (adjRib *AdjRib) ProcessRoutes(peerIP string, add []packet.NLRI, addPath *P
 		}
 
 		adjRib.logger.Info(fmt.Sprintln("Processing nlri", nlri.GetPrefix().Prefix.String()))
-		dest, _ := adjRib.GetDest(nlri, true)
+		op := LocRIBStateUpdate
+		dest, alreadyCreated := adjRib.GetDest(nlri, true)
+		if !alreadyCreated {
+			op = LocRIBStateAdd
+		}
 		if oldPath := dest.getPathForIP(peerIP, nlri.GetPathId()); oldPath == nil &&
 			addPath.NeighborConf != nil {
 			if !addPath.NeighborConf.CanAcceptNewPrefix() {
@@ -288,6 +313,7 @@ func (adjRib *AdjRib) ProcessRoutes(peerIP string, add []packet.NLRI, addPath *P
 			dest.SelectRouteForLocRib(addPathCount)
 		withdrawn, updated, updatedAddPaths = adjRib.updateRibOutInfo(action, addPathsMod,
 			addRoutes, updRoutes, delRoutes, dest, withdrawn, updated, updatedAddPaths)
+		adjRib.routeStateCh <- RouteInfo{op, dest.GetBGPRoute()}
 	}
 
 	return updated, withdrawn, updatedAddPaths, addedAllPrefixes
@@ -320,6 +346,7 @@ func (adjRib *AdjRib) ProcessRoutesForReachableRoutes(nextHop string, reachabili
 					adjRib.updateRibOutInfo(action, addPathsMod, addRoutes,
 						updRoutes, delRoutes, dest, withdrawn,
 						updated, updatedAddPaths)
+				adjRib.routeStateCh <- RouteInfo{LocRIBStateAdd, dest.GetBGPRoute()}
 			}
 		}
 	}
@@ -400,6 +427,7 @@ func (adjRib *AdjRib) RemoveUpdatesFromNeighbor(peerIP string, neighborConf *bas
 	updatedAddPaths := make([]*Destination, 0)
 
 	for destIP, dest := range adjRib.destPathMap {
+		op := LocRIBStateUpdate
 		dest.RemoveAllPaths(peerIP, remPath)
 		action, addPathsMod, addRoutes, updRoutes, delRoutes :=
 			dest.SelectRouteForLocRib(addPathCount)
@@ -413,8 +441,11 @@ func (adjRib *AdjRib) RemoveUpdatesFromNeighbor(peerIP string, neighborConf *bas
 		if action == RouteActionDelete && dest.IsEmpty() {
 			adjRib.logger.Info(fmt.Sprintln("All routes removed for dest",
 				dest.IPPrefix.Prefix.String()))
+			adjRib.removeRoutesFromRouteList(dest)
 			delete(adjRib.destPathMap, destIP)
+			op = LocRIBStateDelete
 		}
+		adjRib.routeStateCh <- RouteInfo{op, dest.GetBGPRoute()}
 	}
 
 	if neighborConf != nil {
@@ -429,6 +460,7 @@ func (adjRib *AdjRib) RemoveUpdatesFromAllNeighbors(addPathCount int) {
 	updatedAddPaths := make([]*Destination, 0)
 
 	for destIP, dest := range adjRib.destPathMap {
+		op := LocRIBStateUpdate
 		dest.RemoveAllNeighborPaths()
 		action, addPathsMod, addRoutes, updRoutes, delRoutes :=
 			dest.SelectRouteForLocRib(addPathCount)
@@ -436,8 +468,11 @@ func (adjRib *AdjRib) RemoveUpdatesFromAllNeighbors(addPathCount int) {
 			delRoutes, dest, withdrawn, updated,
 			updatedAddPaths)
 		if action == RouteActionDelete && dest.IsEmpty() {
+			adjRib.removeRoutesFromRouteList(dest)
 			delete(adjRib.destPathMap, destIP)
+			op = LocRIBStateDelete
 		}
+		adjRib.routeStateCh <- RouteInfo{op, dest.GetBGPRoute()}
 	}
 }
 
@@ -475,6 +510,7 @@ func (adjRib *AdjRib) RemoveRouteFromAggregate(ip *packet.IPPrefix, aggIP *packe
 	}
 	adjRib.logger.Info(fmt.Sprintln("RemoveRouteFromAggregate: locRibPath", dest.LocRibPath,
 		"locRibRoutePath", dest.LocRibPathRoute.path))
+	op := LocRIBStateUpdate
 	path = dest.LocRibPathRoute.path
 	remPath := NewPath(adjRib, nil, path.PathAttrs, true, false, path.routeType)
 
@@ -505,8 +541,11 @@ func (adjRib *AdjRib) RemoveRouteFromAggregate(ip *packet.IPPrefix, aggIP *packe
 		dest.aggPath = aggPath
 	}
 	if action == RouteActionDelete && aggDest.IsEmpty() {
+		adjRib.removeRoutesFromRouteList(dest)
 		delete(adjRib.destPathMap, aggIP.Prefix.String())
+		op = LocRIBStateDelete
 	}
+	adjRib.routeStateCh <- RouteInfo{op, aggDest.GetBGPRoute()}
 
 	return updated, withdrawn, remPath, updatedAddPaths
 }
@@ -531,6 +570,7 @@ func (adjRib *AdjRib) AddRouteToAggregate(ip *packet.IPPrefix, aggIP *packet.IPP
 	path = dest.LocRibPath
 	remPath := NewPath(adjRib, nil, path.PathAttrs, true, false, path.routeType)
 
+	op := LocRIBStateUpdate
 	if aggDest, ok = adjRib.GetDest(aggIP, true); ok {
 		aggPath = aggDest.getPathForIP(srcIP, AggregatePathId)
 		adjRib.logger.Info(fmt.Sprintf("AdjRib:AddRouteToAggregate - aggIP %v found in",
@@ -553,6 +593,7 @@ func (adjRib *AdjRib) AddRouteToAggregate(ip *packet.IPPrefix, aggIP *packet.IPP
 	} else {
 		adjRib.logger.Info(fmt.Sprintf("AdjRib:AddRouteToAggregate - aggIP %v,",
 			"agg path NOT found, create new path", aggIP))
+		op = LocRIBStateAdd
 		pathAttrs := packet.ConstructPathAttrForAggRoutes(path.PathAttrs, bgpAgg.GenerateASSet)
 		packet.SetNextHopPathAttrs(pathAttrs, ifaceIP)
 		packet.SetPathAttrAggregator(pathAttrs, adjRib.gConf.AS, adjRib.gConf.RouterId)
@@ -570,44 +611,39 @@ func (adjRib *AdjRib) AddRouteToAggregate(ip *packet.IPPrefix, aggIP *packet.IPP
 		}
 	}
 
+	adjRib.routeStateCh <- RouteInfo{op, aggDest.GetBGPRoute()}
 	if aggPath != nil {
 		aggPath.SetUpdate(false)
 	}
 	return updated, withdrawn, remPath, updatedAddPaths
 }
 
-func (adjRib *AdjRib) removeRoutesFromRouteList(routes []*Route) {
+func (adjRib *AdjRib) removeRoutesFromRouteList(dest *Destination) {
 	defer adjRib.routeMutex.Unlock()
 	adjRib.routeMutex.Lock()
-	adjRib.logger.Info(fmt.Sprintln("removeRoutesFromRouteList: routes =", routes))
-	for _, route := range routes {
-		idx := route.routeListIdx
-		if idx != -1 {
-			adjRib.logger.Info(fmt.Sprintln(
-				"removeRoutesFromRouteList: remove route at idx", idx))
-			if !adjRib.activeGet {
-				adjRib.routeList[idx] = adjRib.routeList[len(adjRib.routeList)-1]
-				adjRib.routeList[idx].setIdx(idx)
-				adjRib.routeList[len(adjRib.routeList)-1] = nil
-				adjRib.routeList = adjRib.routeList[:len(adjRib.routeList)-1]
-			} else {
-				adjRib.routeList[idx] = nil
-				adjRib.routeListDirty = true
-			}
+	idx := dest.routeListIdx
+	if idx != -1 {
+		adjRib.logger.Info(fmt.Sprintln(
+			"removeRoutesFromRouteList: remove dest at idx", idx))
+		if !adjRib.activeGet {
+			adjRib.routeList[idx] = adjRib.routeList[len(adjRib.routeList)-1]
+			adjRib.routeList[idx].routeListIdx = idx
+			adjRib.routeList[len(adjRib.routeList)-1] = nil
+			adjRib.routeList = adjRib.routeList[:len(adjRib.routeList)-1]
+		} else {
+			adjRib.routeList[idx] = nil
+			adjRib.routeListDirty = true
 		}
 	}
 }
 
-func (adjRib *AdjRib) addRoutesToRouteList(routes []*Route) {
+func (adjRib *AdjRib) addRoutesToRouteList(dest *Destination) {
 	defer adjRib.routeMutex.Unlock()
 	adjRib.routeMutex.Lock()
-	adjRib.logger.Info(fmt.Sprintln("addRoutesToRouteList: routes =", routes))
-	for _, route := range routes {
-		adjRib.routeList = append(adjRib.routeList, route)
-		adjRib.logger.Info(fmt.Sprintln("addRoutesToRouteList: added route at idx",
-			len(adjRib.routeList)-1))
-		route.routeListIdx = len(adjRib.routeList) - 1
-	}
+	adjRib.routeList = append(adjRib.routeList, dest)
+	adjRib.logger.Info(fmt.Sprintln("addRoutesToRouteList: added dest at idx",
+		len(adjRib.routeList)-1))
+	dest.routeListIdx = len(adjRib.routeList) - 1
 }
 
 func (adjRib *AdjRib) ResetRouteList() {
@@ -631,7 +667,7 @@ func (adjRib *AdjRib) ResetRouteList() {
 				break
 			}
 			adjRib.routeList[idx] = adjRib.routeList[modIdx]
-			adjRib.routeList[idx].setIdx(idx)
+			adjRib.routeList[idx].routeListIdx = idx
 			adjRib.routeList[modIdx] = nil
 			lastIdx = modIdx
 		}
@@ -665,7 +701,7 @@ func (adjRib *AdjRib) BulkGetBGPRoutes(index int, count int) (int, int, []*bgpd.
 	n := 0
 	result := make([]*bgpd.BGPRouteState, count)
 	for i = index; i < len(adjRib.routeList) && n < count; i++ {
-		if adjRib.routeList[i] != nil && adjRib.routeList[i].path != nil {
+		if adjRib.routeList[i] != nil && len(adjRib.routeList[i].BGPRouteState.Paths) > 0 {
 			result[n] = adjRib.routeList[i].GetBGPRoute()
 			n++
 		}
