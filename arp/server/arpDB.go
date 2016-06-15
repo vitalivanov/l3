@@ -27,7 +27,7 @@ import (
 	"arpd"
 	"fmt"
 	"github.com/garyburd/redigo/redis"
-	"models"
+	"models/objects"
 	"strconv"
 	"utils/dbutils"
 )
@@ -49,7 +49,7 @@ func (server *ARPServer) initiateDB() error {
 }
 
 func (server *ARPServer) getArpGlobalConfig() {
-	var dbObj models.ArpGlobal
+	var dbObj objects.ArpGlobal
 
 	objList, err := dbObj.GetAllObjFromDb(server.dbHdl)
 	if err != nil {
@@ -62,8 +62,8 @@ func (server *ARPServer) getArpGlobalConfig() {
 		return
 	}
 	obj := arpd.NewArpGlobal()
-	dbObject := objList[0].(models.ArpGlobal)
-	models.ConvertarpdArpGlobalObjToThrift(&dbObject, obj)
+	dbObject := objList[0].(objects.ArpGlobal)
+	objects.ConvertarpdArpGlobalObjToThrift(&dbObject, obj)
 	server.logger.Info(fmt.Sprintln("Timeout : ", int(obj.Timeout)))
 	arpConf := ArpConf{
 		RefTimeout: int(obj.Timeout),

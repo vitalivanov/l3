@@ -13,13 +13,13 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 // peer.go
 package server
@@ -441,13 +441,13 @@ func (p *Peer) SendUpdate(updated map[*bgprib.Path][]*bgprib.Destination,
 		p.logger.Info(fmt.Sprintf("Neighbor %s: Send update message withdraw routes:%+v",
 			p.NeighborConf.Neighbor.NeighborAddress, withdrawList))
 		updateMsg := packet.NewBGPUpdateMessage(withdrawList, nil, nil)
-		p.sendUpdateMsg(updateMsg.Clone(), withdrawPath)
+		p.sendUpdateMsg(updateMsg.Clone(), nil)
 		withdrawList = withdrawList[:0]
 	}
 
 	for path, nlriList := range newUpdated {
-		p.logger.Info(fmt.Sprintf("Neighbor %s: Send update message valid routes:%+v",
-			p.NeighborConf.Neighbor.NeighborAddress, nlriList))
+		p.logger.Info(fmt.Sprintf("Neighbor %s: Send update message valid routes:%+v, path attrs:%+v",
+			p.NeighborConf.Neighbor.NeighborAddress, nlriList, path.PathAttrs))
 		updateMsg := packet.NewBGPUpdateMessage(make([]packet.NLRI, 0), path.PathAttrs, nlriList)
 		p.sendUpdateMsg(updateMsg.Clone(), path)
 	}

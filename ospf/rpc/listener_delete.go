@@ -42,10 +42,6 @@ func (h *OSPFHandler) DeleteOspfAreaEntry(ospfAreaConf *ospfd.OspfAreaEntry) (bo
 	return true, nil
 }
 
-func (h *OSPFHandler) DeleteOspfStubAreaEntry(ospfStubAreaConf *ospfd.OspfStubAreaEntry) (bool, error) {
-	h.logger.Info(fmt.Sprintln("Delete Stub Area Config attrs:", ospfStubAreaConf))
-	return true, nil
-}
 
 func (h *OSPFHandler) DeleteOspfIfEntry(ospfIfConf *ospfd.OspfIfEntry) (bool, error) {
 	h.logger.Info(fmt.Sprintln("Delete interface config attrs:", ospfIfConf))
