@@ -49,36 +49,36 @@ type RouteInfo struct {
 }
 
 func (adjRib *AdjRib) addLocRIBRouteStateToDB(route *bgpd.BGPRouteState) error {
-	adjRib.logger.Info(fmt.Sprintln("addLocRIBRouteStateToDB route %s/%d", route.Network, route.CIDRLen))
+	adjRib.logger.Info(fmt.Sprintf("addLocRIBRouteStateToDB route %s/%d", route.Network, route.CIDRLen))
 	var dbObj objects.BGPRouteState
 	objects.ConvertThriftTobgpdBGPRouteStateObj(route, &dbObj)
 	err := adjRib.dbUtil.StoreObjectInDb(&dbObj)
 	if err != nil {
-		adjRib.logger.Err(fmt.Sprintln("Failed to add BGP Route %s/%d to DB with error", route.Network,
+		adjRib.logger.Err(fmt.Sprintf("Failed to add BGP Route %s/%d to DB with error", route.Network,
 			route.CIDRLen, err))
-		return errors.New(fmt.Sprintln("Failed to add BGP Route %s/%d to DB with error", route.Network,
+		return errors.New(fmt.Sprintf("Failed to add BGP Route %s/%d to DB with error", route.Network,
 			route.CIDRLen, err))
 	}
-	adjRib.logger.Info(fmt.Sprintln("Added route %s/%d to DB", route.Network, route.CIDRLen))
+	adjRib.logger.Info(fmt.Sprintf("Added route %s/%d to DB", route.Network, route.CIDRLen))
 	return nil
 }
 
 func (adjRib *AdjRib) delLocRIBRouteStateToDB(route *bgpd.BGPRouteState) error {
-	adjRib.logger.Info(fmt.Sprintln("delLocRIBRouteStateToDB route %s/%d", route.Network, route.CIDRLen))
+	adjRib.logger.Info(fmt.Sprintf("delLocRIBRouteStateToDB route %s/%d", route.Network, route.CIDRLen))
 	var dbObj objects.BGPRouteState
 	objects.ConvertThriftTobgpdBGPRouteStateObj(route, &dbObj)
 	err := adjRib.dbUtil.DeleteObjectFromDb(&dbObj)
 	if err != nil {
-		adjRib.logger.Err(fmt.Sprintln("Failed to delete BGP Route %s/%d from DB with error", route.Network,
+		adjRib.logger.Err(fmt.Sprintf("Failed to delete BGP Route %s/%d from DB with error", route.Network,
 			route.CIDRLen, err))
-		return errors.New(fmt.Sprintln("Failed to delete BGP Route %s/%d from DB with error", route.Network,
+		return errors.New(fmt.Sprintf("Failed to delete BGP Route %s/%d from DB with error", route.Network,
 			route.CIDRLen, err))
 	}
-	adjRib.logger.Info(fmt.Sprintln("Deleted route %s/%d from DB", route.Network, route.CIDRLen))
+	adjRib.logger.Info(fmt.Sprintf("Deleted route %s/%d from DB", route.Network, route.CIDRLen))
 	return nil
 }
 
-func (adjRib *AdjRib) StartRIBStateReceiver() {
+func (adjRib *AdjRib) StartLocRIBRouteReceiver() {
 	adjRib.logger.Info("Starting the LocRIB route state receiver")
 	var err error
 
@@ -92,9 +92,9 @@ func (adjRib *AdjRib) StartRIBStateReceiver() {
 				err = adjRib.delLocRIBRouteStateToDB(info.route)
 			} else if info.operation == LocRIBStateUpdate {
 				//err = adjRib.updLocRIBRouteStateToDB(info.route)
-				err = adjRib.addLocRIBRouteStateToDB(info.route)
+				err = adjRib.delLocRIBRouteStateToDB(info.route)
 				if err == nil {
-					err = adjRib.delLocRIBRouteStateToDB(info.route)
+					err = adjRib.addLocRIBRouteStateToDB(info.route)
 				}
 			} else {
 				adjRib.logger.Err(fmt.Sprintf("Recieved unknown route state change operation %d", info.operation))

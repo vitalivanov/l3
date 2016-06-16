@@ -102,6 +102,7 @@ func NewAdjRib(logger *logging.Writer, rMgr config.RouteMgrIntf,
 	}
 	rib.dbUtil = dbUtil
 
+	go rib.StartLocRIBRouteReceiver()
 	return rib
 }
 
@@ -160,18 +161,6 @@ func (adjRib *AdjRib) GetDest(nlri packet.NLRI, createIfNotExist bool) (*Destina
 	return dest, ok
 }
 
-func (adjRib *AdjRib) updateRouteList(addedRoutes, updatedRoutes, deletedRoutes []*Route) {
-	/*
-		if len(addedRoutes) > 0 {
-			adjRib.addRoutesToRouteList(addedRoutes)
-		}
-
-		if len(deletedRoutes) > 0 {
-			adjRib.removeRoutesFromRouteList(deletedRoutes)
-		}
-	*/
-}
-
 func (adjRib *AdjRib) updateRibOutInfo(action RouteAction, addPathsMod bool, addRoutes,
 	updRoutes, delRoutes []*Route, dest *Destination, withdrawn []*Destination,
 	updated map[*Path][]*Destination, updatedAddPaths []*Destination) (
@@ -184,7 +173,6 @@ func (adjRib *AdjRib) updateRibOutInfo(action RouteAction, addPathsMod bool, add
 		updatedAddPaths = append(updatedAddPaths, dest)
 	}
 
-	//adjRib.updateRouteList(addRoutes, updRoutes, delRoutes)
 	return withdrawn, updated, updatedAddPaths
 }
 
