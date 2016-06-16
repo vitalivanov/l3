@@ -24,7 +24,7 @@ install:
 before_script:
   - ln -s $HOME/gopath/src/reltools/Makefile $HOME/gopath/src/Makefile
   - export SR_CODE_BASE=$HOME/gopath/src
-  - cd $HOME/gopath/src;make codegen
+  - cd $HOME/gopath/src; make codegen
 
 script:
   - go test ./...
