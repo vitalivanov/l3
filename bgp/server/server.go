@@ -218,8 +218,8 @@ func (server *BGPServer) DoesRouteExist(params interface{}) bool {
 	dest := policyParams.dest
 	if dest == nil {
 		server.logger.Info(fmt.Sprintln("BGPServer:DoesRouteExist - dest not found for ip",
-			policyParams.route.BGPRouteState.Network, "prefix length",
-			policyParams.route.BGPRouteState.CIDRLen))
+			policyParams.route.Dest.BGPRouteState.Network, "prefix length",
+			policyParams.route.Dest.BGPRouteState.CIDRLen))
 		return false
 	}
 
@@ -422,8 +422,8 @@ func (server *BGPServer) setUpdatedWithAggPaths(policyParams *PolicyParams,
 func (server *BGPServer) UndoAggregateAction(actionInfo interface{},
 	conditionList []interface{}, params interface{}, policyStmt utilspolicy.PolicyStmt) {
 	policyParams := params.(PolicyParams)
-	ipPrefix := packet.NewIPPrefix(net.ParseIP(policyParams.route.BGPRouteState.Network),
-		uint8(policyParams.route.BGPRouteState.CIDRLen))
+	ipPrefix := packet.NewIPPrefix(net.ParseIP(policyParams.route.Dest.BGPRouteState.Network),
+		uint8(policyParams.route.Dest.BGPRouteState.CIDRLen))
 	aggPrefix := server.getAggPrefix(conditionList)
 	aggActions := actionInfo.(utilspolicy.PolicyAggregateActionInfo)
 	bgpAgg := config.BGPAggregate{
@@ -456,8 +456,8 @@ func (server *BGPServer) UndoAggregateAction(actionInfo interface{},
 func (server *BGPServer) ApplyAggregateAction(actionInfo interface{},
 	conditionInfo []interface{}, params interface{}) {
 	policyParams := params.(PolicyParams)
-	ipPrefix := packet.NewIPPrefix(net.ParseIP(policyParams.route.BGPRouteState.Network),
-		uint8(policyParams.route.BGPRouteState.CIDRLen))
+	ipPrefix := packet.NewIPPrefix(net.ParseIP(policyParams.route.Dest.BGPRouteState.Network),
+		uint8(policyParams.route.Dest.BGPRouteState.CIDRLen))
 	aggPrefix := server.getAggPrefix(conditionInfo)
 	aggActions := actionInfo.(utilspolicy.PolicyAggregateActionInfo)
 	bgpAgg := config.BGPAggregate{
@@ -517,9 +517,9 @@ func (server *BGPServer) CheckForAggregation(updated map[*bgprib.Path][]*bgprib.
 			continue
 		}
 		peEntity := utilspolicy.PolicyEngineFilterEntityParams{
-			DestNetIp: route.BGPRouteState.Network + "/" +
-				strconv.Itoa(int(route.BGPRouteState.CIDRLen)),
-			NextHopIp:  route.BGPRouteState.NextHop,
+			DestNetIp: route.Dest.BGPRouteState.Network + "/" +
+				strconv.Itoa(int(route.Dest.BGPRouteState.CIDRLen)),
+			NextHopIp:  route.PathInfo.NextHop,
 			DeletePath: true,
 		}
 		server.logger.Info(fmt.Sprintf("BGPServer:checkForAggregate - withdraw dest %s policylist",
@@ -554,9 +554,9 @@ func (server *BGPServer) CheckForAggregation(updated map[*bgprib.Path][]*bgprib.
 				dest.IPPrefix.Prefix.String(), route.PolicyList, route.PolicyHitCounter))
 			if route != nil {
 				peEntity := utilspolicy.PolicyEngineFilterEntityParams{
-					DestNetIp: route.BGPRouteState.Network + "/" +
-						strconv.Itoa(int(route.BGPRouteState.CIDRLen)),
-					NextHopIp:  route.BGPRouteState.NextHop,
+					DestNetIp: route.Dest.BGPRouteState.Network + "/" +
+						strconv.Itoa(int(route.Dest.BGPRouteState.CIDRLen)),
+					NextHopIp:  route.PathInfo.NextHop,
 					CreatePath: true,
 				}
 				callbackInfo := PolicyParams{
@@ -615,9 +615,9 @@ func (server *BGPServer) TraverseAndApplyBGPRib(data interface{}, updateFunc uti
 					continue
 				}
 				peEntity := utilspolicy.PolicyEngineFilterEntityParams{
-					DestNetIp: route.BGPRouteState.Network + "/" +
-						strconv.Itoa(int(route.BGPRouteState.CIDRLen)),
-					NextHopIp:  route.BGPRouteState.NextHop,
+					DestNetIp: route.Dest.BGPRouteState.Network + "/" +
+						strconv.Itoa(int(route.Dest.BGPRouteState.CIDRLen)),
+					NextHopIp:  route.PathInfo.NextHop,
 					PolicyList: route.PolicyList,
 				}
 				callbackInfo := PolicyParams{
@@ -653,8 +653,8 @@ func (server *BGPServer) TraverseAndReverseBGPRib(policyData interface{}) {
 	var route *bgprib.Route
 	for idx := 0; idx < len(policyExtensions.RouteInfoList); idx++ {
 		route = policyExtensions.RouteInfoList[idx]
-		dest := server.AdjRib.GetDestFromIPAndLen(route.BGPRouteState.Network,
-			uint32(route.BGPRouteState.CIDRLen))
+		dest := server.AdjRib.GetDestFromIPAndLen(route.Dest.BGPRouteState.Network,
+			uint32(route.Dest.BGPRouteState.CIDRLen))
 		callbackInfo := PolicyParams{
 			route:           route,
 			dest:            dest,
@@ -663,13 +663,13 @@ func (server *BGPServer) TraverseAndReverseBGPRib(policyData interface{}) {
 			updatedAddPaths: &updatedAddPaths,
 		}
 		peEntity := utilspolicy.PolicyEngineFilterEntityParams{
-			DestNetIp: route.BGPRouteState.Network + "/" +
-				strconv.Itoa(int(route.BGPRouteState.CIDRLen)),
-			NextHopIp: route.BGPRouteState.NextHop,
+			DestNetIp: route.Dest.BGPRouteState.Network + "/" +
+				strconv.Itoa(int(route.Dest.BGPRouteState.CIDRLen)),
+			NextHopIp: route.PathInfo.NextHop,
 		}
 
-		ipPrefix, err := bgppolicy.GetNetworkPrefixFromCIDR(route.BGPRouteState.Network + "/" +
-			strconv.Itoa(int(route.BGPRouteState.CIDRLen)))
+		ipPrefix, err := bgppolicy.GetNetworkPrefixFromCIDR(route.Dest.BGPRouteState.Network + "/" +
+			strconv.Itoa(int(route.Dest.BGPRouteState.CIDRLen)))
 		if err != nil {
 			server.logger.Info(fmt.Sprintln("Invalid route ", ipPrefix))
 			continue
