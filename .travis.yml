@@ -3,18 +3,23 @@ language: go
 go:
   - 1.6
 
-go_import_path: 
+go_import_path: $HOME/gopath/snaproute
 
 before_install:
-  - export GOPATH=$HOME/gopath
+  - mkdir -p $HOME/gopath/snaproute
+  - mkdir -p $HOME/gopath/reltools
+  - mkdir -p $HOME/gopath/external
+  - mkdir -p $HOME/gopath/generated
+  - export GOPATH=$GOPATH:$HOME/gopath/snaproute:$HOME/gopath/external:$HOME/gopath/generated
 
 install:
-  - git clone git@github.com:SnapRoute/asicd.git $HOME/gopath/src/asicd
-  - git clone git@github.com:SnapRoute/reltools.git $HOME/gopath/src/reltools
-  - git clone git@github.com:SnapRoute/models.git $HOME/gopath/src/models
-  - git clone git@github.com:SnapRoute/config.git $HOME/gopath/src/config
-  - git clone git@github.com:SnapRoute/utils.git $HOME/gopath/src/utils
-  - git clone git@github.com:SnapRoute/l2.git $HOME/gopath/src/l2
+  - git clone git@github.com:SnapRoute/asicd.git $HOME/gopath/snaproute/src/asicd
+  - git clone git@github.com:SnapRoute/models.git $HOME/gopath/snaproute/src/models
+  - git clone git@github.com:SnapRoute/config.git $HOME/gopath/snaproute/src/config
+  - git clone git@github.com:SnapRoute/utils.git $HOME/gopath/snaproute/src/utils
+  - git clone git@github.com:SnapRoute/reltools.git $HOME/gopath/reltools
+  - git clone git@github.com:SnapRoute/pyang.git $HOME/gopath/external/src/pyang
+  - git clone git@github.com:SnapRoute/openconfig.git $HOME/gopath/external/src/openconfig
 
 before_script:
   - ln -s $HOME/gopath/src/reltools/Makefile $HOME/gopath/src/Makefile
