@@ -3,9 +3,22 @@ language: go
 go:
   - 1.6
 
-go_import_path: snaproute/src
+go_import_path: 
 
 before_install:
-  - export GOPATH=$HOME/gopath/src/snaproute
+  - export GOPATH=$HOME/gopath
 
-script: go test ./...
+install:
+  - git clone git@github.com:SnapRoute/asicd.git $HOME/gopath/src/asicd
+  - git clone git@github.com:SnapRoute/reltools.git $HOME/gopath/src/reltools
+  - git clone git@github.com:SnapRoute/models.git $HOME/gopath/src/models
+  - git clone git@github.com:SnapRoute/config.git $HOME/gopath/src/config
+  - git clone git@github.com:SnapRoute/utils.git $HOME/gopath/src/utils
+
+before_script:
+  - ln -s $HOME/gopath/src/reltools/Makefile $HOME/gopath/src/Makefile
+  - export SR_CODE_BASE=$HOME/gopath/src
+  - cd $HOME/gopath/src;make codegen
+
+script:
+  - go test ./...
