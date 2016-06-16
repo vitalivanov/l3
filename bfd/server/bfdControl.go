@@ -13,13 +13,13 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 package server
 
@@ -136,14 +136,13 @@ const (
 	DEFAULT_REQUIRED_MIN_RX_INTERVAL      = 250000
 	DEFAULT_REQUIRED_MIN_ECHO_RX_INTERVAL = 0
 	DEFAULT_CONTROL_PACKET_LEN            = 24
-	MAX_NUM_SESSIONS                      = 1024
 	DEST_PORT                             = 3784
 	SRC_PORT                              = 49152
 	DEST_PORT_LAG                         = 6784
 	SRC_PORT_LAG                          = 49153
 	STARTUP_TX_INTERVAL                   = 2000000
 	STARTUP_RX_INTERVAL                   = 2000000
-	TX_JITTER                             = 25 //Timer will be running at 0 to 25% less than TX_INTERVAL
+	TX_JITTER                             = 10 //Timer will be running at 0 to 10% less than TX_INTERVAL
 	//DEDICATED_MAC                         = net.HardwareAddr{0x01, 0x00, 0x5E, 0x90, 0x00, 0x01}
 )
 
