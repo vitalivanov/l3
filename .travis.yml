@@ -16,9 +16,14 @@ before_install:
 
 install:
   - sudo apt-get install python-dev python-bitarray python-paramiko python-netaddr
+  - git clone git@github.com:SnapRoute/apps.git $HOME/gopath/snaproute/src/apps
   - git clone git@github.com:SnapRoute/asicd.git $HOME/gopath/snaproute/src/asicd
-  - git clone git@github.com:SnapRoute/models.git $HOME/gopath/snaproute/src/models
   - git clone git@github.com:SnapRoute/config.git $HOME/gopath/snaproute/src/config
+  - git clone git@github.com:SnapRoute/docs.git $HOME/gopath/snaproute/src/docs
+  - git clone git@github.com:SnapRoute/flexSdk.git $HOME/gopath/snaproute/src/flexSdk
+  - git clone git@github.com:SnapRoute/infra.git $HOME/gopath/snaproute/src/infra
+  - git clone git@github.com:SnapRoute/l2.git $HOME/gopath/snaproute/src/l2
+  - git clone git@github.com:SnapRoute/models.git $HOME/gopath/snaproute/src/models
   - git clone git@github.com:SnapRoute/utils.git $HOME/gopath/snaproute/src/utils
   - git clone git@github.com:SnapRoute/reltools.git $HOME/gopath/reltools
   - git clone git@github.com:SnapRoute/pyang.git $HOME/gopath/external/src/pyang
