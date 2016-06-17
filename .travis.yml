@@ -27,7 +27,7 @@ install:
 before_script:
   - ln -s $HOME/gopath/reltools/Makefile $HOME/gopath/snaproute/src/Makefile
   - export SR_CODE_BASE=$HOME/gopath
-  - cd $HOME/gopath/snaproute/src;make codegen
+  - cd $HOME/gopath/snaproute/src;make buildinfogen;make codegen
 
 script:
   - go test ./...
