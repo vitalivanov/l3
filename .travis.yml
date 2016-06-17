@@ -32,6 +32,7 @@ install:
   - git clone git@github.com:SnapRoute/openconfig.git $HOME/gopath/src/external/src/openconfig
 
 before_script:
+  - rm -f $HOME/gopath/src/snaproute/src/Makefile
   - ln -s $HOME/gopath/src/reltools/Makefile $HOME/gopath/src/snaproute/src/Makefile
   - export SR_CODE_BASE=$HOME/gopath/src
   - cd $HOME/gopath/src/snaproute/src;make buildinfogen;make codegen
