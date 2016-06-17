@@ -571,9 +571,9 @@ func (m RIBDServer) GetRouteReachabilityInfo(destNet string) (nextHopIntf *ribdI
 		if rmapInfoList.selectedRouteProtocol != "INVALID" {
 			found = true
 			routeInfoList, ok := rmapInfoList.routeInfoProtocolMap[rmapInfoList.selectedRouteProtocol]
-			if !ok {
+			if !ok || len(routeInfoList) == 0 {
 				logger.Debug("Selected route not found")
-				return nextHopIntf, err
+				return nil, errors.New("dest ip address not reachable")
 			}
 			v := routeInfoList[0]
 			nextHopIntf.NextHopIp = v.nextHopIp.String()

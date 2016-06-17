@@ -199,6 +199,13 @@ const (
 	BGPPathAttrOriginMax
 )
 
+var BGPPathAttrOriginToStrMap = map[BGPPathAttrOriginType]string{
+	BGPPathAttrOriginIGP:        "IGP",
+	BGPPathAttrOriginEGP:        "EGP",
+	BGPPathAttrOriginIncomplete: "Incomplete",
+	BGPPathAttrOriginMax:        "Unknown",
+}
+
 type BGPASPathSegmentType uint8
 
 const (

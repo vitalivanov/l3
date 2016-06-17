@@ -90,9 +90,11 @@ func (p *Peer) Init() {
 	}
 
 	go p.fsmManager.Init()
+	p.ProcessBfd(true)
 }
 
 func (p *Peer) Cleanup() {
+	p.ProcessBfd(false)
 	p.fsmManager.CloseCh <- true
 	p.fsmManager = nil
 }
@@ -200,7 +202,7 @@ func (p *Peer) ProcessBfd(add bool) {
 			p.logger.Info(fmt.Sprintln("BfdSessionConfig FAILED, ret:",
 				ret, "err:", err))
 		} else {
-			p.logger.Info("Bfd session configured")
+			p.logger.Info(fmt.Sprintln("Bfd session configured: ", ipAddr, " param: ", sessionParam))
 			p.NeighborConf.Neighbor.State.BfdNeighborState = "up"
 		}
 	} else {
