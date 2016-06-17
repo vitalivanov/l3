@@ -3,6 +3,31 @@ language: go
 go:
   - 1.6
 
-go_import_path: $HOME/gopath/src/github.com/SnapRoute
+sudo: required
 
-script: go test ./...
+go_import_path: $HOME/gopath/snaproute
+
+before_install:
+  - mkdir -p $HOME/gopath/snaproute
+  - mkdir -p $HOME/gopath/reltools
+  - mkdir -p $HOME/gopath/external
+  - mkdir -p $HOME/gopath/generated
+  - export GOPATH=$GOPATH:$HOME/gopath/snaproute:$HOME/gopath/external:$HOME/gopath/generated
+
+install:
+  - sudo apt-get install python-dev python-bitarray python-paramiko python-netaddr
+  - git clone git@github.com:SnapRoute/asicd.git $HOME/gopath/snaproute/src/asicd
+  - git clone git@github.com:SnapRoute/models.git $HOME/gopath/snaproute/src/models
+  - git clone git@github.com:SnapRoute/config.git $HOME/gopath/snaproute/src/config
+  - git clone git@github.com:SnapRoute/utils.git $HOME/gopath/snaproute/src/utils
+  - git clone git@github.com:SnapRoute/reltools.git $HOME/gopath/reltools
+  - git clone git@github.com:SnapRoute/pyang.git $HOME/gopath/external/src/pyang
+  - git clone git@github.com:SnapRoute/openconfig.git $HOME/gopath/external/src/openconfig
+
+before_script:
+  - ln -s $HOME/gopath/reltools/Makefile $HOME/gopath/snaproute/src/Makefile
+  - export SR_CODE_BASE=$HOME/gopath
+  - cd $HOME/gopath/snaproute/src;make codegen
+
+script:
+  - go test ./...

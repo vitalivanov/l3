@@ -270,6 +270,17 @@ func (m RIBDServicesHandler) TrackReachabilityStatus(ipAddr string, protocol str
 func (m RIBDServicesHandler) GetIPv4RouteState(destNw string) (*ribd.IPv4RouteState, error) {
 	logger.Info("Get state for IPv4Route")
 	route := ribd.NewIPv4RouteState()
+	if m.server.DbHdl == nil {
+		logger.Err("DbHdl not initialized")
+		return route, errors.New("DBHdl not initialized")
+	}
+	var routeObj objects.IPv4RouteState
+	var routeObjtemp objects.IPv4RouteState
+	obj, err := m.server.DbHdl.GetObjectFromDb(routeObj, destNw)
+	if err == nil {
+		routeObjtemp = obj.(objects.IPv4RouteState)
+		objects.ConvertribdIPv4RouteStateObjToThrift(&routeObjtemp, route)
+	}
 	return route, nil
 }
 

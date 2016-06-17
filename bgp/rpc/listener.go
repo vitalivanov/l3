@@ -804,8 +804,7 @@ func (h *BGPHandler) DeleteBGPPeerGroup(peerGroup *bgpd.BGPPeerGroup) (bool, err
 	return true, nil
 }
 
-func (h *BGPHandler) GetBGPRouteState(network string, cidrLen int16,
-	nextHop string) (*bgpd.BGPRouteState, error) {
+func (h *BGPHandler) GetBGPRouteState(network string, cidrLen int16) (*bgpd.BGPRouteState, error) {
 	bgpRoute := h.server.AdjRib.GetBGPRoute(network)
 	var err error = nil
 	if bgpRoute == nil {
