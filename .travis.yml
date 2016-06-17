@@ -5,6 +5,8 @@ go:
 
 sudo: required
 
+cache: false
+
 go_import_path: snaproute/src
 
 before_install:
