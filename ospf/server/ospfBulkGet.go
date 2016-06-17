@@ -250,7 +250,9 @@ func (server *OSPFServer) GetBulkOspfNbrEntryState(idx int, cnt int) (int, int, 
 	server.logger.Info(fmt.Sprintln("Getbulk: nbr states called."))
 	var nextIdx int
 	var count int
-
+	if len(server.neighborBulkSlice) < 1 {
+		return 0,0, nil
+	}
 	server.neighborSliceStartCh <- false
 	/*	if ret == false {
 		server.logger.Err("Ospf is busy refreshing the cache")
