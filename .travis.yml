@@ -19,7 +19,7 @@ before_install:
 install:
   - sudo apt-get install python-dev python-bitarray python-paramiko python-netaddr
   - sudo apt-get install libboost-dev libboost-test-dev libboost-program-options-dev libboost-system-dev libboost-filesystem-dev libevent-dev automake libtool flex bison pkg-config g++ libssl-dev ant
-  - wget -O $HOME/.tmp/thrift-0.9.3.tar.gz http://apache.arvixe.com/thrift/0.9.3/thrift-0.9.3.tar.gz
+  - wget -O $HOME/.tmp/thrift-0.9.3.tar.gz http://www-us.apache.org/dist/thrift/0.9.3/thrift-0.9.3.tar.gz
   - cd $HOME/.tmp;tar -xvf thrift-0.9.3.tar.gz;./configure;make;sudo make install
   - ls -alt $HOME/gopath/src/snaproute/src
   - git clone git@github.com:SnapRoute/apps.git $HOME/gopath/src/snaproute/src/apps
