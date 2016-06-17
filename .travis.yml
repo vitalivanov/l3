@@ -13,7 +13,7 @@ before_install:
   - mkdir -p $HOME/gopath/src/reltools
   - mkdir -p $HOME/gopath/src/external/src
   - mkdir -p $HOME/gopath/src/generated/src
-  - mkdit -p $HOME/.tmp
+  - mkdir -p $HOME/.tmp
   - export GOPATH=$GOPATH:$HOME/gopath/src/snaproute:$HOME/gopath/src/external:$HOME/gopath/src/generated
 
 install:
