@@ -5,34 +5,35 @@ go:
 
 sudo: required
 
-go_import_path: $HOME/gopath/snaproute
+cache: false
+
+go_import_path: snaproute/src
 
 before_install:
-  - mkdir -p $HOME/gopath/snaproute
-  - mkdir -p $HOME/gopath/reltools
-  - mkdir -p $HOME/gopath/external
-  - mkdir -p $HOME/gopath/generated
-  - export GOPATH=$GOPATH:$HOME/gopath/snaproute:$HOME/gopath/external:$HOME/gopath/generated
+  - mkdir -p $HOME/gopath/src/reltools
+  - mkdir -p $HOME/gopath/src/external/src
+  - mkdir -p $HOME/gopath/src/generated/src
+  - export GOPATH=$GOPATH:$HOME/gopath/src/snaproute:$HOME/gopath/src/external:$HOME/gopath/src/generated
 
 install:
   - sudo apt-get install python-dev python-bitarray python-paramiko python-netaddr
-  - git clone git@github.com:SnapRoute/apps.git $HOME/gopath/snaproute/src/apps
-  - git clone git@github.com:SnapRoute/asicd.git $HOME/gopath/snaproute/src/asicd
-  - git clone git@github.com:SnapRoute/config.git $HOME/gopath/snaproute/src/config
-  - git clone git@github.com:SnapRoute/docs.git $HOME/gopath/snaproute/src/docs
-  - git clone git@github.com:SnapRoute/flexSdk.git $HOME/gopath/snaproute/src/flexSdk
-  - git clone git@github.com:SnapRoute/infra.git $HOME/gopath/snaproute/src/infra
-  - git clone git@github.com:SnapRoute/l2.git $HOME/gopath/snaproute/src/l2
-  - git clone git@github.com:SnapRoute/models.git $HOME/gopath/snaproute/src/models
-  - git clone git@github.com:SnapRoute/utils.git $HOME/gopath/snaproute/src/utils
-  - git clone git@github.com:SnapRoute/reltools.git $HOME/gopath/reltools
-  - git clone git@github.com:SnapRoute/pyang.git $HOME/gopath/external/src/pyang
-  - git clone git@github.com:SnapRoute/openconfig.git $HOME/gopath/external/src/openconfig
+  - git clone git@github.com:SnapRoute/apps.git $HOME/gopath/src/snaproute/src/apps
+  - git clone git@github.com:SnapRoute/asicd.git $HOME/gopath/src/snaproute/src/asicd
+  - git clone git@github.com:SnapRoute/config.git $HOME/gopath/src/snaproute/src/config
+  - git clone git@github.com:SnapRoute/docs.git $HOME/gopath/src/snaproute/src/docs
+  - git clone git@github.com:SnapRoute/flexSdk.git $HOME/gopath/src/snaproute/src/flexSdk
+  - git clone git@github.com:SnapRoute/infra.git $HOME/gopath/src/snaproute/src/infra
+  - git clone git@github.com:SnapRoute/l2.git $HOME/gopath/src/snaproute/src/l2
+  - git clone git@github.com:SnapRoute/models.git $HOME/gopath/src/snaproute/src/models
+  - git clone git@github.com:SnapRoute/utils.git $HOME/gopath/src/snaproute/src/utils
+  - git clone git@github.com:SnapRoute/reltools.git $HOME/gopath/src/reltools
+  - git clone git@github.com:SnapRoute/pyang.git $HOME/gopath/src/external/src/pyang
+  - git clone git@github.com:SnapRoute/openconfig.git $HOME/gopath/src/external/src/openconfig
 
 before_script:
-  - ln -s $HOME/gopath/reltools/Makefile $HOME/gopath/snaproute/src/Makefile
-  - export SR_CODE_BASE=$HOME/gopath
-  - cd $HOME/gopath/snaproute/src;make buildinfogen;make codegen
+  - ln -s $HOME/gopath/src/reltools/Makefile $HOME/gopath/src/snaproute/src/Makefile
+  - export SR_CODE_BASE=$HOME/gopath/src
+  - cd $HOME/gopath/src/snaproute/src;make buildinfogen;make codegen
 
 script:
   - go test ./...
