@@ -5,7 +5,7 @@ go:
 
 sudo: required
 
-#dist: trusty
+dist: trusty
 
 cache: false
 
@@ -20,6 +20,7 @@ before_install:
 
 install:
   - sudo apt-get update
+  - echo $PYTHONPATH
   - ls -al /usr/bin/python*
   - ls -l /usr/lib/python*
   - ls -l /usr/lib/python2.7/dist-packages/
@@ -30,6 +31,7 @@ install:
   - sudo apt-get install -y python-bitarray
   - sudo apt-get install -y python-paramiko python-netaddr
   - sudo apt-get install -y libboost-dev libboost-test-dev libboost-program-options-dev libboost-system-dev libboost-filesystem-dev libevent-dev automake libtool flex bison pkg-config g++ libssl-dev ant
+  - echo $PYTHONPATH
   - ls -al /usr/bin/python*
   - ls -l /usr/lib/python*
   - ls -l /usr/lib/python2.7/dist-packages/
@@ -53,6 +55,7 @@ install:
 
 before_script:
   - sudo apt-get install -y python-bitarray
+  - echo $PYTHONPATH
   - ls -al /usr/bin/python*
   - ls -l /usr/lib/python*
   - ls -l /usr/lib/python2.7/dist-packages/
