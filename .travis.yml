@@ -19,7 +19,13 @@ before_install:
   - export GOPATH=$GOPATH:$HOME/gopath/src/snaproute:$HOME/gopath/src/external:$HOME/gopath/src/generated
 
 install:
-  - sudo apt-get install -y python-dev python-bitarray python-paramiko python-netaddr
+  - sudo apt-get update
+  - sudo apt-get install -y build-essential
+  - sudo apt-get install -y gccgo-4.8
+  - sudo apt-get install -y git
+  - sudo apt-get install -y python-dev
+  - sudo apt-get install -y python-bitarray
+  - sudo apt-get install -y python-paramiko python-netaddr
   - sudo apt-get install -y libboost-dev libboost-test-dev libboost-program-options-dev libboost-system-dev libboost-filesystem-dev libevent-dev automake libtool flex bison pkg-config g++ libssl-dev ant
 #  - sudo apt-get install thrift-compiler
   - wget -O $HOME/.tmp/thrift-0.9.3.tar.gz http://www-us.apache.org/dist/thrift/0.9.3/thrift-0.9.3.tar.gz
@@ -40,6 +46,7 @@ install:
   - ls -alt $HOME/gopath/src/snaproute/src
 
 before_script:
+  - sudo apt-get install -y python-bitarray
   - ln -s $HOME/gopath/src/reltools/Makefile $HOME/gopath/src/snaproute/src/Makefile
   - ls -alt $HOME/gopath/src/snaproute/src
   - export SR_CODE_BASE=$HOME/gopath/src
