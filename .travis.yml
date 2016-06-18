@@ -5,7 +5,7 @@ go:
 
 sudo: required
 
-dist: trusty
+#dist: trusty
 
 cache: false
 
@@ -20,6 +20,9 @@ before_install:
 
 install:
   - sudo apt-get update
+  - ls -al /usr/bin/python*
+  - ls -l /usr/lib/python*
+  - ls -l /usr/lib/python2.7/dist-packages/
   - sudo apt-get install -y build-essential
   - sudo apt-get install -y gccgo-4.8
   - sudo apt-get install -y git
@@ -27,6 +30,9 @@ install:
   - sudo apt-get install -y python-bitarray
   - sudo apt-get install -y python-paramiko python-netaddr
   - sudo apt-get install -y libboost-dev libboost-test-dev libboost-program-options-dev libboost-system-dev libboost-filesystem-dev libevent-dev automake libtool flex bison pkg-config g++ libssl-dev ant
+  - ls -al /usr/bin/python*
+  - ls -l /usr/lib/python*
+  - ls -l /usr/lib/python2.7/dist-packages/
 #  - sudo apt-get install thrift-compiler
   - wget -O $HOME/.tmp/thrift-0.9.3.tar.gz http://www-us.apache.org/dist/thrift/0.9.3/thrift-0.9.3.tar.gz
   - cd $HOME/.tmp;tar -xvf thrift-0.9.3.tar.gz;cd thrift-0.9.3;./configure --with-java=no --with-ruby=no --with-erlang=no --with-nodejs=no;make;sudo make install
@@ -47,6 +53,9 @@ install:
 
 before_script:
   - sudo apt-get install -y python-bitarray
+  - ls -al /usr/bin/python*
+  - ls -l /usr/lib/python*
+  - ls -l /usr/lib/python2.7/dist-packages/
   - ln -s $HOME/gopath/src/reltools/Makefile $HOME/gopath/src/snaproute/src/Makefile
   - ls -alt $HOME/gopath/src/snaproute/src
   - export SR_CODE_BASE=$HOME/gopath/src
