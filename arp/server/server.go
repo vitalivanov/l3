@@ -32,7 +32,7 @@ import (
 	"utils/asicdClient"
 	"utils/commonDefs"
 	"utils/dbutils"
-	"utils/eventUtils"
+	//"utils/eventUtils"
 	"utils/logging"
 )
 
@@ -232,10 +232,10 @@ func (server *ARPServer) InitServer(asicdPlugin asicdClient.AsicdClientIntf) {
 	}
 
 	// Initialize Events
-	err = eventUtils.InitEvents("ARPD", server.dbHdl, server.logger)
-	if err != nil {
-		server.logger.Err(fmt.Sprintln("Unable to initialize events", err))
-	}
+	//err = eventUtils.InitEvents("ARPD", server.dbHdl, server.logger)
+	//if err != nil {
+	//	server.logger.Err(fmt.Sprintln("Unable to initialize events", err))
+	//}
 
 	sigChan := make(chan os.Signal, 1)
 	signalList := []os.Signal{syscall.SIGHUP}
