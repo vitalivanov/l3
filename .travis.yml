@@ -35,6 +35,9 @@ install:
   - ls -al /usr/bin/python*
   - ls -l /usr/lib/python*
   - ls -l /usr/lib/python2.7/dist-packages/
+  - ls -l /usr/lib/python2.7/dist-packages/bitarray
+  - pip install bitarray
+  - ls -l /usr/lib/python2.7/dist-packages/bitarray
 #  - sudo apt-get install thrift-compiler
   - wget -O $HOME/.tmp/thrift-0.9.3.tar.gz http://www-us.apache.org/dist/thrift/0.9.3/thrift-0.9.3.tar.gz
   - cd $HOME/.tmp;tar -xvf thrift-0.9.3.tar.gz;cd thrift-0.9.3;./configure --with-java=no --with-ruby=no --with-erlang=no --with-nodejs=no;make;sudo make install
@@ -54,11 +57,14 @@ install:
   - ls -alt $HOME/gopath/src/snaproute/src
 
 before_script:
+  - ls -l /usr/lib/python2.7/dist-packages/bitarray
   - sudo apt-get install -y python-bitarray
+  - pip install bitarray
   - echo $PYTHONPATH
   - ls -al /usr/bin/python*
   - ls -l /usr/lib/python*
   - ls -l /usr/lib/python2.7/dist-packages/
+  - ls -l /usr/lib/python2.7/dist-packages/bitarray
   - ln -s $HOME/gopath/src/reltools/Makefile $HOME/gopath/src/snaproute/src/Makefile
   - ls -alt $HOME/gopath/src/snaproute/src
   - export SR_CODE_BASE=$HOME/gopath/src
