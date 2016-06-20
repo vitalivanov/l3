@@ -20,6 +20,7 @@ before_install:
   - mkdir -p $HOME/gopath/src/external/src/github.com/garyburd
   - mkdir -p $HOME/gopath/src/external/src/github.com/google
   - mkdir -p $HOME/gopath/src/external/src/github.com/gorilla
+  - mkdir -p $HOME/gopath/src/external/src/github.com/mattn
   - mkdir -p $HOME/gopath/src/external/src/github.com/nu7hatch
   - mkdir -p $HOME/gopath/src/external/src/github.com/op
   - mkdir -p $HOME/gopath/src/external/src/github.com/socketplane
@@ -60,10 +61,12 @@ install:
   - git clone git@github.com:SnapRoute/nanomsg.git $HOME/gopath/src/external/src/github.com/op/go-nanomsg
   - git clone git@github.com:SnapRoute/netlink.git $HOME/gopath/src/external/src/github.com/vishvananda/netlink
   - git clone git@github.com:SnapRoute/mux.git $HOME/gopath/src/external/src/github.com/gorilla/mux
+  - git clone git@github.com:SnapRoute/context.git $HOME/gopath/src/external/src/github.com/gorilla/context
+  - git clone git@github.com:SnapRoute/go-sqlite3.git $HOME/gopath/src/external/src/github.com/gorilla/go-sqlite3
   - git clone git@github.com:SnapRoute/gouuid.git $HOME/gopath/src/external/src/github.com/nu7hatch/gouuid
   - git clone git@github.com:SnapRoute/gopacket.git $HOME/gopath/src/external/src/github.com/google/gopacket
   - git clone git@github.com:SnapRoute/libovsdb.git $HOME/gopath/src/external/src/github.com/socketplane/libovsdb
-  - git clone git@github.com:SnapRoute/golangx.git $HOME/gopath/src/external/src/golang.org/x/net
+  - git clone git@github.com:SnapRoute/net.git $HOME/gopath/src/external/src/golang.org/x/net
   - git clone git@github.com:SnapRoute/pyang.git $HOME/gopath/src/external/src/pyang
   - git clone git@github.com:SnapRoute/openconfig.git $HOME/gopath/src/external/src/openconfig
   - ls -alt $HOME/gopath/src/snaproute/src
