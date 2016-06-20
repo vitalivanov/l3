@@ -30,7 +30,6 @@ import (
 	"fmt"
 	"git.apache.org/thrift.git/lib/go/thrift"
 	"github.com/garyburd/redigo/redis"
-	_ "github.com/mattn/go-sqlite3"
 	"io/ioutil"
 	vxlan "l3/tunnel/vxlan/protocol"
 	"models/objects"
