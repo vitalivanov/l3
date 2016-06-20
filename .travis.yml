@@ -21,6 +21,7 @@ before_install:
   - mkdir -p $HOME/gopath/src/external/src/github.com/google
   - mkdir -p $HOME/gopath/src/external/src/github.com/gorilla
   - mkdir -p $HOME/gopath/src/external/src/github.com/mattn
+  - mkdir -p $HOME/gopath/src/external/src/github.com/nanomsg
   - mkdir -p $HOME/gopath/src/external/src/github.com/nu7hatch
   - mkdir -p $HOME/gopath/src/external/src/github.com/op
   - mkdir -p $HOME/gopath/src/external/src/github.com/socketplane
@@ -38,6 +39,7 @@ install:
   - echo $PYTHONPATH
   - echo $PATH
   - sudo apt-get install -y build-essential gccgo-4.8 git
+  - sudo apt-get install -y libpcap0.8 libpcap0.8-dev libpcap-dev
   - sudo apt-get install -y python-dev python-bitarray python-paramiko python-netaddr
   - sudo apt-get install -y libboost-dev libboost-test-dev libboost-program-options-dev libboost-system-dev libboost-filesystem-dev libevent-dev automake libtool flex bison pkg-config g++ libssl-dev ant
   - sudo apt-get install redis-server
@@ -59,6 +61,7 @@ install:
   - git clone git@github.com:SnapRoute/reltools.git $HOME/gopath/src/reltools
   - git clone git@github.com:SnapRoute/thrift.git $HOME/gopath/src/external/src/git.apache.org/thrift.git
   - git clone git@github.com:SnapRoute/redigo.git $HOME/gopath/src/external/src/github.com/garyburd/redigo
+  - git clone git@github.com:SnapRoute/nanomsg.git $HOME/gopath/src/external/src/github.com/nanomsg/nanomsg
   - git clone git@github.com:SnapRoute/go-nanomsg.git $HOME/gopath/src/external/src/github.com/op/go-nanomsg
   - git clone git@github.com:SnapRoute/netlink.git $HOME/gopath/src/external/src/github.com/vishvananda/netlink
   - git clone git@github.com:SnapRoute/mux.git $HOME/gopath/src/external/src/github.com/gorilla/mux
@@ -71,6 +74,12 @@ install:
   - git clone git@github.com:SnapRoute/pyang.git $HOME/gopath/src/external/src/pyang
   - git clone git@github.com:SnapRoute/openconfig.git $HOME/gopath/src/external/src/openconfig
   - ls -alt $HOME/gopath/src/snaproute/src
+  - cd $HOME/gopath/src/external/src/github.com/nanomsg/nanomsg;sudo apt-get install -y libtool;libtoolize;./autogen.sh;./configure;make;sudo make install
+  - cd $HOME/gopath/src/external/src/github.com/netfilter/libmnl;./autogen.sh;./configure --prefix=$HOME/gopath/src/external/src/github.com/netfilter/libiptables;make;make install
+  - export LIBMNL_CFLAGS=$HOME/gopath/src/external/src/github.com/netfilter/libiptables/include/libmnl
+  - export LIBMNL_LIBS=$HOME/gopath/src/external/src/github.com/netfilter/libiptables/lib/pkgconfig
+  - cd $HOME/gopath/src/external/src/github.com/netfilter/libnftnl;./autogen.sh;./configure --prefix="$HOME/gopath/src/external/src/github.com/netfilter/libiptables" CFLAGS="-I $HOME/gopath/src/external/src/github.com/netfilter/libiptables/include" LDFLAGS="-L $HOME/gopath/src/external/src/github.com/netfilter/libiptables/lib";make;make install
+  - cd $HOME/gopath/src/external/src/github.com/netfilter/iptables;./autogen.sh;./configure --prefix="$HOME/gopath/src/external/src/github.com/netfilter/libiptables" CFLAGS="-I $HOME/gopath/src/external/src/github.com/netfilter/libiptables/include" LDFLAGS="-L $HOME/gopath/src/external/src/github.com/netfilter/libiptables/lib" LIBS="-lmnl -lnftnl";make;make install
 
 before_script:
   - ln -s $HOME/gopath/src/reltools/Makefile $HOME/gopath/src/snaproute/src/Makefile
