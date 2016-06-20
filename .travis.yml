@@ -21,9 +21,10 @@ before_install:
 install:
   - sudo apt-get update
   - echo $PYTHONPATH
-  - ls -al /usr/bin/python*
+  - echo $PATH
   - ls -l /usr/lib/python*
   - ls -l /usr/lib/python2.7/dist-packages/
+  - ls -l /opt/
   - sudo apt-get install -y build-essential
   - sudo apt-get install -y gccgo-4.8
   - sudo apt-get install -y git
@@ -32,11 +33,10 @@ install:
   - sudo apt-get install -y python-paramiko python-netaddr
   - sudo apt-get install -y libboost-dev libboost-test-dev libboost-program-options-dev libboost-system-dev libboost-filesystem-dev libevent-dev automake libtool flex bison pkg-config g++ libssl-dev ant
   - echo $PYTHONPATH
-  - ls -al /usr/bin/python*
   - ls -l /usr/lib/python*
   - ls -l /usr/lib/python2.7/dist-packages/
   - ls -l /usr/lib/python2.7/dist-packages/bitarray
-  - pip install bitarray
+  - sudo pip install bitarray
   - ls -l /usr/lib/python2.7/dist-packages/bitarray
 #  - sudo apt-get install thrift-compiler
   - wget -O $HOME/.tmp/thrift-0.9.3.tar.gz http://www-us.apache.org/dist/thrift/0.9.3/thrift-0.9.3.tar.gz
@@ -59,9 +59,9 @@ install:
 before_script:
   - ls -l /usr/lib/python2.7/dist-packages/bitarray
   - sudo apt-get install -y python-bitarray
-  - pip install bitarray
+  - sudo pip install bitarray
   - echo $PYTHONPATH
-  - ls -al /usr/bin/python*
+  - echo $PATH
   - ls -l /usr/lib/python*
   - ls -l /usr/lib/python2.7/dist-packages/
   - ls -l /usr/lib/python2.7/dist-packages/bitarray
