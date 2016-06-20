@@ -13,13 +13,13 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 // server.go
 package rpc
@@ -31,7 +31,7 @@ import (
 	"l3/bgp/config"
 	bgppolicy "l3/bgp/policy"
 	"l3/bgp/server"
-	"models"
+	"models/objects"
 	"net"
 	"strings"
 	"utils/dbutils"
@@ -66,7 +66,7 @@ func NewBGPHandler(server *server.BGPServer, policy *bgppolicy.BGPPolicyEngine, 
 	return h
 }
 
-func (h *BGPHandler) convertModelToBGPGlobalConfig(obj models.BGPGlobal) (config.GlobalConfig, error) {
+func (h *BGPHandler) convertModelToBGPGlobalConfig(obj objects.BGPGlobal) (config.GlobalConfig, error) {
 	var err error
 	gConf := config.GlobalConfig{
 		AS:                  obj.ASNum,
@@ -93,7 +93,7 @@ func (h *BGPHandler) convertModelToBGPGlobalConfig(obj models.BGPGlobal) (config
 }
 
 func (h *BGPHandler) handleGlobalConfig() error {
-	var obj models.BGPGlobal
+	var obj objects.BGPGlobal
 	objList, err := h.dbUtil.GetAllObjFromDb(obj)
 	if err != nil {
 		h.logger.Err(fmt.Sprintf("GetAllObjFromDb failed for BGPGlobal with error %s", err))
@@ -101,7 +101,7 @@ func (h *BGPHandler) handleGlobalConfig() error {
 	}
 
 	for _, confObj := range objList {
-		obj = confObj.(models.BGPGlobal)
+		obj = confObj.(objects.BGPGlobal)
 
 		gConf, err := h.convertModelToBGPGlobalConfig(obj)
 		if err != nil {
@@ -113,7 +113,7 @@ func (h *BGPHandler) handleGlobalConfig() error {
 	return nil
 }
 
-func (h *BGPHandler) convertModelToBGPPeerGroup(obj models.BGPPeerGroup) (group config.PeerGroupConfig, err error) {
+func (h *BGPHandler) convertModelToBGPPeerGroup(obj objects.BGPPeerGroup) (group config.PeerGroupConfig, err error) {
 	group = config.PeerGroupConfig{
 		BaseConfig: config.BaseConfig{
 			PeerAS:                  uint32(obj.PeerAS),
@@ -141,7 +141,7 @@ func (h *BGPHandler) convertModelToBGPPeerGroup(obj models.BGPPeerGroup) (group 
 }
 
 func (h *BGPHandler) handlePeerGroup() error {
-	var obj models.BGPPeerGroup
+	var obj objects.BGPPeerGroup
 	objList, err := h.dbUtil.GetAllObjFromDb(obj)
 	if err != nil {
 		h.logger.Err(fmt.Sprintf("GetAllObjFromDb for BGPPeerGroup failed with error %s", err))
@@ -149,7 +149,7 @@ func (h *BGPHandler) handlePeerGroup() error {
 	}
 
 	for _, confObj := range objList {
-		obj = confObj.(models.BGPPeerGroup)
+		obj = confObj.(objects.BGPPeerGroup)
 
 		group, err := h.convertModelToBGPPeerGroup(obj)
 		if err != nil {
@@ -164,7 +164,7 @@ func (h *BGPHandler) handlePeerGroup() error {
 	return nil
 }
 
-func (h *BGPHandler) convertModelToBGPNeighbor(obj models.BGPNeighbor) (neighbor config.NeighborConfig, err error) {
+func (h *BGPHandler) convertModelToBGPNeighbor(obj objects.BGPNeighbor) (neighbor config.NeighborConfig, err error) {
 	var ip net.IP
 	var ifIndex int32
 	ip, ifIndex, err = h.getIPAndIfIndexForNeighbor(obj.NeighborAddress, obj.IfIndex)
@@ -205,7 +205,7 @@ func (h *BGPHandler) convertModelToBGPNeighbor(obj models.BGPNeighbor) (neighbor
 }
 
 func (h *BGPHandler) handleNeighborConfig() error {
-	var obj models.BGPNeighbor
+	var obj objects.BGPNeighbor
 	objList, err := h.dbUtil.GetAllObjFromDb(obj)
 	if err != nil {
 		h.logger.Err(fmt.Sprintf("GetAllObjFromDb for BGPNeighbor failed with error %s", err))
@@ -213,7 +213,7 @@ func (h *BGPHandler) handleNeighborConfig() error {
 	}
 
 	for _, confObj := range objList {
-		obj = confObj.(models.BGPNeighbor)
+		obj = confObj.(objects.BGPNeighbor)
 
 		neighbor, err := h.convertModelToBGPNeighbor(obj)
 		if err != nil {
@@ -229,7 +229,7 @@ func (h *BGPHandler) handleNeighborConfig() error {
 }
 
 func convertModelToPolicyConditionConfig(
-	cfg models.BGPPolicyCondition) *utilspolicy.PolicyConditionConfig {
+	cfg objects.BGPPolicyCondition) *utilspolicy.PolicyConditionConfig {
 	destIPMatch := utilspolicy.PolicyDstIpMatchPrefixSetCondition{
 		Prefix: utilspolicy.PolicyPrefix{
 			IpPrefix:        cfg.IpPrefix,
@@ -245,7 +245,7 @@ func convertModelToPolicyConditionConfig(
 
 func (h *BGPHandler) handlePolicyConditions() error {
 	h.logger.Info(fmt.Sprintln("handlePolicyConditions"))
-	var conditionObj models.BGPPolicyCondition
+	var conditionObj objects.BGPPolicyCondition
 	conditionList, err := h.dbUtil.GetAllObjFromDb(conditionObj)
 	if err != nil {
 		h.logger.Err(fmt.Sprintln("handlePolicyConditions - Failed to create policy",
@@ -255,7 +255,7 @@ func (h *BGPHandler) handlePolicyConditions() error {
 
 	for idx := 0; idx < len(conditionList); idx++ {
 		policyCondCfg :=
-			convertModelToPolicyConditionConfig(conditionList[idx].(models.BGPPolicyCondition))
+			convertModelToPolicyConditionConfig(conditionList[idx].(objects.BGPPolicyCondition))
 		h.logger.Info(fmt.Sprintln("handlePolicyConditions - create policy condition",
 			policyCondCfg.Name))
 		h.bgpPE.ConditionCfgCh <- *policyCondCfg
@@ -263,7 +263,7 @@ func (h *BGPHandler) handlePolicyConditions() error {
 	return nil
 }
 
-func convertModelToPolicyActionConfig(cfg models.BGPPolicyAction) *utilspolicy.PolicyActionConfig {
+func convertModelToPolicyActionConfig(cfg objects.BGPPolicyAction) *utilspolicy.PolicyActionConfig {
 	return &utilspolicy.PolicyActionConfig{
 		Name:            cfg.Name,
 		ActionType:      cfg.ActionType,
@@ -274,7 +274,7 @@ func convertModelToPolicyActionConfig(cfg models.BGPPolicyAction) *utilspolicy.P
 
 func (h *BGPHandler) handlePolicyActions() error {
 	h.logger.Info(fmt.Sprintln("handlePolicyActions"))
-	var actionObj models.BGPPolicyAction
+	var actionObj objects.BGPPolicyAction
 	actionList, err := h.dbUtil.GetAllObjFromDb(actionObj)
 	if err != nil {
 		h.logger.Err(fmt.Sprintln("handlePolicyActions - Failed to create policy action",
@@ -284,7 +284,7 @@ func (h *BGPHandler) handlePolicyActions() error {
 
 	for idx := 0; idx < len(actionList); idx++ {
 		policyActionCfg :=
-			convertModelToPolicyActionConfig(actionList[idx].(models.BGPPolicyAction))
+			convertModelToPolicyActionConfig(actionList[idx].(objects.BGPPolicyAction))
 		h.logger.Info(fmt.Sprintln("handlePolicyActions - create policy action",
 			policyActionCfg.Name))
 		h.bgpPE.ActionCfgCh <- *policyActionCfg
@@ -292,7 +292,7 @@ func (h *BGPHandler) handlePolicyActions() error {
 	return nil
 }
 
-func convertModelToPolicyStmtConfig(cfg models.BGPPolicyStmt) *utilspolicy.PolicyStmtConfig {
+func convertModelToPolicyStmtConfig(cfg objects.BGPPolicyStmt) *utilspolicy.PolicyStmtConfig {
 	return &utilspolicy.PolicyStmtConfig{
 		Name:            cfg.Name,
 		MatchConditions: cfg.MatchConditions,
@@ -303,7 +303,7 @@ func convertModelToPolicyStmtConfig(cfg models.BGPPolicyStmt) *utilspolicy.Polic
 
 func (h *BGPHandler) handlePolicyStmts() error {
 	h.logger.Info(fmt.Sprintln("handlePolicyStmts"))
-	var stmtObj models.BGPPolicyStmt
+	var stmtObj objects.BGPPolicyStmt
 	stmtList, err := h.dbUtil.GetAllObjFromDb(stmtObj)
 	if err != nil {
 		h.logger.Err(fmt.Sprintln("handlePolicyStmts - Failed to create policy statement",
@@ -312,7 +312,7 @@ func (h *BGPHandler) handlePolicyStmts() error {
 	}
 
 	for idx := 0; idx < len(stmtList); idx++ {
-		policyStmtCfg := convertModelToPolicyStmtConfig(stmtList[idx].(models.BGPPolicyStmt))
+		policyStmtCfg := convertModelToPolicyStmtConfig(stmtList[idx].(objects.BGPPolicyStmt))
 		h.logger.Info(fmt.Sprintln("handlePolicyStmts - create policy statement",
 			policyStmtCfg.Name))
 		h.bgpPE.StmtCfgCh <- *policyStmtCfg
@@ -321,7 +321,7 @@ func (h *BGPHandler) handlePolicyStmts() error {
 }
 
 func convertModelToPolicyDefinitionConfig(
-	cfg models.BGPPolicyDefinition) *utilspolicy.PolicyDefinitionConfig {
+	cfg objects.BGPPolicyDefinition) *utilspolicy.PolicyDefinitionConfig {
 	stmtPrecedenceList := make([]utilspolicy.PolicyDefinitionStmtPrecedence, 0)
 	for i := 0; i < len(cfg.StatementList); i++ {
 		stmtPrecedence := utilspolicy.PolicyDefinitionStmtPrecedence{
@@ -341,7 +341,7 @@ func convertModelToPolicyDefinitionConfig(
 
 func (h *BGPHandler) handlePolicyDefinitions() error {
 	h.logger.Info(fmt.Sprintln("handlePolicyDefinitions"))
-	var defObj models.BGPPolicyDefinition
+	var defObj objects.BGPPolicyDefinition
 	definitionList, err := h.dbUtil.GetAllObjFromDb(defObj)
 	if err != nil {
 		h.logger.Err(fmt.Sprintln("handlePolicyDefinitions - Failed to create policy",
@@ -351,7 +351,7 @@ func (h *BGPHandler) handlePolicyDefinitions() error {
 
 	for idx := 0; idx < len(definitionList); idx++ {
 		policyDefCfg := convertModelToPolicyDefinitionConfig(
-			definitionList[idx].(models.BGPPolicyDefinition))
+			definitionList[idx].(objects.BGPPolicyDefinition))
 		h.logger.Info(fmt.Sprintln("handlePolicyDefinitions - create policy definition",
 			policyDefCfg.Name))
 		h.bgpPE.DefinitionCfgCh <- *policyDefCfg
@@ -461,7 +461,7 @@ func (h *BGPHandler) GetBulkBGPGlobalState(index bgpd.Int,
 }
 
 func (h *BGPHandler) UpdateBGPGlobal(origG *bgpd.BGPGlobal, updatedG *bgpd.BGPGlobal,
-	attrSet []bool, op string) (bool, error) {
+	attrSet []bool, op []*bgpd.PatchOpInfo) (bool, error) {
 	h.logger.Info(fmt.Sprintln("Update global config attrs:", updatedG, "old config:", origG))
 	return h.SendBGPGlobal(updatedG)
 }
@@ -707,7 +707,7 @@ func (h *BGPHandler) GetBulkBGPNeighborState(index bgpd.Int,
 }
 
 func (h *BGPHandler) UpdateBGPNeighbor(origN *bgpd.BGPNeighbor, updatedN *bgpd.BGPNeighbor,
-	attrSet []bool, op string) (bool, error) {
+	attrSet []bool, op []*bgpd.PatchOpInfo) (bool, error) {
 	h.logger.Info(fmt.Sprintln("Update peer attrs:", updatedN))
 	return h.SendBGPNeighbor(origN, updatedN, attrSet)
 }
@@ -793,7 +793,7 @@ func (h *BGPHandler) CreateBGPPeerGroup(peerGroup *bgpd.BGPPeerGroup) (bool, err
 }
 
 func (h *BGPHandler) UpdateBGPPeerGroup(origG *bgpd.BGPPeerGroup, updatedG *bgpd.BGPPeerGroup,
-	attrSet []bool, op string) (bool, error) {
+	attrSet []bool, op []*bgpd.PatchOpInfo) (bool, error) {
 	h.logger.Info(fmt.Sprintln("Update peer attrs:", updatedG))
 	return h.SendBGPPeerGroup(origG, updatedG, attrSet)
 }
@@ -804,8 +804,7 @@ func (h *BGPHandler) DeleteBGPPeerGroup(peerGroup *bgpd.BGPPeerGroup) (bool, err
 	return true, nil
 }
 
-func (h *BGPHandler) GetBGPRouteState(network string, cidrLen int16,
-	nextHop string) (*bgpd.BGPRouteState, error) {
+func (h *BGPHandler) GetBGPRouteState(network string, cidrLen int16) (*bgpd.BGPRouteState, error) {
 	bgpRoute := h.server.AdjRib.GetBGPRoute(network)
 	var err error = nil
 	if bgpRoute == nil {
@@ -870,7 +869,7 @@ func (h *BGPHandler) GetBulkBGPPolicyConditionState(fromIndex bgpd.Int, rcount b
 
 func (h *BGPHandler) UpdateBGPPolicyCondition(origC *bgpd.BGPPolicyCondition,
 	updatedC *bgpd.BGPPolicyCondition,
-	attrSet []bool, op string) (val bool, err error) {
+	attrSet []bool, op []*bgpd.PatchOpInfo) (val bool, err error) {
 	return val, err
 }
 
@@ -915,7 +914,7 @@ func (h *BGPHandler) GetBulkBGPPolicyActionState(fromIndex bgpd.Int, rcount bgpd
 }
 
 func (h *BGPHandler) UpdateBGPPolicyAction(origC *bgpd.BGPPolicyAction, updatedC *bgpd.BGPPolicyAction,
-	attrSet []bool, op string) (val bool, err error) {
+	attrSet []bool, op []*bgpd.PatchOpInfo) (val bool, err error) {
 	return val, err
 }
 
@@ -953,7 +952,7 @@ func (h *BGPHandler) GetBulkBGPPolicyStmtState(fromIndex bgpd.Int, rcount bgpd.I
 }
 
 func (h *BGPHandler) UpdateBGPPolicyStmt(origC *bgpd.BGPPolicyStmt,
-	updatedC *bgpd.BGPPolicyStmt, attrSet []bool, op string) (
+	updatedC *bgpd.BGPPolicyStmt, attrSet []bool, op []*bgpd.PatchOpInfo) (
 	val bool, err error) {
 	return val, err
 }
@@ -1004,7 +1003,7 @@ func (h *BGPHandler) GetBulkBGPPolicyDefinitionState(fromIndex bgpd.Int, rcount 
 
 func (h *BGPHandler) UpdateBGPPolicyDefinition(origC *bgpd.BGPPolicyDefinition,
 	updatedC *bgpd.BGPPolicyDefinition,
-	attrSet []bool, op string) (val bool, err error) {
+	attrSet []bool, op []*bgpd.PatchOpInfo) (val bool, err error) {
 	return val, err
 }
 

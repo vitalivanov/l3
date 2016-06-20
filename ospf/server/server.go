@@ -13,13 +13,13 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 package server
 
@@ -80,6 +80,7 @@ type OSPFServer struct {
 	GlobalConfigCh     chan config.GlobalConf
 	AreaConfigCh       chan config.AreaConf
 	IntfConfigCh       chan config.InterfaceConf
+	IfMetricConfCh     chan config.IfMetricConf
 	GlobalConfigRetCh  chan error
 	AreaConfigRetCh    chan error
 	IntfConfigRetCh    chan error
@@ -89,7 +90,7 @@ type OSPFServer struct {
 	AreaSelfOrigLsa    map[LsdbKey]SelfOrigLsa
 	LsdbUpdateCh       chan LsdbUpdateMsg
 	LsaUpdateRetCodeCh chan bool
-	IntfStateChangeCh  chan LSAChangeMsg
+	IntfStateChangeCh  chan NetworkLSAChangeMsg
 	NetworkDRChangeCh  chan DrChangeMsg
 	FlushNetworkLSACh  chan NetworkLSAChangeMsg
 	CreateNetworkLSACh chan ospfNbrMdata
@@ -102,34 +103,35 @@ type OSPFServer struct {
 	ribSubSocketCh    chan []byte
 	ribSubSocketErrCh chan error
 
-	asicdSubSocket        *nanomsg.SubSocket
-	asicdSubSocketCh      chan []byte
-	asicdSubSocketErrCh   chan error
-	AreaConfMap           map[AreaConfKey]AreaConf
-	IntfConfMap           map[IntfConfKey]IntfConf
-	IntfTxMap             map[IntfConfKey]IntfTxHandle
-	IntfRxMap             map[IntfConfKey]IntfRxHandle
-	NeighborConfigMap     map[NeighborConfKey]OspfNeighborEntry
-	NeighborListMap       map[IntfConfKey]list.List
-	neighborConfMutex     sync.Mutex
-	neighborHelloEventCh  chan IntfToNeighMsg
-	neighborFSMCtrlCh     chan bool
-	neighborConfCh        chan ospfNeighborConfMsg
-	neighborConfStopCh    chan bool
-	nbrFSMCtrlCh          chan bool
-	neighborSliceRefCh    *time.Ticker
-	neighborSliceStartCh  chan bool
-	neighborBulkSlice     []NeighborConfKey
-	neighborDBDEventCh    chan ospfNeighborDBDMsg
-	neighborLSAReqEventCh chan ospfNeighborLSAreqMsg
-	neighborLSAUpdEventCh chan ospfNeighborLSAUpdMsg
-	neighborLSAACKEventCh chan ospfNeighborLSAAckMsg
-	ospfNbrDBDSendCh      chan ospfNeighborDBDMsg
-	ospfNbrLsaReqSendCh   chan ospfNeighborLSAreqMsg
-	ospfNbrLsaUpdSendCh   chan ospfFloodMsg
-	ospfNbrLsaAckSendCh   chan ospfNeighborAckTxMsg
-	ospfRxNbrPktStopCh    chan bool
-	ospfTxNbrPktStopCh    chan bool
+	asicdSubSocket          *nanomsg.SubSocket
+	asicdSubSocketCh        chan []byte
+	asicdSubSocketErrCh     chan error
+	AreaConfMap             map[AreaConfKey]AreaConf
+	IntfConfMap             map[IntfConfKey]IntfConf
+	IntfTxMap               map[IntfConfKey]IntfTxHandle
+	IntfRxMap               map[IntfConfKey]IntfRxHandle
+	NeighborConfigMap       map[NeighborConfKey]OspfNeighborEntry
+	NeighborListMap         map[IntfConfKey]list.List
+	neighborConfMutex       sync.Mutex
+	neighborHelloEventCh    chan IntfToNeighMsg
+	neighborFSMCtrlCh       chan bool
+	neighborConfCh          chan ospfNeighborConfMsg
+	neighborConfStopCh      chan bool
+	nbrFSMCtrlCh            chan bool
+	neighborSliceRefCh      *time.Ticker
+	neighborSliceStartCh    chan bool
+	neighborBulkSlice       []NeighborConfKey
+	neighborDBDEventCh      chan ospfNeighborDBDMsg
+	neighborIntfEventCh     chan IntfConfKey
+	neighborLSAReqEventCh   chan ospfNeighborLSAreqMsg
+	neighborLSAUpdEventCh   chan ospfNeighborLSAUpdMsg
+	neighborLSAACKEventCh   chan ospfNeighborLSAAckMsg
+	ospfNbrDBDSendCh        chan ospfNeighborDBDMsg
+	ospfNbrLsaReqSendCh     chan ospfNeighborLSAreqMsg
+	ospfNbrLsaUpdSendCh     chan ospfFloodMsg
+	ospfNbrLsaAckSendCh     chan ospfNeighborAckTxMsg
+	ospfRxNbrPktStopCh      chan bool
+	ospfTxNbrPktStopCh      chan bool
 
 	//neighborDBDEventCh   chan IntfToNeighDbdMsg
 
@@ -168,6 +170,7 @@ func NewOSPFServer(logger *logging.Writer) *OSPFServer {
 	ospfServer.GlobalConfigCh = make(chan config.GlobalConf)
 	ospfServer.AreaConfigCh = make(chan config.AreaConf)
 	ospfServer.IntfConfigCh = make(chan config.InterfaceConf)
+	ospfServer.IfMetricConfCh = make(chan config.IfMetricConf)
 	ospfServer.GlobalConfigRetCh = make(chan error)
 	ospfServer.AreaConfigRetCh = make(chan error)
 	ospfServer.IntfConfigRetCh = make(chan error)
@@ -180,7 +183,7 @@ func NewOSPFServer(logger *logging.Writer) *OSPFServer {
 	ospfServer.IntfRxMap = make(map[IntfConfKey]IntfRxHandle)
 	ospfServer.AreaLsdb = make(map[LsdbKey]LSDatabase)
 	ospfServer.AreaSelfOrigLsa = make(map[LsdbKey]SelfOrigLsa)
-	ospfServer.IntfStateChangeCh = make(chan LSAChangeMsg)
+	ospfServer.IntfStateChangeCh = make(chan NetworkLSAChangeMsg)
 	ospfServer.NetworkDRChangeCh = make(chan DrChangeMsg)
 	ospfServer.CreateNetworkLSACh = make(chan ospfNbrMdata)
 	ospfServer.FlushNetworkLSACh = make(chan NetworkLSAChangeMsg)
@@ -208,6 +211,7 @@ func NewOSPFServer(logger *logging.Writer) *OSPFServer {
 	ospfServer.nbrFSMCtrlCh = make(chan bool)
 	ospfServer.RefreshDuration = time.Duration(10) * time.Minute
 	ospfServer.neighborDBDEventCh = make(chan ospfNeighborDBDMsg)
+	ospfServer.neighborIntfEventCh = make(chan IntfConfKey)
 	ospfServer.neighborLSAReqEventCh = make(chan ospfNeighborLSAreqMsg, 2)
 	ospfServer.neighborLSAUpdEventCh = make(chan ospfNeighborLSAUpdMsg, 2)
 	ospfServer.neighborLSAACKEventCh = make(chan ospfNeighborLSAAckMsg, 2)
@@ -349,21 +353,27 @@ func (server *OSPFServer) StartServer(paramFile string) {
 			if err == nil {
 				//Handle Global Configuration
 			}
-			server.GlobalConfigRetCh <- err
+		//	server.GlobalConfigRetCh <- err
 		case areaConf := <-server.AreaConfigCh:
 			server.logger.Info(fmt.Sprintln("Received call for performing Area Configuration", areaConf))
 			err := server.processAreaConfig(areaConf)
 			if err == nil {
 				//Handle Area Configuration
 			}
-			server.AreaConfigRetCh <- err
+		//	server.AreaConfigRetCh <- err
 		case ifConf := <-server.IntfConfigCh:
 			server.logger.Info(fmt.Sprintln("Received call for performing Intf Configuration", ifConf))
 			err := server.processIntfConfig(ifConf)
 			if err == nil {
 				//Handle Intf Configuration
 			}
-			server.IntfConfigRetCh <- err
+		//	server.IntfConfigRetCh <- err
+		case ifMetricConf := <-server.IfMetricConfCh:
+			server.logger.Info(fmt.Sprintln("Received call for preforming Intf Metric Configuration", ifMetricConf))
+			err := server.processIfMetricConfig(ifMetricConf)
+			if err == nil {
+
+			}
 		case asicdrxBuf := <-server.asicdSubSocketCh:
 			server.processAsicdNotification(asicdrxBuf)
 		case <-server.asicdSubSocketErrCh:

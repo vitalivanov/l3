@@ -21,39 +21,31 @@
 // |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
 //                                                                                                           
 
-package rpc
+// ribdRouteServer.go
+package server
 
 import (
+	"ribd"
 	"fmt"
-	"ospfd"
-	//    "l3/ospf/config"
-	//    "l3/ospf/server"
-	//    "utils/logging"
-	//    "net"
 )
 
-func (h *OSPFHandler) DeleteOspfGlobal(ospfGlobalConf *ospfd.OspfGlobal) (bool, error) {
-	h.logger.Info(fmt.Sprintln("Delete global config attrs:", ospfGlobalConf))
-	return true, nil
-}
-
-func (h *OSPFHandler) DeleteOspfAreaEntry(ospfAreaConf *ospfd.OspfAreaEntry) (bool, error) {
-	h.logger.Info(fmt.Sprintln("Delete Area Config attrs:", ospfAreaConf))
-	return true, nil
-}
-
-
-func (h *OSPFHandler) DeleteOspfIfEntry(ospfIfConf *ospfd.OspfIfEntry) (bool, error) {
-	h.logger.Info(fmt.Sprintln("Delete interface config attrs:", ospfIfConf))
-	return true, nil
-}
-
-func (h *OSPFHandler) DeleteOspfIfMetricEntry(ospfIfMetricConf *ospfd.OspfIfMetricEntry) (bool, error) {
-	h.logger.Info(fmt.Sprintln("Delete interface metric config attrs:", ospfIfMetricConf))
-	return true, nil
-}
-
-func (h *OSPFHandler) DeleteOspfVirtIfEntry(ospfVirtIfConf *ospfd.OspfVirtIfEntry) (bool, error) {
-	h.logger.Info(fmt.Sprintln("Delete virtual interface config attrs:", ospfVirtIfConf))
-	return true, nil
+func (ribdServiceHandler *RIBDServer) StartRouteProcessServer() {
+	logger.Info("Starting the routeserver loop")
+	for {
+		select {
+		case routeConf := <-ribdServiceHandler.RouteConfCh:
+			logger.Debug(fmt.Sprintln("received message on RouteConfCh channel, op: ", routeConf.Op))
+			if routeConf.Op == "add" {
+			    ribdServiceHandler.ProcessRouteCreateConfig(routeConf.OrigConfigObject.(*ribd.IPv4Route))
+			} else if routeConf.Op == "del" {
+				ribdServiceHandler.ProcessRouteDeleteConfig(routeConf.OrigConfigObject.(*ribd.IPv4Route))
+			} else if routeConf.Op == "update" {
+				if routeConf.PatchOp == nil || len(routeConf.PatchOp) == 0 {
+                      ribdServiceHandler.ProcessRouteUpdateConfig(routeConf.OrigConfigObject.(*ribd.IPv4Route), routeConf.NewConfigObject.(*ribd.IPv4Route), routeConf.AttrSet)
+				} else {
+                     ribdServiceHandler.ProcessRoutePatchUpdateConfig(routeConf.OrigConfigObject.(*ribd.IPv4Route), routeConf.NewConfigObject.(*ribd.IPv4Route), routeConf.PatchOp)
+				}
+			}
+		}
+	}
 }

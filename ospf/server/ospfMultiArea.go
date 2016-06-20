@@ -13,13 +13,13 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 package server
 
@@ -173,6 +173,7 @@ func (server *OSPFServer) GenerateSummaryLsa() {
 		lsDbKey := LsdbKey{
 			AreaId: areaId,
 		}
+		isStub := server.isStubArea(aKey.AreaId)
 		sEnt, _ := server.SummaryLsDb[lsDbKey]
 		sEnt = make(map[LsaKey]SummaryLsa)
 		for rKey, rEnt := range server.GlobalRoutingTbl {
@@ -195,9 +196,22 @@ func (server *OSPFServer) GenerateSummaryLsa() {
 			// If DestType == ASBdrRouter
 			// If Routing Table Entry Describes the preferred path to
 			// AS Boundary Router
-			if rKey.DestType == ASAreaBdrRouter ||
-				rKey.DestType == ASBdrRouter {
-				lsaKey, summaryLsa := server.GenerateType4SummaryLSA(rKey, rEnt)
+			/*
+					RFC 2328 section 12.4.3
+					if the destination of this route is an AS boundary
+					router, a summary-LSA should be originated if and only
+				if the routing table entry describes the preferred path
+				to the AS boundary router (see Step 3 of Section 16.4).
+				If so, a Type 4 summary-LSA is originated for the
+				destination, with Link State ID equal to the AS boundary
+				router's Router ID and metric equal to the routing table
+				entry's cost. Note: these LSAs should not be generated
+				 if Area A has been configured as a stub area.
+			*/
+
+			if (rKey.DestType == ASAreaBdrRouter ||
+				rKey.DestType == ASBdrRouter) && !isStub {
+				lsaKey, summaryLsa := server.GenerateType4SummaryLSA(rKey, rEnt, lsDbKey)
 				sEnt[lsaKey] = summaryLsa
 			}
 
@@ -207,24 +221,79 @@ func (server *OSPFServer) GenerateSummaryLsa() {
 				// Generate Type 3 Summary LSA for the desitnation
 				// LSId = networks's address
 				// Metric = Routing Table cost
-				lsaKey, summaryLsa := server.GenerateType3SummaryLSA(rKey, rEnt)
+				lsaKey, summaryLsa := server.GenerateType3SummaryLSA(rKey, rEnt, lsDbKey)
 				sEnt[lsaKey] = summaryLsa
 			} else if rKey.DestType == Network &&
 				rEnt.RoutingTblEnt.PathType == IntraArea {
 				//TODO: Address Range
 				// By default LSId = network's address
 				// Metric = Routing Table cost
-				lsaKey, summaryLsa := server.GenerateType3SummaryLSA(rKey, rEnt)
+				lsaKey, summaryLsa := server.GenerateType3SummaryLSA(rKey, rEnt, lsDbKey)
 				sEnt[lsaKey] = summaryLsa
 			}
 		}
+
 		server.SummaryLsDb[lsDbKey] = sEnt
+		if isStub {
+			lsaKey, defsummaryLsa := server.GenerateDefaultSummary3LSA(lsDbKey)
+			sEnt[lsaKey] = defsummaryLsa
+		}
 	}
 
 }
 
-func (server *OSPFServer) GenerateType3SummaryLSA(rKey RoutingTblEntryKey, rEnt GlobalRoutingTblEntry) (LsaKey, SummaryLsa) {
+/*
+@fn GenerateDefaultSummary3LSA
+
+ RFC 2328 A 4.4
+ For stub areas, Type 3 summary-LSAs can also be used to describe a
+ (per-area) default route.  Default summary routes are used in stub
+  areas instead of flooding a complete set of external routes.  When
+ describing a default summary route, the summary-LSA's Link State ID
+ is always set to DefaultDestination (0.0.0.0) and the Network Mask
+ is set to 0.0.0.0.
+
+*/
+func (server *OSPFServer) GenerateDefaultSummary3LSA(lsDbKey LsdbKey) (LsaKey, SummaryLsa) {
 	var summaryLsa SummaryLsa
+	seq_num := InitialSequenceNumber
+	metric := int32(20)
+	areaConfKey := AreaConfKey{
+		AreaId: config.AreaId(convertUint32ToIPv4(lsDbKey.AreaId)),
+	}
+
+	conf, exist := server.AreaConfMap[areaConfKey]
+	if exist {
+		metric = conf.StubDefaultCost
+	}
+	AdvRouter := convertIPv4ToUint32(server.ospfGlobalConf.RouterId)
+	lsaKey := LsaKey{
+		LSType:    Summary3LSA,
+		LSId:      0,
+		AdvRouter: AdvRouter,
+	}
+
+	//check if summaryLSA exist
+	if lsdbEnt, ok := server.SummaryLsDb[lsDbKey]; ok {
+		if summaryLsa, ok = lsdbEnt[lsaKey]; ok {
+			seq_num = summaryLsa.LsaMd.LSSequenceNum + 1
+			server.logger.Info(fmt.Sprintln("SUMMARY: Refreshed summary LSA ", lsaKey))
+		}
+	}
+
+	summaryLsa.LsaMd.Options = uint8(0)
+	summaryLsa.LsaMd.LSAge = 0
+	summaryLsa.LsaMd.LSSequenceNum = seq_num
+	summaryLsa.LsaMd.LSLen = uint16(OSPF_LSA_HEADER_SIZE + 8)
+	summaryLsa.Netmask = 0
+	summaryLsa.Metric = uint32(metric)
+
+	return lsaKey, summaryLsa
+}
+
+func (server *OSPFServer) GenerateType3SummaryLSA(rKey RoutingTblEntryKey, rEnt GlobalRoutingTblEntry, lsDbKey LsdbKey) (LsaKey, SummaryLsa) {
+	var summaryLsa SummaryLsa
+	seq_num := InitialSequenceNumber
 
 	AdvRouter := convertIPv4ToUint32(server.ospfGlobalConf.RouterId)
 	lsaKey := LsaKey{
@@ -233,9 +302,17 @@ func (server *OSPFServer) GenerateType3SummaryLSA(rKey RoutingTblEntryKey, rEnt 
 		AdvRouter: AdvRouter,
 	}
 
+	//check if summaryLSA exist
+	if lsdbEnt, ok := server.SummaryLsDb[lsDbKey]; ok {
+		if summaryLsa, ok = lsdbEnt[lsaKey]; ok {
+			seq_num = summaryLsa.LsaMd.LSSequenceNum + 1
+			server.logger.Info(fmt.Sprintln("SUMMARY: Refreshed summary LSA ", lsaKey))
+		}
+	}
+
 	summaryLsa.LsaMd.Options = uint8(2) //Need to be re-visited
 	summaryLsa.LsaMd.LSAge = 0
-	summaryLsa.LsaMd.LSSequenceNum = InitialSequenceNumber
+	summaryLsa.LsaMd.LSSequenceNum = seq_num
 	summaryLsa.LsaMd.LSLen = uint16(OSPF_LSA_HEADER_SIZE + 8)
 	summaryLsa.Netmask = rKey.AddrMask
 	summaryLsa.Metric = uint32(rEnt.RoutingTblEnt.Cost)

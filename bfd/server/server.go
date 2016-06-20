@@ -13,13 +13,13 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 package server
 
@@ -45,10 +45,11 @@ import (
 )
 
 var (
-	bfdSnapshotLen  int32  = 65549                   // packet capture length
-	bfdPromiscuous  bool   = false                   // mode
-	bfdDedicatedMac string = "01:00:5E:90:00:01"     // Dest MAC perlink packets till neighbor's MAC is learned
-	bfdPcapFilter   string = "udp and dst port 6784" // packet capture filter
+	bfdSnapshotLen   int32  = 65549                   // packet capture length
+	bfdPromiscuous   bool   = false                   // mode
+	bfdDedicatedMac  string = "01:00:5E:90:00:01"     // Dest MAC perlink packets till neighbor's MAC is learned
+	bfdPcapFilter    string = "udp and dst port 3784" // packet capture filter
+	bfdPcapFilterLag string = "udp and dst port 6784" // packet capture filter
 )
 
 type ClientJson struct {
@@ -126,6 +127,7 @@ type BfdGlobal struct {
 	NumSessions             uint32
 	Sessions                map[int32]*BfdSession
 	SessionsIdSlice         []int32
+	SessionsByIp            map[string]*BfdSession
 	InactiveSessionsIdSlice []int32
 	NumSessionParams        uint32
 	SessionParams           map[string]*BfdSessionParam
@@ -167,6 +169,7 @@ type BFDServer struct {
 	BfdPacketRecvCh       chan RecvedBfdPacket
 	SessionParamConfigCh  chan SessionParamConfig
 	SessionParamDeleteCh  chan string
+	tobeCreatedSessions   map[string]BfdSessionMgmt
 	bfdGlobal             BfdGlobal
 }
 
@@ -190,6 +193,7 @@ func NewBFDServer(logger *logging.Writer) *BFDServer {
 	bfdServer.bfdGlobal.NumSessions = 0
 	bfdServer.bfdGlobal.Sessions = make(map[int32]*BfdSession)
 	bfdServer.bfdGlobal.SessionsIdSlice = []int32{}
+	bfdServer.bfdGlobal.SessionsByIp = make(map[string]*BfdSession)
 	bfdServer.bfdGlobal.InactiveSessionsIdSlice = []int32{}
 	bfdServer.bfdGlobal.NumSessionParams = 0
 	bfdServer.bfdGlobal.SessionParams = make(map[string]*BfdSessionParam)

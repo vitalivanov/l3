@@ -13,13 +13,13 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 package server
 
@@ -193,6 +193,13 @@ func (server *OSPFServer) EncodeLSAReqPkt(intfKey IntfConfKey, ent IntfConf,
 	copy(ospf[16:24], ent.IfAuthKey)
 
 	ipPktlen := IP_HEADER_MIN_LEN + ospfHdr.pktlen
+	var dstIp net.IP
+	if ent.IfType == config.NumberedP2P {
+		dstIp = net.ParseIP(config.AllSPFRouters)
+		dstMAC, _ = net.ParseMAC(config.McastMAC)
+	} else {
+		dstIp = nbrConf.OspfNbrIPAddr
+	}
 	ipLayer := layers.IPv4{
 		Version:  uint8(4),
 		IHL:      uint8(IP_HEADER_MIN_LEN),
@@ -201,7 +208,7 @@ func (server *OSPFServer) EncodeLSAReqPkt(intfKey IntfConfKey, ent IntfConf,
 		TTL:      uint8(1),
 		Protocol: layers.IPProtocol(OSPF_PROTO_ID),
 		SrcIP:    ent.IfIpAddr,
-		DstIP:    nbrConf.OspfNbrIPAddr,
+		DstIP:    dstIp,
 	}
 
 	ethLayer := layers.Ethernet{
@@ -256,6 +263,7 @@ func (server *OSPFServer) BuildAndSendLSAReq(nbrId NeighborConfKey, nbrConf Ospf
 		req.adv_router_id = reqlist[i].lsa_headers.adv_router_id
 		nbrConf.req_list_mutex.Lock()
 		msg.lsa_slice = append(msg.lsa_slice, req)
+		reqlist[i].valid = false
 		nbrConf.req_list_mutex.Unlock()
 		/* update LSA Retx list */
 		reTxNbr := newospfNeighborRetx()
@@ -336,6 +344,11 @@ func (server *OSPFServer) BuildLsaUpdPkt(intfKey IntfConfKey, ent IntfConf,
 	binary.BigEndian.PutUint16(ospf[12:14], csum)
 	copy(ospf[16:24], ent.IfAuthKey)
 
+	if ent.IfType == config.NumberedP2P {
+		dstIp = net.ParseIP(config.AllSPFRouters)
+		dstMAC, _ = net.ParseMAC(config.McastMAC)
+	}
+
 	ipPktlen := IP_HEADER_MIN_LEN + ospfHdr.pktlen
 	ipLayer := layers.IPv4{
 		Version:  uint8(4),
@@ -345,12 +358,12 @@ func (server *OSPFServer) BuildLsaUpdPkt(intfKey IntfConfKey, ent IntfConf,
 		TTL:      uint8(1),
 		Protocol: layers.IPProtocol(OSPF_PROTO_ID),
 		SrcIP:    ent.IfIpAddr,
-		DstIP:    dstIp, //net.IP{40, 1, 1, 2},
+		DstIP:    dstIp,
 	}
 
 	ethLayer := layers.Ethernet{
 		SrcMAC:       ent.IfMacAddr,
-		DstMAC:       dstMAC, //net.HardwareAddr{0x00, 0xe0, 0x4c, 0x68, 0x00, 0x81},
+		DstMAC:       dstMAC,
 		EthernetType: layers.EthernetTypeIPv4,
 	}
 
@@ -521,6 +534,7 @@ func (server *OSPFServer) DecodeLSAUpd(msg ospfNeighborLSAUpdMsg) {
 		server.ospfNbrLsaAckSendCh <- *lsaAckMsg
 
 		index = end_index
+		server.UpdateNeighborList(msg.nbrKey, *lsa_key)
 
 	}
 }
@@ -761,6 +775,10 @@ func (server *OSPFServer) BuildLSAAckPkt(intfKey IntfConfKey, ent IntfConf,
 	copy(ospf[16:24], ent.IfAuthKey)
 
 	ipPktlen := IP_HEADER_MIN_LEN + ospfHdr.pktlen
+	if ent.IfType == config.NumberedP2P {
+		dstIp = net.ParseIP(config.AllSPFRouters)
+		dstMAC, _ = net.ParseMAC(config.McastMAC)
+	}
 	ipLayer := layers.IPv4{
 		Version:  uint8(4),
 		IHL:      uint8(IP_HEADER_MIN_LEN),

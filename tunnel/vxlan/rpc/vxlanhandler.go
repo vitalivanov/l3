@@ -136,7 +136,7 @@ func (v *VXLANDServiceHandler) DeleteVxlanInstance(config *vxland.VxlanInstance)
 	return false, err
 }
 
-func (v *VXLANDServiceHandler) UpdateVxlanInstance(origconfig *vxland.VxlanInstance, newconfig *vxland.VxlanInstance, attrset []bool, op string) (bool, error) {
+func (v *VXLANDServiceHandler) UpdateVxlanInstance(origconfig *vxland.VxlanInstance, newconfig *vxland.VxlanInstance, attrset []bool, op []*vxland.PatchOpInfo) (bool, error) {
 	v.logger.Info(fmt.Sprintf("UpdateVxlanConfigInstance orig[%#v] new[%#v]", origconfig, newconfig))
 	oc, _ := vxlan.ConvertVxlanInstanceToVxlanConfig(origconfig)
 	nc, err := vxlan.ConvertVxlanInstanceToVxlanConfig(newconfig)
@@ -178,10 +178,10 @@ func (v *VXLANDServiceHandler) DeleteVxlanVtepInstance(config *vxland.VxlanVtepI
 	return false, err
 }
 
-func (v *VXLANDServiceHandler) UpdateVxlanVtepInstance(origconfig *vxland.VxlanVtepInstance, newconfig *vxland.VxlanVtepInstance, attrset []bool, op string) (bool, error) {
-	v.logger.Info(fmt.Sprintf("UpdateVxlanVtepInstance orig[%#v] new[%#v]", origconfig, newconfig))
-	oc, _ := vxlan.ConvertVxlanVtepInstanceToVtepConfig(origconfig)
-	nc, err := vxlan.ConvertVxlanVtepInstanceToVtepConfig(newconfig)
+func (v *VXLANDServiceHandler) UpdateVxlanVtepInstances(origconfig *vxland.VxlanVtepInstances, newconfig *vxland.VxlanVtepInstances, attrset []bool, op []*vxland.PatchOpInfo) (bool, error) {
+	v.logger.Info(fmt.Sprintf("UpdateVxlanVtepInstances orig[%#v] new[%#v]", origconfig, newconfig))
+	oc, _ := v.server.ConvertVxlanVtepInstanceToVtepConfig(origconfig)
+	nc, err := v.server.ConvertVxlanVtepInstanceToVtepConfig(newconfig)
 	if err == nil {
 		err = vxlan.VtepConfigCheck(nc)
 		if err == nil {
@@ -198,7 +198,6 @@ func (v *VXLANDServiceHandler) UpdateVxlanVtepInstance(origconfig *vxland.VxlanV
 	return false, err
 }
 
-<<<<<<< HEAD
 func (v *VXLANDServiceHandler) HandleDbReadVxlanInstance(dbHdl redis.Conn) error {
 	if dbHdl != nil {
 		var dbObj models.VxlanInstance
