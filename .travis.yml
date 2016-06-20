@@ -59,7 +59,7 @@ install:
   - git clone git@github.com:SnapRoute/reltools.git $HOME/gopath/src/reltools
   - git clone git@github.com:SnapRoute/thrift.git $HOME/gopath/src/external/src/git.apache.org/thrift.git
   - git clone git@github.com:SnapRoute/redigo.git $HOME/gopath/src/external/src/github.com/garyburd/redigo
-  - git clone git@github.com:SnapRoute/nanomsg.git $HOME/gopath/src/external/src/github.com/op/go-nanomsg
+  - git clone git@github.com:SnapRoute/go-nanomsg.git $HOME/gopath/src/external/src/github.com/op/go-nanomsg
   - git clone git@github.com:SnapRoute/netlink.git $HOME/gopath/src/external/src/github.com/vishvananda/netlink
   - git clone git@github.com:SnapRoute/mux.git $HOME/gopath/src/external/src/github.com/gorilla/mux
   - git clone git@github.com:SnapRoute/context.git $HOME/gopath/src/external/src/github.com/gorilla/context
