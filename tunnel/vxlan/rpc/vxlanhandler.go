@@ -33,7 +33,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 	"io/ioutil"
 	vxlan "l3/tunnel/vxlan/protocol"
-	"models"
+	"models/objects"
 	"utils/logging"
 	"vxland"
 )
@@ -82,7 +82,7 @@ func NewVXLANDServiceHandler(server *vxlan.VXLANServer, logger *logging.Writer) 
 	}
 
 	// lets read the current config and re-play the config
-	//handler.ReadConfigFromDB()
+	handler.ReadConfigFromDB()
 
 	return handler
 }
@@ -178,10 +178,10 @@ func (v *VXLANDServiceHandler) DeleteVxlanVtepInstance(config *vxland.VxlanVtepI
 	return false, err
 }
 
-func (v *VXLANDServiceHandler) UpdateVxlanVtepInstances(origconfig *vxland.VxlanVtepInstances, newconfig *vxland.VxlanVtepInstances, attrset []bool, op []*vxland.PatchOpInfo) (bool, error) {
+func (v *VXLANDServiceHandler) UpdateVxlanVtepInstance(origconfig *vxland.VxlanVtepInstance, newconfig *vxland.VxlanVtepInstance, attrset []bool, op []*vxland.PatchOpInfo) (bool, error) {
 	v.logger.Info(fmt.Sprintf("UpdateVxlanVtepInstances orig[%#v] new[%#v]", origconfig, newconfig))
-	oc, _ := v.server.ConvertVxlanVtepInstanceToVtepConfig(origconfig)
-	nc, err := v.server.ConvertVxlanVtepInstanceToVtepConfig(newconfig)
+	oc, _ := vxlan.ConvertVxlanVtepInstanceToVtepConfig(origconfig)
+	nc, err := vxlan.ConvertVxlanVtepInstanceToVtepConfig(newconfig)
 	if err == nil {
 		err = vxlan.VtepConfigCheck(nc)
 		if err == nil {
@@ -200,7 +200,7 @@ func (v *VXLANDServiceHandler) UpdateVxlanVtepInstances(origconfig *vxland.Vxlan
 
 func (v *VXLANDServiceHandler) HandleDbReadVxlanInstance(dbHdl redis.Conn) error {
 	if dbHdl != nil {
-		var dbObj models.VxlanInstance
+		var dbObj objects.VxlanInstance
 		objList, err := dbObj.GetAllObjFromDb(dbHdl)
 		if err != nil {
 			v.logger.Warning("DB Query failed when retrieving VxlanInstance objects")
@@ -208,8 +208,8 @@ func (v *VXLANDServiceHandler) HandleDbReadVxlanInstance(dbHdl redis.Conn) error
 		}
 		for idx := 0; idx < len(objList); idx++ {
 			obj := vxland.NewVxlanInstance()
-			dbObject := objList[idx].(models.VxlanInstance)
-			models.ConvertvxlandVxlanInstanceObjToThrift(&dbObject, obj)
+			dbObject := objList[idx].(objects.VxlanInstance)
+			objects.ConvertvxlandVxlanInstanceObjToThrift(&dbObject, obj)
 			_, err = v.CreateVxlanInstance(obj)
 			if err != nil {
 				return err
@@ -221,7 +221,7 @@ func (v *VXLANDServiceHandler) HandleDbReadVxlanInstance(dbHdl redis.Conn) error
 
 func (v *VXLANDServiceHandler) HandleDbReadVxlanVtepInstance(dbHdl redis.Conn) error {
 	if dbHdl != nil {
-		var dbObj models.VxlanVtepInstance
+		var dbObj objects.VxlanVtepInstance
 		objList, err := dbObj.GetAllObjFromDb(dbHdl)
 		if err != nil {
 			v.logger.Warning("DB Query failed when retrieving VxlanVtepInstance objects")
@@ -229,8 +229,8 @@ func (v *VXLANDServiceHandler) HandleDbReadVxlanVtepInstance(dbHdl redis.Conn) e
 		}
 		for idx := 0; idx < len(objList); idx++ {
 			obj := vxland.NewVxlanVtepInstance()
-			dbObject := objList[idx].(models.VxlanVtepInstance)
-			models.ConvertvxlandVxlanVtepInstanceObjToThrift(&dbObject, obj)
+			dbObject := objList[idx].(objects.VxlanVtepInstance)
+			objects.ConvertvxlandVxlanVtepInstanceObjToThrift(&dbObject, obj)
 			_, err = v.CreateVxlanVtepInstance(obj)
 			if err != nil {
 				return err

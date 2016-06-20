@@ -361,8 +361,9 @@ func (intf VXLANSnapClient) CreateVtep(vtep *vxlan.VtepDbEntry, vteplistener cha
 				ifIndex: vtep.SrcIfName,
 				refCnt:  1,
 			}
+			pbmp := []string{}
 			PortVlanDb[vtep.VlanId] = append(PortVlanDb[vtep.VlanId], v)
-			pbmp := fmt.Sprintf("%d", vtep.NextHop.IfIndex)
+			pbmp = append(pbmp, fmt.Sprintf("%d", vtep.NextHop.IfIndex))
 
 			asicdVlan := &asicdServices.Vlan{
 				VlanId:   int32(vtep.VlanId),
@@ -379,18 +380,18 @@ func (intf VXLANSnapClient) CreateVtep(vtep *vxlan.VtepDbEntry, vteplistener cha
 				}
 			}
 			if portExists == -1 {
-				oldpbmp := ""
+				oldpbmp := []string{}
 				for _, p := range PortVlanDb[vtep.VlanId] {
-					oldpbmp += fmt.Sprintf("%s", p.ifIndex)
+					oldpbmp = append(oldpbmp, fmt.Sprintf("%s", p.ifIndex))
 				}
 				v := &portVlanValue{
 					ifIndex: vtep.SrcIfName,
 					refCnt:  1,
 				}
 				PortVlanDb[vtep.VlanId] = append(PortVlanDb[vtep.VlanId], v)
-				newpbmp := ""
+				newpbmp := []string{}
 				for _, p := range PortVlanDb[vtep.VlanId] {
-					newpbmp += fmt.Sprintf("%s", p.ifIndex)
+					newpbmp = append(newpbmp, fmt.Sprintf("%s", p.ifIndex))
 				}
 
 				oldAsicdVlan := &asicdServices.Vlan{
@@ -404,7 +405,8 @@ func (intf VXLANSnapClient) CreateVtep(vtep *vxlan.VtepDbEntry, vteplistener cha
 				// note if the thrift attribute id's change then
 				// this attr may need to be updated
 				attrset := []bool{false, true, false}
-				asicdclnt.ClientHdl.UpdateVlan(oldAsicdVlan, newAsicdVlan, attrset, "add")
+				op := []*asicdServices.PatchOpInfo{}
+				asicdclnt.ClientHdl.UpdateVlan(oldAsicdVlan, newAsicdVlan, attrset, op)
 			} else {
 				v := PortVlanDb[vtep.VlanId][portExists]
 				v.refCnt++
@@ -451,15 +453,15 @@ func (intf VXLANSnapClient) DeleteVtep(vtep *vxlan.VtepDbEntry) {
 
 				// lets remove this port from the vlan
 				if v.refCnt == 0 {
-					oldpbmp := ""
+					oldpbmp := []string{}
 					for _, p := range PortVlanDb[vtep.VlanId] {
-						oldpbmp += fmt.Sprintf("%s", p.ifIndex)
+						oldpbmp = append(oldpbmp, fmt.Sprintf("%s", p.ifIndex))
 					}
 					// remove from local list
 					PortVlanDb[vtep.VlanId] = append(PortVlanDb[vtep.VlanId][:portExists], PortVlanDb[vtep.VlanId][portExists+1:]...)
-					newpbmp := ""
+					newpbmp := []string{}
 					for _, p := range PortVlanDb[vtep.VlanId] {
-						newpbmp += fmt.Sprintf("%s", p.ifIndex)
+						newpbmp = append(newpbmp, fmt.Sprintf("%s", p.ifIndex))
 					}
 
 					oldAsicdVlan := &asicdServices.Vlan{
@@ -473,7 +475,8 @@ func (intf VXLANSnapClient) DeleteVtep(vtep *vxlan.VtepDbEntry) {
 					// note if the thrift attribute id's change then
 					// this attr may need to be updated
 					attrset := []bool{false, true, false}
-					asicdclnt.ClientHdl.UpdateVlan(oldAsicdVlan, newAsicdVlan, attrset, "del")
+					op := []*asicdServices.PatchOpInfo{}
+					asicdclnt.ClientHdl.UpdateVlan(oldAsicdVlan, newAsicdVlan, attrset, op)
 				}
 				// lets remove the vlan
 				if len(PortVlanDb[vtep.VlanId]) == 0 {

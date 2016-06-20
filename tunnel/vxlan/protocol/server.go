@@ -13,13 +13,13 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 // server.go
 package vxlan
@@ -95,12 +95,11 @@ func NewVXLANServer(l *logging.Writer, paramspath string) *VXLANServer {
 		logger.Info(fmt.Sprintf("Params path: %s", paramspath))
 
 		// setup server to monitor the daemons vxlan have a depenance on
-		keepalivelistener := keepalive.InitDaemonStatusListner()
+		go keepalive.InitKeepAlive("vxland", paramspath)
 
 		VxlanServer = &VXLANServer{
-			Paramspath:     paramspath,
-			logger:         l,
-			DaemonStatusCh: keepalivelistener.DaemonStatusCh,
+			Paramspath: paramspath,
+			logger:     l,
 			Configchans: &VxLanConfigChannels{
 				Vxlancreate:               make(chan VxlanConfig, 0),
 				Vxlandelete:               make(chan VxlanConfig, 0),
