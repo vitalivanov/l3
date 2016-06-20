@@ -40,6 +40,7 @@ install:
   - sudo apt-get install -y build-essential gccgo-4.8 git
   - sudo apt-get install -y python-dev python-bitarray python-paramiko python-netaddr
   - sudo apt-get install -y libboost-dev libboost-test-dev libboost-program-options-dev libboost-system-dev libboost-filesystem-dev libevent-dev automake libtool flex bison pkg-config g++ libssl-dev ant
+  - sudo apt-get install redis-server
   - sudo -H pip install bitarray
   - echo $PYTHONPATH
   - echo $PATH
@@ -72,8 +73,6 @@ install:
   - ls -alt $HOME/gopath/src/snaproute/src
 
 before_script:
-  - echo $PYTHONPATH
-  - echo $PATH
   - ln -s $HOME/gopath/src/reltools/Makefile $HOME/gopath/src/snaproute/src/Makefile
   - ls -alt $HOME/gopath/src/snaproute/src
   - export PYTHONPATH=/usr/lib/python2.7/dist-packages
@@ -81,4 +80,5 @@ before_script:
   - cd $HOME/gopath/src/snaproute/src;make buildinfogen;make codegen;make ipc
 
 script:
-  - go test ./...
+  - cd $HOME/gopath/src/snaproute/src/l3
+  - go test -v ./...
