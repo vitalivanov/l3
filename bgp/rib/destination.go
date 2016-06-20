@@ -60,6 +60,7 @@ type Destination struct {
 	pathIds           []uint32
 	recalculate       bool
 	BGPRouteState     *bgpd.BGPRouteState
+	PathInfoRouteMap  map[*bgpd.PathInfo]*Route
 	routeListIdx      int
 }
 
@@ -77,6 +78,7 @@ func NewDestination(rib *AdjRib, ipPrefix *packet.IPPrefix, gConf *config.Global
 		maxPathId:         1,
 		pathIds:           make([]uint32, 0),
 		routeListIdx:      -1,
+		PathInfoRouteMap:  make(map[*bgpd.PathInfo]*Route),
 		BGPRouteState: &bgpd.BGPRouteState{
 			Network: ipPrefix.Prefix.String(),
 			CIDRLen: int16(ipPrefix.Length),
@@ -230,6 +232,7 @@ func (d *Destination) AddOrUpdatePath(peerIp string, pathId uint32, path *Path) 
 			d.IPPrefix.Prefix.String(), peerIp, pathId))
 		if route, ok := d.pathRouteMap[oldPath]; ok {
 			idx = route.routeListIdx
+			delete(d.PathInfoRouteMap, route.PathInfo)
 		}
 		if d.LocRibPath == oldPath {
 			d.LocRibPath = path
@@ -255,6 +258,7 @@ func (d *Destination) AddOrUpdatePath(peerIp string, pathId uint32, path *Path) 
 		idx = len(d.BGPRouteState.Paths)
 		d.BGPRouteState.Paths = append(d.BGPRouteState.Paths, route.PathInfo)
 	}
+	d.PathInfoRouteMap[route.PathInfo] = route
 	route.setIdx(idx)
 	d.peerPathMap[peerIp][pathId] = path
 	return added
@@ -287,9 +291,17 @@ func (d *Destination) RemovePath(peerIP string, pathId uint32, path *Path) *Path
 		d.releasePathId(route.OutPathId)
 		delete(d.pathRouteMap, oldPath)
 		if route.routeListIdx != -1 {
-			d.BGPRouteState.Paths[route.routeListIdx] = d.BGPRouteState.Paths[len(d.BGPRouteState.Paths)-1]
-			d.BGPRouteState.Paths[len(d.BGPRouteState.Paths)-1] = nil
-			d.BGPRouteState.Paths = d.BGPRouteState.Paths[:len(d.BGPRouteState.Paths)-1]
+			newPath := d.BGPRouteState.Paths[len(d.BGPRouteState.Paths)-1]
+			if newRoute, ok := d.PathInfoRouteMap[newPath]; ok {
+				delete(d.PathInfoRouteMap, route.PathInfo)
+				d.BGPRouteState.Paths[route.routeListIdx] = newPath
+				newRoute.setIdx(route.routeListIdx)
+				d.BGPRouteState.Paths[len(d.BGPRouteState.Paths)-1] = nil
+				d.BGPRouteState.Paths = d.BGPRouteState.Paths[:len(d.BGPRouteState.Paths)-1]
+			} else {
+				d.logger.Err(fmt.Sprintf("Could not find path %v in PathInfoRouteMap %v",
+					d.BGPRouteState.Paths[len(d.BGPRouteState.Paths)-1], d.PathInfoRouteMap))
+			}
 		}
 		delete(d.peerPathMap[peerIP], pathId)
 		if len(d.peerPathMap[peerIP]) == 0 {
