@@ -70,7 +70,7 @@ before_script:
   - ls -l /usr/lib/python2.7/dist-packages/bitarray
   - ln -s $HOME/gopath/src/reltools/Makefile $HOME/gopath/src/snaproute/src/Makefile
   - ls -alt $HOME/gopath/src/snaproute/src
-#  - export PYTHONPATH=/usr/lib/python2.7/dist-packages
+  - export PYTHONPATH=/usr/lib/python2.7/dist-packages
   - export SR_CODE_BASE=$HOME/gopath/src
   - cd $HOME/gopath/src/snaproute/src;make buildinfogen;make codegen;make ipc
 
