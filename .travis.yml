@@ -36,7 +36,7 @@ install:
   - ls -l /usr/lib/python*
   - ls -l /usr/lib/python2.7/dist-packages/
   - ls -l /usr/lib/python2.7/dist-packages/bitarray
-  - sudo pip install bitarray
+  - sudo -H pip install bitarray
   - ls -l /usr/lib/python2.7/dist-packages/bitarray
 #  - sudo apt-get install thrift-compiler
   - wget -O $HOME/.tmp/thrift-0.9.3.tar.gz http://www-us.apache.org/dist/thrift/0.9.3/thrift-0.9.3.tar.gz
@@ -59,7 +59,7 @@ install:
 before_script:
   - ls -l /usr/lib/python2.7/dist-packages/bitarray
   - sudo apt-get install -y python-bitarray
-  - sudo pip install bitarray
+  - sudo -H pip install bitarray
   - echo $PYTHONPATH
   - echo $PATH
   - ls -l /usr/lib/python*
