@@ -345,3 +345,52 @@ func (server *OSPFServer) resetNeighborLists(nbr NeighborConfKey, intf IntfConfK
 	ospfIntfToNbrMap[intf] = nbrMdata
 	server.logger.Info(fmt.Sprintln("DEAD: nbrList ", nbrMdata.nbrList))
 }
+
+func (server *OSPFServer) CheckNeighborFullEvent(nbrKey NeighborConfKey) {
+	nbrConf, exists := server.NeighborConfigMap[nbrKey]
+    nbrFull := true
+	if exists {
+        reqlist := ospfNeighborRequest_list[nbrKey]
+        if reqlist != nil {
+            for _, ent := range reqlist {
+                if ent.valid == true {
+                    nbrFull = false
+                }
+            }
+        }
+        if !nbrFull  {
+            return
+        }
+		nbrConfMsg := ospfNeighborConfMsg{
+			ospfNbrConfKey: nbrKey,
+			ospfNbrEntry: OspfNeighborEntry{
+				OspfNbrRtrId:           nbrConf.OspfNbrRtrId,
+				OspfNbrIPAddr:          nbrConf.OspfNbrIPAddr,
+				OspfRtrPrio:            nbrConf.OspfRtrPrio,
+				intfConfKey:            nbrConf.intfConfKey,
+				OspfNbrOptions:         0,
+				OspfNbrState:           config.NbrFull,
+				isStateUpdate:          true,
+				OspfNbrInactivityTimer: time.Now(),
+				OspfNbrDeadTimer:       nbrConf.OspfNbrDeadTimer,
+				isSeqNumUpdate:         false,
+				isMasterUpdate:         false,
+				nbrEvent:               nbrConf.nbrEvent,
+			},
+			nbrMsgType: NBRUPD,
+		}
+		server.neighborConfCh <- nbrConfMsg
+        server.logger.Info(fmt.Sprintln("NBREVENT: Nbr FULL ", nbrKey.IPAddr))
+	}
+}
+
+
+func (server *OSPFServer) UpdateNeighborList(nbrKey NeighborConfKey, lsaKey LsaKey) {
+    nbrConf, exists := server.NeighborConfigMap[nbrKey]
+	if exists {
+        if nbrConf.OspfNbrState == config.NbrFull {
+            return
+        }
+        server.CheckNeighborFullEvent(nbrKey) 
+    }
+}
