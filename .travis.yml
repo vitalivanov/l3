@@ -11,6 +11,9 @@ cache: false
 
 go_import_path: snaproute/src/l3
 
+services:
+  - redis-server
+
 before_install:
   - mkdir -p $HOME/gopath/src/reltools
   - mkdir -p $HOME/gopath/src/generated/src
@@ -42,11 +45,6 @@ install:
   - sudo apt-get install -y libpcap0.8 libpcap0.8-dev libpcap-dev
   - sudo apt-get install -y python-dev python-bitarray python-paramiko python-netaddr
   - sudo apt-get install -y libboost-dev libboost-test-dev libboost-program-options-dev libboost-system-dev libboost-filesystem-dev libevent-dev automake libtool flex bison pkg-config g++ libssl-dev ant
-  - sudo apt-get install -y redis-server
-  - which redis-server
-  - sudo find /usr -iname redis*
-  - sudo find /opt -iname redis*
-  - sudo /usr/bin/redis-server /etc/redis/redis.conf
   - sudo -H pip install bitarray
   - echo $PYTHONPATH
   - echo $PATH
