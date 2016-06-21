@@ -80,8 +80,8 @@ install:
   - cd $HOME/gopath/src/external/src/github.com/netfilter/libmnl;./autogen.sh;./configure --prefix=$HOME/gopath/src/external/src/github.com/netfilter/libiptables;make;make install
   - export LIBMNL_CFLAGS=$HOME/gopath/src/external/src/github.com/netfilter/libiptables/include/libmnl
   - export LIBMNL_LIBS=$HOME/gopath/src/external/src/github.com/netfilter/libiptables/lib/pkgconfig
-  - cd $HOME/gopath/src/external/src/github.com/netfilter/libnftnl;./autogen.sh;./configure --prefix="$HOME/gopath/src/external/src/github.com/netfilter/libiptables" CFLAGS="-I $HOME/gopath/src/external/src/github.com/netfilter/libiptables/include" LDFLAGS="-L $HOME/gopath/src/external/src/github.com/netfilter/libiptables/lib";make;make install
-  - cd $HOME/gopath/src/external/src/github.com/netfilter/iptables;./autogen.sh;./configure --prefix="$HOME/gopath/src/external/src/github.com/netfilter/libiptables" CFLAGS="-I $HOME/gopath/src/external/src/github.com/netfilter/libiptables/include" LDFLAGS="-L $HOME/gopath/src/external/src/github.com/netfilter/libiptables/lib" LIBS="-lmnl -lnftnl";make;make install
+  - cd $HOME/gopath/src/external/src/github.com/netfilter/libnftnl;./autogen.sh;./configure --prefix=$HOME/gopath/src/external/src/github.com/netfilter/libiptables CFLAGS=-I$HOME/gopath/src/external/src/github.com/netfilter/libiptables/include LDFLAGS=-L$HOME/gopath/src/external/src/github.com/netfilter/libiptables/lib;make;make install
+  - cd $HOME/gopath/src/external/src/github.com/netfilter/iptables;./autogen.sh;./configure --prefix=$HOME/gopath/src/external/src/github.com/netfilter/libiptables CFLAGS=-I$HOME/gopath/src/external/src/github.com/netfilter/libiptables/include LDFLAGS=-L$HOME/gopath/src/external/src/github.com/netfilter/libiptables/lib LIBS="-lmnl -lnftnl";make;make install
 
 before_script:
   - ln -s $HOME/gopath/src/reltools/Makefile $HOME/gopath/src/snaproute/src/Makefile
