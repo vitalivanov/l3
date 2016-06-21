@@ -22,7 +22,7 @@
 //
 
 // locRIBStateClient.go
-package server
+package rib
 
 import (
 	"bgpd"
