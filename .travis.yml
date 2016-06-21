@@ -46,7 +46,7 @@ install:
   - which redis-server
   - sudo find /usr -iname redis*
   - sudo find /opt -iname redis*
-  - sudo /etc/init.d/redis-server restart
+  - sudo /usr/bin/redis-server /etc/redis/redis.conf
   - sudo -H pip install bitarray
   - echo $PYTHONPATH
   - echo $PATH
