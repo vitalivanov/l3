@@ -27,6 +27,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"l3/tunnel/vxlan/clients/snapclient"
 	vxlan "l3/tunnel/vxlan/protocol"
 	"l3/tunnel/vxlan/rpc"
 	"utils/keepalive"
@@ -49,6 +50,20 @@ func main() {
 		fmt.Println("Failed to start the logger. Nothing will be logged...")
 	}
 	logger.Info("Started the logger successfully.")
+
+	// Order of calls here matters as the logger
+	// needs to exist before clients are registerd
+	// and before the server is created.  Similarly
+	// the clients need to exist before the server
+	// is created as they are connected at time
+	// of server creation
+	vxlan.SetLogger(logger)
+
+	// register all appropriate clients for use by server
+	// TODO add logic to read a param file which contains
+	// which client interface to use
+	client := snapclient.NewVXLANSnapClient(logger)
+	vxlan.RegisterClients(*client)
 
 	// create a new vxlan server
 	server := vxlan.NewVXLANServer(logger, path)
