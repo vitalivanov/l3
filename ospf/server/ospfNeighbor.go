@@ -36,6 +36,8 @@ import (
 */
 func (server *OSPFServer) exchangePacketDiscardCheck(nbrConf OspfNeighborEntry, nbrDbPkt ospfDatabaseDescriptionData) (isDiscard bool) {
 	if nbrDbPkt.msbit != nbrConf.isMaster {
+		info := "SeqNumberMismatch. Nbr should be master " + nbrConf.OspfNbrIPAddr.String()
+		server.AddOspfEventState(config.ADJACENCY, info)
 		server.logger.Info(fmt.Sprintln("NBREVENT: SeqNumberMismatch. Nbr should be master  dbdmsbit ", nbrDbPkt.msbit,
 			" isMaster ", nbrConf.isMaster))
 		return true
@@ -43,6 +45,8 @@ func (server *OSPFServer) exchangePacketDiscardCheck(nbrConf OspfNeighborEntry, 
 
 	if nbrDbPkt.ibit == true {
 		server.logger.Info("NBREVENT:SeqNumberMismatch . Nbr ibit is true ")
+		info := "SeqNumberMismatch . Nbr ibit is true " + nbrConf.OspfNbrIPAddr.String()
+		server.AddOspfEventState(config.ADJACENCY, info)
 		return true
 	}
 	/*
@@ -60,12 +64,16 @@ func (server *OSPFServer) exchangePacketDiscardCheck(nbrConf OspfNeighborEntry, 
 			}
 			server.logger.Info(fmt.Sprintln("NBREVENT:SeqNumberMismatch : Nbr is master but dbd packet seq no doesnt match. dbd seq ",
 				nbrDbPkt.dd_sequence_number, "nbr seq ", nbrConf.ospfNbrSeqNum))
+			info := "SeqNumberMismatch . " + nbrConf.OspfNbrIPAddr.String()
+			server.AddOspfEventState(config.ADJACENCY, info)
 			return true
 		}
 	} else {
 		if nbrDbPkt.dd_sequence_number != nbrConf.ospfNbrSeqNum {
 			server.logger.Info(fmt.Sprintln("NBREVENT:SeqNumberMismatch : Nbr is slave but dbd packet seq no doesnt match.dbd seq ",
 				nbrDbPkt.dd_sequence_number, "nbr seq ", nbrConf.ospfNbrSeqNum))
+			info := "SeqNumberMismatch . " + nbrConf.OspfNbrIPAddr.String()
+			server.AddOspfEventState(config.ADJACENCY, info)
 			return true
 		}
 	}
@@ -500,6 +508,8 @@ func (server *OSPFServer) ProcessNbrStateMachine() {
 				var nbrState config.NbrState
 				var dbd_mdata ospfDatabaseDescriptionData
 				var send_dbd bool
+				info := "Create new neighbor with id" + nbrData.NeighborIP.String()
+				server.AddOspfEventState(config.ADJACENCY, info)
 				server.logger.Info(fmt.Sprintln("NBREVENT: Create new neighbor with id ", nbrData.RouterId))
 
 				if nbrData.TwoWayStatus { // update the state

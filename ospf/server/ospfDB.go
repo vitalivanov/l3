@@ -31,7 +31,25 @@ import (
 	"ospfd"
 	"strings"
 	"utils/dbutils"
+	"time"
 )
+
+type DbRouteMsg struct {
+	op bool
+	entry RoutingTblEntryKey
+}
+
+type DbLsdbMsg struct {
+	op bool 
+	entry LsdbSliceEnt
+}
+
+type DbEventMsg struct {
+	eventType string
+	eventInfo string
+}
+
+var DBEventSeq int32
 
 func (server *OSPFServer) InitializeDB() error {
 	server.dbHdl = dbutils.NewDBUtil(server.logger)
@@ -40,7 +58,50 @@ func (server *OSPFServer) InitializeDB() error {
 		server.logger.Err("Failed to create the DB Handle")
 		return err
 	}
+	server.InitDBChannels()
+	DBEventSeq = 0
 	return nil
+}
+
+func (server *OSPFServer) InitDBChannels() {
+	server.DbReadConfig = make(chan bool)
+	server.DbRouteOp = make(chan DbRouteMsg)
+	server.DbLsdbOp = make(chan DbLsdbMsg)
+	server.DbEventOp = make(chan DbEventMsg)
+}
+
+func (server *OSPFServer) StartDBListener() {
+	if server.dbHdl == nil {
+		server.logger.Info(fmt.Sprintln("DB: Null db handle. No redis db messages will be logged."))
+	}
+	for {
+		select {
+		     case start := <- server.DbReadConfig:
+			if start {
+			server.ReadOspfCfgFromDB()
+			} else {
+			   return
+			}
+
+		     case msg := <- server.DbRouteOp:
+			if msg.op {
+			  server.AddIPv4RoutesState(msg.entry)  
+			} else {
+			   server.DelIPv4RoutesState(msg.entry)
+			}
+
+		     case msg := <- server.DbLsdbOp:
+			if msg.op {
+			    server.AddLsdbEntry(msg.entry)
+			} else {
+			    server.DelLsdbEntry(msg.entry)
+			}
+
+		     case msg := <- server.DbEventOp:
+			server.AddOspfEventState(msg.eventType, msg.eventInfo)
+		}
+	}
+	
 }
 
 func (server *OSPFServer) ReadOspfCfgFromDB() {
@@ -183,8 +244,8 @@ func (server *OSPFServer) AddIPv4RoutesState(entry RoutingTblEntryKey) error {
 		server.logger.Info(fmt.Sprintln("DB: Routing table entry doesnt exist key ", entry))
 		return nil
 	}
-	var dbObj objects.OspfIPv4Routes
-	obj := ospfd.NewOspfIPv4Routes()
+	var dbObj objects.OspfIPv4RouteState
+	obj := ospfd.NewOspfIPv4RouteState()
 	/* Fill in obj values */
 	obj.DestId = convertUint32ToIPv4(entry.DestId)
 	obj.AddrMask = convertUint32ToIPv4(entry.AddrMask)
@@ -220,7 +281,7 @@ func (server *OSPFServer) AddIPv4RoutesState(entry RoutingTblEntryKey) error {
 	obj.LSOrigin.LSId = int32(rEntry.RoutingTblEnt.LSOrigin.LSId)
 	obj.LSOrigin.AdvRouter = int32(rEntry.RoutingTblEnt.LSOrigin.AdvRouter)
 
-	objects.ConvertThriftToospfdOspfIPv4RoutesObj(obj, &dbObj)
+	objects.ConvertThriftToospfdOspfIPv4RouteStateObj(obj, &dbObj)
 	err := dbObj.StoreObjectInDb(server.dbHdl)
 	if err != nil {
 		server.logger.Err(fmt.Sprintln("DB: Failed to add object in db , err ", err))
@@ -233,15 +294,15 @@ func (server *OSPFServer) AddIPv4RoutesState(entry RoutingTblEntryKey) error {
 func (server *OSPFServer) DelIPv4RoutesState(entry RoutingTblEntryKey) error {
 	server.logger.Info(fmt.Sprintln("DB: Delete IPv4 entry from db ", entry))
 
-	var dbObj objects.OspfIPv4Routes
-	obj := ospfd.NewOspfIPv4Routes()
+	var dbObj objects.OspfIPv4RouteState
+	obj := ospfd.NewOspfIPv4RouteState()
 
 	obj.LSOrigin = &ospfd.OspfLsaKey{}
 	obj.DestId = convertUint32ToIPv4(entry.DestId)
 	obj.AddrMask = convertUint32ToIPv4(entry.AddrMask)
 	obj.DestType = string(entry.DestType)
 
-	objects.ConvertThriftToospfdOspfIPv4RoutesObj(obj, &dbObj)
+	objects.ConvertThriftToospfdOspfIPv4RouteStateObj(obj, &dbObj)
 	err := dbObj.DeleteObjectFromDb(server.dbHdl)
 	if err != nil {
 		server.logger.Err(fmt.Sprintln("DB: Failed to add object in db , err ", err))
@@ -348,4 +409,44 @@ func (server *OSPFServer) DelLsdbEntry(entry LsdbSliceEnt) error {
 		return errors.New(fmt.Sprintln("Failed to DEL OspfLsdbEntryState db : ", entry))
 	}
 	return nil
+}
+
+func (server *OSPFServer) AddOspfEventState(eventType string, eventInfo string) error {
+	server.logger.Info(fmt.Sprintln("DB: Add ospf event ", eventInfo))
+	var dbObj objects.OspfEventState
+	obj := ospfd.NewOspfEventState()
+
+        obj.Index = DBEventSeq
+	DBEventSeq++
+	obj.TimeStamp = time.Now().String()
+	obj.EventInfo = eventInfo
+	obj.EventType = eventType
+
+	objects.ConvertThriftToospfdOspfEventStateObj(obj, &dbObj)
+	err := dbObj.StoreObjectInDb(server.dbHdl)
+        if err != nil {
+                server.logger.Err(fmt.Sprintln("DB: Failed to add event object in db , err ", err))
+                return errors.New(fmt.Sprintln("Failed to add OspfEventState in db : ", eventInfo))
+        }
+
+        return err
+
+}
+
+func (server *OSPFServer) DelOspfEventState(entry config.OspfEventState) error {
+	server.logger.Info(fmt.Sprintln("DB: DEL ospf event ", entry))
+	var dbObj objects.OspfEventState
+ 	obj := ospfd.NewOspfEventState()
+	
+	obj.TimeStamp = time.Now().String()
+	obj.EventInfo = entry.EventInfo
+	obj.EventType = entry.EventType
+	
+	objects.ConvertThriftToospfdOspfEventStateObj(obj, &dbObj)
+	err := dbObj.DeleteObjectFromDb(server.dbHdl)
+	if err != nil {
+		server.logger.Info(fmt.Sprintln("DB: Failed to log event ", entry))
+		return errors.New(fmt.Sprintln("DB: Failed to log event ", entry))
+	}
+	return err
 }
