@@ -82,14 +82,18 @@ install:
   - export LIBMNL_LIBS=$HOME/gopath/src/external/src/github.com/netfilter/libiptables/lib/pkgconfig
   - cd $HOME/gopath/src/external/src/github.com/netfilter/libnftnl;./autogen.sh;./configure --prefix=$HOME/gopath/src/external/src/github.com/netfilter/libiptables CFLAGS=-I$HOME/gopath/src/external/src/github.com/netfilter/libiptables/include LDFLAGS=-L$HOME/gopath/src/external/src/github.com/netfilter/libiptables/lib;make;make install
   - cd $HOME/gopath/src/external/src/github.com/netfilter/iptables;./autogen.sh;./configure --prefix=$HOME/gopath/src/external/src/github.com/netfilter/libiptables CFLAGS=-I$HOME/gopath/src/external/src/github.com/netfilter/libiptables/include LDFLAGS=-L$HOME/gopath/src/external/src/github.com/netfilter/libiptables/lib LIBS="-lmnl -lnftnl";make;make install
+  - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib
+  - echo $LD_LIBRARY_PATH
 
 before_script:
   - ln -s $HOME/gopath/src/reltools/Makefile $HOME/gopath/src/snaproute/src/Makefile
   - ls -alt $HOME/gopath/src/snaproute/src
   - export PYTHONPATH=/usr/lib/python2.7/dist-packages
   - export SR_CODE_BASE=$HOME/gopath/src
+  - echo $LD_LIBRARY_PATH
   - cd $HOME/gopath/src/snaproute/src;make buildinfogen;make codegen;make ipc
 
 script:
+  - echo $LD_LIBRARY_PATH
   - cd $HOME/gopath/src/snaproute/src/l3
   - go test -v ./...
