@@ -42,7 +42,7 @@ install:
   - sudo apt-get install -y libpcap0.8 libpcap0.8-dev libpcap-dev
   - sudo apt-get install -y python-dev python-bitarray python-paramiko python-netaddr
   - sudo apt-get install -y libboost-dev libboost-test-dev libboost-program-options-dev libboost-system-dev libboost-filesystem-dev libevent-dev automake libtool flex bison pkg-config g++ libssl-dev ant
-  - sudo apt-get install redis-server redis-tools
+  - sudo apt-get install -y redis-server redis-tools
   - /etc/init.d/redis-server restart
   - sudo -H pip install bitarray
   - echo $PYTHONPATH
