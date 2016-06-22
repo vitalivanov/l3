@@ -118,6 +118,7 @@ func BuildPublisherMap() {
 	PublisherInfoMap["EBGP"] = PublisherInfoMap["BGP"]
 	PublisherInfoMap["IBGP"] = PublisherInfoMap["BGP"]
 	PublisherInfoMap["BFD"] = PublisherMapInfo{ribdCommonDefs.PUB_SOCKET_BFDD_ADDR, InitPublisher(ribdCommonDefs.PUB_SOCKET_BFDD_ADDR)}
+	PublisherInfoMap["VXLAN"] = PublisherMapInfo{ribdCommonDefs.PUB_SOCKET_VXLAND_ADDR, InitPublisher(ribdCommonDefs.PUB_SOCKET_VXLAND_ADDR)}
 }
 func BuildRouteProtocolTypeMapDB() {
 	RouteProtocolTypeMapDB["CONNECTED"] = ribdCommonDefs.CONNECTED

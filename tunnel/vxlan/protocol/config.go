@@ -26,21 +26,53 @@
 package vxlan
 
 import (
-	"errors"
 	"fmt"
-	"l3/tunnel/vxlan/vxlan_linux"
 	"net"
 	"reflect"
+	//"strings"
+	"errors"
 	"vxland"
 )
 
+const (
+	VxlanCommandCreate = iota + 1
+	VxlanCommandDelete
+	VxlanCommandUpdate
+)
+
 type VxLanConfigChannels struct {
-	Vxlancreate chan VxlanConfig
-	Vxlandelete chan VxlanConfig
-	Vxlanupdate chan VxlanUpdate
-	Vtepcreate  chan VtepConfig
-	Vtepdelete  chan VtepConfig
-	Vtepupdate  chan VtepUpdate
+	Vxlancreate               chan VxlanConfig
+	Vxlandelete               chan VxlanConfig
+	Vxlanupdate               chan VxlanUpdate
+	Vtepcreate                chan VtepConfig
+	Vtepdelete                chan VtepConfig
+	Vtepupdate                chan VtepUpdate
+	VxlanAccessPortVlanUpdate chan VxlanAccessPortVlan
+	VxlanNextHopUpdate        chan VxlanNextHopIp
+	VxlanPortCreate           chan PortConfig
+	Vxlanintfinfo             chan VxlanIntfInfo
+}
+
+type VxlanIntfInfo struct {
+	Command  int
+	IntfName string
+	IfIndex  int32
+	Mac      net.HardwareAddr
+	Ip       net.IP
+}
+
+type VxlanNextHopIp struct {
+	Command   int
+	Ip        net.IP
+	Intf      int32
+	IntfName  string
+	NextHopIp net.IP
+}
+
+type VxlanAccessPortVlan struct {
+	Command  int
+	VlanId   uint16
+	IntfList []int32
 }
 
 type VxlanUpdate struct {
@@ -63,16 +95,23 @@ type VxlanConfig struct {
 	MTU    uint32 // MTU size for each VTEP
 }
 
+type PortConfig struct {
+	Name         string
+	HardwareAddr net.HardwareAddr
+	Speed        int32
+	PortNum      int32
+	IfIndex      int32
+}
+
 // tunnel endpoint for the VxLAN
 type VtepConfig struct {
-	VtepId                uint32           `SNAPROUTE: KEY` //VTEP ID.
-	VxlanId               uint32           `SNAPROUTE: KEY` //VxLAN ID.
+	Vni                   uint32           `SNAPROUTE: KEY` //VxLAN ID.
 	VtepName              string           //VTEP instance name.
 	SrcIfName             string           //Source interface ifIndex.
 	UDP                   uint16           //vxlan udp port.  Deafult is the iana default udp port
 	TTL                   uint16           //TTL of the Vxlan tunnel
 	TOS                   uint16           //Type of Service
-	InnerVlanHandlingMode bool             //The inner vlan tag handling mode.
+	InnerVlanHandlingMode int32            //The inner vlan tag handling mode.
 	Learning              bool             //specifies if unknown source link layer  addresses and IP addresses are entered into the VXLAN  device forwarding database.
 	Rsc                   bool             //specifies if route short circuit is turned on.
 	L2miss                bool             //specifies if netlink LLADDR miss notifications are generated.
@@ -81,7 +120,8 @@ type VtepConfig struct {
 	TunnelDstIp           net.IP           //Destination IP address for the static VxLAN tunnel
 	VlanId                uint16           //Vlan Id to encapsulate with the vtep tunnel ethernet header
 	TunnelSrcMac          net.HardwareAddr //Src Mac assigned to the VTEP within this VxLAN. If an address is not assigned the the local switch address will be used.
-	TunnelDstMac          net.HardwareAddr
+	TunnelDstMac          net.HardwareAddr // Optional - may be looked up based on TunnelNextHopIp
+	TunnelNextHopIP       net.IP           // NextHopIP is used to find the DMAC for the tunnel within Asicd
 }
 
 func ConvertInt32ToBool(val int32) bool {
@@ -91,47 +131,90 @@ func ConvertInt32ToBool(val int32) bool {
 	return true
 }
 
-func (s *VXLANServer) ConvertVxlanInstanceToVxlanConfig(c *vxland.VxlanInstance) (*VxlanConfig, error) {
+// VxlanConfigCheck
+// Validate the VXLAN provisioning
+func VxlanConfigCheck(c *VxlanConfig) error {
+	if GetVxlanDBEntry(c.VNI) != nil {
+		return errors.New(fmt.Sprintln("Error VxlanInstance Exists vni is not unique", c))
+	}
+	return nil
+}
+
+// VtepConfigCheck
+// Validate the VTEP provisioning
+func VtepConfigCheck(c *VtepConfig) error {
+	key := VtepDbKey{
+		name: c.VtepName,
+	}
+	if GetVtepDBEntry(&key) != nil {
+		return errors.New(fmt.Sprintln("Error VtepInstance Exists name is not unique", c))
+	}
+	return nil
+}
+
+// ConvertVxlanInstanceToVxlanConfig:
+// Convert thrift struct to vxlan config and check that db entry exists already
+func ConvertVxlanInstanceToVxlanConfig(c *vxland.VxlanInstance) (*VxlanConfig, error) {
+
+	if GetVxlanDBEntry(uint32(c.Vni)) != nil {
+		return nil, errors.New(fmt.Sprintln("Error VxlanInstance Exists", c))
+	}
 
 	return &VxlanConfig{
-		VNI:    uint32(c.VxlanId),
+		VNI:    uint32(c.Vni),
 		VlanId: uint16(c.VlanId),
-		Group:  net.ParseIP(c.McDestIp),
-		MTU:    uint32(c.Mtu),
 	}, nil
 }
 
-func (s *VXLANServer) ConvertVxlanVtepInstanceToVtepConfig(c *vxland.VxlanVtepInstances) (*VtepConfig, error) {
+func getVtepName(intf string) string {
+	vtepName := intf
+	//if !strings.Contains("vtep", intf) {
+	//	vtepName = "vtep" + intf
+	//}
+	return vtepName
+}
 
-	DstNetMac, _ := net.ParseMAC(c.DstMac)
+// ConvertVxlanVtepInstanceToVtepConfig:
+// Convert thrift struct to vxlan config
+func ConvertVxlanVtepInstanceToVtepConfig(c *vxland.VxlanVtepInstance) (*VtepConfig, error) {
 
-	ok, name, mac, ip := s.getLoopbackInfo()
-	if !ok {
-		errorstr := "VTEP: Src Tunnel Info not provisioned yet, loopback intf needed"
-		s.logger.Info(errorstr)
-		return &VtepConfig{}, errors.New(errorstr)
+	var mac net.HardwareAddr
+	var ip net.IP
+	var name string
+	//var ok bool
+	vtepName := getVtepName(c.Intf)
+	name = c.IntfRef
+	ip = net.ParseIP(c.SrcIp)
+
+	/* TODO need to create a generic way to get an interface name, mac, ip
+	if c.SrcIp == "0.0.0.0" && c.IntfRef != "" {
+		// need to get the appropriate IntfRef type
+		ok, name, mac, ip = snapclient.asicDGetLoopbackInfo()
+		if !ok {
+			errorstr := "VTEP: Src Tunnel Info not provisioned yet, loopback intf needed"
+			logger.Info(errorstr)
+			return &VtepConfig{}, errors.New(errorstr)
+		}
+		fmt.Println("loopback info:", name, mac, ip)
+		if c.SrcIp != "0.0.0.0" {
+			ip = net.ParseIP(c.SrcIp)
+		}
+		logger.Info(fmt.Sprintf("Forcing Vtep %s to use Lb %s SrcMac %s Ip %s", vtepName, name, mac, ip))
 	}
-	srcName := s.getLinuxIfName(c.SrcIfIndex)
+	*/
 
-	s.logger.Info(fmt.Sprintf("Forcing Vtep %s to use Lb %s SrcMac %s Ip %s", c.VtepName, name, mac, ip))
 	return &VtepConfig{
-		VtepId:    uint32(c.VtepId),
-		VxlanId:   uint32(c.VxlanId),
-		VtepName:  string(c.VtepName),
-		SrcIfName: srcName,
-		UDP:       uint16(c.UDP),
+		Vni:       uint32(c.Vni),
+		VtepName:  vtepName,
+		SrcIfName: name,
+		UDP:       uint16(c.DstUDP),
 		TTL:       uint16(c.TTL),
 		TOS:       uint16(c.TOS),
-		InnerVlanHandlingMode: ConvertInt32ToBool(c.InnerVlanHandlingMode),
-		Learning:              ConvertInt32ToBool(c.Learning),
-		Rsc:                   ConvertInt32ToBool(c.Rsc),
-		L2miss:                ConvertInt32ToBool(c.L2miss),
-		L3miss:                ConvertInt32ToBool(c.L3miss),
+		InnerVlanHandlingMode: c.InnerVlanHandlingMode,
 		TunnelSrcIp:           ip,
 		TunnelDstIp:           net.ParseIP(c.DstIp),
 		VlanId:                uint16(c.VlanId),
 		TunnelSrcMac:          mac,
-		TunnelDstMac:          DstNetMac,
 	}, nil
 }
 
@@ -225,44 +308,68 @@ func (s *VXLANServer) updateThriftVtep(c *VtepUpdate) {
 
 func (s *VXLANServer) ConfigListener() {
 
-	s.Configchans = &VxLanConfigChannels{
-		Vxlancreate: make(chan VxlanConfig, 0),
-		Vxlandelete: make(chan VxlanConfig, 0),
-		Vxlanupdate: make(chan VxlanUpdate, 0),
-		Vtepcreate:  make(chan VtepConfig, 0),
-		Vtepdelete:  make(chan VtepConfig, 0),
-		Vtepupdate:  make(chan VtepUpdate, 0),
-	}
-
-	softswitch := vxlan_linux.NewVxlanLinux(s.logger)
-
-	go func(cc *VxLanConfigChannels, ss *vxlan_linux.VxlanLinux) {
+	go func(cc *VxLanConfigChannels) {
 		for {
 			select {
+
+			case daemonstatus := <-s.DaemonStatusCh:
+				if daemonstatus.Name == "asicd" {
+					// TODO do something
+				} else if daemonstatus.Name == "ribd" {
+					// TODO do something
+				} else if daemonstatus.Name == "arpd" {
+					// TODO do something
+				}
 			case vxlan := <-cc.Vxlancreate:
-				s.saveVxLanConfigData(&vxlan)
-				c := vxlan_linux.VxlanConfig(vxlan)
-				ss.CreateVxLAN(&c)
+				CreateVxLAN(&vxlan)
 
 			case vxlan := <-cc.Vxlandelete:
-				c := vxlan_linux.VxlanConfig(vxlan)
-				ss.DeleteVxLAN(&c)
+				DeleteVxLAN(&vxlan)
 
 			case <-cc.Vxlanupdate:
 				//s.UpdateThriftVxLAN(&vxlan)
 
 			case vtep := <-cc.Vtepcreate:
-				s.saveVtepConfigData(&vtep)
-				c := vxlan_linux.VtepConfig(vtep)
-				ss.CreateVtep(&c)
+				CreateVtep(&vtep)
 
 			case vtep := <-cc.Vtepdelete:
-				c := vxlan_linux.VtepConfig(vtep)
-				ss.DeleteVtep(&c)
+				DeleteVtep(&vtep)
 
 			case <-cc.Vtepupdate:
 				//s.UpdateThriftVtep(&vtep)
+
+			case <-cc.VxlanAccessPortVlanUpdate:
+				// updates from client which are post create of vxlan
+
+			case ipinfo := <-cc.VxlanNextHopUpdate:
+				// updates from client which are triggered post create of vtep
+				reachable := false
+				if ipinfo.Command == VxlanCommandCreate {
+					reachable = true
+				}
+				//ip := net.ParseIP(fmt.Sprintf("%s.%s.%s.%s", uint8(ipinfo.Ip>>24&0xff), uint8(ipinfo.Ip>>16&0xff), uint8(ipinfo.Ip>>8&0xff), uint8(ipinfo.Ip>>0&0xff)))
+				s.HandleNextHopChange(ipinfo.Ip, ipinfo.NextHopIp, ipinfo.Intf, ipinfo.IntfName, reachable)
+
+			case port := <-cc.VxlanPortCreate:
+				// store all the valid physical ports
+				if p, ok := PortConfigMap[port.IfIndex]; ok {
+					var portcfg = &PortConfig{}
+					CopyStruct(p, portcfg)
+					PortConfigMap[port.IfIndex] = portcfg
+				}
+			case intfinfo := <-cc.Vxlanintfinfo:
+				for _, vtep := range GetVtepDB() {
+					logger.Info(fmt.Sprintln("received intf info", intfinfo, vtep))
+					if vtep.SrcIfName == intfinfo.IntfName {
+
+						vtep.VxlanVtepMachineFsm.VxlanVtepEvents <- MachineEvent{
+							E:    VxlanVtepEventSrcInterfaceResolved,
+							Src:  VxlanVtepMachineModuleStr,
+							Data: intfinfo,
+						}
+					}
+				}
 			}
 		}
-	}(s.Configchans, softswitch)
+	}(s.Configchans)
 }
