@@ -22,7 +22,7 @@
 //
 
 // route.go
-package server
+package rib
 
 import (
 	"bgpd"

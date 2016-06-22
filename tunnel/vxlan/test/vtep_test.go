@@ -2,22 +2,23 @@ package vxlan_test
 
 import (
 	"fmt"
-	"github.com/google/gopacket"
-	"github.com/google/gopacket/layers"
-	"github.com/google/gopacket/pcap"
-	"github.com/vishvananda/netlink"
+	vxlan_linux "l3/tunnel/vxlan/clients/testlinux"
 	vxlan "l3/tunnel/vxlan/protocol"
-	"l3/tunnel/vxlan/vxlan_linux"
 	"net"
 	"testing"
 	"time"
 	"utils/logging"
+
+	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
+	"github.com/google/gopacket/pcap"
+	"github.com/vishvananda/netlink"
 )
 
 var logger *logging.Writer
 
 func Setup() {
-	logger, _ = logging.NewLogger("./", "vxland", "TEST")
+	logger, _ = logging.NewLogger("./", "vxland", true)
 	vxlan.SetLogger(logger)
 	// options "linux", "proxy"
 	// as of 4/11/16 linux does not work getting error counts (carrier)
@@ -212,7 +213,7 @@ func waitTillVtepIsUp(ifname string) {
 
 }
 
-func TestRxArpPacket(t *testing.T) {
+func _TestRxArpPacket(t *testing.T) {
 
 	Setup()
 
@@ -234,8 +235,7 @@ func TestRxArpPacket(t *testing.T) {
 
 	fmt.Printf("src/dst ip %#v %#v \n", srcip, dstip)
 	vtepconfig := &vxlan.VtepConfig{
-		VtepId:    10,
-		VxlanId:   500,
+		Vni:       500,
 		VtepName:  "vtep10",
 		SrcIfName: vteplbnamerx,
 		UDP:       uint16(UDP_PORT),
@@ -278,7 +278,7 @@ func TestRxArpPacket(t *testing.T) {
 	waitTillVtepIsUp(vtepconfig.VtepName)
 	// send an ARP frame
 	// Set up all the layers' fields we can.
-	arppktbuf := CreateVxlanArpFrame([3]uint8{uint8(vtepconfig.VxlanId >> 16 & 0xff), uint8(vtepconfig.VxlanId >> 8 & 0xff), uint8(vtepconfig.VxlanId >> 0 & 0xff)})
+	arppktbuf := CreateVxlanArpFrame([3]uint8{uint8(vtepconfig.Vni >> 16 & 0xff), uint8(vtepconfig.Vni >> 8 & 0xff), uint8(vtepconfig.Vni >> 0 & 0xff)})
 	fmt.Println("Sending packet to ", vteplbnametx)
 	if vxlan_linux.VxlanConfigMode == "proxy" {
 
