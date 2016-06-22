@@ -213,7 +213,7 @@ func waitTillVtepIsUp(ifname string) {
 
 }
 
-func TestRxArpPacket(t *testing.T) {
+func _TestRxArpPacket(t *testing.T) {
 
 	Setup()
 
