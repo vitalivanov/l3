@@ -459,6 +459,12 @@ func (server *OSPFServer) generateRouterLSA(areaId uint32) {
 			server.logger.Info(fmt.Sprintln("LSDB: Area id not matching. i/p ", areaId, "if areaid ", AreaId, ent.IfIpAddr))
 			continue
 		}
+		msg := DbEventMsg{
+                	eventType: config.LSA,
+                	eventInfo: "Generate router LSA " + ent.IfIpAddr.String(),
+        	}
+        	server.DbEventOp <- msg
+
 		if ent.IfFSMState <= config.Waiting {
 			server.logger.Info(fmt.Sprintln("LSDB: If is in waiting. Skip.", ent.IfIpAddr))
 			continue
@@ -627,11 +633,6 @@ func (server *OSPFServer) generateRouterLSA(areaId uint32) {
 		}
 		server.DbLsdbOp <- msg
 	}
-	msg := DbEventMsg{
-		eventType: config.LSA,
-		eventInfo: "Generate router LSA " + ent.IfIpAddr.String(),
-	}
-	server.DbEventOp <- msg
 	return
 }
 
