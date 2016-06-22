@@ -35,18 +35,22 @@ import (
 	for dbd exchange state packets.
 */
 func (server *OSPFServer) exchangePacketDiscardCheck(nbrConf OspfNeighborEntry, nbrDbPkt ospfDatabaseDescriptionData) (isDiscard bool) {
+	msg := DbEventMsg{
+		eventType: config.ADJACENCY,
+	}
+
 	if nbrDbPkt.msbit != nbrConf.isMaster {
-		info := "SeqNumberMismatch. Nbr should be master " + nbrConf.OspfNbrIPAddr.String()
-		server.AddOspfEventState(config.ADJACENCY, info)
+		msg.eventInfo = "SeqNumberMismatch. Nbr should be master " + nbrConf.OspfNbrIPAddr.String()
 		server.logger.Info(fmt.Sprintln("NBREVENT: SeqNumberMismatch. Nbr should be master  dbdmsbit ", nbrDbPkt.msbit,
 			" isMaster ", nbrConf.isMaster))
+		server.DbEventOp <- msg
 		return true
 	}
 
 	if nbrDbPkt.ibit == true {
 		server.logger.Info("NBREVENT:SeqNumberMismatch . Nbr ibit is true ")
-		info := "SeqNumberMismatch . Nbr ibit is true " + nbrConf.OspfNbrIPAddr.String()
-		server.AddOspfEventState(config.ADJACENCY, info)
+		msg.eventInfo = "SeqNumberMismatch . Nbr ibit is true " + nbrConf.OspfNbrIPAddr.String()
+		server.DbEventOp <- msg
 		return true
 	}
 	/*
@@ -64,16 +68,16 @@ func (server *OSPFServer) exchangePacketDiscardCheck(nbrConf OspfNeighborEntry, 
 			}
 			server.logger.Info(fmt.Sprintln("NBREVENT:SeqNumberMismatch : Nbr is master but dbd packet seq no doesnt match. dbd seq ",
 				nbrDbPkt.dd_sequence_number, "nbr seq ", nbrConf.ospfNbrSeqNum))
-			info := "SeqNumberMismatch . " + nbrConf.OspfNbrIPAddr.String()
-			server.AddOspfEventState(config.ADJACENCY, info)
+			msg.eventInfo = "SeqNumberMismatch . " + nbrConf.OspfNbrIPAddr.String()
+			server.DbEventOp <- msg
 			return true
 		}
 	} else {
 		if nbrDbPkt.dd_sequence_number != nbrConf.ospfNbrSeqNum {
 			server.logger.Info(fmt.Sprintln("NBREVENT:SeqNumberMismatch : Nbr is slave but dbd packet seq no doesnt match.dbd seq ",
 				nbrDbPkt.dd_sequence_number, "nbr seq ", nbrConf.ospfNbrSeqNum))
-			info := "SeqNumberMismatch . " + nbrConf.OspfNbrIPAddr.String()
-			server.AddOspfEventState(config.ADJACENCY, info)
+			msg.eventInfo = "SeqNumberMismatch . " + nbrConf.OspfNbrIPAddr.String()
+			server.DbEventOp <- msg
 			return true
 		}
 	}
@@ -508,8 +512,11 @@ func (server *OSPFServer) ProcessNbrStateMachine() {
 				var nbrState config.NbrState
 				var dbd_mdata ospfDatabaseDescriptionData
 				var send_dbd bool
-				info := "Create new neighbor with id" + nbrData.NeighborIP.String()
-				server.AddOspfEventState(config.ADJACENCY, info)
+				msg := DbEventMsg{
+					eventType: config.ADJACENCY,
+				}
+				msg.eventInfo = "Create new neighbor with id " + nbrData.NeighborIP.String()
+				server.DbEventOp <- msg
 				server.logger.Info(fmt.Sprintln("NBREVENT: Create new neighbor with id ", nbrData.RouterId))
 
 				if nbrData.TwoWayStatus { // update the state
@@ -875,8 +882,6 @@ func (server *OSPFServer) generateDbsummary4LsaList(self_areaId uint32) []*ospfN
 		db_list = append(db_list, db_summary)
 		lsid := convertUint32ToIPv4(lsaKey.LSId)
 		server.logger.Info(fmt.Sprintln("negotiation: db_list summary 4 append router lsid  ", lsid))
-
-		/*  TODO - check if we want to add Summary4 LSA */
 	}
 	return db_list
 }
@@ -914,7 +919,11 @@ func (server *OSPFServer) neighborDeadTimerEvent(nbrConfKey NeighborConfKey) {
 		_, exists := server.NeighborConfigMap[nbrConfKey]
 		if exists {
 			nbrConf := server.NeighborConfigMap[nbrConfKey]
-
+			msg := DbEventMsg{
+				eventType: config.ADJACENCY,
+				eventInfo: "Neighbor Dead " + nbrConf.OspfNbrIPAddr.String(),
+			}
+			server.DbEventOp <- msg
 			nbrConfMsg := ospfNeighborConfMsg{
 				ospfNbrConfKey: nbrConfKey,
 				ospfNbrEntry: OspfNeighborEntry{

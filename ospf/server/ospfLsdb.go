@@ -199,7 +199,11 @@ func (server *OSPFServer) insertSummaryLsa(lsdbKey LsdbKey, lsaKey LsaKey, lsaEn
 	val.LSId = lsaKey.LSId
 	val.AdvRtr = lsaKey.AdvRouter
 	server.LsdbSlice = append(server.LsdbSlice, val)
-	server.AddLsdbEntry(val)
+	msg := DbLsdbMsg{
+		entry: val,
+		op:    true,
+	}
+	server.DbLsdbOp <- msg
 }
 
 func (server *OSPFServer) flushSummaryLsa(lsdbKey LsdbKey, lsaKey LsaKey) {
@@ -399,8 +403,18 @@ func (server *OSPFServer) generateNetworkLSA(areaId uint32, key IntfConfKey, isD
 		val.LSId = lsaKey.LSId
 		val.AdvRtr = lsaKey.AdvRouter
 		server.LsdbSlice = append(server.LsdbSlice, val)
-		server.AddLsdbEntry(val)
+		msg := DbLsdbMsg{
+			entry: val,
+			op:    true,
+		}
+		server.DbLsdbOp <- msg
 	}
+	msg := DbEventMsg{
+		eventType: config.LSA,
+		eventInfo: "Generate network LSA" + ent.IfIpAddr.String(),
+	}
+	server.DbEventOp <- msg
+
 	return
 }
 
@@ -607,8 +621,17 @@ func (server *OSPFServer) generateRouterLSA(areaId uint32) {
 		val.LSId = lsaKey.LSId
 		val.AdvRtr = lsaKey.AdvRouter
 		server.LsdbSlice = append(server.LsdbSlice, val)
-		server.AddLsdbEntry(val)
+		msg := DbLsdbMsg{
+			entry: val,
+			op:    true,
+		}
+		server.DbLsdbOp <- msg
 	}
+	msg := DbEventMsg{
+		eventType: config.LSA,
+		eventInfo: "Generate router LSA " + ent.IfIpAddr.String(),
+	}
+	server.DbEventOp <- msg
 	return
 }
 
@@ -670,7 +693,11 @@ func (server *OSPFServer) generateASExternalLsa(route RouteMdata) LsaKey {
 			val.LSId = lsaKey.LSId
 			val.AdvRtr = lsaKey.AdvRouter
 			server.LsdbSlice = append(server.LsdbSlice, val)
-			server.AddLsdbEntry(val)
+			msg := DbLsdbMsg{
+				entry: val,
+				op:    true,
+			}
+			server.DbLsdbOp <- msg
 		}
 	}
 
@@ -700,7 +727,11 @@ func (server *OSPFServer) updateAsExternalLSA(lsdbKey LsdbKey, lsaKey LsaKey) er
 		val.LSId = lsaKey.LSId
 		val.AdvRtr = lsaKey.AdvRouter
 		server.LsdbSlice = append(server.LsdbSlice, val)
-		server.AddLsdbEntry(val)
+		msg := DbLsdbMsg{
+			entry: val,
+			op:    true,
+		}
+		server.DbLsdbOp <- msg
 	}
 	return nil
 }
@@ -740,17 +771,7 @@ func (server *OSPFServer) processRecvdRouterLsa(data []byte, areaId uint32) bool
 	}
 	//Todo: If there is already existing entry Verify the seq num
 	lsDbEnt, _ := server.AreaLsdb[lsdbKey]
-	/*
-		ent, exist := lsDbEnt.RouterLsaMap[*lsakey]
-		if exist {
-			if ent.LsaMd.LSSequenceNum >= routerLsa.LsaMd.LSSequenceNum {
-				server.logger.Err("Old instance of Router LSA Recvd")
-				return false
-			}
-			routerLsa.LsaMd.LSSequenceNum += 1
-		}
-	*/
-	//Handle LsaAge
+
 	//Add entry in LSADatabase
 	lsDbEnt.RouterLsaMap[*lsakey] = *routerLsa
 	server.AreaLsdb[lsdbKey] = lsDbEnt
@@ -762,7 +783,11 @@ func (server *OSPFServer) processRecvdRouterLsa(data []byte, areaId uint32) bool
 		val.LSId = lsakey.LSId
 		val.AdvRtr = lsakey.AdvRouter
 		server.LsdbSlice = append(server.LsdbSlice, val)
-		server.AddLsdbEntry(val)
+		msg := DbLsdbMsg{
+			entry: val,
+			op:    true,
+		}
+		server.DbLsdbOp <- msg
 	}
 	server.logger.Info(fmt.Sprintln("Router LSA: added to LSDB lsid ",
 		lsakey.LSId, " adv_router ", lsakey.AdvRouter, " lstype ", lsakey.LSType))
@@ -919,7 +944,11 @@ func (server *OSPFServer) processRecvdSummaryLsa(data []byte, areaId uint32, lsa
 		val.LSId = lsakey.LSId
 		val.AdvRtr = lsakey.AdvRouter
 		server.LsdbSlice = append(server.LsdbSlice, val)
-		server.AddLsdbEntry(val)
+		msg := DbLsdbMsg{
+			entry: val,
+			op:    true,
+		}
+		server.DbLsdbOp <- msg
 	}
 	return true
 }
@@ -987,7 +1016,11 @@ func (server *OSPFServer) processRecvdASExternalLsa(data []byte, areaId uint32) 
 		val.LSId = lsakey.LSId
 		val.AdvRtr = lsakey.AdvRouter
 		server.LsdbSlice = append(server.LsdbSlice, val)
-		server.AddLsdbEntry(val)
+		msg := DbLsdbMsg{
+			entry: val,
+			op:    true,
+		}
+		server.DbLsdbOp <- msg
 	}
 
 	return true
