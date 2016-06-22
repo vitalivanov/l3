@@ -39,14 +39,6 @@ import (
 	"utils/ipcutils"
 )
 
-var PortConfigMap map[int32]portConfig
-
-type portConfig struct {
-	Name         string
-	HardwareAddr net.HardwareAddr
-	Speed        int32
-	IfIndex      int32
-}
 
 type VXLANClientBase struct {
 	Address            string
