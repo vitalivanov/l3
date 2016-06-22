@@ -170,8 +170,6 @@ func (server *ARPServer) initArpParams() {
 	server.logger.Debug("Calling initParams...")
 	server.snapshotLen = 65549
 	server.promiscuous = false
-	server.minCnt = 1
-	server.retryCnt = 10
 	server.pcapTimeout = time.Duration(1) * time.Second
 	server.timerGranularity = 1
 	server.ConfRefreshTimeout = 600 / server.timerGranularity
@@ -183,7 +181,7 @@ func (server *ARPServer) initArpParams() {
 	server.probeWait = 5
 	server.probeNum = 5
 	server.probeMax = 20
-	server.probeMax = 10
+	server.probeMin = 10
 	server.arpSliceRefreshDuration = time.Duration(10) * time.Minute
 	server.dumpArpTable = false
 }
