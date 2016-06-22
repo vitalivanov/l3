@@ -243,8 +243,12 @@ func (v *VXLANDServiceHandler) HandleDbReadVxlanVtepInstance(dbHdl redis.Conn) e
 func (v *VXLANDServiceHandler) ReadConfigFromDB() error {
 
 	dbHdl := dbutils.NewDBUtil(v.logger)
-
-	defer dbHdl.Close()
+	err := dbHdl.Connect()
+	if err != nil {
+		v.logger.Err("Unable to connect to db")
+		return err
+	}
+	defer dbHdl.Disconnect()
 
 	if err := v.HandleDbReadVxlanInstance(dbHdl); err != nil {
 		//stp.StpLogger("ERROR", "Error getting All VxlanInstance objects")
