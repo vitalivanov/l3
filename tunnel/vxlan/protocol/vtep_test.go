@@ -478,7 +478,7 @@ func TestFSMIntfFailVtepVxlanCreate(t *testing.T) {
 // Test creation of vtep and the src interface does not exist
 // basically provisioning incomplete, then once interface exists
 // notify state machine
-func _TestFSMIntfFailThenSendIntfSuccessVtepVxlanCreate(t *testing.T) {
+func TestFSMIntfFailThenSendIntfSuccessVtepVxlanCreate(t *testing.T) {
 
 	// setup common test info
 	setup()
@@ -594,7 +594,7 @@ func _TestFSMIntfFailThenSendIntfSuccessVtepVxlanCreate(t *testing.T) {
 
 // TestFSMNextHopFailVtepVxlanCreate:
 // Test next hop ip has not been discovered yet thus verify state
-func _TestFSMNextHopFailVtepVxlanCreate(t *testing.T) {
+func TestFSMNextHopFailVtepVxlanCreate(t *testing.T) {
 
 	// setup common test info
 	setup()
@@ -686,7 +686,7 @@ func _TestFSMNextHopFailVtepVxlanCreate(t *testing.T) {
 // TestFSMNextHopFailThenSucceedVtepVxlanCreate:
 // Test next hop ip has not been discovered yet thus verify state
 // then notify state machine when next hop has been found
-func _TestFSMNextHopFailThenSucceedVtepVxlanCreate(t *testing.T) {
+func TestFSMNextHopFailThenSucceedVtepVxlanCreate(t *testing.T) {
 
 	// setup common test info
 	setup()
@@ -801,7 +801,7 @@ func _TestFSMNextHopFailThenSucceedVtepVxlanCreate(t *testing.T) {
 
 // TestFSMResolveNextHopFailVtepVxlanCreate:
 // Test that next hop ip mac address does not exist yet
-func _TestFSMResolveNextHopMacFailVtepVxlanCreate(t *testing.T) {
+func TestFSMResolveNextHopMacFailVtepVxlanCreate(t *testing.T) {
 
 	// setup common test info
 	setup()
