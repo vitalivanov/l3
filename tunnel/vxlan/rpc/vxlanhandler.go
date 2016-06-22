@@ -33,6 +33,7 @@ import (
 	"io/ioutil"
 	vxlan "l3/tunnel/vxlan/protocol"
 	"models/objects"
+	"utils/dbutils"
 	"utils/logging"
 	"vxland"
 )
@@ -241,12 +242,7 @@ func (v *VXLANDServiceHandler) HandleDbReadVxlanVtepInstance(dbHdl redis.Conn) e
 
 func (v *VXLANDServiceHandler) ReadConfigFromDB() error {
 
-	dbHdl, err := redis.Dial("tcp", ":6379")
-	if err != nil {
-		//h.logger.Err(fmt.Sprintf("Failed to open the DB at %s with error %s", dbPath, err))
-		//stp.StpLogger("ERROR", fmt.Sprintf("Failed to open the DB at %s with error %s", dbPath, err))
-		return err
-	}
+	dbHdl := dbutils.NewDBUtil(v.logger)
 
 	defer dbHdl.Close()
 
@@ -255,7 +251,7 @@ func (v *VXLANDServiceHandler) ReadConfigFromDB() error {
 		return err
 	}
 
-	if err = v.HandleDbReadVxlanVtepInstance(dbHdl); err != nil {
+	if err := v.HandleDbReadVxlanVtepInstance(dbHdl); err != nil {
 		//stp.StpLogger("ERROR", "Error getting All VxlanVtepInstance objects")
 		return err
 	}
