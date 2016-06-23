@@ -29,7 +29,7 @@ import (
 	"fmt"
 	"l3/bgp/api"
 	"l3/rib/ribdCommonDefs"
-	"models"
+	"models/objects"
 	"utils/logging"
 	utilspolicy "utils/policy"
 
@@ -86,7 +86,7 @@ func (mgr *FSPolicyMgr) setupSubSocket(address string) (*nanomsg.SubSocket, erro
 	return socket, nil
 }
 
-func convertModelsToPolicyConditionConfig(cfg *models.PolicyCondition) *utilspolicy.PolicyConditionConfig {
+func convertModelsToPolicyConditionConfig(cfg *objects.PolicyCondition) *utilspolicy.PolicyConditionConfig {
 	if cfg == nil {
 		return nil
 	}
@@ -106,7 +106,7 @@ func convertModelsToPolicyConditionConfig(cfg *models.PolicyCondition) *utilspol
 }
 
 func (mgr *FSPolicyMgr) handlePolicyConditionUpdates(msg ribdCommonDefs.RibdNotifyMsg) {
-	policyCondition := models.PolicyCondition{}
+	policyCondition := objects.PolicyCondition{}
 	var updateMsg string
 	switch msg.MsgType {
 	case ribdCommonDefs.NOTIFY_POLICY_CONDITION_CREATED:
@@ -143,7 +143,7 @@ func (mgr *FSPolicyMgr) handlePolicyConditionUpdates(msg ribdCommonDefs.RibdNoti
 	}
 }
 
-func convertModelsToPolicyStmtConfig(cfg *models.PolicyStmt) *utilspolicy.PolicyStmtConfig {
+func convertModelsToPolicyStmtConfig(cfg *objects.PolicyStmt) *utilspolicy.PolicyStmtConfig {
 	if cfg == nil {
 		return nil
 	}
@@ -160,7 +160,7 @@ func convertModelsToPolicyStmtConfig(cfg *models.PolicyStmt) *utilspolicy.Policy
 }
 
 func (mgr *FSPolicyMgr) handlePolicyStmtUpdates(msg ribdCommonDefs.RibdNotifyMsg) {
-	policyStmt := models.PolicyStmt{}
+	policyStmt := objects.PolicyStmt{}
 	var updateMsg string
 	switch msg.MsgType {
 	case ribdCommonDefs.NOTIFY_POLICY_STMT_CREATED:
@@ -196,7 +196,7 @@ func (mgr *FSPolicyMgr) handlePolicyStmtUpdates(msg ribdCommonDefs.RibdNotifyMsg
 	}
 }
 
-func convertModelsToPolicyDefintionConfig(cfg *models.PolicyDefinition) *utilspolicy.PolicyDefinitionConfig {
+func convertModelsToPolicyDefintionConfig(cfg *objects.PolicyDefinition) *utilspolicy.PolicyDefinitionConfig {
 	if cfg == nil {
 		return nil
 	}
@@ -218,7 +218,7 @@ func convertModelsToPolicyDefintionConfig(cfg *models.PolicyDefinition) *utilspo
 }
 
 func (mgr *FSPolicyMgr) handlePolicyDefinitionUpdates(msg ribdCommonDefs.RibdNotifyMsg) {
-	policyDefinition := models.PolicyDefinition{}
+	policyDefinition := objects.PolicyDefinition{}
 	var updateMsg string
 	switch msg.MsgType {
 	case ribdCommonDefs.NOTIFY_POLICY_DEFINITION_CREATED:

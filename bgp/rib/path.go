@@ -278,6 +278,10 @@ func (p *Path) IsInternal() bool {
 	return p.NeighborConf != nil && p.NeighborConf.IsInternal()
 }
 
+func (p *Path) GetSourceStr() string {
+	return ""
+}
+
 func (p *Path) GetNumASes() uint32 {
 	p.logger.Info(fmt.Sprintln("Path:GetNumASes - path attrs =", p.PathAttrs))
 	return packet.GetNumASes(p.PathAttrs)

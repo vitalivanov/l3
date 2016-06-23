@@ -32,6 +32,7 @@ import (
 	"utils/asicdClient"
 	"utils/commonDefs"
 	"utils/dbutils"
+	"utils/eventUtils"
 	"utils/logging"
 )
 
@@ -169,8 +170,6 @@ func (server *ARPServer) initArpParams() {
 	server.logger.Debug("Calling initParams...")
 	server.snapshotLen = 65549
 	server.promiscuous = false
-	server.minCnt = 1
-	server.retryCnt = 10
 	server.pcapTimeout = time.Duration(1) * time.Second
 	server.timerGranularity = 1
 	server.ConfRefreshTimeout = 600 / server.timerGranularity
@@ -182,7 +181,7 @@ func (server *ARPServer) initArpParams() {
 	server.probeWait = 5
 	server.probeNum = 5
 	server.probeMax = 20
-	server.probeMax = 10
+	server.probeMin = 10
 	server.arpSliceRefreshDuration = time.Duration(10) * time.Minute
 	server.dumpArpTable = false
 }
@@ -228,6 +227,12 @@ func (server *ARPServer) InitServer(asicdPlugin asicdClient.AsicdClientIntf) {
 
 	if server.dbHdl != nil {
 		server.getArpGlobalConfig()
+	}
+
+	// Initialize Events
+	err = eventUtils.InitEvents("ARPD", server.dbHdl, server.logger)
+	if err != nil {
+		server.logger.Err(fmt.Sprintln("Unable to initialize events", err))
 	}
 
 	sigChan := make(chan os.Signal, 1)

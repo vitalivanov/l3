@@ -91,7 +91,7 @@ func (h *OSPFHandler) convertNbrEntryStateToThrift(nbr config.NeighborState) *os
 	nbrEntry.NbrAddressLessIndex = int32(nbr.NbrAddressLessIndex)
 	nbrEntry.NbrRtrId = string(nbr.NbrRtrId)
 	nbrEntry.NbrOptions = int32(nbr.NbrOptions)
-	nbrEntry.NbrState = int32(nbr.NbrState)
+	nbrEntry.NbrState = string(nbr.NbrState)
 	nbrEntry.NbrEvents = int32(nbr.NbrEvents)
 	nbrEntry.NbrHelloSuppressed = bool(nbr.NbrHelloSuppressed)
 
@@ -209,7 +209,12 @@ func (h *OSPFHandler) GetBulkOspfGlobalState(fromIdx ospfd.Int, count ospfd.Int)
 	return ospfGlobalStateGetInfo, nil
 }
 
-func (h *OSPFHandler) GetBulkOspfIPv4Routes(fromIdx ospfd.Int, count ospfd.Int) (*ospfd.OspfIPv4RoutesGetInfo, error) {
+func (h *OSPFHandler) GetBulkOspfIPv4RouteState(fromIdx ospfd.Int, count ospfd.Int) (*ospfd.OspfIPv4RouteStateGetInfo, error) {
 	/* This is template API . All OSPF routes are currently installed in the redis db */
 	return  nil, nil
+}
+
+func (h *OSPFHandler) GetBulkOspfEventState(fromIdx ospfd.Int, count ospfd.Int) (*ospfd.OspfEventStateGetInfo, error) {
+       /* This is template API. Events are stored in redis-db */
+	return nil, nil
 }

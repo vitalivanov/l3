@@ -13,13 +13,13 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 package server
 
@@ -85,10 +85,29 @@ func (server *OSPFServer) BuildHelloPkt(ent IntfConf) []byte {
 		authType: ent.IfAuthType,
 		//authKey:        ent.IfAuthKey,
 	}
+
+	/*
+	   Rfc 2328 4.5
+	   ExternalRoutingCapability
+	           Entire OSPF areas can be configured as "stubs" (see Section
+	           3.6).  AS-external-LSAs will not be flooded into stub areas.
+	           This capability is represented by the E-bit in the OSPF
+	           Options field (see Section A.2).  In order to ensure
+	           consistent configuration of stub areas, all routers
+	           interfacing to such an area must have the E-bit clear in
+	           their Hello packets
+	*/
+
+	areaId := config.AreaId(convertIPInByteToString(ent.IfAreaId))
+	isStub := server.isStubArea(areaId)
+	option := uint8(2)
+	if isStub {
+		option = uint8(0)
+	}
 	helloData := OSPFHelloData{
 		netmask:             ent.IfNetmask,
 		helloInterval:       ent.IfHelloInterval,
-		options:             uint8(2), // Need to revisit
+		options:             option,
 		rtrPrio:             ent.IfRtrPriority,
 		rtrDeadInterval:     ent.IfRtrDeadInterval,
 		designatedRtr:       ent.IfDRIp,
@@ -328,8 +347,8 @@ func (server *OSPFServer) CreateAndSendHelloRecvdMsg(routerId uint32,
 
 	if ifType == config.Broadcast ||
 		ifType == config.Nbma ||
-		ifType == config.PointToMultipoint || 
-		ifType == config.NumberedP2P{
+		ifType == config.PointToMultipoint ||
+		ifType == config.NumberedP2P {
 		msg.NeighborIP = net.IPv4(ipHdrMd.srcIP[0], ipHdrMd.srcIP[1], ipHdrMd.srcIP[2], ipHdrMd.srcIP[3])
 		//copy(msg.NeighborIP, ipHdrMd.srcIP)
 	} else { //Check for Virtual Links and unnumbered p2p

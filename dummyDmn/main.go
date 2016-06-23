@@ -21,52 +21,34 @@
 // |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
 //                                                                                                           
 
-// test_route_ops
 package main
 
 import (
+	"utils/dmnBase"
+	"l3/dummyDmn/server"
 	"fmt"
-	"github.com/garyburd/redigo/redis"
-	"l3/rib/server"
-	"ribd"
-	"utils/logging"
 )
+var DummyDmn dmnBase.L3Daemon
 
-var route ribd.IPv4Route
-var routeServer *server.RIBDServer
-
-func CreateRoute(cfg *ribd.IPv4Route) {
-	routeServer.ProcessRouteCreateConfig(cfg)
-}
-func DeleteRoute(cfg *ribd.IPv4Route) {
-	routeServer.ProcessRouteDeleteConfig(cfg)
-}
 func main() {
-	fmt.Println("Start logger")
-	logger, err := logging.NewLogger("ribd", "RIB", true)
-	if err != nil {
-		fmt.Println("Failed to start the logger. Nothing will be logged...")
+	status := DummyDmn.Init("dmnd", "DUMMY")
+	DummyDmn.Logger.Info(fmt.Sprintln("Init done with status", status))
+	if status == false {
+		fmt.Println("Init failed")
+		return
 	}
-	logger.Info("Started the logger successfully.")
+	dummyServer := server.NewDummyServer(DummyDmn)
 
-	dbHdl, err := redis.Dial("tcp", ":6379")
-	if err != nil {
-		logger.Err("Failed to dial out to Redis server")
-		return
+	go dummyServer.StartServer()
+    <-dummyServer.ServerStartedCh
+	
+	DummyDmn.Logger.Info("Dummy server started")
+	
+	// Start keepalive routine
+	DummyDmn.Logger.Println("Starting KeepAlive")
+	DummyDmn.StartKeepAlive()
+	
+	//simulate rpc.StartServer()
+	for {
 	}
-	routeServer = server.NewRIBDServicesHandler(dbHdl, logger)
-	if routeServer == nil {
-		logger.Println("routeServer nil")
-		return
-	}
-	route = ribd.IPv4Route{
-		DestinationNw:     "40.0.1.1",
-		NetworkMask:       "255.255.255.0",
-		NextHopIp:         "1.1.1.1",
-		OutgoingIntfType:  "Loopback",
-		OutgoingInterface: "0",
-		Protocol:          "STATIC",
-	}
-	CreateRoute(&route)
-	DeleteRoute(&route)
 }

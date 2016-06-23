@@ -46,6 +46,17 @@ const (
 	McastMAC      string = "01:00:5e:00:00:05"
 )
 
+/*Event types */
+const (
+	ADJACENCY string = "ADJACENCY"
+	INTF      string = "INTF"
+	RIB       string = "RIB"
+	FLOOD     string = "FLOOD"
+	AREA      string = "AREA"
+	SPF       string = "SPF"
+	LSA       string = "LSA"
+)
+
 type Status int
 
 const (
@@ -122,7 +133,17 @@ const (
 	NumberedP2P       IfType = 3
 	UnnumberedP2P     IfType = 4
 	PointToMultipoint IfType = 5
+	Stub              IfType = 6
 )
+
+var IfTypeList = []string{
+	"Undefined",
+	"Broadcast",
+	"Nbma",
+	"NumberedP2P",
+	"UnnumberedP2P",
+	"PointToMultipoint",
+	"Stub"}
 
 type MulticastForwarding int
 
@@ -198,6 +219,17 @@ const (
 	NbrFull          NbrState = 8
 )
 
+var NbrStateList = []string{
+	"Undef",
+	"NbrDown",
+	"NbrAttempt",
+	"NbrInit",
+	"NbrTwoWay",
+	"NbrExchangeStart",
+	"NbrExchange",
+	"NbrLoading",
+	"NbrFull"}
+
 type NbrEvent int
 
 const (
@@ -253,12 +285,12 @@ type GlobalState struct {
 
 // Indexed By AreaId
 type AreaConf struct {
-	AreaId                              AreaId
-	AuthType                            AuthType
-	ImportAsExtern                      ImportAsExtern
-	AreaSummary                         AreaSummary
-	AreaNssaTranslatorRole              NssaTranslatorRole
-	AreaNssaTranslatorStabilityInterval PositiveInteger
+	AreaId                 AreaId
+	AuthType               AuthType
+	ImportAsExtern         ImportAsExtern
+	AreaSummary            AreaSummary
+	StubDefaultCost        int32
+	AreaNssaTranslatorRole NssaTranslatorRole
 }
 
 type AreaState struct {
@@ -415,7 +447,7 @@ type NeighborState struct {
 	NbrRtrId                   string
 	NbrOptions                 int
 	NbrPriority                uint8
-	NbrState                   NbrState
+	NbrState                   string
 	NbrEvents                  int
 	NbrLsRetransQLen           int
 	NbmaNbrPermanence          int
@@ -539,3 +571,10 @@ type OspfIPv4Route struct {
 	NextHops        string
 	LSOrigin        string
 }
+
+type OspfEventState struct {
+	TimeStamp      string
+	EventType      string
+	EventInfo      string
+}
+	

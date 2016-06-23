@@ -33,8 +33,9 @@ import (
 func (server *OSPFServer) StartOspfIntfFSM(key IntfConfKey) {
 	ent, _ := server.IntfConfMap[key]
 	areaId := convertIPv4ToUint32(ent.IfAreaId)
-	msg := LSAChangeMsg{
+	msg := NetworkLSAChangeMsg{
 		areaId: areaId,
+		intfKey: key,
 	}
 
 	server.logger.Info("Sending msg for router LSA generation")
@@ -125,11 +126,14 @@ func (server *OSPFServer) StartOspfBroadcastIntfFSM(key IntfConfKey) {
 			server.StartSendHelloPkt(key)
 		case <-ent.WaitTimer.C:
 			server.logger.Info("Wait timer expired")
+			eventInfo := "Wait time expired for " 
+			server.AddOspfEventState(config.INTF, eventInfo)
 			//server.IntfConfMap[key] = ent
 			// Elect BDR And DR
 			server.ElectBDRAndDR(key)
 		case msg := <-ent.BackupSeenCh:
 			server.logger.Info(fmt.Sprintf("Transit to action state because of backup seen", msg))
+			server.AddOspfEventState(config.INTF, "Backup seen")
 			server.ElectBDRAndDR(key)
 		case createMsg := <-ent.NeighCreateCh:
 
@@ -494,22 +498,6 @@ func (server *OSPFServer) createAndSendEventsIntfFSM(key IntfConfKey,
 		newstate: newState,
 	}
 
-	/*
-		server.logger.Info("1. Sending msg for router LSA generation")
-		server.IntfStateChangeCh <- msg
-	*/
-	/*
-		if oldState != newState {
-			if newState == config.DesignatedRouter {
-				// Construct Network LSA
-				server.logger.Info("1. Sending msg for Network LSA generation")
-			} else if oldState == config.DesignatedRouter {
-				// Flush Network LSA
-				server.logger.Info("2. Sending msg for Network LSA generation")
-			}
-			server.NetworkDRChangeCh<-msg1
-			server.logger.Info(fmt.Sprintln("oldState", oldState, " != newState", newState))
-		} */
 	server.logger.Info("DRBDR changed. Sending message for router/network LSA generation")
 	server.NetworkDRChangeCh <- msg1
 	server.logger.Info(fmt.Sprintln("oldState", oldState, " newState", newState))

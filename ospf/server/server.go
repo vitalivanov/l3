@@ -90,7 +90,7 @@ type OSPFServer struct {
 	AreaSelfOrigLsa    map[LsdbKey]SelfOrigLsa
 	LsdbUpdateCh       chan LsdbUpdateMsg
 	LsaUpdateRetCodeCh chan bool
-	IntfStateChangeCh  chan LSAChangeMsg
+	IntfStateChangeCh  chan NetworkLSAChangeMsg
 	NetworkDRChangeCh  chan DrChangeMsg
 	FlushNetworkLSACh  chan NetworkLSAChangeMsg
 	CreateNetworkLSACh chan ospfNbrMdata
@@ -103,34 +103,35 @@ type OSPFServer struct {
 	ribSubSocketCh    chan []byte
 	ribSubSocketErrCh chan error
 
-	asicdSubSocket        *nanomsg.SubSocket
-	asicdSubSocketCh      chan []byte
-	asicdSubSocketErrCh   chan error
-	AreaConfMap           map[AreaConfKey]AreaConf
-	IntfConfMap           map[IntfConfKey]IntfConf
-	IntfTxMap             map[IntfConfKey]IntfTxHandle
-	IntfRxMap             map[IntfConfKey]IntfRxHandle
-	NeighborConfigMap     map[NeighborConfKey]OspfNeighborEntry
-	NeighborListMap       map[IntfConfKey]list.List
-	neighborConfMutex     sync.Mutex
-	neighborHelloEventCh  chan IntfToNeighMsg
-	neighborFSMCtrlCh     chan bool
-	neighborConfCh        chan ospfNeighborConfMsg
-	neighborConfStopCh    chan bool
-	nbrFSMCtrlCh          chan bool
-	neighborSliceRefCh    *time.Ticker
-	neighborSliceStartCh  chan bool
-	neighborBulkSlice     []NeighborConfKey
-	neighborDBDEventCh    chan ospfNeighborDBDMsg
-	neighborLSAReqEventCh chan ospfNeighborLSAreqMsg
-	neighborLSAUpdEventCh chan ospfNeighborLSAUpdMsg
-	neighborLSAACKEventCh chan ospfNeighborLSAAckMsg
-	ospfNbrDBDSendCh      chan ospfNeighborDBDMsg
-	ospfNbrLsaReqSendCh   chan ospfNeighborLSAreqMsg
-	ospfNbrLsaUpdSendCh   chan ospfFloodMsg
-	ospfNbrLsaAckSendCh   chan ospfNeighborAckTxMsg
-	ospfRxNbrPktStopCh    chan bool
-	ospfTxNbrPktStopCh    chan bool
+	asicdSubSocket          *nanomsg.SubSocket
+	asicdSubSocketCh        chan []byte
+	asicdSubSocketErrCh     chan error
+	AreaConfMap             map[AreaConfKey]AreaConf
+	IntfConfMap             map[IntfConfKey]IntfConf
+	IntfTxMap               map[IntfConfKey]IntfTxHandle
+	IntfRxMap               map[IntfConfKey]IntfRxHandle
+	NeighborConfigMap       map[NeighborConfKey]OspfNeighborEntry
+	NeighborListMap         map[IntfConfKey]list.List
+	neighborConfMutex       sync.Mutex
+	neighborHelloEventCh    chan IntfToNeighMsg
+	neighborFSMCtrlCh       chan bool
+	neighborConfCh          chan ospfNeighborConfMsg
+	neighborConfStopCh      chan bool
+	nbrFSMCtrlCh            chan bool
+	neighborSliceRefCh      *time.Ticker
+	neighborSliceStartCh    chan bool
+	neighborBulkSlice       []NeighborConfKey
+	neighborDBDEventCh      chan ospfNeighborDBDMsg
+	neighborIntfEventCh     chan IntfConfKey
+	neighborLSAReqEventCh   chan ospfNeighborLSAreqMsg
+	neighborLSAUpdEventCh   chan ospfNeighborLSAUpdMsg
+	neighborLSAACKEventCh   chan ospfNeighborLSAAckMsg
+	ospfNbrDBDSendCh        chan ospfNeighborDBDMsg
+	ospfNbrLsaReqSendCh     chan ospfNeighborLSAreqMsg
+	ospfNbrLsaUpdSendCh     chan ospfFloodMsg
+	ospfNbrLsaAckSendCh     chan ospfNeighborAckTxMsg
+	ospfRxNbrPktStopCh      chan bool
+	ospfTxNbrPktStopCh      chan bool
 
 	//neighborDBDEventCh   chan IntfToNeighDbdMsg
 
@@ -161,6 +162,10 @@ type OSPFServer struct {
 	AreaStubs      map[VertexKey]StubVertex
 
 	dbHdl *dbutils.DBUtil
+	DbReadConfig chan bool
+	DbRouteOp chan DbRouteMsg
+	DbLsdbOp chan DbLsdbMsg
+	DbEventOp chan DbEventMsg
 }
 
 func NewOSPFServer(logger *logging.Writer) *OSPFServer {
@@ -182,7 +187,7 @@ func NewOSPFServer(logger *logging.Writer) *OSPFServer {
 	ospfServer.IntfRxMap = make(map[IntfConfKey]IntfRxHandle)
 	ospfServer.AreaLsdb = make(map[LsdbKey]LSDatabase)
 	ospfServer.AreaSelfOrigLsa = make(map[LsdbKey]SelfOrigLsa)
-	ospfServer.IntfStateChangeCh = make(chan LSAChangeMsg)
+	ospfServer.IntfStateChangeCh = make(chan NetworkLSAChangeMsg)
 	ospfServer.NetworkDRChangeCh = make(chan DrChangeMsg)
 	ospfServer.CreateNetworkLSACh = make(chan ospfNbrMdata)
 	ospfServer.FlushNetworkLSACh = make(chan NetworkLSAChangeMsg)
@@ -210,6 +215,7 @@ func NewOSPFServer(logger *logging.Writer) *OSPFServer {
 	ospfServer.nbrFSMCtrlCh = make(chan bool)
 	ospfServer.RefreshDuration = time.Duration(10) * time.Minute
 	ospfServer.neighborDBDEventCh = make(chan ospfNeighborDBDMsg)
+	ospfServer.neighborIntfEventCh = make(chan IntfConfKey)
 	ospfServer.neighborLSAReqEventCh = make(chan ospfNeighborLSAreqMsg, 2)
 	ospfServer.neighborLSAUpdEventCh = make(chan ospfNeighborLSAUpdMsg, 2)
 	ospfServer.neighborLSAACKEventCh = make(chan ospfNeighborLSAAckMsg, 2)
@@ -323,6 +329,7 @@ func (server *OSPFServer) InitServer(paramFile string) {
 	if err != nil {
 		server.logger.Err(fmt.Sprintln("DB Initialization faliure err:", err))
 	}
+	go server.StartDBListener()
 	/*
 	   server.logger.Info("Listen for RIBd updates")
 	   server.listenForRIBUpdates(ribdCommonDefs.PUB_SOCKET_ADDR)
@@ -337,7 +344,7 @@ func (server *OSPFServer) InitServer(paramFile string) {
 	go server.spfCalculation()
 	if server.dbHdl != nil {
 		// Read DB for config objects in case of restarts
-		server.ReadOspfCfgFromDB()
+		server.DbReadConfig <- true
 	}
 
 }

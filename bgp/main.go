@@ -37,6 +37,7 @@ import (
 	"utils/dbutils"
 	"utils/keepalive"
 	"utils/logging"
+	"utils/statedbclient"
 )
 
 const (
@@ -87,13 +88,18 @@ func main() {
 		pMgr := ovsMgr.NewOvsPolicyMgr()
 		iMgr := ovsMgr.NewOvsIntfMgr()
 		bMgr := ovsMgr.NewOvsBfdMgr()
+		sDBMgr, err := statedbclient.NewStateDBClient(statedbclient.OVSPlugin, logger)
+		if err != nil {
+			logger.Info(fmt.Sprintln("Starting OVDB state DB client failed ERROR:", err))
+			return
+		}
 
 		// starting bgp policy engine...
 		logger.Info(fmt.Sprintln("Starting BGP policy engine..."))
 		bgpPolicyMgr := bgppolicy.NewPolicyManager(logger, pMgr)
 		go bgpPolicyMgr.StartPolicyEngine()
 
-		bgpServer := server.NewBGPServer(logger, bgpPolicyMgr, iMgr, rMgr, bMgr)
+		bgpServer := server.NewBGPServer(logger, bgpPolicyMgr, iMgr, rMgr, bMgr, sDBMgr)
 		go bgpServer.StartServer()
 
 		logger.Info(fmt.Sprintln("Starting config listener..."))
@@ -129,6 +135,7 @@ func main() {
 			return
 		}
 		pMgr := FSMgr.NewFSPolicyMgr(logger, fileName)
+		sDBMgr, err := statedbclient.NewStateDBClient(statedbclient.FlexSwitchPlugin, logger)
 		if err != nil {
 			return
 		}
@@ -139,7 +146,7 @@ func main() {
 
 		logger.Info(fmt.Sprintln("Starting BGP Server..."))
 
-		bgpServer := server.NewBGPServer(logger, bgpPolicyMgr, iMgr, rMgr, bMgr)
+		bgpServer := server.NewBGPServer(logger, bgpPolicyMgr, iMgr, rMgr, bMgr, sDBMgr)
 		go bgpServer.StartServer()
 
 		api.InitPolicy(bgpPolicyMgr)

@@ -13,13 +13,13 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 package server
 
@@ -35,14 +35,22 @@ import (
 	for dbd exchange state packets.
 */
 func (server *OSPFServer) exchangePacketDiscardCheck(nbrConf OspfNeighborEntry, nbrDbPkt ospfDatabaseDescriptionData) (isDiscard bool) {
+	msg := DbEventMsg{
+		eventType: config.ADJACENCY,
+	}
+
 	if nbrDbPkt.msbit != nbrConf.isMaster {
+		msg.eventInfo = "SeqNumberMismatch. Nbr should be master " + nbrConf.OspfNbrIPAddr.String()
 		server.logger.Info(fmt.Sprintln("NBREVENT: SeqNumberMismatch. Nbr should be master  dbdmsbit ", nbrDbPkt.msbit,
 			" isMaster ", nbrConf.isMaster))
+		server.DbEventOp <- msg
 		return true
 	}
 
 	if nbrDbPkt.ibit == true {
 		server.logger.Info("NBREVENT:SeqNumberMismatch . Nbr ibit is true ")
+		msg.eventInfo = "SeqNumberMismatch . Nbr ibit is true " + nbrConf.OspfNbrIPAddr.String()
+		server.DbEventOp <- msg
 		return true
 	}
 	/*
@@ -60,12 +68,16 @@ func (server *OSPFServer) exchangePacketDiscardCheck(nbrConf OspfNeighborEntry, 
 			}
 			server.logger.Info(fmt.Sprintln("NBREVENT:SeqNumberMismatch : Nbr is master but dbd packet seq no doesnt match. dbd seq ",
 				nbrDbPkt.dd_sequence_number, "nbr seq ", nbrConf.ospfNbrSeqNum))
+			msg.eventInfo = "SeqNumberMismatch . " + nbrConf.OspfNbrIPAddr.String()
+			server.DbEventOp <- msg
 			return true
 		}
 	} else {
 		if nbrDbPkt.dd_sequence_number != nbrConf.ospfNbrSeqNum {
 			server.logger.Info(fmt.Sprintln("NBREVENT:SeqNumberMismatch : Nbr is slave but dbd packet seq no doesnt match.dbd seq ",
 				nbrDbPkt.dd_sequence_number, "nbr seq ", nbrConf.ospfNbrSeqNum))
+			msg.eventInfo = "SeqNumberMismatch . " + nbrConf.OspfNbrIPAddr.String()
+			server.DbEventOp <- msg
 			return true
 		}
 	}
@@ -500,6 +512,11 @@ func (server *OSPFServer) ProcessNbrStateMachine() {
 				var nbrState config.NbrState
 				var dbd_mdata ospfDatabaseDescriptionData
 				var send_dbd bool
+				msg := DbEventMsg{
+					eventType: config.ADJACENCY,
+				}
+				msg.eventInfo = "Create new neighbor with id " + nbrData.NeighborIP.String()
+				server.DbEventOp <- msg
 				server.logger.Info(fmt.Sprintln("NBREVENT: Create new neighbor with id ", nbrData.RouterId))
 
 				if nbrData.TwoWayStatus { // update the state
@@ -562,6 +579,10 @@ func (server *OSPFServer) ProcessNbrStateMachine() {
 		case nbrDbPkt := <-(server.neighborDBDEventCh):
 			server.logger.Info(fmt.Sprintln("NBREVENT: DBD received  ", nbrDbPkt))
 			server.processDBDEvent(nbrDbPkt.ospfNbrConfKey, nbrDbPkt.ospfNbrDBDData)
+
+		case intfKey := <-(server.neighborIntfEventCh):
+			server.logger.Info(fmt.Sprintln("NBREVENT: Interface down ", intfKey))
+			server.processIntfDownEvent(intfKey)
 
 		case state := <-server.neighborFSMCtrlCh:
 			if state == false {
@@ -861,8 +882,6 @@ func (server *OSPFServer) generateDbsummary4LsaList(self_areaId uint32) []*ospfN
 		db_list = append(db_list, db_summary)
 		lsid := convertUint32ToIPv4(lsaKey.LSId)
 		server.logger.Info(fmt.Sprintln("negotiation: db_list summary 4 append router lsid  ", lsid))
-
-		/*  TODO - check if we want to add Summary4 LSA */
 	}
 	return db_list
 }
@@ -900,7 +919,11 @@ func (server *OSPFServer) neighborDeadTimerEvent(nbrConfKey NeighborConfKey) {
 		_, exists := server.NeighborConfigMap[nbrConfKey]
 		if exists {
 			nbrConf := server.NeighborConfigMap[nbrConfKey]
-
+			msg := DbEventMsg{
+				eventType: config.ADJACENCY,
+				eventInfo: "Neighbor Dead " + nbrConf.OspfNbrIPAddr.String(),
+			}
+			server.DbEventOp <- msg
 			nbrConfMsg := ospfNeighborConfMsg{
 				ospfNbrConfKey: nbrConfKey,
 				ospfNbrEntry: OspfNeighborEntry{
@@ -984,4 +1007,34 @@ func (server *OSPFServer) processNeighborDeadEvent(nbrKey NeighborConfKey, intfK
 	intfConf := server.IntfConfMap[intfKey]
 	intfConf.NbrStateChangeCh <- nbrStateChangeData
 	server.logger.Info(fmt.Sprintln("DEAD: end processing nbr dead ", nbrKey))
+}
+
+/*@fn processIntfDownEvent
+ This API takes care of interface down/delete event
+1) Clear all lists.
+2) send delete message for neighbor struct.
+*/
+func (server *OSPFServer) processIntfDownEvent(intfKey IntfConfKey) {
+	server.logger.Info(fmt.Sprintln("DEAD: Intf down ", intfKey))
+	_, exist := server.IntfConfMap[intfKey]
+	if !exist {
+		server.logger.Info(fmt.Sprintln("DEAD: Intf map doesnt exist ", intfKey))
+		return
+	}
+	nbrMdata, valid := ospfIntfToNbrMap[intfKey]
+	if !valid {
+		server.logger.Info(fmt.Sprintln("DEAD: Intf deleted but intf-to-nbr map doesnt exist. ", intfKey))
+		return
+	}
+	for _, nbr := range nbrMdata.nbrList { // delete all lists
+		updateLSALists(nbr)
+		nbrConfMsg := ospfNeighborConfMsg{
+			ospfNbrConfKey: nbr,
+			nbrMsgType:     NBRDEL,
+		}
+		server.neighborConfCh <- nbrConfMsg
+	}
+	//delete interface to nbr mapping.
+	delete(ospfIntfToNbrMap, intfKey)
+
 }
