@@ -11,6 +11,9 @@ cache: false
 
 go_import_path: snaproute/src/l3
 
+services:
+  - redis-server
+
 before_install:
   - mkdir -p $HOME/gopath/src/reltools
   - mkdir -p $HOME/gopath/src/generated/src
@@ -42,7 +45,6 @@ install:
   - sudo apt-get install -y libpcap0.8 libpcap0.8-dev libpcap-dev
   - sudo apt-get install -y python-dev python-bitarray python-paramiko python-netaddr
   - sudo apt-get install -y libboost-dev libboost-test-dev libboost-program-options-dev libboost-system-dev libboost-filesystem-dev libevent-dev automake libtool flex bison pkg-config g++ libssl-dev ant
-  - sudo apt-get install redis-server
   - sudo -H pip install bitarray
   - echo $PYTHONPATH
   - echo $PATH
@@ -83,7 +85,6 @@ install:
   - cd $HOME/gopath/src/external/src/github.com/netfilter/libnftnl;./autogen.sh;./configure --prefix=$HOME/gopath/src/external/src/github.com/netfilter/libiptables CFLAGS=-I$HOME/gopath/src/external/src/github.com/netfilter/libiptables/include LDFLAGS=-L$HOME/gopath/src/external/src/github.com/netfilter/libiptables/lib;make;make install
   - cd $HOME/gopath/src/external/src/github.com/netfilter/iptables;./autogen.sh;./configure --prefix=$HOME/gopath/src/external/src/github.com/netfilter/libiptables CFLAGS=-I$HOME/gopath/src/external/src/github.com/netfilter/libiptables/include LDFLAGS=-L$HOME/gopath/src/external/src/github.com/netfilter/libiptables/lib LIBS="-lmnl -lnftnl";make;make install
   - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib
-  - echo $LD_LIBRARY_PATH
 
 before_script:
   - ln -s $HOME/gopath/src/reltools/Makefile $HOME/gopath/src/snaproute/src/Makefile
@@ -91,9 +92,10 @@ before_script:
   - export PYTHONPATH=/usr/lib/python2.7/dist-packages
   - export SR_CODE_BASE=$HOME/gopath/src
   - echo $LD_LIBRARY_PATH
+  - echo $PATH
   - cd $HOME/gopath/src/snaproute/src;make buildinfogen;make codegen;make ipc
 
 script:
-  - echo $LD_LIBRARY_PATH
   - cd $HOME/gopath/src/snaproute/src/l3
-  - go test -v ./...
+  - gobin=$(which go)
+  - sudo -E LD_LIBRARY_PATH=/usr/local/lib $gobin test -v -cover ./...

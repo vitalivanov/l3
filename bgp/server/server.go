@@ -43,6 +43,7 @@ import (
 	"utils/netUtils"
 	utilspolicy "utils/policy"
 	"utils/policy/policyCommonDefs"
+	"utils/statedbclient"
 )
 
 type PeerUpdate struct {
@@ -108,14 +109,15 @@ type BGPServer struct {
 	actionFuncMap  map[int]bgppolicy.PolicyActionFunc
 	AddPathCount   int
 	// all managers
-	IntfMgr  config.IntfStateMgrIntf
-	routeMgr config.RouteMgrIntf
-	bfdMgr   config.BfdMgrIntf
+	IntfMgr    config.IntfStateMgrIntf
+	routeMgr   config.RouteMgrIntf
+	bfdMgr     config.BfdMgrIntf
+	stateDBMgr statedbclient.StateDBClient
 }
 
 func NewBGPServer(logger *logging.Writer, policyEngine *bgppolicy.BGPPolicyEngine,
 	iMgr config.IntfStateMgrIntf, rMgr config.RouteMgrIntf,
-	bMgr config.BfdMgrIntf) *BGPServer {
+	bMgr config.BfdMgrIntf, sDBMgr statedbclient.StateDBClient) *BGPServer {
 	bgpServer := &BGPServer{}
 	bgpServer.logger = logger
 	bgpServer.bgpPE = policyEngine
@@ -141,7 +143,8 @@ func NewBGPServer(logger *logging.Writer, policyEngine *bgppolicy.BGPPolicyEngin
 	bgpServer.IntfMgr = iMgr
 	bgpServer.routeMgr = rMgr
 	bgpServer.bfdMgr = bMgr
-	bgpServer.AdjRib = bgprib.NewAdjRib(logger, rMgr, &bgpServer.BgpConfig.Global.Config)
+	bgpServer.stateDBMgr = sDBMgr
+	bgpServer.AdjRib = bgprib.NewAdjRib(logger, rMgr, sDBMgr, &bgpServer.BgpConfig.Global.Config)
 	bgpServer.IfacePeerMap = make(map[int32][]string)
 	bgpServer.ifaceIP = nil
 	bgpServer.actionFuncMap = make(map[int]bgppolicy.PolicyActionFunc)

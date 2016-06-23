@@ -30,11 +30,12 @@ import (
 	"l3/bgp/baseobjects"
 	"l3/bgp/config"
 	"l3/bgp/packet"
+	"models/objects"
 	"net"
 	"sync"
 	"time"
-	"utils/dbutils"
 	"utils/logging"
+	"utils/statedbclient"
 )
 
 var totalRoutes int
@@ -62,6 +63,7 @@ type AdjRib struct {
 	logger           *logging.Writer
 	gConf            *config.GlobalConfig
 	routeMgr         config.RouteMgrIntf
+	stateDBMgr       statedbclient.StateDBClient
 	destPathMap      map[string]*Destination
 	reachabilityMap  map[string]*ReachabilityInfo
 	unreachablePaths map[string]map[*Path]map[*Destination][]uint32
@@ -70,16 +72,15 @@ type AdjRib struct {
 	routeListDirty   bool
 	activeGet        bool
 	timer            *time.Timer
-	dbUtil           *dbutils.DBUtil
-	routeStateCh     chan RouteInfo
 }
 
-func NewAdjRib(logger *logging.Writer, rMgr config.RouteMgrIntf,
+func NewAdjRib(logger *logging.Writer, rMgr config.RouteMgrIntf, sDBMgr statedbclient.StateDBClient,
 	gConf *config.GlobalConfig) *AdjRib {
 	rib := &AdjRib{
 		logger:           logger,
 		gConf:            gConf,
 		routeMgr:         rMgr,
+		stateDBMgr:       sDBMgr,
 		destPathMap:      make(map[string]*Destination),
 		reachabilityMap:  make(map[string]*ReachabilityInfo),
 		unreachablePaths: make(map[string]map[*Path]map[*Destination][]uint32),
@@ -87,22 +88,11 @@ func NewAdjRib(logger *logging.Writer, rMgr config.RouteMgrIntf,
 		routeListDirty:   false,
 		activeGet:        false,
 		routeMutex:       sync.RWMutex{},
-		routeStateCh:     make(chan RouteInfo, 100),
 	}
 
 	rib.timer = time.AfterFunc(time.Duration(100)*time.Second, rib.ResetRouteList)
 	rib.timer.Stop()
 
-	// Start DB Util
-	dbUtil := dbutils.NewDBUtil(logger)
-	err := dbUtil.Connect()
-	if err != nil {
-		logger.Err(fmt.Sprintf("RIB - DB connect failed with error %s. Exiting!!", err))
-		return nil
-	}
-	rib.dbUtil = dbUtil
-
-	go rib.StartLocRIBRouteReceiver()
 	return rib
 }
 
@@ -176,6 +166,12 @@ func (adjRib *AdjRib) updateRibOutInfo(action RouteAction, addPathsMod bool, add
 	return withdrawn, updated, updatedAddPaths
 }
 
+func (adjRib *AdjRib) GetRouteStateConfigObj(route *bgpd.BGPRouteState) objects.ConfigObj {
+	var dbObj objects.BGPRouteState
+	objects.ConvertThriftTobgpdBGPRouteStateObj(route, &dbObj)
+	return &dbObj
+}
+
 func (adjRib *AdjRib) ProcessRoutes(peerIP string, add []packet.NLRI, addPath *Path,
 	rem []packet.NLRI, remPath *Path, addPathCount int) (map[*Path][]*Destination,
 	[]*Destination, []*Destination, bool) {
@@ -196,7 +192,7 @@ func (adjRib *AdjRib) ProcessRoutes(peerIP string, add []packet.NLRI, addPath *P
 					nlri.GetPrefix().Prefix.String()))
 				continue
 			}
-			op := LocRIBStateUpdate
+			op := adjRib.stateDBMgr.UpdateObject
 			oldPath := dest.RemovePath(peerIP, nlri.GetPathId(), remPath)
 			if oldPath != nil && !oldPath.IsReachable() {
 				nextHopStr := oldPath.GetNextHop().String()
@@ -245,12 +241,12 @@ func (adjRib *AdjRib) ProcessRoutes(peerIP string, add []packet.NLRI, addPath *P
 			}
 			if action == RouteActionDelete {
 				if dest.IsEmpty() {
-					op = LocRIBStateDelete
+					op = adjRib.stateDBMgr.DeleteObject
 					adjRib.removeRoutesFromRouteList(dest)
 					delete(adjRib.destPathMap, nlri.GetPrefix().Prefix.String())
 				}
 			}
-			adjRib.routeStateCh <- RouteInfo{op, dest.GetBGPRoute()}
+			op(adjRib.GetRouteStateConfigObj(dest.GetBGPRoute()))
 		} else {
 			adjRib.logger.Info(fmt.Sprintln("Can't withdraw destination",
 				nlri.GetPrefix().Prefix.String(),
@@ -266,10 +262,10 @@ func (adjRib *AdjRib) ProcessRoutes(peerIP string, add []packet.NLRI, addPath *P
 		}
 
 		adjRib.logger.Info(fmt.Sprintln("Processing nlri", nlri.GetPrefix().Prefix.String()))
-		op := LocRIBStateUpdate
+		op := adjRib.stateDBMgr.UpdateObject
 		dest, alreadyCreated := adjRib.GetDest(nlri, true)
 		if !alreadyCreated {
-			op = LocRIBStateAdd
+			op = adjRib.stateDBMgr.AddObject
 		}
 		if oldPath := dest.getPathForIP(peerIP, nlri.GetPathId()); oldPath == nil &&
 			addPath.NeighborConf != nil {
@@ -301,7 +297,7 @@ func (adjRib *AdjRib) ProcessRoutes(peerIP string, add []packet.NLRI, addPath *P
 			dest.SelectRouteForLocRib(addPathCount)
 		withdrawn, updated, updatedAddPaths = adjRib.updateRibOutInfo(action, addPathsMod,
 			addRoutes, updRoutes, delRoutes, dest, withdrawn, updated, updatedAddPaths)
-		adjRib.routeStateCh <- RouteInfo{op, dest.GetBGPRoute()}
+		op(adjRib.GetRouteStateConfigObj(dest.GetBGPRoute()))
 	}
 
 	return updated, withdrawn, updatedAddPaths, addedAllPrefixes
@@ -334,7 +330,7 @@ func (adjRib *AdjRib) ProcessRoutesForReachableRoutes(nextHop string, reachabili
 					adjRib.updateRibOutInfo(action, addPathsMod, addRoutes,
 						updRoutes, delRoutes, dest, withdrawn,
 						updated, updatedAddPaths)
-				adjRib.routeStateCh <- RouteInfo{LocRIBStateAdd, dest.GetBGPRoute()}
+				adjRib.stateDBMgr.AddObject(adjRib.GetRouteStateConfigObj(dest.GetBGPRoute()))
 			}
 		}
 	}
@@ -415,7 +411,7 @@ func (adjRib *AdjRib) RemoveUpdatesFromNeighbor(peerIP string, neighborConf *bas
 	updatedAddPaths := make([]*Destination, 0)
 
 	for destIP, dest := range adjRib.destPathMap {
-		op := LocRIBStateUpdate
+		op := adjRib.stateDBMgr.UpdateObject
 		dest.RemoveAllPaths(peerIP, remPath)
 		action, addPathsMod, addRoutes, updRoutes, delRoutes :=
 			dest.SelectRouteForLocRib(addPathCount)
@@ -431,9 +427,9 @@ func (adjRib *AdjRib) RemoveUpdatesFromNeighbor(peerIP string, neighborConf *bas
 				dest.IPPrefix.Prefix.String()))
 			adjRib.removeRoutesFromRouteList(dest)
 			delete(adjRib.destPathMap, destIP)
-			op = LocRIBStateDelete
+			op = adjRib.stateDBMgr.DeleteObject
 		}
-		adjRib.routeStateCh <- RouteInfo{op, dest.GetBGPRoute()}
+		op(adjRib.GetRouteStateConfigObj(dest.GetBGPRoute()))
 	}
 
 	if neighborConf != nil {
@@ -448,7 +444,7 @@ func (adjRib *AdjRib) RemoveUpdatesFromAllNeighbors(addPathCount int) {
 	updatedAddPaths := make([]*Destination, 0)
 
 	for destIP, dest := range adjRib.destPathMap {
-		op := LocRIBStateUpdate
+		op := adjRib.stateDBMgr.UpdateObject
 		dest.RemoveAllNeighborPaths()
 		action, addPathsMod, addRoutes, updRoutes, delRoutes :=
 			dest.SelectRouteForLocRib(addPathCount)
@@ -458,9 +454,9 @@ func (adjRib *AdjRib) RemoveUpdatesFromAllNeighbors(addPathCount int) {
 		if action == RouteActionDelete && dest.IsEmpty() {
 			adjRib.removeRoutesFromRouteList(dest)
 			delete(adjRib.destPathMap, destIP)
-			op = LocRIBStateDelete
+			op = adjRib.stateDBMgr.DeleteObject
 		}
-		adjRib.routeStateCh <- RouteInfo{op, dest.GetBGPRoute()}
+		op(adjRib.GetRouteStateConfigObj(dest.GetBGPRoute()))
 	}
 }
 
@@ -498,7 +494,7 @@ func (adjRib *AdjRib) RemoveRouteFromAggregate(ip *packet.IPPrefix, aggIP *packe
 	}
 	adjRib.logger.Info(fmt.Sprintln("RemoveRouteFromAggregate: locRibPath", dest.LocRibPath,
 		"locRibRoutePath", dest.LocRibPathRoute.path))
-	op := LocRIBStateUpdate
+	op := adjRib.stateDBMgr.UpdateObject
 	path = dest.LocRibPathRoute.path
 	remPath := NewPath(adjRib, nil, path.PathAttrs, true, false, path.routeType)
 
@@ -531,9 +527,9 @@ func (adjRib *AdjRib) RemoveRouteFromAggregate(ip *packet.IPPrefix, aggIP *packe
 	if action == RouteActionDelete && aggDest.IsEmpty() {
 		adjRib.removeRoutesFromRouteList(dest)
 		delete(adjRib.destPathMap, aggIP.Prefix.String())
-		op = LocRIBStateDelete
+		op = adjRib.stateDBMgr.DeleteObject
 	}
-	adjRib.routeStateCh <- RouteInfo{op, aggDest.GetBGPRoute()}
+	op(adjRib.GetRouteStateConfigObj(dest.GetBGPRoute()))
 
 	return updated, withdrawn, remPath, updatedAddPaths
 }
@@ -558,7 +554,7 @@ func (adjRib *AdjRib) AddRouteToAggregate(ip *packet.IPPrefix, aggIP *packet.IPP
 	path = dest.LocRibPath
 	remPath := NewPath(adjRib, nil, path.PathAttrs, true, false, path.routeType)
 
-	op := LocRIBStateUpdate
+	op := adjRib.stateDBMgr.UpdateObject
 	if aggDest, ok = adjRib.GetDest(aggIP, true); ok {
 		aggPath = aggDest.getPathForIP(srcIP, AggregatePathId)
 		adjRib.logger.Info(fmt.Sprintf("AdjRib:AddRouteToAggregate - aggIP %v found in",
@@ -581,7 +577,7 @@ func (adjRib *AdjRib) AddRouteToAggregate(ip *packet.IPPrefix, aggIP *packet.IPP
 	} else {
 		adjRib.logger.Info(fmt.Sprintf("AdjRib:AddRouteToAggregate - aggIP %v,",
 			"agg path NOT found, create new path", aggIP))
-		op = LocRIBStateAdd
+		op = adjRib.stateDBMgr.AddObject
 		pathAttrs := packet.ConstructPathAttrForAggRoutes(path.PathAttrs, bgpAgg.GenerateASSet)
 		packet.SetNextHopPathAttrs(pathAttrs, ifaceIP)
 		packet.SetPathAttrAggregator(pathAttrs, adjRib.gConf.AS, adjRib.gConf.RouterId)
@@ -599,7 +595,7 @@ func (adjRib *AdjRib) AddRouteToAggregate(ip *packet.IPPrefix, aggIP *packet.IPP
 		}
 	}
 
-	adjRib.routeStateCh <- RouteInfo{op, aggDest.GetBGPRoute()}
+	op(adjRib.GetRouteStateConfigObj(dest.GetBGPRoute()))
 	if aggPath != nil {
 		aggPath.SetUpdate(false)
 	}
