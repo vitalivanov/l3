@@ -46,6 +46,17 @@ const (
 	McastMAC      string = "01:00:5e:00:00:05"
 )
 
+/*Event types */
+const (
+	ADJACENCY string = "ADJACENCY"
+	INTF      string = "INTF"
+	RIB       string = "RIB"
+	FLOOD     string = "FLOOD"
+	AREA      string = "AREA"
+	SPF       string = "SPF"
+	LSA       string = "LSA"
+)
+
 type Status int
 
 const (
@@ -560,3 +571,10 @@ type OspfIPv4Route struct {
 	NextHops        string
 	LSOrigin        string
 }
+
+type OspfEventState struct {
+	TimeStamp      string
+	EventType      string
+	EventInfo      string
+}
+	
