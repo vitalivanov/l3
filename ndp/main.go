@@ -20,36 +20,36 @@
 // |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
 // |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
 //
-
 package main
 
 import (
-	"fmt"
-	"l3/dummyDmn/server"
-	"utils/dmnBase"
+	_ "fmt"
+	_ "utils/dmnBase"
 )
 
-var DummyDmn dmnBase.L3Daemon
+//var DummyDmn dmnBase.L3Daemon
 
 func main() {
-	status := DummyDmn.Init("dmnd", "DUMMY")
-	DummyDmn.Logger.Info(fmt.Sprintln("Init done with status", status))
-	if status == false {
-		fmt.Println("Init failed")
-		return
-	}
-	dummyServer := server.NewDummyServer(DummyDmn)
+	/*
+		status := DummyDmn.Init("dmnd", "DUMMY")
+		DummyDmn.Logger.Info(fmt.Sprintln("Init done with status", status))
+		if status == false {
+			fmt.Println("Init failed")
+			return
+		}
+		dummyServer := server.NewDummyServer(DummyDmn)
 
-	go dummyServer.StartServer()
-	<-dummyServer.ServerStartedCh
+		go dummyServer.StartServer()
+		<-dummyServer.ServerStartedCh
 
-	DummyDmn.Logger.Info("Dummy server started")
+		DummyDmn.Logger.Info("Dummy server started")
 
-	// Start keepalive routine
-	DummyDmn.Logger.Println("Starting KeepAlive")
-	DummyDmn.StartKeepAlive()
+		// Start keepalive routine
+		DummyDmn.Logger.Println("Starting KeepAlive")
+		DummyDmn.StartKeepAlive()
 
-	//simulate rpc.StartServer()
-	for {
-	}
+		//simulate rpc.StartServer()
+		for {
+		}
+	*/
 }
