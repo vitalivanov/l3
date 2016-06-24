@@ -56,12 +56,20 @@ func (p Paths) getPaths() Paths {
 	return p
 }
 
+type ByRouteSrc struct {
+	Paths
+}
+
+func (b ByRouteSrc) Less(i, j int) bool {
+	return getRouteSource(b.Paths[i].routeType) < getRouteSource(b.Paths[j].routeType)
+}
+
 type ByPref struct {
 	Paths
 }
 
 func (b ByPref) Less(i, j int) bool {
-	return b.Paths[i].Pref < b.Paths[i].Pref
+	return b.Paths[i].Pref > b.Paths[j].Pref
 }
 
 type BySmallestAS struct {
@@ -69,7 +77,7 @@ type BySmallestAS struct {
 }
 
 func (b BySmallestAS) Less(i, j int) bool {
-	return b.Paths[i].GetNumASes() < b.Paths[i].GetNumASes()
+	return b.Paths[i].GetNumASes() < b.Paths[j].GetNumASes()
 }
 
 type ByLowestOrigin struct {
@@ -77,7 +85,7 @@ type ByLowestOrigin struct {
 }
 
 func (b ByLowestOrigin) Less(i, j int) bool {
-	return b.Paths[i].GetOrigin() < b.Paths[i].GetOrigin()
+	return b.Paths[i].GetOrigin() < b.Paths[j].GetOrigin()
 }
 
 type ByIBGPOrEBGPRoutes struct {
