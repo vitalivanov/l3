@@ -27,8 +27,10 @@ import (
 	"asicd/asicdCommonDefs"
 	"errors"
 	"fmt"
+	"models/events"
 	"time"
 	"utils/commonDefs"
+	"utils/eventUtils"
 )
 
 type UpdateArpEntryMsg struct {
@@ -253,6 +255,13 @@ func (server *ARPServer) processArpEntryMacMoveMsg(msg commonDefs.IPv4NbrMacMove
 	if entry, ok := server.arpCache[msg.IpAddr]; ok {
 		entry.PortNum = int(msg.IfIndex)
 		server.arpCache[msg.IpAddr] = entry
+		evtKey := events.ArpEntryKey{
+			IpAddr: msg.IpAddr,
+		}
+		err := eventUtils.PublishEvents(events.ArpEntryUpdated, evtKey)
+		if err != nil {
+			server.logger.Err("Error in publishing ArpEntryUpdated Event")
+		}
 	} else {
 		server.logger.Debug(fmt.Sprintf("Mac move message received. Neighbor IP does not exist in arp cache - %x", msg.IpAddr))
 	}
@@ -347,6 +356,13 @@ func (server *ARPServer) processArpEntryUpdateMsg(msg UpdateArpEntryMsg) {
 		if err != nil {
 			return
 		}
+		evtKey := events.ArpEntryKey{
+			IpAddr: msg.IpAddr,
+		}
+		err = eventUtils.PublishEvents(events.ArpEntryLearned, evtKey)
+		if err != nil {
+			server.logger.Err("Error in publishing ArpEntryLearned Event")
+		}
 	}
 	if !exist {
 		server.storeArpEntryInDB(msg.IpAddr, portEnt.L3IfIdx)
@@ -389,6 +405,13 @@ func (server *ARPServer) processArpCounterUpdateMsg() {
 					err := server.processAsicdMsg(asicdMsg)
 					if err != nil {
 						continue
+					}
+					evtKey := events.ArpEntryKey{
+						IpAddr: ip,
+					}
+					err = eventUtils.PublishEvents(events.ArpEntryDeleted, evtKey)
+					if err != nil {
+						server.logger.Err("Error in publishing ArpEntryDeleted Event")
 					}
 				}
 				server.printArpEntries()

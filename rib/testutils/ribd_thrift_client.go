@@ -34,9 +34,6 @@ const (
 	IP = "localhost"
 	PORT = "10002"
 )
-func main() {
-	
-}
 func GetRIBdClient() *ribd.RIBDServicesClient {
 	fmt.Println("Starting RIBd Thrift client for Testing")
 	var clientTransport thrift.TTransport

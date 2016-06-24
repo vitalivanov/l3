@@ -674,10 +674,10 @@ func (server *OSPFServer) DeleteRoute(rKey RoutingTblEntryKey) {
 			server.logger.Err(fmt.Sprintln("Error Deleting Route:", err))
 		}
 		server.logger.Info(fmt.Sprintln("Return Value for RIB DeleteV4Route call: ", ret))
-	        err = server.DelIPv4RoutesState(rKey)
-                if err != nil {
-                    server.logger.Info(fmt.Sprintln("DB: Failed to delete route from db. route , err ", rKey, err))
-                 }
+		err = server.DelIPv4RoutesState(rKey)
+		if err != nil {
+			server.logger.Info(fmt.Sprintln("DB: Failed to delete route from db. route , err ", rKey, err))
+		}
 
 	}
 }
@@ -728,10 +728,15 @@ func (server *OSPFServer) InstallRoute(rKey RoutingTblEntryKey) {
 			server.logger.Err(fmt.Sprintln("Error Installing Route:", err))
 		}
 		server.logger.Info(fmt.Sprintln("Return Value for RIB CreateV4Route call: ", ret))
-		err = server.AddIPv4RoutesState(rKey)
-                if err != nil {
-                    server.logger.Info(fmt.Sprintln("DB: Failed to add route to db. route , err ", rKey, err))
-                 }
+		msg := DbRouteMsg{
+			entry: rKey,
+			op:    true,
+		}
+		server.DbRouteOp <- msg
+
+		if err != nil {
+			server.logger.Info(fmt.Sprintln("DB: Failed to add route to db. route , err ", rKey, err))
+		}
 
 	}
 }

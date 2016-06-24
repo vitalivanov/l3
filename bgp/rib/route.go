@@ -13,19 +13,20 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 // route.go
-package server
+package rib
 
 import (
 	"bgpd"
+	"l3/bgp/packet"
 	"time"
 )
 
@@ -39,8 +40,8 @@ const (
 )
 
 type Route struct {
-	BGPRouteState    *bgpd.BGPRouteState
-	dest             *Destination
+	PathInfo         *bgpd.PathInfo
+	Dest             *Destination
 	path             *Path
 	routeListIdx     int
 	time             time.Time
@@ -52,22 +53,25 @@ type Route struct {
 
 func NewRoute(dest *Destination, path *Path, action RouteAction, inPathId, outPathId uint32) *Route {
 	currTime := time.Now()
-	bgpRoute := &bgpd.BGPRouteState{
-		Network:     dest.IPPrefix.Prefix.String(),
-		CIDRLen:     int16(dest.IPPrefix.Length),
-		NextHop:     path.GetNextHop().String(),
-		Metric:      int32(path.MED),
-		LocalPref:   int32(path.LocalPref),
-		Path:        path.GetAS4ByteList(),
-		PathId:      int32(inPathId),
-		UpdatedTime: currTime.String(),
+	pathInfo := &bgpd.PathInfo{
+		NextHop:        path.GetNextHop().String(),
+		Metric:         int32(path.MED),
+		LocalPref:      int32(path.LocalPref),
+		Path:           path.GetAS4ByteList(),
+		PathId:         int32(inPathId),
+		UpdatedTime:    currTime.String(),
+		ValidPath:      path.IsReachable(),
+		BestPath:       false,
+		MultiPath:      false,
+		AdditionalPath: false,
+		Origin:         packet.GetOriginTypeStr(path.GetOrigin()),
+		PathType:       path.GetSourceStr(),
 	}
 	return &Route{
-		BGPRouteState:    bgpRoute,
-		dest:             dest,
+		PathInfo:         pathInfo,
+		Dest:             dest,
 		path:             path,
 		routeListIdx:     -1,
-		time:             currTime,
 		action:           action,
 		OutPathId:        outPathId,
 		PolicyList:       make([]string, 0),
@@ -75,17 +79,14 @@ func NewRoute(dest *Destination, path *Path, action RouteAction, inPathId, outPa
 	}
 }
 
+/*
 func (r *Route) GetBGPRoute() *bgpd.BGPRouteState {
 	if r.BGPRouteState != nil {
 		r.BGPRouteState.UpdatedDuration = time.Now().Sub(r.time).String()
 	}
 	return r.BGPRouteState
 }
-
-func (r *Route) update() {
-	r.time = time.Now()
-	r.BGPRouteState.UpdatedTime = r.time.String()
-}
+*/
 
 func (r *Route) setAction(action RouteAction) {
 	r.action = action
@@ -93,4 +94,28 @@ func (r *Route) setAction(action RouteAction) {
 
 func (r *Route) setIdx(idx int) {
 	r.routeListIdx = idx
+}
+
+func (r *Route) SetBestPath() {
+	r.PathInfo.BestPath = true
+}
+
+func (r *Route) ResetBestPath() {
+	r.PathInfo.BestPath = false
+}
+
+func (r *Route) SetMultiPath() {
+	r.PathInfo.MultiPath = true
+}
+
+func (r *Route) ResetMultiPath() {
+	r.PathInfo.MultiPath = false
+}
+
+func (r *Route) SetAdditionalPath() {
+	r.PathInfo.AdditionalPath = true
+}
+
+func (r *Route) ResetAdditionalPath() {
+	r.PathInfo.AdditionalPath = false
 }

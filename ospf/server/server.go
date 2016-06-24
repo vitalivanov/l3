@@ -162,6 +162,10 @@ type OSPFServer struct {
 	AreaStubs      map[VertexKey]StubVertex
 
 	dbHdl *dbutils.DBUtil
+	DbReadConfig chan bool
+	DbRouteOp chan DbRouteMsg
+	DbLsdbOp chan DbLsdbMsg
+	DbEventOp chan DbEventMsg
 }
 
 func NewOSPFServer(logger *logging.Writer) *OSPFServer {
@@ -325,6 +329,7 @@ func (server *OSPFServer) InitServer(paramFile string) {
 	if err != nil {
 		server.logger.Err(fmt.Sprintln("DB Initialization faliure err:", err))
 	}
+	go server.StartDBListener()
 	/*
 	   server.logger.Info("Listen for RIBd updates")
 	   server.listenForRIBUpdates(ribdCommonDefs.PUB_SOCKET_ADDR)
@@ -339,7 +344,7 @@ func (server *OSPFServer) InitServer(paramFile string) {
 	go server.spfCalculation()
 	if server.dbHdl != nil {
 		// Read DB for config objects in case of restarts
-		server.ReadOspfCfgFromDB()
+		server.DbReadConfig <- true
 	}
 
 }

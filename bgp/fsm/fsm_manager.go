@@ -99,7 +99,7 @@ func NewFSMManager(logger *logging.Writer, neighborConf *base.NeighborConf, bgpP
 	}
 	mgr.fsms = make(map[uint8]*FSM)
 	mgr.AcceptCh = make(chan net.Conn)
-	mgr.tcpConnFailCh = make(chan uint8)
+	mgr.tcpConnFailCh = make(chan uint8, 2)
 	mgr.acceptConn = false
 	mgr.CloseCh = make(chan bool)
 	mgr.StopFSMCh = make(chan string)
