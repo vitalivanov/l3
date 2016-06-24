@@ -867,7 +867,9 @@ type NLRI interface {
 	Encode() ([]byte, error)
 	Decode([]byte) error
 	Len() uint32
-	GetPrefix() *IPPrefix
+	GetIPPrefix() *IPPrefix
+	GetPrefix() net.IP
+	GetLength() uint8
 	GetPathId() uint32
 	String() string
 }
@@ -915,8 +917,16 @@ func (ip *IPPrefix) Len() uint32 {
 	return uint32(((ip.Length + 7) / 8) + 1)
 }
 
-func (ip *IPPrefix) GetPrefix() *IPPrefix {
+func (ip *IPPrefix) GetIPPrefix() *IPPrefix {
 	return ip
+}
+
+func (ip *IPPrefix) GetPrefix() net.IP {
+	return ip.Prefix
+}
+
+func (ip *IPPrefix) GetLength() uint8 {
+	return ip.Length
 }
 
 func (ip *IPPrefix) GetPathId() uint32 {
@@ -935,14 +945,14 @@ func NewIPPrefix(prefix net.IP, length uint8) *IPPrefix {
 }
 
 type ExtNLRI struct {
-	IPPrefix
+	*IPPrefix
 	PathId uint32
 }
 
 func (n *ExtNLRI) Clone() NLRI {
 	x := *n
 	prefix := n.IPPrefix.Clone()
-	x.IPPrefix = *prefix.(*IPPrefix)
+	x.IPPrefix = prefix.(*IPPrefix)
 	return &x
 }
 
@@ -967,24 +977,16 @@ func (n *ExtNLRI) Decode(pkt []byte) error {
 	}
 	n.PathId = binary.BigEndian.Uint32(pkt[:4])
 
-	n.IPPrefix = IPPrefix{}
+	n.IPPrefix = &IPPrefix{}
 	err := n.IPPrefix.Decode(pkt[4:])
 	return err
-}
-
-func (n *ExtNLRI) GetPrefix() *IPPrefix {
-	return &n.IPPrefix
-}
-
-func (n *ExtNLRI) GetPathId() uint32 {
-	return n.PathId
 }
 
 func (n *ExtNLRI) String() string {
 	return "{" + strconv.Itoa(int(n.PathId)) + " " + n.Prefix.String() + "/" + strconv.Itoa(int(n.Length)) + "}"
 }
 
-func NewExtNLRI(pathId uint32, prefix IPPrefix) *ExtNLRI {
+func NewExtNLRI(pathId uint32, prefix *IPPrefix) *ExtNLRI {
 	return &ExtNLRI{
 		IPPrefix: prefix,
 		PathId:   pathId,
