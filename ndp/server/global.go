@@ -20,20 +20,11 @@
 // |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
 // |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
 //
-package main
+package server
 
 import (
-	"fmt"
-	_ "utils/asicdClient"
 	"utils/dmnBase"
 )
 
-func main() {
-	// @TODO: read plugin from json file
-	plugin := "Flexswitch"
-	fmt.Println("NDP: initializing neighbor discovery base information")
-	//status := ndpDmnBase.InitPlugin("ndpd", "NDP", plugin)
-	switchPlugin := dmnBase.InitPlugin("ndpd", "NDP", plugin)
-	//ndpDmnBase.Logger.Info(fmt.Sprintln("Init done and status is", status))
-	switchPlugin.Log(dmnBase.INFO, "Init done")
+type NDPServer struct {
 }
