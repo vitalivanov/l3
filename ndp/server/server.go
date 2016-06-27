@@ -26,11 +26,6 @@ import (
 	"utils/dmnBase"
 )
 
-func (svr *NDPServer) Connect() {
-	// This is connect to underneath servers, like asicd client on flexswitch and ovsdb on ops
-	svr.switchPlugin.ConnectToServers()
-}
-
 func (svr *NDPServer) InitGlobalDS() {
 
 }
@@ -39,9 +34,8 @@ func (svr *NDPServer) DeInitGlobalDS() {
 
 }
 
-func NDPNewServer(sPlugin dmnBase.SwitchIntf) *NDPServer {
+func NDPNewServer(baseObj *dmnBase.FSDaemon) *NDPServer {
 	svr := &NDPServer{}
-	svr.switchPlugin = sPlugin
-	svr.Connect()
+	svr.DmnBase = baseObj
 	return svr
 }

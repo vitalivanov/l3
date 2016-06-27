@@ -23,16 +23,56 @@
 package flexswitch
 
 import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"git.apache.org/thrift.git/lib/go/thrift"
+	"io/ioutil"
 	"ndpd"
+	"strconv"
+	"utils/logging"
 )
 
-func NewConfigHandler() *NDPDServicesProcessor {
+//func NewConfigHandler() *NDPDServicesProcessor {
+func NewConfigHandler() *ConfigHandler {
 	handler := &ConfigHandler{}
-	processor := ndpd.NewNDPDServicesProcessor(handler)
-	return processor
+	//	processor := ndpd.NewNDPDServicesProcessor(handler)
+	//	return processor
+	return handler
 }
 
-/*
+func NewConfigPlugin(handler *ConfigHandler, fileName string, logger *logging.Writer) *ConfigPlugin {
+	l := &ConfigPlugin{handler, fileName, logger}
+	return l
+}
+
+func (cfg *ConfigPlugin) Start() error {
+	fileName := cfg.fileName + "clients.json"
+
+	clientJson, err := getClient(fileName, "ndpd")
+	if err != nil || clientJson == nil {
+		return err
+	}
+	cfg.logger.Info(fmt.Sprintln("Got Client Info for", clientJson.Name, " port", clientJson.Port))
+	// create processor, transport and protocol for server
+	processor := ndpd.NewNDPDServicesProcessor(cfg.handler)
+	transportFactory := thrift.NewTBufferedTransportFactory(8192)
+	protocolFactory := thrift.NewTBinaryProtocolFactoryDefault()
+	transport, err := thrift.NewTServerSocket("localhost:" + strconv.Itoa(clientJson.Port))
+	if err != nil {
+		cfg.logger.Info(fmt.Sprintln("StartServer: NewTServerSocket failed with error:", err))
+		return err
+	}
+	server := thrift.NewTSimpleServer4(processor, transport, transportFactory, protocolFactory)
+	err = server.Serve()
+	if err != nil {
+		cfg.logger.Err(fmt.Sprintln("Failed to start the listener, err:", err))
+		return err
+	}
+	return nil
+
+}
+
 func getClient(fileName string, process string) (*ClientJson, error) {
 	var allClients []ClientJson
 
@@ -48,44 +88,3 @@ func getClient(fileName string, process string) (*ClientJson, error) {
 	}
 	return nil, errors.New("couldn't find " + process + " port info")
 }
-
-// Client RPC Listener code..
-func (dmn *FSDaemon) StartListener(processor interface{}) error {
-	fileName := dmn.FSBaseDmn.ParamsDir + CLIENTS_FILE_NAME
-
-	clientJson, err := getClient(fileName, dmn.FSBaseDmn.DmnName)
-	if err != nil || clientJson == nil {
-		return err
-	}
-	dmn.FSBaseDmn.Logger.Info(fmt.Sprintln("Got Client Info for", clientJson.Name, " port", clientJson.Port))
-	// create processor, transport and protocol for server
-	//processor := lldpd.NewLLDPDServicesProcessor(handler)
-	transportFactory := thrift.NewTBufferedTransportFactory(8192)
-	protocolFactory := thrift.NewTBinaryProtocolFactoryDefault()
-	transport, err := thrift.NewTServerSocket("localhost:" + strconv.Itoa(clientJson.Port))
-	if err != nil {
-		dmn.FSBaseDmn.Logger.Info(fmt.Sprintln("StartServer: NewTServerSocket failed with error:", err))
-		return err
-	}
-	server := thrift.NewTSimpleServer4(processor, transport, transportFactory, protocolFactory)
-	err = server.Serve()
-	if err != nil {
-		dmn.FSBaseDmn.Logger.Err(fmt.Sprintln("Failed to start the listener, err:", err))
-		return err
-	}
-	return nil
-}
-
-
-func CreateNDGlobal(config *NDGlobal) (bool, err) {
-	return true, nil
-}
-
-func UpdateNDGlobal(orgCfg *NDGlobal, newCfg *NDGlobal, attrset []bool, op []*ndpd.PatchOpInfo) (bool, error) {
-	return true, nil
-}
-
-func DeleteNDGlobal(config *NDGlobal) (bool, error) {
-	return true, nil
-}
-*/

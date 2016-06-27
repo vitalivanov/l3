@@ -24,6 +24,7 @@ package main
 
 import (
 	"fmt"
+	"l3/ndp/flexswitch"
 	"l3/ndp/server"
 	_ "utils/asicdClient"
 	"utils/dmnBase"
@@ -42,20 +43,25 @@ func main() {
 	 *   5) Start ClientHdl
 	 */
 	// Step 1
-	switchPlugin := dmnBase.InitPlugin("ndpd", "NDP", plugin)
-	switchPlugin.Log(dmnBase.INFO, "Init done")
+	var ndpBase dmnBase.FSDaemon
+	status := ndpBase.Init("ndpd", "NDP")
+	if status == false {
+		fmt.Println("Init failed")
+		return
+	}
+	ndpBase.Logger.Info(fmt.Sprintln("Init done"))
 	// Step 2
-	_ = server.NDPNewServer(switchPlugin)
-	// Step 4
-	switchPlugin.StartKeepAlive()
-	// Step 5
-	//cfgHandler := flexswitch.NewConfigHandler()
-	/*
-		processor := flexswitch.NewConfigHandler()
-		err := ndpSvr.switchPlugin.StartListener(processor)
-		if err != nil {
-			ndpSvr.switchPlugin.Log(dmnBase.ERR, fmt.Sprintln("failed to start listener, Error:", err))
-			return
-		}
-	*/
+	ndpServer := server.NDPNewServer(&ndpBase)
+	switch plugin {
+	case "OvsDB":
+
+	default:
+		lPlugin := flexswitch.NewConfigPlugin(flexswitch.NewConfigHandler(),
+			ndpServer.DmnBase.FSBaseDmn.ParamsDir, ndpServer.DmnBase.FSBaseDmn.Logger)
+		// Step 3
+		// Step 4
+		ndpServer.DmnBase.StartKeepAlive()
+		// Step 5
+		lPlugin.Start()
+	}
 }

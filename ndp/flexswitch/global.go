@@ -22,5 +22,20 @@
 //
 package flexswitch
 
+import (
+	"utils/logging"
+)
+
+type ConfigPlugin struct {
+	handler  *ConfigHandler
+	fileName string
+	logger   *logging.Writer
+}
+
+type ClientJson struct {
+	Name string `json:Name`
+	Port int    `json:Port`
+}
+
 type ConfigHandler struct {
 }
