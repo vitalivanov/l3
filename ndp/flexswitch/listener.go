@@ -20,14 +20,20 @@
 // |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
 // |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
 //
-package server
+package flexswitch
 
 import (
-	"utils/dmnBase"
-	"utils/logging"
+	"ndpd"
 )
 
-type NDPServer struct {
-	DmnBase *dmnBase.FSDaemon
-	logger  *logging.Writer
+func (h *ConfigHandler) CreateNDGlobal(config *ndpd.NDGlobal) (bool, error) {
+	return true, nil
+}
+
+func (h *ConfigHandler) UpdateNDGlobal(orgCfg *ndpd.NDGlobal, newCfg *ndpd.NDGlobal, attrset []bool, op []*ndpd.PatchOpInfo) (bool, error) {
+	return true, nil
+}
+
+func (h *ConfigHandler) DeleteNDGlobal(config *ndpd.NDGlobal) (bool, error) {
+	return true, nil
 }

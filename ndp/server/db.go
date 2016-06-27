@@ -22,12 +22,6 @@
 //
 package server
 
-import (
-	"utils/dmnBase"
-	"utils/logging"
-)
-
-type NDPServer struct {
-	DmnBase *dmnBase.FSDaemon
-	logger  *logging.Writer
+func (svr *NDPServer) ReadDB() error {
+	return nil
 }

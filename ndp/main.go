@@ -38,9 +38,10 @@ func main() {
 	/* Steps before starting client
 	 *   1) Init Switch Plugin
 	 *   2) Create new ndp server
-	 *   3) Start the server
-	 *   4) Start keepAlive
-	 *   5) Start ClientHdl
+	 *   3) Connect to Clients/Ovsdb
+	 *   4) Start the server
+	 *   5) Start keepAlive
+	 *   6) Start ClientHdl
 	 */
 	// Step 1
 	var ndpBase dmnBase.FSDaemon
@@ -58,10 +59,14 @@ func main() {
 	default:
 		lPlugin := flexswitch.NewConfigPlugin(flexswitch.NewConfigHandler(),
 			ndpServer.DmnBase.FSBaseDmn.ParamsDir, ndpServer.DmnBase.FSBaseDmn.Logger)
+
 		// Step 3
+		ndpServer.DmnBase.ConnectToServers()
 		// Step 4
-		ndpServer.DmnBase.StartKeepAlive()
+		ndpServer.NDPStartServer()
 		// Step 5
+		ndpServer.DmnBase.StartKeepAlive()
+		// Step 6
 		lPlugin.Start()
 	}
 }

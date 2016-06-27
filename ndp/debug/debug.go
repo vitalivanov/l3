@@ -20,14 +20,14 @@
 // |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
 // |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
 //
-package server
+package debug
 
 import (
-	"utils/dmnBase"
 	"utils/logging"
 )
 
-type NDPServer struct {
-	DmnBase *dmnBase.FSDaemon
-	logger  *logging.Writer
+var Logger *logging.Writer
+
+func NDPSetLogger(log *logging.Writer) {
+	Logger = log
 }
