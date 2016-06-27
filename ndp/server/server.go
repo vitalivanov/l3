@@ -21,3 +21,27 @@
 // |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
 //
 package server
+
+import (
+	"utils/dmnBase"
+)
+
+func (svr *NDPServer) Connect() {
+	// This is connect to underneath servers, like asicd client on flexswitch and ovsdb on ops
+	svr.switchPlugin.ConnectToServers()
+}
+
+func (svr *NDPServer) InitGlobalDS() {
+
+}
+
+func (svr *NDPServer) DeInitGlobalDS() {
+
+}
+
+func NDPNewServer(sPlugin dmnBase.SwitchIntf) *NDPServer {
+	svr := &NDPServer{}
+	svr.switchPlugin = sPlugin
+	svr.Connect()
+	return svr
+}

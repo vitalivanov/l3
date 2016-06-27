@@ -24,6 +24,7 @@ package main
 
 import (
 	"fmt"
+	"l3/ndp/server"
 	_ "utils/asicdClient"
 	"utils/dmnBase"
 )
@@ -32,8 +33,29 @@ func main() {
 	// @TODO: read plugin from json file
 	plugin := "Flexswitch"
 	fmt.Println("NDP: initializing neighbor discovery base information")
-	//status := ndpDmnBase.InitPlugin("ndpd", "NDP", plugin)
+
+	/* Steps before starting client
+	 *   1) Init Switch Plugin
+	 *   2) Create new ndp server
+	 *   3) Start the server
+	 *   4) Start keepAlive
+	 *   5) Start ClientHdl
+	 */
+	// Step 1
 	switchPlugin := dmnBase.InitPlugin("ndpd", "NDP", plugin)
-	//ndpDmnBase.Logger.Info(fmt.Sprintln("Init done and status is", status))
 	switchPlugin.Log(dmnBase.INFO, "Init done")
+	// Step 2
+	_ = server.NDPNewServer(switchPlugin)
+	// Step 4
+	switchPlugin.StartKeepAlive()
+	// Step 5
+	//cfgHandler := flexswitch.NewConfigHandler()
+	/*
+		processor := flexswitch.NewConfigHandler()
+		err := ndpSvr.switchPlugin.StartListener(processor)
+		if err != nil {
+			ndpSvr.switchPlugin.Log(dmnBase.ERR, fmt.Sprintln("failed to start listener, Error:", err))
+			return
+		}
+	*/
 }

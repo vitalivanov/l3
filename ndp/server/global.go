@@ -27,4 +27,5 @@ import (
 )
 
 type NDPServer struct {
+	switchPlugin dmnBase.SwitchIntf // This is used mainly for communicating with chip and other dmn's on system
 }
