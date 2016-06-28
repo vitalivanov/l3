@@ -46,36 +46,21 @@ package rx
 */
 import (
 	"errors"
-	"fmt"
+	_ "fmt"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	_ "github.com/google/gopacket/pcap"
-	"l3/ndp/debug"
+	_ "l3/ndp/debug"
 	_ "net"
 	_ "time"
 )
 
-func ProcessNdSolicitationPkt(pkt gopacket.Packet) error {
-	ethLayer := pkt.Layer(layers.LayerTypeEthernet)
-	if ethLayer == nil {
-		return errors.New("Invalid eth layer")
-	}
-	eth := ethLayer.(*layers.Ethernet)
-	// copy src mac and dst mac
-	debug.Logger.Info(fmt.Sprintln("ethernet layer is", eth))
-
+func GetNdSolicitationHeader(pkt gopacket.Packet, ndHeader *layers.ICMPv6) error {
 	ipLayer := pkt.Layer(layers.LayerTypeIPv6)
 	if ipLayer == nil {
 		return errors.New("Invalid IPv6 layer")
 	}
-
-	ipHdr := ipLayer.(*layers.IPv6)
-	debug.Logger.Info(fmt.Sprintln("ip header is", ipHdr))
-
 	ipPayload := ipLayer.LayerPayload()
-	//DecodeNdSolicitation(ipPayload)
-	var icmpv6 layers.ICMPv6
-	icmpv6.DecodeFromBytes(ipPayload, nil)
-
+	ndHeader.DecodeFromBytes(ipPayload, nil)
 	return nil
 }
