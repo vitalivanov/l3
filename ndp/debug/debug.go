@@ -20,53 +20,14 @@
 // |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
 // |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
 //
-package main
+package debug
 
 import (
-	"fmt"
-	"l3/ndp/flexswitch"
-	"l3/ndp/server"
-	_ "utils/asicdClient"
-	"utils/dmnBase"
+	"utils/logging"
 )
 
-func main() {
-	// @TODO: read plugin from json file
-	plugin := "Flexswitch"
-	fmt.Println("NDP: initializing neighbor discovery base information")
+var Logger *logging.Writer
 
-	/* Steps before starting client
-	 *   1) Init Switch Plugin
-	 *   2) Create new ndp server
-	 *   3) Connect to Clients/Ovsdb
-	 *   4) Start the server
-	 *   5) Start keepAlive
-	 *   6) Start ClientHdl
-	 */
-	// Step 1
-	var ndpBase dmnBase.FSDaemon
-	status := ndpBase.Init("ndpd", "NDP")
-	if status == false {
-		fmt.Println("Init failed")
-		return
-	}
-	ndpBase.Logger.Info(fmt.Sprintln("Init done"))
-	// Step 2
-	ndpServer := server.NDPNewServer(&ndpBase)
-	switch plugin {
-	case "OvsDB":
-
-	default:
-		lPlugin := flexswitch.NewConfigPlugin(flexswitch.NewConfigHandler(),
-			ndpServer.DmnBase.FSBaseDmn.ParamsDir, ndpServer.DmnBase.FSBaseDmn.Logger)
-
-		// Step 3
-		ndpServer.DmnBase.ConnectToServers()
-		// Step 4
-		ndpServer.NDPStartServer()
-		// Step 5
-		ndpServer.DmnBase.StartKeepAlive()
-		// Step 6
-		lPlugin.Start()
-	}
+func NDPSetLogger(log *logging.Writer) {
+	Logger = log
 }
