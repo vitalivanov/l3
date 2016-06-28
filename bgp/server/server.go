@@ -45,6 +45,12 @@ import (
 	"utils/statedbclient"
 )
 
+type GlobalUpdate struct {
+	OldConfig config.GlobalConfig
+	NewConfig config.GlobalConfig
+	AttrSet   []bool
+}
+
 type PeerUpdate struct {
 	OldPeer config.NeighborConfig
 	NewPeer config.NeighborConfig
@@ -82,7 +88,7 @@ type BGPServer struct {
 	listener         *net.TCPListener
 	ifaceMgr         *utils.InterfaceMgr
 	BgpConfig        config.Bgp
-	GlobalConfigCh   chan config.GlobalConfig
+	GlobalConfigCh   chan GlobalUpdate
 	AddPeerCh        chan PeerUpdate
 	RemPeerCh        chan string
 	AddPeerGroupCh   chan PeerGroupUpdate
@@ -125,7 +131,7 @@ func NewBGPServer(logger *logging.Writer, policyManager *bgppolicy.BGPPolicyMana
 	bgpServer.ifaceMgr = utils.NewInterfaceMgr(logger)
 	bgpServer.BgpConfig = config.Bgp{}
 	bgpServer.GlobalCfgDone = false
-	bgpServer.GlobalConfigCh = make(chan config.GlobalConfig)
+	bgpServer.GlobalConfigCh = make(chan GlobalUpdate)
 	bgpServer.AddPeerCh = make(chan PeerUpdate)
 	bgpServer.RemPeerCh = make(chan string)
 	bgpServer.AddPeerGroupCh = make(chan PeerGroupUpdate)
@@ -168,6 +174,7 @@ func NewBGPServer(logger *logging.Writer, policyManager *bgppolicy.BGPPolicyMana
 	locRibPE.SetActionFuncs(bgpServer.actionFuncMap)
 	locRibPE.SetTraverseFuncs(bgpServer.TraverseAndApplyBGPRib, bgpServer.TraverseAndReverseBGPRib)
 	bgpServer.locRibPE = locRibPE
+	bgpServer.policyManager.AddPolicyEngine(bgpServer.locRibPE)
 
 	return bgpServer
 }
@@ -756,6 +763,7 @@ func (server *BGPServer) UpdatePeerGroupInPeers(groupName string, peerGroup *con
 		peer.Init()
 	}
 }
+
 func (server *BGPServer) SetupRedistribution(gConf config.GlobalConfig) {
 	server.logger.Info("SetUpRedistribution")
 	if gConf.Redistribution == nil || len(gConf.Redistribution) == 0 {
@@ -779,6 +787,7 @@ func (server *BGPServer) SetupRedistribution(gConf config.GlobalConfig) {
 		server.routeMgr.ApplyPolicy("BGP", gConf.Redistribution[i].Policy, "Redistribution", conditions)
 	}
 }
+
 func (server *BGPServer) copyGlobalConf(gConf config.GlobalConfig) {
 	server.BgpConfig.Global.Config.AS = gConf.AS
 	server.BgpConfig.Global.Config.RouterId = gConf.RouterId
@@ -857,7 +866,7 @@ func (server *BGPServer) constructBGPGlobalState(gConf *config.GlobalConfig) {
 func (server *BGPServer) listenChannelUpdates() {
 	for {
 		select {
-		case gConf := <-server.GlobalConfigCh:
+		case globalUpdate := <-server.GlobalConfigCh:
 			for peerIP, peer := range server.PeerMap {
 				server.logger.Info(fmt.Sprintf("Cleanup peer %s", peerIP))
 				peer.Cleanup()
@@ -866,6 +875,7 @@ func (server *BGPServer) listenChannelUpdates() {
 				"will get cleaned up"))
 			runtime.Gosched()
 
+			gConf := globalUpdate.NewConfig
 			packet.SetNextHopPathAttrs(server.ConnRoutesPath.PathAttrs, gConf.RouterId)
 			server.RemoveRoutesFromAllNeighbor()
 			server.copyGlobalConf(gConf)
@@ -1144,7 +1154,8 @@ func (server *BGPServer) listenChannelUpdates() {
 }
 
 func (server *BGPServer) StartServer() {
-	gConf := <-server.GlobalConfigCh
+	globalUpdate := <-server.GlobalConfigCh
+	gConf := globalUpdate.NewConfig
 	server.GlobalCfgDone = true
 	server.logger.Info(fmt.Sprintln("Recieved global conf:", gConf))
 	server.BgpConfig.Global.Config = gConf

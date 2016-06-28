@@ -108,7 +108,7 @@ func (h *BGPHandler) handleGlobalConfig() error {
 			h.logger.Err(fmt.Sprintln("handleGlobalConfig - Failed to convert Model object BGP Global, error:", err))
 			return err
 		}
-		h.server.GlobalConfigCh <- gConf
+		h.server.GlobalConfigCh <- server.GlobalUpdate{config.GlobalConfig{}, gConf, make([]bool, 0)}
 	}
 	return nil
 }
@@ -401,16 +401,19 @@ func (h *BGPHandler) convertStrIPToNetIP(ip string) net.IP {
 	return netIP
 }
 
-func (h *BGPHandler) SendBGPGlobal(bgpGlobal *bgpd.BGPGlobal) (bool, error) {
+func (h *BGPHandler) validateBGPGlobal(bgpGlobal *bgpd.BGPGlobal) (gConf config.GlobalConfig, err error) {
+	if bgpGlobal == nil {
+		return gConf, err
+	}
+
 	ip := h.convertStrIPToNetIP(bgpGlobal.RouterId)
-	var err error = nil
 	if ip == nil {
 		err = errors.New(fmt.Sprintf("BGPGlobal: IP %s is not valid", bgpGlobal.RouterId))
 		h.logger.Info(fmt.Sprintln("SendBGPGlobal: IP", bgpGlobal.RouterId, "is not valid"))
-		return false, err
+		return gConf, err
 	}
 
-	gConf := config.GlobalConfig{
+	gConf = config.GlobalConfig{
 		AS:                  uint32(bgpGlobal.ASNum),
 		RouterId:            ip,
 		UseMultiplePaths:    bgpGlobal.UseMultiplePaths,
@@ -425,13 +428,27 @@ func (h *BGPHandler) SendBGPGlobal(bgpGlobal *bgpd.BGPGlobal) (bool, error) {
 			gConf.Redistribution = append(gConf.Redistribution, redistribution)
 		}
 	}
-	h.server.GlobalConfigCh <- gConf
+	return gConf, nil
+}
+
+func (h *BGPHandler) SendBGPGlobal(oldConfig *bgpd.BGPGlobal, newConfig *bgpd.BGPGlobal, attrSet []bool) (bool, error) {
+	oldGlobal, err := h.validateBGPGlobal(oldConfig)
+	if err != nil {
+		return false, err
+	}
+
+	newGlobal, err := h.validateBGPGlobal(newConfig)
+	if err != nil {
+		return false, err
+	}
+
+	h.server.GlobalConfigCh <- server.GlobalUpdate{oldGlobal, newGlobal, attrSet}
 	return true, err
 }
 
 func (h *BGPHandler) CreateBGPGlobal(bgpGlobal *bgpd.BGPGlobal) (bool, error) {
 	h.logger.Info(fmt.Sprintln("Create global config attrs:", bgpGlobal))
-	return h.SendBGPGlobal(bgpGlobal)
+	return h.SendBGPGlobal(nil, bgpGlobal, make([]bool, 0))
 }
 
 func (h *BGPHandler) GetBGPGlobalState(rtrId string) (*bgpd.BGPGlobalState, error) {
@@ -463,7 +480,7 @@ func (h *BGPHandler) GetBulkBGPGlobalState(index bgpd.Int,
 func (h *BGPHandler) UpdateBGPGlobal(origG *bgpd.BGPGlobal, updatedG *bgpd.BGPGlobal,
 	attrSet []bool, op []*bgpd.PatchOpInfo) (bool, error) {
 	h.logger.Info(fmt.Sprintln("Update global config attrs:", updatedG, "old config:", origG))
-	return h.SendBGPGlobal(updatedG)
+	return h.SendBGPGlobal(origG, updatedG, attrSet)
 }
 
 func (h *BGPHandler) DeleteBGPGlobal(bgpGlobal *bgpd.BGPGlobal) (bool, error) {
