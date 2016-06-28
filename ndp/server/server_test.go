@@ -20,29 +20,24 @@
 // |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
 // |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
 //
-package flexswitch
+package server
 
 import (
-	"asicdServices"
-	nanomsg "github.com/op/go-nanomsg"
-	"utils/logging"
+	"testing"
 )
 
-type ConfigPlugin struct {
-	handler  *ConfigHandler
-	fileName string
-	logger   *logging.Writer
-}
+// Test ND Solicitation message Decoder
+func TestInvalidInitPortInfo(t *testing.T) {
+	svr := &NDPServer{}
+	svr.InitGlobalDS()
+	svr.InitSystemPortInfo(nil)
 
-type ClientJson struct {
-	Name string `json:Name`
-	Port int    `json:Port`
-}
+	if len(svr.GblInfo) > 0 {
+		t.Error("There should not be any elements in the system port map", len(svr.GblInfo))
+	}
+	svr.DeInitGlobalDS()
 
-type ConfigHandler struct {
-}
-
-type AsicPlugin struct {
-	asicdClient    *asicdServices.ASICDServicesClient
-	asicdSubSocket *nanomsg.SubSocket
+	if svr.GblInfo != nil {
+		t.Error("De-Init for ndp global info didn't happen")
+	}
 }

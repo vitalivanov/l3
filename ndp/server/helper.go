@@ -20,29 +20,16 @@
 // |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
 // |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
 //
-package flexswitch
+package server
 
 import (
-	"asicdServices"
-	nanomsg "github.com/op/go-nanomsg"
-	"utils/logging"
+	"l3/ndp/config"
 )
 
-type ConfigPlugin struct {
-	handler  *ConfigHandler
-	fileName string
-	logger   *logging.Writer
+func (gblInfo *NDPGlobalInfo) InitRuntimePortInfo(portConf *config.PortInfo) {
+	gblInfo.Port = *portConf
 }
 
-type ClientJson struct {
-	Name string `json:Name`
-	Port int    `json:Port`
-}
-
-type ConfigHandler struct {
-}
-
-type AsicPlugin struct {
-	asicdClient    *asicdServices.ASICDServicesClient
-	asicdSubSocket *nanomsg.SubSocket
+func (gblInfo *NDPGlobalInfo) InitRuntimeIPInfo(ipConf *config.IPv6IntfInfo) {
+	gblInfo.IP = *ipConf
 }

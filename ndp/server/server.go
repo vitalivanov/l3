@@ -24,24 +24,15 @@ package server
 
 import (
 	"fmt"
+	"l3/ndp/config"
 	"l3/ndp/debug"
+	"l3/ndp/flexswitch"
 	_ "models/objects"
 	"os"
 	"os/signal"
-	_ "runtime/pprof"
-	_ "strconv"
 	"syscall"
-	_ "time"
 	"utils/dmnBase"
 )
-
-func (svr *NDPServer) InitGlobalDS() {
-
-}
-
-func (svr *NDPServer) DeInitGlobalDS() {
-
-}
 
 func NDPNewServer(baseObj *dmnBase.FSDaemon) *NDPServer {
 	svr := &NDPServer{}
@@ -81,6 +72,47 @@ func (svr *NDPServer) OSSignalHandle() {
 	go svr.SignalHandler(sigChannel)
 }
 
+func (svr *NDPServer) InitGlobalDS() {
+	svr.GblInfo = make(map[string]NDPGlobalInfo, NDP_SYSTEM_PORT_MAP_CAPACITY)
+}
+
+func (svr *NDPServer) DeInitGlobalDS() {
+	svr.GblInfo = nil
+}
+
+func (svr *NDPServer) InitSystemPortInfo(portInfo *config.PortInfo) {
+	if portInfo == nil {
+		return
+	}
+	gblInfo, _ := svr.GblInfo[portInfo.IntfRef]
+	gblInfo.InitRuntimePortInfo(portInfo)
+	svr.GblInfo[portInfo.IntfRef] = gblInfo
+}
+
+func (svr *NDPServer) InitSystemIPIntf(ipInfo *config.IPv6IntfInfo) {
+	if ipInfo == nil {
+		return
+	}
+	gblInfo, _ := svr.GblInfo[ipInfo.IntfRef]
+	gblInfo.InitRuntimeIPInfo(ipInfo)
+	svr.GblInfo[ipInfo.IntfRef] = gblInfo
+}
+
+// @TODO: Once we have the changes for modularity from FS Base Daemon we will use that to change this code
+func (svr *NDPServer) ReadFromClient() {
+	portStates := flexswitch.GetPorts(svr.DmnBase.Asicdclnt.ClientHdl, svr.DmnBase.AsicdSubSocket)
+	for _, port := range portStates {
+		svr.InitSystemPortInfo(port)
+	}
+
+	//vlans := flexswitch.GetVlans(svr.DmnBase.Asicdclnt.ClientHdl, svr.DmnBase.AsicdSubSocket)
+
+	ipIntfs := flexswitch.GetIPIntf(svr.DmnBase.Asicdclnt.ClientHdl, svr.DmnBase.AsicdSubSocket)
+	for _, ipIntf := range ipIntfs {
+		svr.InitSystemIPIntf(ipIntf)
+	}
+}
+
 /*  ndp server:
  * 1) OS Signal Handler
  * 2) Read from DB and close DB
@@ -94,4 +126,6 @@ func (svr *NDPServer) NDPStartServer() {
 	svr.ReadDB()
 	// @TODO: Base class should be interface where the call is agnostic to the server
 	svr.DmnBase.InitSubscribers(make([]string, 0))
+	svr.InitGlobalDS()
+	svr.ReadFromClient()
 }

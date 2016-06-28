@@ -23,11 +23,27 @@
 package server
 
 import (
+	"l3/ndp/config"
 	"utils/dmnBase"
 	"utils/logging"
 )
 
+type NDPGlobalInfo struct {
+	// System Port
+	Port config.PortInfo
+
+	// Port IP
+	IP config.IPv6IntfInfo
+}
+
 type NDPServer struct {
 	DmnBase *dmnBase.FSDaemon
 	logger  *logging.Writer
+
+	// System Ports information, key is IntfRef
+	GblInfo map[string]NDPGlobalInfo
 }
+
+const (
+	NDP_SYSTEM_PORT_MAP_CAPACITY = 50
+)

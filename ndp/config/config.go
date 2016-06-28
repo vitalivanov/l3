@@ -7,11 +7,11 @@
 //
 //    http://www.apache.org/licenses/LICENSE-2.0
 //
-//	 Unless required by applicable law or agreed to in writing, software
-//	 distributed under the License is distributed on an "AS IS" BASIS,
-//	 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-//	 See the License for the specific language governing permissions and
-//	 limitations under the License.
+//       Unless required by applicable law or agreed to in writing, software
+//       distributed under the License is distributed on an "AS IS" BASIS,
+//       WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//       See the License for the specific language governing permissions and
+//       limitations under the License.
 //
 // _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
 // |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
@@ -20,29 +20,26 @@
 // |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
 // |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
 //
-package flexswitch
 
-import (
-	"asicdServices"
-	nanomsg "github.com/op/go-nanomsg"
-	"utils/logging"
-)
+package config
 
-type ConfigPlugin struct {
-	handler  *ConfigHandler
-	fileName string
-	logger   *logging.Writer
+type PortInfo struct {
+	IntfRef     string
+	IfIndex     int32
+	Name        string
+	OperState   string
+	MacAddr     string
+	Description string
 }
 
-type ClientJson struct {
-	Name string `json:Name`
-	Port int    `json:Port`
+type PortState struct {
+	IfIndex int32
+	IfState string
 }
 
-type ConfigHandler struct {
-}
-
-type AsicPlugin struct {
-	asicdClient    *asicdServices.ASICDServicesClient
-	asicdSubSocket *nanomsg.SubSocket
+type IPv6IntfInfo struct {
+	IntfRef   string
+	IfIndex   int32
+	IpAddr    string
+	OperState string
 }
