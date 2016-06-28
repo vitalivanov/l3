@@ -7,11 +7,11 @@
 //
 //    http://www.apache.org/licenses/LICENSE-2.0
 //
-//	 Unless required by applicable law or agreed to in writing, software
-//	 distributed under the License is distributed on an "AS IS" BASIS,
-//	 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-//	 See the License for the specific language governing permissions and
-//	 limitations under the License.
+//       Unless required by applicable law or agreed to in writing, software
+//       distributed under the License is distributed on an "AS IS" BASIS,
+//       WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//       See the License for the specific language governing permissions and
+//       limitations under the License.
 //
 // _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
 // |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
@@ -20,27 +20,19 @@
 // |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
 // |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
 //
-package server
 
-import (
-	"l3/ndp/config"
-	"utils/dmnBase"
-	"utils/logging"
-)
+package config
 
-type NDPGlobalInfo struct {
-	// System Port
-	Port config.PortInfo
+type PortInfo struct {
+	IntfRef     string
+	IfIndex     int32
+	Name        string
+	OperState   string
+	MacAddr     string
+	Description string
 }
 
-type NDPServer struct {
-	DmnBase *dmnBase.FSDaemon
-	logger  *logging.Writer
-
-	// System Ports information, key is IntfRef
-	SystemPorts map[string]NDPGlobalInfo
+type PortState struct {
+	IfIndex int32
+	IfState string
 }
-
-const (
-	NDP_SYSTEM_PORT_MAP_CAPACITY = 50
-)

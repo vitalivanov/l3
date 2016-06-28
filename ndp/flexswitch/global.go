@@ -23,6 +23,8 @@
 package flexswitch
 
 import (
+	"asicdServices"
+	nanomsg "github.com/op/go-nanomsg"
 	"utils/logging"
 )
 
@@ -38,4 +40,9 @@ type ClientJson struct {
 }
 
 type ConfigHandler struct {
+}
+
+type AsicPlugin struct {
+	asicdClient    *asicdServices.ASICDServicesClient
+	asicdSubSocket *nanomsg.SubSocket
 }
