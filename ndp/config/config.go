@@ -23,7 +23,18 @@
 
 package config
 
+import (
+	"github.com/google/gopacket/pcap"
+)
+
+type PcapBase struct {
+	// Pcap Handler for Each Port
+	PcapHandle *pcap.Handle
+	PcapCtrl   chan bool
+}
+
 type PortInfo struct {
+	PcapBase
 	IntfRef     string
 	IfIndex     int32
 	Name        string
@@ -38,6 +49,7 @@ type PortState struct {
 }
 
 type IPv6IntfInfo struct {
+	PcapBase
 	IntfRef   string
 	IfIndex   int32
 	IpAddr    string

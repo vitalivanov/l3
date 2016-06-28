@@ -21,15 +21,3 @@
 // |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
 //
 package server
-
-import (
-	"l3/ndp/config"
-)
-
-func (gblInfo *NDPGlobalInfo) InitRuntimePortInfo(portConf *config.PortInfo) {
-	gblInfo.Port = *portConf
-}
-
-func (gblInfo *NDPGlobalInfo) InitRuntimeIPInfo(ipConf *config.IPv6IntfInfo) {
-	gblInfo.IP = *ipConf
-}

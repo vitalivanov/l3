@@ -73,29 +73,29 @@ func (svr *NDPServer) OSSignalHandle() {
 }
 
 func (svr *NDPServer) InitGlobalDS() {
-	svr.GblInfo = make(map[string]NDPGlobalInfo, NDP_SYSTEM_PORT_MAP_CAPACITY)
+	svr.PhyPort = make(map[string]config.PortInfo, NDP_SYSTEM_PORT_MAP_CAPACITY)
+	svr.L3Port = make(map[string]config.IPv6IntfInfo, NDP_SYSTEM_PORT_MAP_CAPACITY)
 }
 
 func (svr *NDPServer) DeInitGlobalDS() {
-	svr.GblInfo = nil
+	svr.PhyPort = nil
+	svr.L3Port = nil
 }
 
 func (svr *NDPServer) InitSystemPortInfo(portInfo *config.PortInfo) {
 	if portInfo == nil {
 		return
 	}
-	gblInfo, _ := svr.GblInfo[portInfo.IntfRef]
-	gblInfo.InitRuntimePortInfo(portInfo)
-	svr.GblInfo[portInfo.IntfRef] = gblInfo
+	svr.PhyPort[portInfo.IntfRef] = *portInfo
+	svr.ndpIntfStateSlice = append(svr.ndpIntfStateSlice, portInfo.IntfRef)
 }
 
 func (svr *NDPServer) InitSystemIPIntf(ipInfo *config.IPv6IntfInfo) {
 	if ipInfo == nil {
 		return
 	}
-	gblInfo, _ := svr.GblInfo[ipInfo.IntfRef]
-	gblInfo.InitRuntimeIPInfo(ipInfo)
-	svr.GblInfo[ipInfo.IntfRef] = gblInfo
+	svr.L3Port[ipInfo.IntfRef] = *ipInfo
+	svr.ndpL3IntfStateSlice = append(svr.ndpL3IntfStateSlice, ipInfo.IntfRef)
 }
 
 // @TODO: Once we have the changes for modularity from FS Base Daemon we will use that to change this code
@@ -110,6 +110,24 @@ func (svr *NDPServer) CollectSystemInformation() {
 	ipIntfs := flexswitch.GetIPIntf(svr.DmnBase.Asicdclnt.ClientHdl, svr.DmnBase.AsicdSubSocket)
 	for _, ipIntf := range ipIntfs {
 		svr.InitSystemIPIntf(ipIntf)
+	}
+}
+
+func (svr *NDPServer) InitPcapHdlrs() {
+	for _, intfRef := range svr.ndpIntfStateSlice {
+		port := svr.PhyPort[intfRef]
+		if port.OperState == NDP_PORT_STATE_UP {
+			// create pcap handler
+			svr.ndpUpIntfStateSlice = append(svr.ndpUpIntfStateSlice, port.IntfRef)
+		}
+	}
+
+	for _, intfRef := range svr.ndpL3IntfStateSlice {
+		l3 := svr.L3Port[intfRef]
+		if l3.OperState == NDP_IP_STATE_UP {
+			// create pcap handler
+			svr.ndpUpL3IntfStateSlice = append(svr.ndpUpL3IntfStateSlice, l3.IntfRef)
+		}
 	}
 }
 
@@ -143,5 +161,6 @@ func (svr *NDPServer) NDPStartServer() {
 	svr.DmnBase.InitSubscribers(make([]string, 0))
 	svr.InitGlobalDS()
 	svr.CollectSystemInformation()
+	svr.InitPcapHdlrs()
 	go svr.EventsListener()
 }

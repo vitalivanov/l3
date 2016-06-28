@@ -32,12 +32,28 @@ func TestInvalidInitPortInfo(t *testing.T) {
 	svr.InitGlobalDS()
 	svr.InitSystemPortInfo(nil)
 
-	if len(svr.GblInfo) > 0 {
-		t.Error("There should not be any elements in the system port map", len(svr.GblInfo))
+	if len(svr.PhyPort) > 0 {
+		t.Error("There should not be any elements in the system port map", len(svr.PhyPort))
 	}
 	svr.DeInitGlobalDS()
 
-	if svr.GblInfo != nil {
-		t.Error("De-Init for ndp global info didn't happen")
+	if svr.PhyPort != nil {
+		t.Error("De-Init for ndp port info didn't happen")
+	}
+}
+
+// Test ND Solicitation message Decoder
+func TestInvalidInitL3Info(t *testing.T) {
+	svr := &NDPServer{}
+	svr.InitGlobalDS()
+	svr.InitSystemIPIntf(nil)
+
+	if len(svr.L3Port) > 0 {
+		t.Error("There should not be any elements in the system ip map", len(svr.L3Port))
+	}
+	svr.DeInitGlobalDS()
+
+	if svr.L3Port != nil {
+		t.Error("De-Init for ndp l3 info didn't happen")
 	}
 }

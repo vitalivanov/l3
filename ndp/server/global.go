@@ -23,25 +23,31 @@
 package server
 
 import (
+	_ "github.com/google/gopacket/pcap"
 	"l3/ndp/config"
 	"utils/dmnBase"
 	"utils/logging"
 )
 
-type NDPGlobalInfo struct {
-	// System Port
-	Port config.PortInfo
-
-	// Port IP
-	IP config.IPv6IntfInfo
-}
+const (
+	NDP_PORT_STATE_UP   = "UP"
+	NDP_PORT_STATE_DOWN = "DOWN"
+	NDP_IP_STATE_UP     = "UP"
+	NDP_IP_STATE_DOWN   = "DOWN"
+)
 
 type NDPServer struct {
 	DmnBase *dmnBase.FSDaemon
 	logger  *logging.Writer
 
 	// System Ports information, key is IntfRef
-	GblInfo map[string]NDPGlobalInfo
+	PhyPort map[string]config.PortInfo
+	L3Port  map[string]config.IPv6IntfInfo
+
+	ndpIntfStateSlice     []string
+	ndpUpIntfStateSlice   []string
+	ndpL3IntfStateSlice   []string
+	ndpUpL3IntfStateSlice []string
 }
 
 const (
