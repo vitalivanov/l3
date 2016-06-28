@@ -91,10 +91,12 @@ func (svr *NDPServer) InitSystemPortInfo(portInfo *config.PortInfo) {
 
 // @TODO: Once we have the changes for modularity from FS Base Daemon we will use that to change this code
 func (svr *NDPServer) ReadFromClient() {
-	portStates := flexswitch.Start(svr.DmnBase.Asicdclnt.ClientHdl, svr.DmnBase.AsicdSubSocket)
+	portStates := flexswitch.GetPorts(svr.DmnBase.Asicdclnt.ClientHdl, svr.DmnBase.AsicdSubSocket)
 	for _, port := range portStates {
 		svr.InitSystemPortInfo(port)
 	}
+
+	//vlans := flexswitch.GetVlans(svr.DmnBase.Asicdclnt.ClientHdl, svr.DmnBase.AsicdSubSocket)
 }
 
 /*  ndp server:
@@ -110,5 +112,6 @@ func (svr *NDPServer) NDPStartServer() {
 	svr.ReadDB()
 	// @TODO: Base class should be interface where the call is agnostic to the server
 	svr.DmnBase.InitSubscribers(make([]string, 0))
+	svr.InitGlobalDS()
 	svr.ReadFromClient()
 }

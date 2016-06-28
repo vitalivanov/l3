@@ -36,7 +36,7 @@ func NewSwitchPlugin(client *asicdServices.ASICDServicesClient, subSock *nanomsg
 }
 
 // @TODO: Need to move this to asicdclient mgr... the library is still missing pieces
-func getPortsStates(p *AsicPlugin) []*config.PortInfo {
+func (p *AsicPlugin) getPortsStates() []*config.PortInfo {
 	debug.Logger.Info("Get Port State List")
 	currMarker := int64(asicdCommonDefs.MIN_SYS_PORTS)
 	more := false
@@ -44,8 +44,7 @@ func getPortsStates(p *AsicPlugin) []*config.PortInfo {
 	count := 10
 	portStates := make([]*config.PortInfo, 0)
 	for {
-		bulkInfo, err := p.asicdClient.GetBulkPortState(
-			asicdServices.Int(currMarker), asicdServices.Int(count))
+		bulkInfo, err := p.asicdClient.GetBulkPortState(asicdServices.Int(currMarker), asicdServices.Int(count))
 		if err != nil {
 			debug.Logger.Err(fmt.Sprintln(": getting bulk port config"+
 				" from asicd failed with reason", err))
@@ -81,8 +80,69 @@ func getPortsStates(p *AsicPlugin) []*config.PortInfo {
 	return portStates
 }
 
+func (p *AsicPlugin) getVlanStates() {
+	debug.Logger.Info("Get Vlans")
+	objCount := 0
+	var currMarker int64
+	more := false
+	count := 10
+	for {
+		bulkInfo, err := p.asicdClient.GetBulkVlanState(asicdServices.Int(currMarker), asicdServices.Int(count))
+		if err != nil {
+			debug.Logger.Err(fmt.Sprintln("getting bulk vlan config",
+				"from asicd failed with reason", err))
+			return
+		}
+		objCount = int(bulkInfo.Count)
+		more = bool(bulkInfo.More)
+		currMarker = int64(bulkInfo.EndIdx)
+		for i := 0; i < objCount; i++ {
+			//svr.VrrpCreateVlanEntry(int(bulkInfo.VlanStateList[i].VlanId),
+			//	bulkInfo.VlanStateList[i].VlanName)
+		}
+		if more == false {
+			break
+		}
+	}
+}
+
+func (p *AsicPlugin) getIPIntf() {
+	debug.Logger.Info("Get IPv6 Interface List")
+	objCount := 0
+	var currMarker int64
+	more := false
+	count := 10
+	for {
+		bulkInfo, err := p.asicdClient.GetBulkIPv6IntfState(asicdServices.Int(currMarker), asicdServices.Int(count))
+		if err != nil {
+			debug.Logger.Err(fmt.Sprintln("getting bulk ipv6 intf config",
+				"from asicd failed with reason", err))
+			return
+		}
+		objCount = int(bulkInfo.Count)
+		more = bool(bulkInfo.More)
+		currMarker = int64(bulkInfo.EndIdx)
+		for i := 0; i < objCount; i++ {
+		}
+		if more == false {
+			break
+		}
+	}
+}
+
 //@TODO: because the FSDaemon is not modular ndp is using arguments for start
-func Start(client *asicdServices.ASICDServicesClient, subSock *nanomsg.SubSocket) []*config.PortInfo {
+func GetPorts(client *asicdServices.ASICDServicesClient, subSock *nanomsg.SubSocket) []*config.PortInfo {
 	asicPlugin := &AsicPlugin{client, subSock}
-	return getPortsStates(asicPlugin)
+	return asicPlugin.getPortsStates()
+}
+
+//@TODO: for futuer if NDP needs stub code is already present
+func GetVlans(client *asicdServices.ASICDServicesClient, subSock *nanomsg.SubSocket) {
+	//asicPlugin := &AsicPlugin{client, subSock}
+	return //asicPlugin.getVlanStates()
+}
+
+func GetIPIntf(client *asicdServices.ASICDServicesClient, subSock *nanomsg.SubSocket) {
+	//asicPlugin := &AsicPlugin{client, subSock}
+	//return asicPlugin.getIPIntf()
 }

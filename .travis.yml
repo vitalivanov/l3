@@ -58,7 +58,7 @@ install:
   - git clone git@github.com:SnapRoute/flexSdk.git $HOME/gopath/src/snaproute/src/flexSdk
   - git clone git@github.com:SnapRoute/infra.git $HOME/gopath/src/snaproute/src/infra
   - git clone git@github.com:SnapRoute/l2.git $HOME/gopath/src/snaproute/src/l2
-  - git clone git@github.com:SnapRoute/models.git $HOME/gopath/src/snaproute/src/models
+  - git clone -b ipv6 git@github.com:SnapRoute/models.git $HOME/gopath/src/snaproute/src/models
   - git clone git@github.com:SnapRoute/utils.git $HOME/gopath/src/snaproute/src/utils
   - git clone git@github.com:SnapRoute/reltools.git $HOME/gopath/src/reltools
   - git clone git@github.com:SnapRoute/thrift.git $HOME/gopath/src/external/src/git.apache.org/thrift.git
