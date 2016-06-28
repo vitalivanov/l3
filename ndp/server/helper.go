@@ -29,3 +29,7 @@ import (
 func (gblInfo *NDPGlobalInfo) InitRuntimePortInfo(portConf *config.PortInfo) {
 	gblInfo.Port = *portConf
 }
+
+func (gblInfo *NDPGlobalInfo) InitRuntimeIPInfo(ipConf *config.IPv6IntfInfo) {
+	gblInfo.IP = *ipConf
+}

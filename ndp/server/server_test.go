@@ -32,10 +32,12 @@ func TestInvalidInitPortInfo(t *testing.T) {
 	svr.InitGlobalDS()
 	svr.InitSystemPortInfo(nil)
 
-	if len(svr.SystemPorts) > 0 {
-		t.Error("There should not be any elements in the system port map", len(svr.SystemPorts))
-	} else {
-		t.Log("Nil pointer check pass for system port state")
+	if len(svr.GblInfo) > 0 {
+		t.Error("There should not be any elements in the system port map", len(svr.GblInfo))
 	}
 	svr.DeInitGlobalDS()
+
+	if svr.GblInfo != nil {
+		t.Error("De-Init for ndp global info didn't happen")
+	}
 }

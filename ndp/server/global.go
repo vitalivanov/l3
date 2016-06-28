@@ -31,6 +31,9 @@ import (
 type NDPGlobalInfo struct {
 	// System Port
 	Port config.PortInfo
+
+	// Port IP
+	IP config.IPv6IntfInfo
 }
 
 type NDPServer struct {
@@ -38,7 +41,7 @@ type NDPServer struct {
 	logger  *logging.Writer
 
 	// System Ports information, key is IntfRef
-	SystemPorts map[string]NDPGlobalInfo
+	GblInfo map[string]NDPGlobalInfo
 }
 
 const (

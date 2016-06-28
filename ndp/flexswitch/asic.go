@@ -106,28 +106,39 @@ func (p *AsicPlugin) getVlanStates() {
 	}
 }
 
-func (p *AsicPlugin) getIPIntf() {
+func (p *AsicPlugin) getIPIntf() []*config.IPv6IntfInfo {
 	debug.Logger.Info("Get IPv6 Interface List")
 	objCount := 0
 	var currMarker int64
 	more := false
 	count := 10
+	ipStates := make([]*config.IPv6IntfInfo, 0)
 	for {
 		bulkInfo, err := p.asicdClient.GetBulkIPv6IntfState(asicdServices.Int(currMarker), asicdServices.Int(count))
 		if err != nil {
 			debug.Logger.Err(fmt.Sprintln("getting bulk ipv6 intf config",
 				"from asicd failed with reason", err))
-			return
+			return nil
 		}
 		objCount = int(bulkInfo.Count)
 		more = bool(bulkInfo.More)
 		currMarker = int64(bulkInfo.EndIdx)
 		for i := 0; i < objCount; i++ {
+			obj := bulkInfo.IPv6IntfStateList[i]
+			ipInfo := &config.IPv6IntfInfo{
+				IntfRef:   obj.IntfRef,
+				IfIndex:   obj.IfIndex,
+				OperState: obj.OperState,
+				IpAddr:    obj.IpAddr,
+			}
+			ipStates = append(ipStates, ipInfo)
 		}
 		if more == false {
 			break
 		}
 	}
+	debug.Logger.Info("Done with IPv6 State list")
+	return ipStates
 }
 
 //@TODO: because the FSDaemon is not modular ndp is using arguments for start
@@ -142,7 +153,7 @@ func GetVlans(client *asicdServices.ASICDServicesClient, subSock *nanomsg.SubSoc
 	return //asicPlugin.getVlanStates()
 }
 
-func GetIPIntf(client *asicdServices.ASICDServicesClient, subSock *nanomsg.SubSocket) {
-	//asicPlugin := &AsicPlugin{client, subSock}
-	//return asicPlugin.getIPIntf()
+func GetIPIntf(client *asicdServices.ASICDServicesClient, subSock *nanomsg.SubSocket) []*config.IPv6IntfInfo {
+	asicPlugin := &AsicPlugin{client, subSock}
+	return asicPlugin.getIPIntf()
 }

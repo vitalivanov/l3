@@ -36,3 +36,10 @@ type PortState struct {
 	IfIndex int32
 	IfState string
 }
+
+type IPv6IntfInfo struct {
+	IntfRef   string
+	IfIndex   int32
+	IpAddr    string
+	OperState string
+}

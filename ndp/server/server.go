@@ -73,20 +73,29 @@ func (svr *NDPServer) OSSignalHandle() {
 }
 
 func (svr *NDPServer) InitGlobalDS() {
-	svr.SystemPorts = make(map[string]NDPGlobalInfo, NDP_SYSTEM_PORT_MAP_CAPACITY)
+	svr.GblInfo = make(map[string]NDPGlobalInfo, NDP_SYSTEM_PORT_MAP_CAPACITY)
 }
 
 func (svr *NDPServer) DeInitGlobalDS() {
-	svr.SystemPorts = nil
+	svr.GblInfo = nil
 }
 
 func (svr *NDPServer) InitSystemPortInfo(portInfo *config.PortInfo) {
 	if portInfo == nil {
 		return
 	}
-	gblInfo, _ := svr.SystemPorts[portInfo.IntfRef]
+	gblInfo, _ := svr.GblInfo[portInfo.IntfRef]
 	gblInfo.InitRuntimePortInfo(portInfo)
-	svr.SystemPorts[portInfo.IntfRef] = gblInfo
+	svr.GblInfo[portInfo.IntfRef] = gblInfo
+}
+
+func (svr *NDPServer) InitSystemIPIntf(ipInfo *config.IPv6IntfInfo) {
+	if ipInfo == nil {
+		return
+	}
+	gblInfo, _ := svr.GblInfo[ipInfo.IntfRef]
+	gblInfo.InitRuntimeIPInfo(ipInfo)
+	svr.GblInfo[ipInfo.IntfRef] = gblInfo
 }
 
 // @TODO: Once we have the changes for modularity from FS Base Daemon we will use that to change this code
@@ -97,6 +106,11 @@ func (svr *NDPServer) ReadFromClient() {
 	}
 
 	//vlans := flexswitch.GetVlans(svr.DmnBase.Asicdclnt.ClientHdl, svr.DmnBase.AsicdSubSocket)
+
+	ipIntfs := flexswitch.GetIPIntf(svr.DmnBase.Asicdclnt.ClientHdl, svr.DmnBase.AsicdSubSocket)
+	for _, ipIntf := range ipIntfs {
+		svr.InitSystemIPIntf(ipIntf)
+	}
 }
 
 /*  ndp server:
