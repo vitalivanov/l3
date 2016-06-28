@@ -99,7 +99,7 @@ func NewAdjRib(logger *logging.Writer, rMgr config.RouteMgrIntf, sDBMgr statedbc
 func isIpInList(prefixes []packet.NLRI, ip packet.NLRI) bool {
 	for _, nlri := range prefixes {
 		if nlri.GetPathId() == ip.GetPathId() &&
-			nlri.GetPrefix().Prefix.Equal(ip.GetPrefix().Prefix) {
+			nlri.GetPrefix().Equal(ip.GetPrefix()) {
 			return true
 		}
 	}
@@ -141,10 +141,10 @@ func (adjRib *AdjRib) GetDestFromIPAndLen(ip string, cidrLen uint32) *Destinatio
 }
 
 func (adjRib *AdjRib) GetDest(nlri packet.NLRI, createIfNotExist bool) (*Destination, bool) {
-	dest, ok := adjRib.destPathMap[nlri.GetPrefix().Prefix.String()]
+	dest, ok := adjRib.destPathMap[nlri.GetPrefix().String()]
 	if !ok && createIfNotExist {
-		dest = NewDestination(adjRib, nlri.GetPrefix(), adjRib.gConf)
-		adjRib.destPathMap[nlri.GetPrefix().Prefix.String()] = dest
+		dest = NewDestination(adjRib, nlri, adjRib.gConf)
+		adjRib.destPathMap[nlri.GetPrefix().String()] = dest
 		adjRib.addRoutesToRouteList(dest)
 	}
 
@@ -184,12 +184,12 @@ func (adjRib *AdjRib) ProcessRoutes(peerIP string, add []packet.NLRI, addPath *P
 	for _, nlri := range rem {
 		if !isIpInList(add, nlri) {
 			adjRib.logger.Info(fmt.Sprintln("Processing withdraw destination",
-				nlri.GetPrefix().Prefix.String()))
+				nlri.GetPrefix().String()))
 			dest, ok := adjRib.GetDest(nlri, false)
 			if !ok {
 				adjRib.logger.Warning(fmt.Sprintln("Can't process withdraw field.",
 					"Destination does not exist, Dest:",
-					nlri.GetPrefix().Prefix.String()))
+					nlri.GetPrefix().String()))
 				continue
 			}
 			op := adjRib.stateDBMgr.UpdateObject
@@ -235,7 +235,7 @@ func (adjRib *AdjRib) ProcessRoutes(peerIP string, add []packet.NLRI, addPath *P
 				if neighborConf := remPath.GetNeighborConf(); neighborConf != nil {
 					adjRib.logger.Info(fmt.Sprintln("Decrement prefix count for",
 						"destination %s from Peer %s",
-						nlri.GetPrefix().Prefix.String(), peerIP))
+						nlri.GetPrefix().String(), peerIP))
 					neighborConf.DecrPrefixCount()
 				}
 			}
@@ -243,25 +243,25 @@ func (adjRib *AdjRib) ProcessRoutes(peerIP string, add []packet.NLRI, addPath *P
 				if dest.IsEmpty() {
 					op = adjRib.stateDBMgr.DeleteObject
 					adjRib.removeRoutesFromRouteList(dest)
-					delete(adjRib.destPathMap, nlri.GetPrefix().Prefix.String())
+					delete(adjRib.destPathMap, nlri.GetPrefix().String())
 				}
 			}
 			op(adjRib.GetRouteStateConfigObj(dest.GetBGPRoute()))
 		} else {
 			adjRib.logger.Info(fmt.Sprintln("Can't withdraw destination",
-				nlri.GetPrefix().Prefix.String(),
+				nlri.GetPrefix().String(),
 				"Destination is part of NLRI in the UDPATE"))
 		}
 	}
 
 	nextHopStr := addPath.GetNextHop().String()
 	for _, nlri := range add {
-		if nlri.GetPrefix().Prefix.String() == "0.0.0.0" {
+		if nlri.GetPrefix().String() == "0.0.0.0" {
 			adjRib.logger.Info(fmt.Sprintf("Can't process NLRI 0.0.0.0"))
 			continue
 		}
 
-		adjRib.logger.Info(fmt.Sprintln("Processing nlri", nlri.GetPrefix().Prefix.String()))
+		adjRib.logger.Info(fmt.Sprintln("Processing nlri", nlri.GetPrefix().String()))
 		op := adjRib.stateDBMgr.UpdateObject
 		dest, alreadyCreated := adjRib.GetDest(nlri, true)
 		if !alreadyCreated {
@@ -272,12 +272,12 @@ func (adjRib *AdjRib) ProcessRoutes(peerIP string, add []packet.NLRI, addPath *P
 			if !addPath.NeighborConf.CanAcceptNewPrefix() {
 				adjRib.logger.Info(fmt.Sprintf("Max prefixes limit reached for",
 					"peer %s, can't process %s",
-					peerIP, nlri.GetPrefix().Prefix.String()))
+					peerIP, nlri.GetPrefix().String()))
 				addedAllPrefixes = false
 				continue
 			}
 			adjRib.logger.Info(fmt.Sprintf("Increment prefix count for destination %s",
-				"from Peer %s", nlri.GetPrefix().Prefix.String(), peerIP))
+				"from Peer %s", nlri.GetPrefix().String(), peerIP))
 			addPath.NeighborConf.IncrPrefixCount()
 		}
 
@@ -320,7 +320,7 @@ func (adjRib *AdjRib) ProcessRoutesForReachableRoutes(nextHop string, reachabili
 
 			for dest, pathIds := range destinations {
 				adjRib.logger.Info(fmt.Sprintln("Processing dest",
-					dest.IPPrefix.Prefix.String()))
+					dest.NLRI.GetPrefix().String()))
 				for _, pathId := range pathIds {
 					dest.AddOrUpdatePath(peerIP, pathId, path)
 				}
@@ -416,7 +416,7 @@ func (adjRib *AdjRib) RemoveUpdatesFromNeighbor(peerIP string, neighborConf *bas
 		action, addPathsMod, addRoutes, updRoutes, delRoutes :=
 			dest.SelectRouteForLocRib(addPathCount)
 		adjRib.logger.Info(fmt.Sprintln("RemoveUpdatesFromNeighbor - dest",
-			dest.IPPrefix.Prefix.String(), "SelectRouteForLocRib returned action",
+			dest.NLRI.GetPrefix().String(), "SelectRouteForLocRib returned action",
 			action, "addRoutes", addRoutes, "updRoutes", updRoutes,
 			"delRoutes", delRoutes))
 		withdrawn, updated, updatedAddPaths = adjRib.updateRibOutInfo(action,
@@ -424,7 +424,7 @@ func (adjRib *AdjRib) RemoveUpdatesFromNeighbor(peerIP string, neighborConf *bas
 			delRoutes, dest, withdrawn, updated, updatedAddPaths)
 		if action == RouteActionDelete && dest.IsEmpty() {
 			adjRib.logger.Info(fmt.Sprintln("All routes removed for dest",
-				dest.IPPrefix.Prefix.String()))
+				dest.NLRI.GetPrefix().String()))
 			adjRib.removeRoutesFromRouteList(dest)
 			delete(adjRib.destPathMap, destIP)
 			op = adjRib.stateDBMgr.DeleteObject
