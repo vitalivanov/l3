@@ -126,11 +126,14 @@ func (server *OSPFServer) StartOspfBroadcastIntfFSM(key IntfConfKey) {
 			server.StartSendHelloPkt(key)
 		case <-ent.WaitTimer.C:
 			server.logger.Info("Wait timer expired")
+			eventInfo := "Wait time expired for " 
+			server.AddOspfEventState(config.INTF, eventInfo)
 			//server.IntfConfMap[key] = ent
 			// Elect BDR And DR
 			server.ElectBDRAndDR(key)
 		case msg := <-ent.BackupSeenCh:
 			server.logger.Info(fmt.Sprintf("Transit to action state because of backup seen", msg))
+			server.AddOspfEventState(config.INTF, "Backup seen")
 			server.ElectBDRAndDR(key)
 		case createMsg := <-ent.NeighCreateCh:
 

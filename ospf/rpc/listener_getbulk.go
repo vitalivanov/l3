@@ -209,7 +209,12 @@ func (h *OSPFHandler) GetBulkOspfGlobalState(fromIdx ospfd.Int, count ospfd.Int)
 	return ospfGlobalStateGetInfo, nil
 }
 
-func (h *OSPFHandler) GetBulkOspfIPv4Routes(fromIdx ospfd.Int, count ospfd.Int) (*ospfd.OspfIPv4RoutesGetInfo, error) {
+func (h *OSPFHandler) GetBulkOspfIPv4RouteState(fromIdx ospfd.Int, count ospfd.Int) (*ospfd.OspfIPv4RouteStateGetInfo, error) {
 	/* This is template API . All OSPF routes are currently installed in the redis db */
 	return  nil, nil
+}
+
+func (h *OSPFHandler) GetBulkOspfEventState(fromIdx ospfd.Int, count ospfd.Int) (*ospfd.OspfEventStateGetInfo, error) {
+       /* This is template API. Events are stored in redis-db */
+	return nil, nil
 }
