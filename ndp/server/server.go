@@ -99,7 +99,7 @@ func (svr *NDPServer) InitSystemIPIntf(ipInfo *config.IPv6IntfInfo) {
 }
 
 // @TODO: Once we have the changes for modularity from FS Base Daemon we will use that to change this code
-func (svr *NDPServer) ReadFromClient() {
+func (svr *NDPServer) CollectSystemInformation() {
 	portStates := flexswitch.GetPorts(svr.DmnBase.Asicdclnt.ClientHdl, svr.DmnBase.AsicdSubSocket)
 	for _, port := range portStates {
 		svr.InitSystemPortInfo(port)
@@ -110,6 +110,21 @@ func (svr *NDPServer) ReadFromClient() {
 	ipIntfs := flexswitch.GetIPIntf(svr.DmnBase.Asicdclnt.ClientHdl, svr.DmnBase.AsicdSubSocket)
 	for _, ipIntf := range ipIntfs {
 		svr.InitSystemIPIntf(ipIntf)
+	}
+}
+
+func (svr *NDPServer) EventsListener() {
+	for {
+		select {
+		//@TODO: need to make this modular... this is bad design, we cannot run ndp alone
+		case rxBuf, ok := <-svr.DmnBase.AsicdSubSocketCh:
+			if !ok {
+				debug.Logger.Err("Switch Channel Closed")
+			} else {
+				flexswitch.ProcessMsg(rxBuf)
+			}
+		}
+
 	}
 }
 
@@ -127,5 +142,6 @@ func (svr *NDPServer) NDPStartServer() {
 	// @TODO: Base class should be interface where the call is agnostic to the server
 	svr.DmnBase.InitSubscribers(make([]string, 0))
 	svr.InitGlobalDS()
-	svr.ReadFromClient()
+	svr.CollectSystemInformation()
+	go svr.EventsListener()
 }
