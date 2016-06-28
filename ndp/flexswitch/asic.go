@@ -25,6 +25,7 @@ package flexswitch
 import (
 	"asicd/asicdCommonDefs"
 	"asicdServices"
+	"encoding/json"
 	"fmt"
 	nanomsg "github.com/op/go-nanomsg"
 	"l3/ndp/config"
@@ -156,4 +157,29 @@ func GetVlans(client *asicdServices.ASICDServicesClient, subSock *nanomsg.SubSoc
 func GetIPIntf(client *asicdServices.ASICDServicesClient, subSock *nanomsg.SubSocket) []*config.IPv6IntfInfo {
 	asicPlugin := &AsicPlugin{client, subSock}
 	return asicPlugin.getIPIntf()
+}
+
+func ProcessMsg(rxBuf []byte) {
+	var err error
+	var msg asicdCommonDefs.AsicdNotification
+	err = json.Unmarshal(rxBuf, &msg)
+	if err != nil {
+		debug.Logger.Err(fmt.Sprintln("Unable to Unmarshal asicd msg:", msg.Msg))
+		return
+	}
+	switch msg.MsgType {
+	case asicdCommonDefs.NOTIFY_L2INTF_STATE_CHANGE:
+		var l2IntfStateNotifyMsg asicdCommonDefs.L2IntfStateNotifyMsg
+		err = json.Unmarshal(msg.Msg, &l2IntfStateNotifyMsg)
+		if err != nil {
+			debug.Logger.Err(fmt.Sprintln("Unable to Unmarshal l2 intf",
+				"state change:", msg.Msg))
+			break
+		}
+		if l2IntfStateNotifyMsg.IfState == asicdCommonDefs.INTF_STATE_UP {
+			//api.SendPortStateChange(l2IntfStateNotifyMsg.IfIndex, "UP")
+		} else {
+			//api.SendPortStateChange(l2IntfStateNotifyMsg.IfIndex, "DOWN")
+		}
+	}
 }
