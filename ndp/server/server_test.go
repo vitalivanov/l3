@@ -23,8 +23,30 @@
 package server
 
 import (
+	"fmt"
+	"github.com/google/gopacket/pcap"
+	"infra/sysd/sysdCommonDefs"
+	"log/syslog"
 	"testing"
+	"utils/logging"
 )
+
+func NDPTestNewLogger(name string, tag string, listenToConfig bool) (*logging.Writer, error) {
+	var err error
+	srLogger := new(logging.Writer)
+	srLogger.MyComponentName = name
+
+	srLogger.SysLogger, err = syslog.New(syslog.LOG_INFO|syslog.LOG_DAEMON, tag)
+	if err != nil {
+		fmt.Println("Failed to initialize syslog - ", err)
+		return srLogger, err
+	}
+
+	srLogger.GlobalLogging = true
+	srLogger.MyLogLevel = sysdCommonDefs.INFO
+	fmt.Println("Logging level ", srLogger.MyLogLevel, " set for ", srLogger.MyComponentName)
+	return srLogger, err
+}
 
 // Test ND Solicitation message Decoder
 func TestInvalidInitPortInfo(t *testing.T) {
@@ -55,5 +77,25 @@ func TestInvalidInitL3Info(t *testing.T) {
 
 	if svr.L3Port != nil {
 		t.Error("De-Init for ndp l3 info didn't happen")
+	}
+}
+
+// Test Pcap Create
+func TestPcapCreate(t *testing.T) {
+	var err error
+	var pcapHdl *pcap.Handle
+	logger, err := NDPTestNewLogger("ndpd", "NDPTEST", true)
+	if err != nil {
+		t.Error("creating logger failed")
+	}
+	svr := NDPNewServer(nil, logger)
+	svr.InitGlobalDS()
+	err = svr.CreatePcapHandler("em1", pcapHdl)
+	if err != nil {
+		t.Error("Pcap Create Failed", err)
+	}
+	svr.DeletePcapHandler(pcapHdl)
+	if pcapHdl != nil {
+		t.Error("Deleting Pcap Handle Failed")
 	}
 }

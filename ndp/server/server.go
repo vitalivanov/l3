@@ -31,8 +31,8 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 	"utils/asicdClient"
-	_ "utils/dmnBase"
 	"utils/logging"
 )
 
@@ -78,6 +78,9 @@ func (svr *NDPServer) OSSignalHandle() {
 func (svr *NDPServer) InitGlobalDS() {
 	svr.PhyPort = make(map[string]config.PortInfo, NDP_SYSTEM_PORT_MAP_CAPACITY)
 	svr.L3Port = make(map[string]config.IPv6IntfInfo, NDP_SYSTEM_PORT_MAP_CAPACITY)
+	svr.SnapShotLen = 1024
+	svr.Promiscuous = false
+	svr.Timeout = 1 * time.Second
 }
 
 func (svr *NDPServer) DeInitGlobalDS() {
@@ -102,13 +105,13 @@ func (svr *NDPServer) InitSystemIPIntf(ipInfo *config.IPv6IntfInfo) {
 }
 
 func (svr *NDPServer) CollectSystemInformation() {
-	portStates := svr.GetPorts()
-	for _, port := range portStates {
-		svr.InitSystemPortInfo(port)
-	}
-
 	/*
-		//vlans := flexswitch.GetVlans(svr.DmnBase.Asicdclnt.ClientHdl, svr.DmnBase.AsicdSubSocket)
+		//we really should not be carrying for system port state...???
+		portStates := svr.GetPorts()
+		for _, port := range portStates {
+			svr.InitSystemPortInfo(port)
+		}
+
 	*/
 
 	ipIntfs := svr.GetIPIntf()
@@ -118,18 +121,41 @@ func (svr *NDPServer) CollectSystemInformation() {
 }
 
 func (svr *NDPServer) InitPcapHdlrs() {
-	for _, intfRef := range svr.ndpIntfStateSlice {
-		port := svr.PhyPort[intfRef]
-		if port.OperState == NDP_PORT_STATE_UP {
-			// create pcap handler
-			svr.ndpUpIntfStateSlice = append(svr.ndpUpIntfStateSlice, port.IntfRef)
+	// We should not be creating pcap for ports, as the port states will just return
+	// us the name and operation state... ideally if the port is down then we can search for that
+	// interface ref in L3 Port map and bring the port down
+	/*
+		for _, intfRef := range svr.ndpIntfStateSlice {
+			port := svr.PhyPort[intfRef]
+			if port.OperState == NDP_PORT_STATE_UP {
+				// create pcap handler
+				if port.PcapBase.PcapHandle != nil {
+					debug.Logger.Info("Pcap already exists for port " + port.Name)
+					continue
+				}
+				err := svr.CreatePcapHandler(port.Name, port.PcapBase.PcapHandle)
+				if err != nil {
+					continue
+				}
+				svr.PhyPort[intfRef] = port
+				svr.ndpUpIntfStateSlice = append(svr.ndpUpIntfStateSlice, port.IntfRef)
+			}
 		}
-	}
+	*/
 
 	for _, intfRef := range svr.ndpL3IntfStateSlice {
 		l3 := svr.L3Port[intfRef]
 		if l3.OperState == NDP_IP_STATE_UP {
 			// create pcap handler
+			if l3.PcapBase.PcapHandle != nil {
+				debug.Logger.Info("Pcap already exists for port " + l3.IntfRef)
+				continue
+			}
+			err := svr.CreatePcapHandler(l3.IntfRef, l3.PcapBase.PcapHandle)
+			if err != nil {
+				continue
+			}
+			svr.L3Port[intfRef] = l3
 			svr.ndpUpL3IntfStateSlice = append(svr.ndpUpL3IntfStateSlice, l3.IntfRef)
 		}
 	}

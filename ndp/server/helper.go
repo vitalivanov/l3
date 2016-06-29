@@ -24,10 +24,14 @@ package server
 
 import (
 	"fmt"
+	"github.com/google/gopacket/pcap"
 	"l3/ndp/config"
 	"l3/ndp/debug"
 )
 
+/*
+ * API: will return all system port information
+ */
 func (svr *NDPServer) GetPorts() []*config.PortInfo {
 	debug.Logger.Info("Get Port State List")
 	portStates := make([]*config.PortInfo, 0)
@@ -58,6 +62,9 @@ func (svr *NDPServer) GetPorts() []*config.PortInfo {
 	return portStates
 }
 
+/*
+ * API: will return all system L3 interfaces information
+ */
 func (svr *NDPServer) GetIPIntf() []*config.IPv6IntfInfo {
 	debug.Logger.Info("Get IPv6 Interface List")
 	ipStates := make([]*config.IPv6IntfInfo, 0)
@@ -77,5 +84,33 @@ func (svr *NDPServer) GetIPIntf() []*config.IPv6IntfInfo {
 	}
 	debug.Logger.Info("Done with IPv6 State list")
 	return ipStates
+}
 
+/*
+ * API: will create pcap handler for each port
+ */
+func (svr *NDPServer) CreatePcapHandler(name string, pHdl *pcap.Handle) error {
+	pHdl, err := pcap.OpenLive(name, svr.SnapShotLen, svr.Promiscuous, svr.Timeout)
+	if err != nil {
+		debug.Logger.Err(fmt.Sprintln("Creating Pcap Handler failed for", name, "Error:", err))
+		return err
+	}
+	filter := "(ip6[6] == 0x3a) and (ip6[40] >= 133 && ip6[40] <= 137)"
+	err = pHdl.SetBPFFilter(filter)
+	if err != nil {
+		debug.Logger.Err(fmt.Sprintln("Creating BPF Filter failed Error", err))
+		pHdl = nil
+		return err
+	}
+	return err
+}
+
+/*
+ * API: will delete pcap handler for each port
+ */
+func (svr *NDPServer) DeletePcapHandler(pHdl *pcap.Handle) {
+	if pHdl != nil {
+		pHdl.Close()
+		pHdl = nil
+	}
 }

@@ -23,11 +23,9 @@
 package server
 
 import (
-	_ "github.com/google/gopacket/pcap"
 	"l3/ndp/config"
+	"time"
 	"utils/asicdClient" // this is switch plugin need to change the name
-	_ "utils/dmnBase"
-	_ "utils/logging"
 )
 
 const (
@@ -38,8 +36,6 @@ const (
 )
 
 type NDPServer struct {
-	//DmnBase      *dmnBase.FSDaemon
-	//logger       *logging.Writer
 	SwitchPlugin asicdClient.AsicdClientIntf
 
 	// System Ports information, key is IntfRef
@@ -50,6 +46,11 @@ type NDPServer struct {
 	ndpUpIntfStateSlice   []string
 	ndpL3IntfStateSlice   []string
 	ndpUpL3IntfStateSlice []string
+
+	//Pcap Default config values
+	SnapShotLen int32
+	Promiscuous bool
+	Timeout     time.Duration
 }
 
 const (
