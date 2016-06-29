@@ -24,11 +24,8 @@ package flexswitch
 
 import (
 	"asicd/asicdCommonDefs"
-	"asicdServices"
 	"encoding/json"
 	"fmt"
-	nanomsg "github.com/op/go-nanomsg"
-	_ "l3/ndp/config"
 	"l3/ndp/debug"
 	"utils/commonDefs"
 )
@@ -69,38 +66,6 @@ func NewSwitchPlugin() commonDefs.AsicdClientStruct {
 
 func (notifyHdl *AsicNotificationHdl) ProcessNotification(msg commonDefs.AsicdNotifyMsg) {
 	notifyHdl.AsicdSubSocketCh <- msg
-}
-
-func (p *AsicPlugin) getVlanStates() {
-	debug.Logger.Info("Get Vlans")
-	objCount := 0
-	var currMarker int64
-	more := false
-	count := 10
-	for {
-		bulkInfo, err := p.asicdClient.GetBulkVlanState(asicdServices.Int(currMarker), asicdServices.Int(count))
-		if err != nil {
-			debug.Logger.Err(fmt.Sprintln("getting bulk vlan config",
-				"from asicd failed with reason", err))
-			return
-		}
-		objCount = int(bulkInfo.Count)
-		more = bool(bulkInfo.More)
-		currMarker = int64(bulkInfo.EndIdx)
-		for i := 0; i < objCount; i++ {
-			//svr.VrrpCreateVlanEntry(int(bulkInfo.VlanStateList[i].VlanId),
-			//	bulkInfo.VlanStateList[i].VlanName)
-		}
-		if more == false {
-			break
-		}
-	}
-}
-
-//@TODO: for futuer if NDP needs stub code is already present
-func GetVlans(client *asicdServices.ASICDServicesClient, subSock *nanomsg.SubSocket) {
-	//asicPlugin := &AsicPlugin{client, subSock}
-	return //asicPlugin.getVlanStates()
 }
 
 func ProcessMsg(rxBuf []byte) {

@@ -101,7 +101,6 @@ func (svr *NDPServer) InitSystemIPIntf(ipInfo *config.IPv6IntfInfo) {
 	svr.ndpL3IntfStateSlice = append(svr.ndpL3IntfStateSlice, ipInfo.IntfRef)
 }
 
-// @TODO: Once we have the changes for modularity from FS Base Daemon we will use that to change this code
 func (svr *NDPServer) CollectSystemInformation() {
 	portStates := svr.GetPorts()
 	for _, port := range portStates {
@@ -164,8 +163,6 @@ func (svr *NDPServer) EventsListener() {
 func (svr *NDPServer) NDPStartServer() {
 	svr.OSSignalHandle()
 	svr.ReadDB()
-	// @TODO: Base class should be interface where the call is agnostic to the server
-	//svr.DmnBase.InitSubscribers(make([]string, 0))
 	svr.InitGlobalDS()
 	svr.CollectSystemInformation()
 	svr.InitPcapHdlrs()
