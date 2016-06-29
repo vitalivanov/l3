@@ -25,8 +25,9 @@ package server
 import (
 	_ "github.com/google/gopacket/pcap"
 	"l3/ndp/config"
-	"utils/dmnBase"
-	"utils/logging"
+	"utils/asicdClient" // this is switch plugin need to change the name
+	_ "utils/dmnBase"
+	_ "utils/logging"
 )
 
 const (
@@ -37,8 +38,9 @@ const (
 )
 
 type NDPServer struct {
-	DmnBase *dmnBase.FSDaemon
-	logger  *logging.Writer
+	//DmnBase      *dmnBase.FSDaemon
+	//logger       *logging.Writer
+	SwitchPlugin asicdClient.AsicdClientIntf
 
 	// System Ports information, key is IntfRef
 	PhyPort map[string]config.PortInfo

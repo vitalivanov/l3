@@ -26,19 +26,22 @@ import (
 	"fmt"
 	"l3/ndp/config"
 	"l3/ndp/debug"
-	"l3/ndp/flexswitch"
+	_ "l3/ndp/flexswitch"
 	_ "models/objects"
 	"os"
 	"os/signal"
 	"syscall"
-	"utils/dmnBase"
+	"utils/asicdClient"
+	_ "utils/dmnBase"
+	"utils/logging"
 )
 
-func NDPNewServer(baseObj *dmnBase.FSDaemon) *NDPServer {
+func NDPNewServer(sPlugin asicdClient.AsicdClientIntf, logger *logging.Writer) *NDPServer {
 	svr := &NDPServer{}
-	svr.DmnBase = baseObj
-	svr.DmnBase.NewServer()                      // Allocate memory to channels
-	debug.NDPSetLogger(baseObj.FSBaseDmn.Logger) // @TODO: Change this to interface and move it to util
+	//svr.DmnBase = baseObj
+	//svr.DmnBase.NewServer()                      // Allocate memory to channels
+	svr.SwitchPlugin = sPlugin
+	debug.NDPSetLogger(logger) // @TODO: Change this to interface and move it to util
 	return svr
 }
 
@@ -100,14 +103,16 @@ func (svr *NDPServer) InitSystemIPIntf(ipInfo *config.IPv6IntfInfo) {
 
 // @TODO: Once we have the changes for modularity from FS Base Daemon we will use that to change this code
 func (svr *NDPServer) CollectSystemInformation() {
-	portStates := flexswitch.GetPorts(svr.DmnBase.Asicdclnt.ClientHdl, svr.DmnBase.AsicdSubSocket)
+	portStates := svr.GetPorts()
 	for _, port := range portStates {
 		svr.InitSystemPortInfo(port)
 	}
 
-	//vlans := flexswitch.GetVlans(svr.DmnBase.Asicdclnt.ClientHdl, svr.DmnBase.AsicdSubSocket)
+	/*
+		//vlans := flexswitch.GetVlans(svr.DmnBase.Asicdclnt.ClientHdl, svr.DmnBase.AsicdSubSocket)
+	*/
 
-	ipIntfs := flexswitch.GetIPIntf(svr.DmnBase.Asicdclnt.ClientHdl, svr.DmnBase.AsicdSubSocket)
+	ipIntfs := svr.GetIPIntf()
 	for _, ipIntf := range ipIntfs {
 		svr.InitSystemIPIntf(ipIntf)
 	}
@@ -135,12 +140,14 @@ func (svr *NDPServer) EventsListener() {
 	for {
 		select {
 		//@TODO: need to make this modular... this is bad design, we cannot run ndp alone
-		case rxBuf, ok := <-svr.DmnBase.AsicdSubSocketCh:
-			if !ok {
-				debug.Logger.Err("Switch Channel Closed")
-			} else {
-				flexswitch.ProcessMsg(rxBuf)
-			}
+		/*
+			case rxBuf, ok := <-svr.DmnBase.AsicdSubSocketCh:
+				if !ok {
+					debug.Logger.Err("Switch Channel Closed")
+				} else {
+					flexswitch.ProcessMsg(rxBuf)
+				}
+		*/
 		}
 
 	}
@@ -158,7 +165,7 @@ func (svr *NDPServer) NDPStartServer() {
 	svr.OSSignalHandle()
 	svr.ReadDB()
 	// @TODO: Base class should be interface where the call is agnostic to the server
-	svr.DmnBase.InitSubscribers(make([]string, 0))
+	//svr.DmnBase.InitSubscribers(make([]string, 0))
 	svr.InitGlobalDS()
 	svr.CollectSystemInformation()
 	svr.InitPcapHdlrs()

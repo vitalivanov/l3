@@ -21,3 +21,61 @@
 // |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
 //
 package server
+
+import (
+	"fmt"
+	"l3/ndp/config"
+	"l3/ndp/debug"
+)
+
+func (svr *NDPServer) GetPorts() []*config.PortInfo {
+	debug.Logger.Info("Get Port State List")
+	portStates := make([]*config.PortInfo, 0)
+	portsInfo, err := svr.SwitchPlugin.GetAllPortState()
+	if err != nil {
+		debug.Logger.Err(fmt.Sprintln("Failed to get all ports from system, ERROR:", err))
+		return portStates
+	}
+	for _, obj := range portsInfo {
+		port := &config.PortInfo{
+			IntfRef:   obj.IntfRef,
+			IfIndex:   obj.IfIndex,
+			OperState: obj.OperState,
+			Name:      obj.Name,
+		}
+		pObj, err := svr.SwitchPlugin.GetPort(obj.Name)
+		if err != nil {
+			debug.Logger.Err(fmt.Sprintln("Getting mac address for",
+				obj.Name, "failed, error:", err))
+		} else {
+			port.MacAddr = pObj.MacAddr
+			port.Description = pObj.Description
+		}
+		portStates = append(portStates, port)
+	}
+
+	debug.Logger.Info("Done with Port State list")
+	return portStates
+}
+
+func (svr *NDPServer) GetIPIntf() []*config.IPv6IntfInfo {
+	debug.Logger.Info("Get IPv6 Interface List")
+	ipStates := make([]*config.IPv6IntfInfo, 0)
+	ipsInfo, err := svr.SwitchPlugin.GetAllIPv6IntfState()
+	if err != nil {
+		debug.Logger.Err(fmt.Sprintln("Failed to get all ipv6 interfaces from system, ERROR:", err))
+		return ipStates
+	}
+	for _, obj := range ipsInfo {
+		ipInfo := &config.IPv6IntfInfo{
+			IntfRef:   obj.IntfRef,
+			IfIndex:   obj.IfIndex,
+			OperState: obj.OperState,
+			IpAddr:    obj.IpAddr,
+		}
+		ipStates = append(ipStates, ipInfo)
+	}
+	debug.Logger.Info("Done with IPv6 State list")
+	return ipStates
+
+}

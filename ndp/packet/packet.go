@@ -20,34 +20,12 @@
 // |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
 // |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
 //
-package flexswitch
+package packet
 
 import (
-	"asicdServices"
-	nanomsg "github.com/op/go-nanomsg"
-	"utils/commonDefs"
-	"utils/logging"
+	_ "github.com/google/gopacket/pcap"
 )
 
-type ConfigPlugin struct {
-	handler  *ConfigHandler
-	fileName string
-	logger   *logging.Writer
-}
-
-type ClientJson struct {
-	Name string `json:Name`
-	Port int    `json:Port`
-}
-
-type ConfigHandler struct {
-}
-
-type AsicNotificationHdl struct {
-	AsicdSubSocketCh chan commonDefs.AsicdNotifyMsg
-}
-
-type AsicPlugin struct {
-	asicdClient    *asicdServices.ASICDServicesClient
-	asicdSubSocket *nanomsg.SubSocket
+type NDPPort struct {
+	IntfRef string
 }
