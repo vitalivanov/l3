@@ -26,7 +26,6 @@ import (
 	"fmt"
 	"l3/ndp/config"
 	"l3/ndp/debug"
-	_ "l3/ndp/flexswitch"
 	_ "models/objects"
 	"os"
 	"os/signal"

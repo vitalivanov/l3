@@ -90,7 +90,8 @@ func TestPcapCreate(t *testing.T) {
 	}
 	svr := NDPNewServer(nil, logger)
 	svr.InitGlobalDS()
-	err = svr.CreatePcapHandler("em1", pcapHdl)
+	// @TODO: get the system linux name
+	err = svr.CreatePcapHandler("eth0", pcapHdl)
 	if err != nil {
 		t.Error("Pcap Create Failed", err)
 	}

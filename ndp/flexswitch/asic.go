@@ -26,6 +26,7 @@ import (
 	"asicd/asicdCommonDefs"
 	"encoding/json"
 	"fmt"
+	"l3/ndp/api"
 	"l3/ndp/debug"
 	"sync"
 	"utils/commonDefs"
@@ -71,7 +72,44 @@ func GetSwitchInst() *commonDefs.AsicdClientStruct {
 }
 
 func (notifyHdl *AsicNotificationHdl) ProcessNotification(msg commonDefs.AsicdNotifyMsg) {
-	notifyHdl.AsicdSubSocketCh <- msg
+	//notifyHdl.AsicdSubSocketCh <- msg
+	switch msg.(type) {
+	case commonDefs.L2IntfStateNotifyMsg:
+		l2Msg := msg.(commonDefs.L2IntfStateNotifyMsg)
+		if l2Msg.IfState == asicdCommonDefs.INTF_STATE_UP {
+			api.SendL2PortNotification(l2Msg.IfIndex, "UP")
+		} else {
+			api.SendL2PortNotification(l2Msg.IfIndex, "UP")
+		}
+	case commonDefs.L3IntfStateNotifyMsg:
+		l3Msg := msg.(commonDefs.L3IntfStateNotifyMsg)
+		if l3Msg.IfState == asicdCommonDefs.INTF_STATE_UP {
+			api.SendL3PortNotification(l3Msg.IfIndex, "UP")
+		} else {
+			api.SendL3PortNotification(l3Msg.IfIndex, "UP")
+		}
+	case commonDefs.VlanNotifyMsg:
+		/*
+			vlanMsg := msg.(commonDefs.VlanNotifyMsg)
+			if vlanMsg.IfState == asicdCommonDefs.INTF_STATE_UP {
+				api.SendVlanNotification(vlanMsg.VlanId, vlanMsg.VlanName, "UP")
+			} else {
+				api.SendVlanNotification(vlanMsg.VlanId, vlanMsg.VlanName, "UP")
+			}
+		*/
+		break
+	//case commonDefs.LagNotifyMsg:
+	//	lagMsg := msg.(commonDefs.LagNotifyMsg)
+	case commonDefs.IPv6IntfNotifyMsg:
+		ipv6Msg := msg.(commonDefs.IPv6IntfNotifyMsg)
+		if ipv6Msg.MsgType == commonDefs.NOTIFY_IPV6INTF_CREATE {
+			api.SendIPv6Notfication(ipv6Msg.IfIndex, ipv6Msg.IpAddr, "CREATE")
+		} else {
+			api.SendIPv6Notfication(ipv6Msg.IfIndex, ipv6Msg.IpAddr, "DELETE")
+		}
+		//case commonDefs.IPv4NbrMacMoveNotifyMsg:
+		//	macMoveMsg := msg.(commonDefs.IPv4NbrMacMoveNotifyMsg)
+	}
 }
 
 func ProcessMsg(rxBuf []byte) {

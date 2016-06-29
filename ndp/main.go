@@ -24,9 +24,9 @@ package main
 
 import (
 	"fmt"
+	"l3/ndp/api"
 	"l3/ndp/flexswitch"
 	"l3/ndp/server"
-	_ "utils/asicdClient"
 	"utils/dmnBase"
 )
 
@@ -63,6 +63,8 @@ func main() {
 			ndpBase.ParamsDir, ndpBase.GetLogger())
 		// create new ndp server and cache the information for switch/asicd plugin
 		ndpServer := server.NDPNewServer(switchPlugin, ndpBase.GetLogger())
+		// Init API layer after server is created
+		api.Init(ndpServer)
 		// build basic NDP server information
 		ndpServer.NDPStartServer()
 		ndpBase.StartKeepAlive()
