@@ -114,3 +114,9 @@ func (svr *NDPServer) DeletePcapHandler(pHdl *pcap.Handle) {
 		pHdl = nil
 	}
 }
+
+/*  API: will handle IPv6 notifications received from switch/asicd
+ */
+func (svr *NDPServer) HandleIPv6Notification(msg *config.IPv6IntfInfo) {
+
+}

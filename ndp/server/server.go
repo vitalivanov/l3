@@ -77,6 +77,7 @@ func (svr *NDPServer) OSSignalHandle() {
 func (svr *NDPServer) InitGlobalDS() {
 	svr.PhyPort = make(map[int32]config.PortInfo, NDP_SYSTEM_PORT_MAP_CAPACITY)
 	svr.L3Port = make(map[int32]config.IPv6IntfInfo, NDP_SYSTEM_PORT_MAP_CAPACITY)
+	svr.Ipv6Ch = make(chan *config.IPv6IntfInfo)
 	svr.SnapShotLen = 1024
 	svr.Promiscuous = false
 	svr.Timeout = 1 * time.Second
@@ -163,15 +164,17 @@ func (svr *NDPServer) InitPcapHdlrs() {
 func (svr *NDPServer) EventsListener() {
 	for {
 		select {
-		//@TODO: need to make this modular... this is bad design, we cannot run ndp alone
-		/*
-			case rxBuf, ok := <-svr.DmnBase.AsicdSubSocketCh:
-				if !ok {
-					debug.Logger.Err("Switch Channel Closed")
-				} else {
-					flexswitch.ProcessMsg(rxBuf)
-				}
-		*/
+		case ipv6Notify := <-svr.Ipv6Ch:
+			svr.HandleIPv6Notification(ipv6Notify)
+			//@TODO: need to make this modular... this is bad design, we cannot run ndp alone
+			/*
+				case rxBuf, ok := <-svr.DmnBase.AsicdSubSocketCh:
+					if !ok {
+						debug.Logger.Err("Switch Channel Closed")
+					} else {
+						flexswitch.ProcessMsg(rxBuf)
+					}
+			*/
 		}
 
 	}

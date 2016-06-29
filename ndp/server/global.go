@@ -42,6 +42,9 @@ type NDPServer struct {
 	PhyPort map[int32]config.PortInfo
 	L3Port  map[int32]config.IPv6IntfInfo
 
+	//IPV6 Create/Delete Notification Channel
+	Ipv6Ch chan *config.IPv6IntfInfo
+
 	ndpIntfStateSlice     []int32
 	ndpUpIntfStateSlice   []int32
 	ndpL3IntfStateSlice   []int32

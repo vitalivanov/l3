@@ -23,6 +23,7 @@
 package api
 
 import (
+	"l3/ndp/config"
 	"l3/ndp/server"
 	"sync"
 )
@@ -61,4 +62,9 @@ func SendVlanNotification(vlanId uint16, vlanName, state string) {
 }
 
 func SendIPv6Notfication(ifIndex int32, ipaddr, msgType string) {
+	ndpApi.server.Ipv6Ch <- &config.IPv6IntfInfo{
+		IfIndex:   ifIndex,
+		IpAddr:    ipaddr,
+		OperState: msgType,
+	}
 }
