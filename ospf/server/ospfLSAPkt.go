@@ -263,6 +263,7 @@ func (server *OSPFServer) BuildAndSendLSAReq(nbrId NeighborConfKey, nbrConf Ospf
 		req.adv_router_id = reqlist[i].lsa_headers.adv_router_id
 		nbrConf.req_list_mutex.Lock()
 		msg.lsa_slice = append(msg.lsa_slice, req)
+		reqlist[i].valid = false
 		nbrConf.req_list_mutex.Unlock()
 		/* update LSA Retx list */
 		reTxNbr := newospfNeighborRetx()
@@ -533,6 +534,7 @@ func (server *OSPFServer) DecodeLSAUpd(msg ospfNeighborLSAUpdMsg) {
 		server.ospfNbrLsaAckSendCh <- *lsaAckMsg
 
 		index = end_index
+		server.UpdateNeighborList(msg.nbrKey, *lsa_key)
 
 	}
 }

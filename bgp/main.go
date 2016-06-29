@@ -13,13 +13,13 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 // main.go
 package main
@@ -27,6 +27,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"l3/bgp/api"
 	"l3/bgp/flexswitch"
 	"l3/bgp/ovs"
 	bgppolicy "l3/bgp/policy"
@@ -36,6 +37,7 @@ import (
 	"utils/dbutils"
 	"utils/keepalive"
 	"utils/logging"
+	"utils/statedbclient"
 )
 
 const (
@@ -86,18 +88,22 @@ func main() {
 		pMgr := ovsMgr.NewOvsPolicyMgr()
 		iMgr := ovsMgr.NewOvsIntfMgr()
 		bMgr := ovsMgr.NewOvsBfdMgr()
+		sDBMgr, err := statedbclient.NewStateDBClient(statedbclient.OVSPlugin, logger)
+		if err != nil {
+			logger.Info(fmt.Sprintln("Starting OVDB state DB client failed ERROR:", err))
+			return
+		}
 
-	    // starting bgp policy engine...
-	    logger.Info(fmt.Sprintln("Starting BGP policy engine..."))
-	    bgpPolicyEng := bgppolicy.NewBGPPolicyEngine(logger,pMgr)
-	    go bgpPolicyEng.StartPolicyEngine()
+		// starting bgp policy engine...
+		logger.Info(fmt.Sprintln("Starting BGP policy engine..."))
+		bgpPolicyMgr := bgppolicy.NewPolicyManager(logger, pMgr)
+		go bgpPolicyMgr.StartPolicyEngine()
 
-		bgpServer := server.NewBGPServer(logger, bgpPolicyEng, iMgr,
-			rMgr, bMgr)
+		bgpServer := server.NewBGPServer(logger, bgpPolicyMgr, iMgr, rMgr, bMgr, sDBMgr)
 		go bgpServer.StartServer()
 
 		logger.Info(fmt.Sprintln("Starting config listener..."))
-		confIface := rpc.NewBGPHandler(bgpServer, bgpPolicyEng, logger, dbUtil, fileName)
+		confIface := rpc.NewBGPHandler(bgpServer, bgpPolicyMgr, logger, dbUtil, fileName)
 		dbUtil.Disconnect()
 
 		// create and start ovsdb handler
@@ -129,25 +135,28 @@ func main() {
 			return
 		}
 		pMgr := FSMgr.NewFSPolicyMgr(logger, fileName)
+		sDBMgr, err := statedbclient.NewStateDBClient(statedbclient.FlexSwitchPlugin, logger)
 		if err != nil {
 			return
 		}
-	    // starting bgp policy engine...
-	    logger.Info(fmt.Sprintln("Starting BGP policy engine..."))
-	    bgpPolicyEng := bgppolicy.NewBGPPolicyEngine(logger,pMgr)
-	    go bgpPolicyEng.StartPolicyEngine()
+		// starting bgp policy engine...
+		logger.Info(fmt.Sprintln("Starting BGP policy engine..."))
+		bgpPolicyMgr := bgppolicy.NewPolicyManager(logger, pMgr)
+		go bgpPolicyMgr.StartPolicyEngine()
 
 		logger.Info(fmt.Sprintln("Starting BGP Server..."))
 
-		bgpServer := server.NewBGPServer(logger, bgpPolicyEng, iMgr,
-			rMgr, bMgr)
+		bgpServer := server.NewBGPServer(logger, bgpPolicyMgr, iMgr, rMgr, bMgr, sDBMgr)
 		go bgpServer.StartServer()
+
+		api.InitPolicy(bgpPolicyMgr)
+		api.Init(bgpServer)
 
 		// Start keepalive routine
 		go keepalive.InitKeepAlive("bgpd", fileName)
 
 		logger.Info(fmt.Sprintln("Starting config listener..."))
-		confIface := rpc.NewBGPHandler(bgpServer, bgpPolicyEng, logger, dbUtil, fileName)
+		confIface := rpc.NewBGPHandler(bgpServer, bgpPolicyMgr, logger, dbUtil, fileName)
 		dbUtil.Disconnect()
 
 		rpc.StartServer(logger, confIface, fileName)

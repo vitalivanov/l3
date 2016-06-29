@@ -13,26 +13,24 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 package api
 
 import (
 	"l3/bgp/config"
+	"l3/bgp/server"
 	"sync"
 )
 
 type ApiLayer struct {
-	bfdCh   chan config.BfdInfo
-	intfCh  chan config.IntfStateInfo
-	routeCh chan *config.RouteCh
-	//routeCh chan []*config.RouteInfo
+	server *server.BGPServer
 }
 
 var bgpapi *ApiLayer = nil
@@ -50,17 +48,15 @@ func getInstance() *ApiLayer {
 /*  Initialize bgp api layer with the channels that will be used for communicating
  *  with the server
  */
-func Init(bfdCh chan config.BfdInfo, intfCh chan config.IntfStateInfo, rCh chan *config.RouteCh) {
+func Init(server *server.BGPServer) {
 	bgpapi = getInstance()
-	bgpapi.bfdCh = bfdCh
-	bgpapi.intfCh = intfCh
-	bgpapi.routeCh = rCh
+	bgpapi.server = server
 }
 
 /*  Send bfd state information from bfd manager to server
  */
 func SendBfdNotification(DestIp string, State bool, Oper config.Operation) {
-	bgpapi.bfdCh <- config.BfdInfo{
+	bgpapi.server.BfdCh <- config.BfdInfo{
 		DestIp: DestIp,
 		State:  State,
 		Oper:   Oper,
@@ -70,7 +66,7 @@ func SendBfdNotification(DestIp string, State bool, Oper config.Operation) {
 /*  Send interface state notification to server
  */
 func SendIntfNotification(ifIndex int32, ipAddr string, state config.Operation) {
-	bgpapi.intfCh <- config.IntfStateInfo{
+	bgpapi.server.IntfCh <- config.IntfStateInfo{
 		Idx:    ifIndex,
 		IPAddr: ipAddr,
 		State:  state,
@@ -80,7 +76,7 @@ func SendIntfNotification(ifIndex int32, ipAddr string, state config.Operation) 
 /*  Send Routes information to server
  */
 func SendRouteNotification(add []*config.RouteInfo, remove []*config.RouteInfo) {
-	bgpapi.routeCh <- &config.RouteCh{
+	bgpapi.server.RoutesCh <- &config.RouteCh{
 		Add:    add,
 		Remove: remove,
 	}

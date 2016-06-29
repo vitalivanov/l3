@@ -22,7 +22,7 @@
 //
 
 // path.go
-package server
+package rib
 
 import (
 	"encoding/binary"
