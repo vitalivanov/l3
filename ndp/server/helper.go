@@ -129,7 +129,7 @@ func (svr *NDPServer) DeletePcapHandler(pHdl *pcap.Handle) {
  *		     Stop Rx/Tx in this case
  */
 func (svr *NDPServer) HandleIPv6Notification(msg *config.IPv6IntfInfo) {
-	switch msg.OperState {
+	switch msg.MsgType {
 	case "CREATE":
 		svr.StartRxTx(msg)
 	case "DELETE":

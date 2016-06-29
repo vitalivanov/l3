@@ -110,8 +110,9 @@ func (svr *NDPServer) InitSystemIPIntf(entry *config.IPv6IntfInfo, ipInfo *confi
 /*
  * API: it will collect all ipv6 interface ports from the system... If needed we can collect port information
  *      also from the system.
+ *	After the information is collected, if the oper state is up then we will start rx/tx
  */
-func (svr *NDPServer) CollectSystemInformation() {
+func (svr *NDPServer) InitSystem() {
 	/*
 		//we really should not be carrying for system port state...???
 		portStates := svr.GetPorts()
@@ -122,44 +123,11 @@ func (svr *NDPServer) CollectSystemInformation() {
 	*/
 	ipIntfs := svr.GetIPIntf()
 	for _, ipIntf := range ipIntfs {
-		gblInfo := svr.L3Port[ipIntf.IfIndex]
-		svr.InitSystemIPIntf(&gblInfo, ipIntf)
-		svr.L3Port[ipIntf.IfIndex] = gblInfo
-	}
-}
-
-func (svr *NDPServer) InitPcapHdlrs() {
-	// We should not be creating pcap for ports, as the port states will just return
-	// us the name and operation state... ideally if the port is down then we can search for that
-	// interface ref in L3 Port map and bring the port down
-	/*
-		for _, ifIndex := range svr.ndpIntfStateSlice {
-			port := svr.PhyPort[ifIndex]
-			if port.OperState == NDP_PORT_STATE_UP {
-				// create pcap handler
-				if port.PcapBase.PcapHandle != nil {
-					debug.Logger.Info("Pcap already exists for port " + port.Name)
-					continue
-				}
-				err := svr.CreatePcapHandler(port.Name, port.PcapBase.PcapHandle)
-				if err != nil {
-					continue
-				}
-				svr.PhyPort[ifIndex] = port
-				svr.ndpUpIntfStateSlice = append(svr.ndpUpIntfStateSlice, port.IfIndex)
-			}
-		}
-	*/
-
-	for _, ifIndex := range svr.ndpL3IntfStateSlice {
-		l3 := svr.L3Port[ifIndex]
-		if l3.OperState == NDP_IP_STATE_UP {
-			err := svr.CreatePcapHandler(l3.IntfRef, l3.PcapBase.PcapHandle)
-			if err != nil {
-				continue
-			}
-			svr.L3Port[ifIndex] = l3
-			svr.ndpUpL3IntfStateSlice = append(svr.ndpUpL3IntfStateSlice, l3.IfIndex)
+		ipPort := svr.L3Port[ipIntf.IfIndex]
+		svr.InitSystemIPIntf(&ipPort, ipIntf)
+		svr.L3Port[ipIntf.IfIndex] = ipPort
+		if ipPort.OperState == NDP_IP_STATE_UP {
+			svr.StartRxTx(ipIntf)
 		}
 	}
 }
@@ -186,7 +154,6 @@ func (svr *NDPServer) NDPStartServer() {
 	svr.OSSignalHandle()
 	svr.ReadDB()
 	svr.InitGlobalDS()
-	svr.CollectSystemInformation()
-	svr.InitPcapHdlrs()
+	svr.InitSystem()
 	go svr.EventsListener()
 }

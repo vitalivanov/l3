@@ -24,9 +24,34 @@ package server
 
 import (
 	"fmt"
+	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
 	"l3/ndp/config"
 	"l3/ndp/debug"
 )
+
+/*
+ *	Receive Ndp Packet
+ */
+func (svr *NDPServer) ReceivedNdpPkts(ifIndex int32) {
+	ipPort, _ := svr.L3Port[ifIndex]
+	src := gopacket.NewPacketSource(ipPort.PcapBase.PcapHandle, layers.LayerTypeEthernet)
+	in := src.Packets()
+	for {
+		select {
+		case pkt, ok := <-in:
+			if !ok {
+				continue
+			}
+			debug.Logger.Info(fmt.Sprintln("Process incoming packets", pkt))
+		case <-ipPort.PcapBase.PcapCtrl:
+			svr.DeletePcapHandler(ipPort.PcapBase.PcapHandle)
+			svr.L3Port[ifIndex] = ipPort
+			ipPort.PcapBase.PcapCtrl <- true
+			return
+		}
+	}
+}
 
 /*
  *	StartRxTx      a) Check if entry is present in the map
@@ -50,6 +75,7 @@ func (svr *NDPServer) StartRxTx(msg *config.IPv6IntfInfo) {
 		"ip address", ipPort.IpAddr))
 
 	// Spawn go routines for rx & tx
+	go svr.ReceivedNdpPkts(ipPort.IfIndex)
 	svr.ndpUpL3IntfStateSlice = append(svr.ndpUpL3IntfStateSlice, msg.IfIndex)
 }
 
@@ -65,7 +91,11 @@ func (svr *NDPServer) StopRxTx(ifIndex int32) {
 		debug.Logger.Err(fmt.Sprintln("No entry found for ifIndex:", ifIndex))
 		return
 	}
-
+	// Blocking call until Pcap is deleted
+	ipPort.PcapBase.PcapCtrl <- true
+	<-ipPort.PcapBase.PcapCtrl
+	debug.Logger.Info(fmt.Sprintln("Stop rx/tx for port:", ipPort.IntfRef, "ifIndex:", ipPort.IfIndex,
+		"ip address", ipPort.IpAddr, "is done"))
 	// Delete Entry from Slice
 	svr.DeleteL3IntfFromUpState(ipPort.IfIndex)
 }

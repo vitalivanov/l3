@@ -63,8 +63,8 @@ func SendVlanNotification(vlanId uint16, vlanName, state string) {
 
 func SendIPv6Notfication(ifIndex int32, ipaddr, msgType string) {
 	ndpApi.server.Ipv6Ch <- &config.IPv6IntfInfo{
-		IfIndex:   ifIndex,
-		IpAddr:    ipaddr,
-		OperState: msgType,
+		IfIndex: ifIndex,
+		IpAddr:  ipaddr,
+		MsgType: msgType,
 	}
 }
