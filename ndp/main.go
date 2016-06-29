@@ -24,9 +24,9 @@ package main
 
 import (
 	"fmt"
+	"l3/ndp/api"
 	"l3/ndp/flexswitch"
 	"l3/ndp/server"
-	_ "utils/asicdClient"
 	"utils/dmnBase"
 )
 
@@ -43,30 +43,31 @@ func main() {
 	 *   5) Start keepAlive
 	 *   6) Start ClientHdl
 	 */
-	// Step 1
-	var ndpBase dmnBase.FSDaemon
-	status := ndpBase.Init("ndpd", "NDP")
-	if status == false {
-		fmt.Println("Init failed")
-		return
-	}
-	ndpBase.Logger.Info(fmt.Sprintln("Init done"))
-	// Step 2
-	ndpServer := server.NDPNewServer(&ndpBase)
 	switch plugin {
 	case "OvsDB":
 
 	default:
+		ndpBase := dmnBase.NewBaseDmn("ndpd", "NDP")
+		status := ndpBase.Init()
+		if status == false {
+			fmt.Println("Failed to do daemon base init")
+			return
+		}
+		// create handler and map for recieving notifications from switch/asicd
+		asicHdl := flexswitch.GetSwitchInst()
+		asicHdl.Logger = ndpBase.GetLogger()
+		// connect to server and do the initializing
+		switchPlugin := ndpBase.InitSwitch(plugin, "ndpd", "NDP", *asicHdl)
+		// create north bound config listener
 		lPlugin := flexswitch.NewConfigPlugin(flexswitch.NewConfigHandler(),
-			ndpServer.DmnBase.FSBaseDmn.ParamsDir, ndpServer.DmnBase.FSBaseDmn.Logger)
-
-		// Step 3
-		ndpServer.DmnBase.ConnectToServers()
-		// Step 4
+			ndpBase.ParamsDir, ndpBase.GetLogger())
+		// create new ndp server and cache the information for switch/asicd plugin
+		ndpServer := server.NDPNewServer(switchPlugin, ndpBase.GetLogger())
+		// Init API layer after server is created
+		api.Init(ndpServer)
+		// build basic NDP server information
 		ndpServer.NDPStartServer()
-		// Step 5
-		ndpServer.DmnBase.StartKeepAlive()
-		// Step 6
+		ndpBase.StartKeepAlive()
 		lPlugin.Start()
 	}
 }

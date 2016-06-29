@@ -20,39 +20,12 @@
 // |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
 // |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
 //
-package server
+package packet
 
 import (
-	"l3/ndp/config"
-	"time"
-	"utils/asicdClient" // this is switch plugin need to change the name
+	_ "github.com/google/gopacket/pcap"
 )
 
-const (
-	NDP_PORT_STATE_UP   = "UP"
-	NDP_PORT_STATE_DOWN = "DOWN"
-	NDP_IP_STATE_UP     = "UP"
-	NDP_IP_STATE_DOWN   = "DOWN"
-)
-
-type NDPServer struct {
-	SwitchPlugin asicdClient.AsicdClientIntf
-
-	// System Ports information, key is IntfRef
-	PhyPort map[string]config.PortInfo
-	L3Port  map[string]config.IPv6IntfInfo
-
-	ndpIntfStateSlice     []string
-	ndpUpIntfStateSlice   []string
-	ndpL3IntfStateSlice   []string
-	ndpUpL3IntfStateSlice []string
-
-	//Pcap Default config values
-	SnapShotLen int32
-	Promiscuous bool
-	Timeout     time.Duration
+type NDPPort struct {
+	IntfRef string
 }
-
-const (
-	NDP_SYSTEM_PORT_MAP_CAPACITY = 50
-)

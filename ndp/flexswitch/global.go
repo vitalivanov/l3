@@ -25,6 +25,7 @@ package flexswitch
 import (
 	"asicdServices"
 	nanomsg "github.com/op/go-nanomsg"
+	"utils/commonDefs"
 	"utils/logging"
 )
 
@@ -40,6 +41,10 @@ type ClientJson struct {
 }
 
 type ConfigHandler struct {
+}
+
+type AsicNotificationHdl struct {
+	AsicdSubSocketCh chan commonDefs.AsicdNotifyMsg
 }
 
 type AsicPlugin struct {

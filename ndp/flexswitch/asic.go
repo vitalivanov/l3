@@ -24,139 +24,92 @@ package flexswitch
 
 import (
 	"asicd/asicdCommonDefs"
-	"asicdServices"
 	"encoding/json"
 	"fmt"
-	nanomsg "github.com/op/go-nanomsg"
-	"l3/ndp/config"
+	"l3/ndp/api"
 	"l3/ndp/debug"
+	"sync"
+	"utils/commonDefs"
 )
 
-func NewSwitchPlugin(client *asicdServices.ASICDServicesClient, subSock *nanomsg.SubSocket) {
+var switchInst *commonDefs.AsicdClientStruct = nil
+var once sync.Once
 
+func initAsicdNotification() commonDefs.AsicdNotification {
+	nMap := make(commonDefs.AsicdNotification)
+	nMap = commonDefs.AsicdNotification{
+		commonDefs.NOTIFY_L2INTF_STATE_CHANGE:       true,
+		commonDefs.NOTIFY_L3INTF_STATE_CHANGE:       true,
+		commonDefs.NOTIFY_VLAN_CREATE:               true,
+		commonDefs.NOTIFY_VLAN_DELETE:               true,
+		commonDefs.NOTIFY_VLAN_UPDATE:               true,
+		commonDefs.NOTIFY_LOGICAL_INTF_CREATE:       false,
+		commonDefs.NOTIFY_LOGICAL_INTF_DELETE:       false,
+		commonDefs.NOTIFY_LOGICAL_INTF_UPDATE:       true,
+		commonDefs.NOTIFY_IPV4INTF_CREATE:           true,
+		commonDefs.NOTIFY_IPV4INTF_DELETE:           true,
+		commonDefs.NOTIFY_LAG_CREATE:                true,
+		commonDefs.NOTIFY_LAG_DELETE:                true,
+		commonDefs.NOTIFY_LAG_UPDATE:                true,
+		commonDefs.NOTIFY_IPV4NBR_MAC_MOVE:          true,
+		commonDefs.NOTIFY_IPV4_ROUTE_CREATE_FAILURE: false,
+		commonDefs.NOTIFY_IPV4_ROUTE_DELETE_FAILURE: false,
+	}
+	return nMap
 }
 
-// @TODO: Need to move this to asicdclient mgr... the library is still missing pieces
-func (p *AsicPlugin) getPortsStates() []*config.PortInfo {
-	debug.Logger.Info("Get Port State List")
-	currMarker := int64(asicdCommonDefs.MIN_SYS_PORTS)
-	more := false
-	objCount := 0
-	count := 10
-	portStates := make([]*config.PortInfo, 0)
-	for {
-		bulkInfo, err := p.asicdClient.GetBulkPortState(asicdServices.Int(currMarker), asicdServices.Int(count))
-		if err != nil {
-			debug.Logger.Err(fmt.Sprintln(": getting bulk port config"+
-				" from asicd failed with reason", err))
-			//return
-			break
+func GetSwitchInst() *commonDefs.AsicdClientStruct {
+	once.Do(func() {
+		notifyMap := initAsicdNotification()
+		notifyHdl := &AsicNotificationHdl{}
+		notifyHdl.AsicdSubSocketCh = make(chan commonDefs.AsicdNotifyMsg)
+		switchInst = &commonDefs.AsicdClientStruct{
+			NHdl: notifyHdl,
+			NMap: notifyMap,
 		}
-		objCount = int(bulkInfo.Count)
-		more = bool(bulkInfo.More)
-		currMarker = int64(bulkInfo.EndIdx)
-		for i := 0; i < objCount; i++ {
-			obj := bulkInfo.PortStateList[i]
-			port := &config.PortInfo{
-				IntfRef:   obj.IntfRef,
-				IfIndex:   obj.IfIndex,
-				OperState: obj.OperState,
-				Name:      obj.Name,
-			}
-			pObj, err := p.asicdClient.GetPort(obj.Name)
-			if err != nil {
-				debug.Logger.Err(fmt.Sprintln("Getting mac address for",
-					obj.Name, "failed, error:", err))
+	})
+	return switchInst
+}
+
+func (notifyHdl *AsicNotificationHdl) ProcessNotification(msg commonDefs.AsicdNotifyMsg) {
+	//notifyHdl.AsicdSubSocketCh <- msg
+	switch msg.(type) {
+	case commonDefs.L2IntfStateNotifyMsg:
+		l2Msg := msg.(commonDefs.L2IntfStateNotifyMsg)
+		if l2Msg.IfState == asicdCommonDefs.INTF_STATE_UP {
+			api.SendL2PortNotification(l2Msg.IfIndex, "UP")
+		} else {
+			api.SendL2PortNotification(l2Msg.IfIndex, "UP")
+		}
+	case commonDefs.L3IntfStateNotifyMsg:
+		l3Msg := msg.(commonDefs.L3IntfStateNotifyMsg)
+		if l3Msg.IfState == asicdCommonDefs.INTF_STATE_UP {
+			api.SendL3PortNotification(l3Msg.IfIndex, "UP")
+		} else {
+			api.SendL3PortNotification(l3Msg.IfIndex, "UP")
+		}
+	case commonDefs.VlanNotifyMsg:
+		/*
+			vlanMsg := msg.(commonDefs.VlanNotifyMsg)
+			if vlanMsg.IfState == asicdCommonDefs.INTF_STATE_UP {
+				api.SendVlanNotification(vlanMsg.VlanId, vlanMsg.VlanName, "UP")
 			} else {
-				port.MacAddr = pObj.MacAddr
-				port.Description = pObj.Description
+				api.SendVlanNotification(vlanMsg.VlanId, vlanMsg.VlanName, "UP")
 			}
-			portStates = append(portStates, port)
+		*/
+		break
+	//case commonDefs.LagNotifyMsg:
+	//	lagMsg := msg.(commonDefs.LagNotifyMsg)
+	case commonDefs.IPv6IntfNotifyMsg:
+		ipv6Msg := msg.(commonDefs.IPv6IntfNotifyMsg)
+		if ipv6Msg.MsgType == commonDefs.NOTIFY_IPV6INTF_CREATE {
+			api.SendIPv6Notfication(ipv6Msg.IfIndex, ipv6Msg.IpAddr, "CREATE")
+		} else {
+			api.SendIPv6Notfication(ipv6Msg.IfIndex, ipv6Msg.IpAddr, "DELETE")
 		}
-		if more == false {
-			break
-		}
+		//case commonDefs.IPv4NbrMacMoveNotifyMsg:
+		//	macMoveMsg := msg.(commonDefs.IPv4NbrMacMoveNotifyMsg)
 	}
-	debug.Logger.Info("Done with Port State list")
-	return portStates
-}
-
-func (p *AsicPlugin) getVlanStates() {
-	debug.Logger.Info("Get Vlans")
-	objCount := 0
-	var currMarker int64
-	more := false
-	count := 10
-	for {
-		bulkInfo, err := p.asicdClient.GetBulkVlanState(asicdServices.Int(currMarker), asicdServices.Int(count))
-		if err != nil {
-			debug.Logger.Err(fmt.Sprintln("getting bulk vlan config",
-				"from asicd failed with reason", err))
-			return
-		}
-		objCount = int(bulkInfo.Count)
-		more = bool(bulkInfo.More)
-		currMarker = int64(bulkInfo.EndIdx)
-		for i := 0; i < objCount; i++ {
-			//svr.VrrpCreateVlanEntry(int(bulkInfo.VlanStateList[i].VlanId),
-			//	bulkInfo.VlanStateList[i].VlanName)
-		}
-		if more == false {
-			break
-		}
-	}
-}
-
-func (p *AsicPlugin) getIPIntf() []*config.IPv6IntfInfo {
-	debug.Logger.Info("Get IPv6 Interface List")
-	objCount := 0
-	var currMarker int64
-	more := false
-	count := 10
-	ipStates := make([]*config.IPv6IntfInfo, 0)
-	for {
-		bulkInfo, err := p.asicdClient.GetBulkIPv6IntfState(asicdServices.Int(currMarker), asicdServices.Int(count))
-		if err != nil {
-			debug.Logger.Err(fmt.Sprintln("getting bulk ipv6 intf config",
-				"from asicd failed with reason", err))
-			return nil
-		}
-		objCount = int(bulkInfo.Count)
-		more = bool(bulkInfo.More)
-		currMarker = int64(bulkInfo.EndIdx)
-		for i := 0; i < objCount; i++ {
-			obj := bulkInfo.IPv6IntfStateList[i]
-			ipInfo := &config.IPv6IntfInfo{
-				IntfRef:   obj.IntfRef,
-				IfIndex:   obj.IfIndex,
-				OperState: obj.OperState,
-				IpAddr:    obj.IpAddr,
-			}
-			ipStates = append(ipStates, ipInfo)
-		}
-		if more == false {
-			break
-		}
-	}
-	debug.Logger.Info("Done with IPv6 State list")
-	return ipStates
-}
-
-//@TODO: because the FSDaemon is not modular ndp is using arguments for start
-func GetPorts(client *asicdServices.ASICDServicesClient, subSock *nanomsg.SubSocket) []*config.PortInfo {
-	asicPlugin := &AsicPlugin{client, subSock}
-	return asicPlugin.getPortsStates()
-}
-
-//@TODO: for futuer if NDP needs stub code is already present
-func GetVlans(client *asicdServices.ASICDServicesClient, subSock *nanomsg.SubSocket) {
-	//asicPlugin := &AsicPlugin{client, subSock}
-	return //asicPlugin.getVlanStates()
-}
-
-func GetIPIntf(client *asicdServices.ASICDServicesClient, subSock *nanomsg.SubSocket) []*config.IPv6IntfInfo {
-	asicPlugin := &AsicPlugin{client, subSock}
-	return asicPlugin.getIPIntf()
 }
 
 func ProcessMsg(rxBuf []byte) {

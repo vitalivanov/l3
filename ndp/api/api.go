@@ -20,38 +20,46 @@
 // |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
 // |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
 //
-
-package config
+package api
 
 import (
-	"github.com/google/gopacket/pcap"
+	"l3/ndp/server"
+	"sync"
 )
 
-type PcapBase struct {
-	// Pcap Handler for Each Port
-	PcapHandle *pcap.Handle
-	PcapCtrl   chan bool
+var ndpApi *NDPApiLayer = nil
+var once sync.Once
+
+type NDPApiLayer struct {
+	server *server.NDPServer
 }
 
-type PortInfo struct {
-	PcapBase
-	IntfRef     string
-	IfIndex     int32
-	Name        string
-	OperState   string
-	MacAddr     string
-	Description string
+/*  Singleton instance should be accessible only within api
+ */
+func getApiInstance() *NDPApiLayer {
+	once.Do(func() {
+		ndpApi = &NDPApiLayer{}
+	})
+	return ndpApi
 }
 
-type PortState struct {
-	IfIndex int32
-	IfState string
+func Init(svr *server.NDPServer) {
+	ndpApi = getApiInstance()
+	ndpApi.server = svr
 }
 
-type IPv6IntfInfo struct {
-	PcapBase
-	IntfRef   string
-	IfIndex   int32
-	IpAddr    string
-	OperState string
+func SendL2PortNotification(ifIndex int32, state string) {
+
+}
+
+func SendL3PortNotification(ifIndex int32, state string) {
+
+}
+
+func SendVlanNotification(vlanId uint16, vlanName, state string) {
+
+}
+
+func SendIPv6Notfication(ifIndex int32, ipaddr, msgType string) {
+
 }

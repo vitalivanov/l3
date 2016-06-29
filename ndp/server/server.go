@@ -26,19 +26,21 @@ import (
 	"fmt"
 	"l3/ndp/config"
 	"l3/ndp/debug"
-	"l3/ndp/flexswitch"
 	_ "models/objects"
 	"os"
 	"os/signal"
 	"syscall"
-	"utils/dmnBase"
+	"time"
+	"utils/asicdClient"
+	"utils/logging"
 )
 
-func NDPNewServer(baseObj *dmnBase.FSDaemon) *NDPServer {
+func NDPNewServer(sPlugin asicdClient.AsicdClientIntf, logger *logging.Writer) *NDPServer {
 	svr := &NDPServer{}
-	svr.DmnBase = baseObj
-	svr.DmnBase.NewServer()                      // Allocate memory to channels
-	debug.NDPSetLogger(baseObj.FSBaseDmn.Logger) // @TODO: Change this to interface and move it to util
+	//svr.DmnBase = baseObj
+	//svr.DmnBase.NewServer()                      // Allocate memory to channels
+	svr.SwitchPlugin = sPlugin
+	debug.NDPSetLogger(logger) // @TODO: Change this to interface and move it to util
 	return svr
 }
 
@@ -73,43 +75,88 @@ func (svr *NDPServer) OSSignalHandle() {
 }
 
 func (svr *NDPServer) InitGlobalDS() {
-	svr.GblInfo = make(map[string]NDPGlobalInfo, NDP_SYSTEM_PORT_MAP_CAPACITY)
+	svr.PhyPort = make(map[string]config.PortInfo, NDP_SYSTEM_PORT_MAP_CAPACITY)
+	svr.L3Port = make(map[string]config.IPv6IntfInfo, NDP_SYSTEM_PORT_MAP_CAPACITY)
+	svr.SnapShotLen = 1024
+	svr.Promiscuous = false
+	svr.Timeout = 1 * time.Second
 }
 
 func (svr *NDPServer) DeInitGlobalDS() {
-	svr.GblInfo = nil
+	svr.PhyPort = nil
+	svr.L3Port = nil
 }
 
 func (svr *NDPServer) InitSystemPortInfo(portInfo *config.PortInfo) {
 	if portInfo == nil {
 		return
 	}
-	gblInfo, _ := svr.GblInfo[portInfo.IntfRef]
-	gblInfo.InitRuntimePortInfo(portInfo)
-	svr.GblInfo[portInfo.IntfRef] = gblInfo
+	svr.PhyPort[portInfo.IntfRef] = *portInfo
+	svr.ndpIntfStateSlice = append(svr.ndpIntfStateSlice, portInfo.IntfRef)
 }
 
 func (svr *NDPServer) InitSystemIPIntf(ipInfo *config.IPv6IntfInfo) {
 	if ipInfo == nil {
 		return
 	}
-	gblInfo, _ := svr.GblInfo[ipInfo.IntfRef]
-	gblInfo.InitRuntimeIPInfo(ipInfo)
-	svr.GblInfo[ipInfo.IntfRef] = gblInfo
+	svr.L3Port[ipInfo.IntfRef] = *ipInfo
+	svr.ndpL3IntfStateSlice = append(svr.ndpL3IntfStateSlice, ipInfo.IntfRef)
 }
 
-// @TODO: Once we have the changes for modularity from FS Base Daemon we will use that to change this code
 func (svr *NDPServer) CollectSystemInformation() {
-	portStates := flexswitch.GetPorts(svr.DmnBase.Asicdclnt.ClientHdl, svr.DmnBase.AsicdSubSocket)
-	for _, port := range portStates {
-		svr.InitSystemPortInfo(port)
-	}
+	/*
+		//we really should not be carrying for system port state...???
+		portStates := svr.GetPorts()
+		for _, port := range portStates {
+			svr.InitSystemPortInfo(port)
+		}
 
-	//vlans := flexswitch.GetVlans(svr.DmnBase.Asicdclnt.ClientHdl, svr.DmnBase.AsicdSubSocket)
+	*/
 
-	ipIntfs := flexswitch.GetIPIntf(svr.DmnBase.Asicdclnt.ClientHdl, svr.DmnBase.AsicdSubSocket)
+	ipIntfs := svr.GetIPIntf()
 	for _, ipIntf := range ipIntfs {
 		svr.InitSystemIPIntf(ipIntf)
+	}
+}
+
+func (svr *NDPServer) InitPcapHdlrs() {
+	// We should not be creating pcap for ports, as the port states will just return
+	// us the name and operation state... ideally if the port is down then we can search for that
+	// interface ref in L3 Port map and bring the port down
+	/*
+		for _, intfRef := range svr.ndpIntfStateSlice {
+			port := svr.PhyPort[intfRef]
+			if port.OperState == NDP_PORT_STATE_UP {
+				// create pcap handler
+				if port.PcapBase.PcapHandle != nil {
+					debug.Logger.Info("Pcap already exists for port " + port.Name)
+					continue
+				}
+				err := svr.CreatePcapHandler(port.Name, port.PcapBase.PcapHandle)
+				if err != nil {
+					continue
+				}
+				svr.PhyPort[intfRef] = port
+				svr.ndpUpIntfStateSlice = append(svr.ndpUpIntfStateSlice, port.IntfRef)
+			}
+		}
+	*/
+
+	for _, intfRef := range svr.ndpL3IntfStateSlice {
+		l3 := svr.L3Port[intfRef]
+		if l3.OperState == NDP_IP_STATE_UP {
+			// create pcap handler
+			if l3.PcapBase.PcapHandle != nil {
+				debug.Logger.Info("Pcap already exists for port " + l3.IntfRef)
+				continue
+			}
+			err := svr.CreatePcapHandler(l3.IntfRef, l3.PcapBase.PcapHandle)
+			if err != nil {
+				continue
+			}
+			svr.L3Port[intfRef] = l3
+			svr.ndpUpL3IntfStateSlice = append(svr.ndpUpL3IntfStateSlice, l3.IntfRef)
+		}
 	}
 }
 
@@ -117,12 +164,14 @@ func (svr *NDPServer) EventsListener() {
 	for {
 		select {
 		//@TODO: need to make this modular... this is bad design, we cannot run ndp alone
-		case rxBuf, ok := <-svr.DmnBase.AsicdSubSocketCh:
-			if !ok {
-				debug.Logger.Err("Switch Channel Closed")
-			} else {
-				flexswitch.ProcessMsg(rxBuf)
-			}
+		/*
+			case rxBuf, ok := <-svr.DmnBase.AsicdSubSocketCh:
+				if !ok {
+					debug.Logger.Err("Switch Channel Closed")
+				} else {
+					flexswitch.ProcessMsg(rxBuf)
+				}
+		*/
 		}
 
 	}
@@ -139,9 +188,8 @@ func (svr *NDPServer) EventsListener() {
 func (svr *NDPServer) NDPStartServer() {
 	svr.OSSignalHandle()
 	svr.ReadDB()
-	// @TODO: Base class should be interface where the call is agnostic to the server
-	svr.DmnBase.InitSubscribers(make([]string, 0))
 	svr.InitGlobalDS()
 	svr.CollectSystemInformation()
+	svr.InitPcapHdlrs()
 	go svr.EventsListener()
 }
