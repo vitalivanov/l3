@@ -23,6 +23,7 @@
 package server
 
 import (
+	_ "errors"
 	"fmt"
 	"github.com/google/gopacket/pcap"
 	"l3/ndp/config"
@@ -90,6 +91,11 @@ func (svr *NDPServer) GetIPIntf() []*config.IPv6IntfInfo {
  * API: will create pcap handler for each port
  */
 func (svr *NDPServer) CreatePcapHandler(name string, pHdl *pcap.Handle) error {
+	// create pcap handler if there is none created right now
+	if pHdl != nil {
+		debug.Logger.Warning("Pcap already exists for port " + name)
+		return nil //errors.New("Pcap already exists for port " + name)
+	}
 	pHdl, err := pcap.OpenLive(name, svr.SnapShotLen, svr.Promiscuous, svr.Timeout)
 	if err != nil {
 		debug.Logger.Err(fmt.Sprintln("Creating Pcap Handler failed for", name, "Error:", err))
@@ -116,7 +122,31 @@ func (svr *NDPServer) DeletePcapHandler(pHdl *pcap.Handle) {
 }
 
 /*  API: will handle IPv6 notifications received from switch/asicd
+ *      Msg types
+ *	    1) Create:
+ *		     Start Rx/Tx in this case
+ *	    2) Delete:
+ *		     Stop Rx/Tx in this case
  */
 func (svr *NDPServer) HandleIPv6Notification(msg *config.IPv6IntfInfo) {
+	switch msg.OperState {
+	case "CREATE":
+		svr.StartRxTx(msg)
+	case "DELETE":
+		svr.StopRxTx(msg.IfIndex)
+	}
+}
 
+/*
+ *    API: It will remove any deleted ip port from the up state slice list
+ */
+func (svr *NDPServer) DeleteL3IntfFromUpState(ifIndex int32) {
+	for idx, entry := range svr.ndpUpL3IntfStateSlice {
+		if entry == ifIndex {
+			//@TODO: need to optimize this
+			svr.ndpUpL3IntfStateSlice = append(svr.ndpUpL3IntfStateSlice[:idx],
+				svr.ndpUpL3IntfStateSlice[idx+1:]...)
+			break
+		}
+	}
 }

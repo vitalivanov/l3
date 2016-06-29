@@ -96,14 +96,21 @@ func (svr *NDPServer) InitSystemPortInfo(portInfo *config.PortInfo) {
 	svr.ndpIntfStateSlice = append(svr.ndpIntfStateSlice, portInfo.IfIndex)
 }
 
-func (svr *NDPServer) InitSystemIPIntf(ipInfo *config.IPv6IntfInfo) {
-	if ipInfo == nil {
+func (svr *NDPServer) InitSystemIPIntf(entry *config.IPv6IntfInfo, ipInfo *config.IPv6IntfInfo) {
+	if ipInfo == nil || entry == nil {
 		return
 	}
-	svr.L3Port[ipInfo.IfIndex] = *ipInfo
+	entry.IfIndex = ipInfo.IfIndex
+	entry.IntfRef = ipInfo.IntfRef
+	entry.OperState = ipInfo.OperState
+	entry.IpAddr = ipInfo.IpAddr
 	svr.ndpL3IntfStateSlice = append(svr.ndpL3IntfStateSlice, ipInfo.IfIndex)
 }
 
+/*
+ * API: it will collect all ipv6 interface ports from the system... If needed we can collect port information
+ *      also from the system.
+ */
 func (svr *NDPServer) CollectSystemInformation() {
 	/*
 		//we really should not be carrying for system port state...???
@@ -113,10 +120,11 @@ func (svr *NDPServer) CollectSystemInformation() {
 		}
 
 	*/
-
 	ipIntfs := svr.GetIPIntf()
 	for _, ipIntf := range ipIntfs {
-		svr.InitSystemIPIntf(ipIntf)
+		gblInfo := svr.L3Port[ipIntf.IfIndex]
+		svr.InitSystemIPIntf(&gblInfo, ipIntf)
+		svr.L3Port[ipIntf.IfIndex] = gblInfo
 	}
 }
 
@@ -146,11 +154,6 @@ func (svr *NDPServer) InitPcapHdlrs() {
 	for _, ifIndex := range svr.ndpL3IntfStateSlice {
 		l3 := svr.L3Port[ifIndex]
 		if l3.OperState == NDP_IP_STATE_UP {
-			// create pcap handler
-			if l3.PcapBase.PcapHandle != nil {
-				debug.Logger.Info("Pcap already exists for port " + l3.IntfRef)
-				continue
-			}
 			err := svr.CreatePcapHandler(l3.IntfRef, l3.PcapBase.PcapHandle)
 			if err != nil {
 				continue
@@ -166,15 +169,6 @@ func (svr *NDPServer) EventsListener() {
 		select {
 		case ipv6Notify := <-svr.Ipv6Ch:
 			svr.HandleIPv6Notification(ipv6Notify)
-			//@TODO: need to make this modular... this is bad design, we cannot run ndp alone
-			/*
-				case rxBuf, ok := <-svr.DmnBase.AsicdSubSocketCh:
-					if !ok {
-						debug.Logger.Err("Switch Channel Closed")
-					} else {
-						flexswitch.ProcessMsg(rxBuf)
-					}
-			*/
 		}
 
 	}
