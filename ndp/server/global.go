@@ -39,13 +39,13 @@ type NDPServer struct {
 	SwitchPlugin asicdClient.AsicdClientIntf
 
 	// System Ports information, key is IntfRef
-	PhyPort map[string]config.PortInfo
-	L3Port  map[string]config.IPv6IntfInfo
+	PhyPort map[int32]config.PortInfo
+	L3Port  map[int32]config.IPv6IntfInfo
 
-	ndpIntfStateSlice     []string
-	ndpUpIntfStateSlice   []string
-	ndpL3IntfStateSlice   []string
-	ndpUpL3IntfStateSlice []string
+	ndpIntfStateSlice     []int32
+	ndpUpIntfStateSlice   []int32
+	ndpL3IntfStateSlice   []int32
+	ndpUpL3IntfStateSlice []int32
 
 	//Pcap Default config values
 	SnapShotLen int32

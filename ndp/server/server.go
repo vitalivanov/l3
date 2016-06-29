@@ -75,8 +75,8 @@ func (svr *NDPServer) OSSignalHandle() {
 }
 
 func (svr *NDPServer) InitGlobalDS() {
-	svr.PhyPort = make(map[string]config.PortInfo, NDP_SYSTEM_PORT_MAP_CAPACITY)
-	svr.L3Port = make(map[string]config.IPv6IntfInfo, NDP_SYSTEM_PORT_MAP_CAPACITY)
+	svr.PhyPort = make(map[int32]config.PortInfo, NDP_SYSTEM_PORT_MAP_CAPACITY)
+	svr.L3Port = make(map[int32]config.IPv6IntfInfo, NDP_SYSTEM_PORT_MAP_CAPACITY)
 	svr.SnapShotLen = 1024
 	svr.Promiscuous = false
 	svr.Timeout = 1 * time.Second
@@ -91,16 +91,16 @@ func (svr *NDPServer) InitSystemPortInfo(portInfo *config.PortInfo) {
 	if portInfo == nil {
 		return
 	}
-	svr.PhyPort[portInfo.IntfRef] = *portInfo
-	svr.ndpIntfStateSlice = append(svr.ndpIntfStateSlice, portInfo.IntfRef)
+	svr.PhyPort[portInfo.IfIndex] = *portInfo
+	svr.ndpIntfStateSlice = append(svr.ndpIntfStateSlice, portInfo.IfIndex)
 }
 
 func (svr *NDPServer) InitSystemIPIntf(ipInfo *config.IPv6IntfInfo) {
 	if ipInfo == nil {
 		return
 	}
-	svr.L3Port[ipInfo.IntfRef] = *ipInfo
-	svr.ndpL3IntfStateSlice = append(svr.ndpL3IntfStateSlice, ipInfo.IntfRef)
+	svr.L3Port[ipInfo.IfIndex] = *ipInfo
+	svr.ndpL3IntfStateSlice = append(svr.ndpL3IntfStateSlice, ipInfo.IfIndex)
 }
 
 func (svr *NDPServer) CollectSystemInformation() {
@@ -124,8 +124,8 @@ func (svr *NDPServer) InitPcapHdlrs() {
 	// us the name and operation state... ideally if the port is down then we can search for that
 	// interface ref in L3 Port map and bring the port down
 	/*
-		for _, intfRef := range svr.ndpIntfStateSlice {
-			port := svr.PhyPort[intfRef]
+		for _, ifIndex := range svr.ndpIntfStateSlice {
+			port := svr.PhyPort[ifIndex]
 			if port.OperState == NDP_PORT_STATE_UP {
 				// create pcap handler
 				if port.PcapBase.PcapHandle != nil {
@@ -136,14 +136,14 @@ func (svr *NDPServer) InitPcapHdlrs() {
 				if err != nil {
 					continue
 				}
-				svr.PhyPort[intfRef] = port
-				svr.ndpUpIntfStateSlice = append(svr.ndpUpIntfStateSlice, port.IntfRef)
+				svr.PhyPort[ifIndex] = port
+				svr.ndpUpIntfStateSlice = append(svr.ndpUpIntfStateSlice, port.IfIndex)
 			}
 		}
 	*/
 
-	for _, intfRef := range svr.ndpL3IntfStateSlice {
-		l3 := svr.L3Port[intfRef]
+	for _, ifIndex := range svr.ndpL3IntfStateSlice {
+		l3 := svr.L3Port[ifIndex]
 		if l3.OperState == NDP_IP_STATE_UP {
 			// create pcap handler
 			if l3.PcapBase.PcapHandle != nil {
@@ -154,8 +154,8 @@ func (svr *NDPServer) InitPcapHdlrs() {
 			if err != nil {
 				continue
 			}
-			svr.L3Port[intfRef] = l3
-			svr.ndpUpL3IntfStateSlice = append(svr.ndpUpL3IntfStateSlice, l3.IntfRef)
+			svr.L3Port[ifIndex] = l3
+			svr.ndpUpL3IntfStateSlice = append(svr.ndpUpL3IntfStateSlice, l3.IfIndex)
 		}
 	}
 }

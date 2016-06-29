@@ -61,5 +61,4 @@ func SendVlanNotification(vlanId uint16, vlanName, state string) {
 }
 
 func SendIPv6Notfication(ifIndex int32, ipaddr, msgType string) {
-
 }
