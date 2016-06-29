@@ -54,4 +54,5 @@ type IPv6IntfInfo struct {
 	IfIndex   int32
 	IpAddr    string
 	OperState string
+	MsgType   string
 }

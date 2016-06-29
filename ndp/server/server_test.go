@@ -44,7 +44,6 @@ func NDPTestNewLogger(name string, tag string, listenToConfig bool) (*logging.Wr
 
 	srLogger.GlobalLogging = true
 	srLogger.MyLogLevel = sysdCommonDefs.INFO
-	fmt.Println("Logging level ", srLogger.MyLogLevel, " set for ", srLogger.MyComponentName)
 	return srLogger, err
 }
 
@@ -68,7 +67,7 @@ func TestInvalidInitPortInfo(t *testing.T) {
 func TestInvalidInitL3Info(t *testing.T) {
 	svr := &NDPServer{}
 	svr.InitGlobalDS()
-	svr.InitSystemIPIntf(nil)
+	svr.InitSystemIPIntf(nil, nil)
 
 	if len(svr.L3Port) > 0 {
 		t.Error("There should not be any elements in the system ip map", len(svr.L3Port))
@@ -91,7 +90,7 @@ func TestPcapCreate(t *testing.T) {
 	svr := NDPNewServer(nil, logger)
 	svr.InitGlobalDS()
 	// @TODO: get the system linux name
-	err = svr.CreatePcapHandler("eth0", pcapHdl)
+	err = svr.CreatePcapHandler("lo", pcapHdl)
 	if err != nil {
 		t.Error("Pcap Create Failed", err)
 	}

@@ -75,8 +75,9 @@ func (svr *NDPServer) OSSignalHandle() {
 }
 
 func (svr *NDPServer) InitGlobalDS() {
-	svr.PhyPort = make(map[string]config.PortInfo, NDP_SYSTEM_PORT_MAP_CAPACITY)
-	svr.L3Port = make(map[string]config.IPv6IntfInfo, NDP_SYSTEM_PORT_MAP_CAPACITY)
+	svr.PhyPort = make(map[int32]config.PortInfo, NDP_SYSTEM_PORT_MAP_CAPACITY)
+	svr.L3Port = make(map[int32]config.IPv6IntfInfo, NDP_SYSTEM_PORT_MAP_CAPACITY)
+	svr.Ipv6Ch = make(chan *config.IPv6IntfInfo)
 	svr.SnapShotLen = 1024
 	svr.Promiscuous = false
 	svr.Timeout = 1 * time.Second
@@ -91,19 +92,27 @@ func (svr *NDPServer) InitSystemPortInfo(portInfo *config.PortInfo) {
 	if portInfo == nil {
 		return
 	}
-	svr.PhyPort[portInfo.IntfRef] = *portInfo
-	svr.ndpIntfStateSlice = append(svr.ndpIntfStateSlice, portInfo.IntfRef)
+	svr.PhyPort[portInfo.IfIndex] = *portInfo
+	svr.ndpIntfStateSlice = append(svr.ndpIntfStateSlice, portInfo.IfIndex)
 }
 
-func (svr *NDPServer) InitSystemIPIntf(ipInfo *config.IPv6IntfInfo) {
-	if ipInfo == nil {
+func (svr *NDPServer) InitSystemIPIntf(entry *config.IPv6IntfInfo, ipInfo *config.IPv6IntfInfo) {
+	if ipInfo == nil || entry == nil {
 		return
 	}
-	svr.L3Port[ipInfo.IntfRef] = *ipInfo
-	svr.ndpL3IntfStateSlice = append(svr.ndpL3IntfStateSlice, ipInfo.IntfRef)
+	entry.IfIndex = ipInfo.IfIndex
+	entry.IntfRef = ipInfo.IntfRef
+	entry.OperState = ipInfo.OperState
+	entry.IpAddr = ipInfo.IpAddr
+	svr.ndpL3IntfStateSlice = append(svr.ndpL3IntfStateSlice, ipInfo.IfIndex)
 }
 
-func (svr *NDPServer) CollectSystemInformation() {
+/*
+ * API: it will collect all ipv6 interface ports from the system... If needed we can collect port information
+ *      also from the system.
+ *	After the information is collected, if the oper state is up then we will start rx/tx
+ */
+func (svr *NDPServer) InitSystem() {
 	/*
 		//we really should not be carrying for system port state...???
 		portStates := svr.GetPorts()
@@ -112,50 +121,13 @@ func (svr *NDPServer) CollectSystemInformation() {
 		}
 
 	*/
-
 	ipIntfs := svr.GetIPIntf()
 	for _, ipIntf := range ipIntfs {
-		svr.InitSystemIPIntf(ipIntf)
-	}
-}
-
-func (svr *NDPServer) InitPcapHdlrs() {
-	// We should not be creating pcap for ports, as the port states will just return
-	// us the name and operation state... ideally if the port is down then we can search for that
-	// interface ref in L3 Port map and bring the port down
-	/*
-		for _, intfRef := range svr.ndpIntfStateSlice {
-			port := svr.PhyPort[intfRef]
-			if port.OperState == NDP_PORT_STATE_UP {
-				// create pcap handler
-				if port.PcapBase.PcapHandle != nil {
-					debug.Logger.Info("Pcap already exists for port " + port.Name)
-					continue
-				}
-				err := svr.CreatePcapHandler(port.Name, port.PcapBase.PcapHandle)
-				if err != nil {
-					continue
-				}
-				svr.PhyPort[intfRef] = port
-				svr.ndpUpIntfStateSlice = append(svr.ndpUpIntfStateSlice, port.IntfRef)
-			}
-		}
-	*/
-
-	for _, intfRef := range svr.ndpL3IntfStateSlice {
-		l3 := svr.L3Port[intfRef]
-		if l3.OperState == NDP_IP_STATE_UP {
-			// create pcap handler
-			if l3.PcapBase.PcapHandle != nil {
-				debug.Logger.Info("Pcap already exists for port " + l3.IntfRef)
-				continue
-			}
-			err := svr.CreatePcapHandler(l3.IntfRef, l3.PcapBase.PcapHandle)
-			if err != nil {
-				continue
-			}
-			svr.L3Port[intfRef] = l3
-			svr.ndpUpL3IntfStateSlice = append(svr.ndpUpL3IntfStateSlice, l3.IntfRef)
+		ipPort := svr.L3Port[ipIntf.IfIndex]
+		svr.InitSystemIPIntf(&ipPort, ipIntf)
+		svr.L3Port[ipIntf.IfIndex] = ipPort
+		if ipPort.OperState == NDP_IP_STATE_UP {
+			svr.StartRxTx(ipIntf)
 		}
 	}
 }
@@ -163,15 +135,8 @@ func (svr *NDPServer) InitPcapHdlrs() {
 func (svr *NDPServer) EventsListener() {
 	for {
 		select {
-		//@TODO: need to make this modular... this is bad design, we cannot run ndp alone
-		/*
-			case rxBuf, ok := <-svr.DmnBase.AsicdSubSocketCh:
-				if !ok {
-					debug.Logger.Err("Switch Channel Closed")
-				} else {
-					flexswitch.ProcessMsg(rxBuf)
-				}
-		*/
+		case ipv6Notify := <-svr.Ipv6Ch:
+			svr.HandleIPv6Notification(ipv6Notify)
 		}
 
 	}
@@ -189,7 +154,6 @@ func (svr *NDPServer) NDPStartServer() {
 	svr.OSSignalHandle()
 	svr.ReadDB()
 	svr.InitGlobalDS()
-	svr.CollectSystemInformation()
-	svr.InitPcapHdlrs()
+	svr.InitSystem()
 	go svr.EventsListener()
 }
