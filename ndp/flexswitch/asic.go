@@ -27,8 +27,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"l3/ndp/debug"
+	"sync"
 	"utils/commonDefs"
 )
+
+var switchInst *commonDefs.AsicdClientStruct = nil
+var once sync.Once
 
 func initAsicdNotification() commonDefs.AsicdNotification {
 	nMap := make(commonDefs.AsicdNotification)
@@ -53,15 +57,17 @@ func initAsicdNotification() commonDefs.AsicdNotification {
 	return nMap
 }
 
-func NewSwitchPlugin() commonDefs.AsicdClientStruct {
-	notifyMap := initAsicdNotification()
-	notifyHdl := &AsicNotificationHdl{}
-	notifyHdl.AsicdSubSocketCh = make(chan commonDefs.AsicdNotifyMsg)
-	asicdHdl := commonDefs.AsicdClientStruct{
-		NHdl: notifyHdl,
-		NMap: notifyMap,
-	}
-	return asicdHdl
+func GetSwitchInst() *commonDefs.AsicdClientStruct {
+	once.Do(func() {
+		notifyMap := initAsicdNotification()
+		notifyHdl := &AsicNotificationHdl{}
+		notifyHdl.AsicdSubSocketCh = make(chan commonDefs.AsicdNotifyMsg)
+		switchInst = &commonDefs.AsicdClientStruct{
+			NHdl: notifyHdl,
+			NMap: notifyMap,
+		}
+	})
+	return switchInst
 }
 
 func (notifyHdl *AsicNotificationHdl) ProcessNotification(msg commonDefs.AsicdNotifyMsg) {

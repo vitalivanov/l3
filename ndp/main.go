@@ -54,10 +54,10 @@ func main() {
 			return
 		}
 		// create handler and map for recieving notifications from switch/asicd
-		asicHdl := flexswitch.NewSwitchPlugin()
+		asicHdl := flexswitch.GetSwitchInst()
 		asicHdl.Logger = ndpBase.GetLogger()
 		// connect to server and do the initializing
-		switchPlugin := ndpBase.InitSwitch(plugin, "ndpd", "NDP", asicHdl)
+		switchPlugin := ndpBase.InitSwitch(plugin, "ndpd", "NDP", *asicHdl)
 		// create north bound config listener
 		lPlugin := flexswitch.NewConfigPlugin(flexswitch.NewConfigHandler(),
 			ndpBase.ParamsDir, ndpBase.GetLogger())
