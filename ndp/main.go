@@ -25,6 +25,7 @@ package main
 import (
 	"fmt"
 	"l3/ndp/api"
+	"l3/ndp/debug"
 	"l3/ndp/flexswitch"
 	"l3/ndp/server"
 	"utils/dmnBase"
@@ -47,6 +48,7 @@ func main() {
 	case "OvsDB":
 
 	default:
+		//@TODO: need to make the object as singleton
 		ndpBase := dmnBase.NewBaseDmn("ndpd", "NDP")
 		status := ndpBase.Init()
 		if status == false {
@@ -56,13 +58,13 @@ func main() {
 		// create handler and map for recieving notifications from switch/asicd
 		asicHdl := flexswitch.GetSwitchInst()
 		asicHdl.Logger = ndpBase.GetLogger()
+		debug.NDPSetLogger(ndpBase.GetLogger()) // @TODO: Change this to interface and move it to util
 		// connect to server and do the initializing
 		switchPlugin := ndpBase.InitSwitch(plugin, "ndpd", "NDP", *asicHdl)
 		// create north bound config listener
-		lPlugin := flexswitch.NewConfigPlugin(flexswitch.NewConfigHandler(),
-			ndpBase.ParamsDir, ndpBase.GetLogger())
+		lPlugin := flexswitch.NewConfigPlugin(flexswitch.NewConfigHandler(), ndpBase.ParamsDir)
 		// create new ndp server and cache the information for switch/asicd plugin
-		ndpServer := server.NDPNewServer(switchPlugin, ndpBase.GetLogger())
+		ndpServer := server.NDPNewServer(switchPlugin)
 		// Init API layer after server is created
 		api.Init(ndpServer)
 		// build basic NDP server information

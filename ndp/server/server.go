@@ -32,15 +32,11 @@ import (
 	"syscall"
 	"time"
 	"utils/asicdClient"
-	"utils/logging"
 )
 
-func NDPNewServer(sPlugin asicdClient.AsicdClientIntf, logger *logging.Writer) *NDPServer {
+func NDPNewServer(sPlugin asicdClient.AsicdClientIntf) *NDPServer {
 	svr := &NDPServer{}
-	//svr.DmnBase = baseObj
-	//svr.DmnBase.NewServer()                      // Allocate memory to channels
 	svr.SwitchPlugin = sPlugin
-	debug.NDPSetLogger(logger) // @TODO: Change this to interface and move it to util
 	return svr
 }
 
