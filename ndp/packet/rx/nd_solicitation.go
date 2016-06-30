@@ -22,13 +22,48 @@
 //
 package rx
 
-/*
 import (
-	"errors"
-	"github.com/google/gopacket"
-	"github.com/google/gopacket/layers"
+	"encoding/binary"
+	_ "errors"
+	_ "github.com/google/gopacket"
+	_ "github.com/google/gopacket/layers"
 	_ "github.com/google/gopacket/pcap"
-	_ "net"
+	_ "l3/ndp/debug"
+	"net"
 	_ "time"
 )
-*/
+
+type NDSolicitation struct {
+	Reserved      uint32
+	TargetAddress net.IP
+}
+
+const (
+	IPV6_ADDRESS_BYTES = 16
+)
+
+/*		ND Solicitation Packet Format Rcvd From ICPMv6
+ *    0                   1                   2                   3
+ *    0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+ *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ *   |                           Reserved                            |
+ *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ *   |                                                               |
+ *   +                                                               +
+ *   |                                                               |
+ *   +                       Target Address                          +
+ *   |                                                               |
+ *   +                                                               +
+ *   |                                                               |
+ *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ *   |   Options ...
+ *   +-+-+-+-+-+-+-+-+-+-+-+-
+ */
+func DecodeNDSolicitation(payload []byte, nds *NDSolicitation) error {
+	nds.Reserved = uint32(binary.BigEndian.Uint32(payload[0:4]))
+	if nds.TargetAddress == nil {
+		nds.TargetAddress = make(net.IP, IPV6_ADDRESS_BYTES, IPV6_ADDRESS_BYTES)
+	}
+	copy(nds.TargetAddress, payload[4:20])
+	return nil
+}

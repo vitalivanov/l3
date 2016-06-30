@@ -27,10 +27,11 @@ import (
 	"fmt"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
+	"l3/ndp/packet/rx"
 )
 
 /*
- *               NEIGHBOR SOLICITATION MESSAGE FORMAT
+ *			ICMPv6 MESSAGE FORMAT
  *
  *    0                   1                   2                   3
  *    0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
@@ -95,12 +96,14 @@ func validateIPv6Hdr(hdr *layers.IPv6) error {
 }
 
 func validateICMPv6Hdr(hdr *layers.ICMPv6) error {
+	nds := &rx.NDSolicitation{}
 	typeCode := hdr.TypeCode
 	if typeCode.Code() != ICMPv6_CODE {
 		return errors.New(fmt.Sprintln("Invalid Code", typeCode.Code()))
 	}
 	switch typeCode.Type() {
 	case layers.ICMPv6TypeNeighborSolicitation:
+		rx.DecodeNDSolicitation(hdr.LayerPayload(), nds)
 
 	case layers.ICMPv6TypeRouterSolicitation:
 		return errors.New("Router Solicitation is not yet supported")
