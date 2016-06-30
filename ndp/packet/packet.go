@@ -88,6 +88,9 @@ func validateIPv6Hdr(hdr *layers.IPv6) error {
 	if hdr.HopLimit != HOP_LIMIT {
 		return errors.New(fmt.Sprintln("Invalid Hop Limit", hdr.HopLimit))
 	}
+	if hdr.Length < ICMPv6_MIN_LENGTH {
+		return errors.New(fmt.Sprintln("Invalid ICMP length", hdr.Length))
+	}
 	return nil
 }
 
