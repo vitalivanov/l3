@@ -43,7 +43,7 @@ func NewConfigPlugin(handler *ConfigHandler, fileName string) *ConfigPlugin {
 	return l
 }
 
-func (cfg *ConfigPlugin) Start() error {
+func (cfg *ConfigPlugin) StartConfigListener() error {
 	fileName := cfg.fileName + "clients.json"
 
 	clientJson, err := getClient(fileName, "ndpd")

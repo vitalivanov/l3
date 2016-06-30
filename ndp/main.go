@@ -70,6 +70,6 @@ func main() {
 		// build basic NDP server information
 		ndpServer.NDPStartServer()
 		ndpBase.StartKeepAlive()
-		lPlugin.Start()
+		lPlugin.StartConfigListener()
 	}
 }
