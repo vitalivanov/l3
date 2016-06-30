@@ -67,15 +67,15 @@ func getIpAndICMPv6Hdr(pkt gopacket.Packet, ipv6Hdr *layers.IPv6, icmpv6Hdr *lay
 /*
  * Validation Conditions are defined below, if anyone of them do not satisfy discard the packet:
  *  - The IP Hop Limit field has a value of 255, i.e., the packet
- *   could not possibly have been forwarded by a router.
+ *   could not possibly have been forwarded by a router. <- done
  *
  *  - ICMP Checksum is valid.
  *
- *  - ICMP Code is 0.
+ *  - ICMP Code is 0. <- done
  *
- *  - ICMP length (derived from the IP length) is 24 or more octets.
+ *  - ICMP length (derived from the IP length) is 24 or more octets. <- done
  *
- *  - Target Address is not a multicast address.
+ *  - Target Address is not a multicast address. <- done
  *
  *  - All included options have a length that is greater than zero.
  *
@@ -104,6 +104,10 @@ func validateICMPv6Hdr(hdr *layers.ICMPv6) error {
 	switch typeCode.Type() {
 	case layers.ICMPv6TypeNeighborSolicitation:
 		rx.DecodeNDSolicitation(hdr.LayerPayload(), nds)
+		if rx.IsNDSolicitationMulticastAddr(nds.TargetAddress[0]) {
+			return errors.New(fmt.Sprintln("Targent Address specified", nds.TargetAddress,
+				"is a multicast address"))
+		}
 
 	case layers.ICMPv6TypeRouterSolicitation:
 		return errors.New("Router Solicitation is not yet supported")

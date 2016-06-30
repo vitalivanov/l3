@@ -24,13 +24,8 @@ package rx
 
 import (
 	"encoding/binary"
-	_ "errors"
-	_ "github.com/google/gopacket"
-	_ "github.com/google/gopacket/layers"
-	_ "github.com/google/gopacket/pcap"
-	_ "l3/ndp/debug"
 	"net"
-	_ "time"
+	"reflect"
 )
 
 type NDSolicitation struct {
@@ -39,7 +34,8 @@ type NDSolicitation struct {
 }
 
 const (
-	IPV6_ADDRESS_BYTES = 16
+	IPV6_ADDRESS_BYTES       = 16
+	IPV6_MULTICAST_BYTE byte = 0xff
 )
 
 /*		ND Solicitation Packet Format Rcvd From ICPMv6
@@ -66,4 +62,15 @@ func DecodeNDSolicitation(payload []byte, nds *NDSolicitation) error {
 	}
 	copy(nds.TargetAddress, payload[4:20])
 	return nil
+}
+
+/*
+ *  According to RFC 2375 https://tools.ietf.org/html/rfc2375 all ipv6 multicast address have first byte as
+ *  FF or 0xff, so compare that with the Target address first byte.
+ */
+func IsNDSolicitationMulticastAddr(in byte) bool {
+	if reflect.DeepEqual(in, IPV6_MULTICAST_BYTE) {
+		return true
+	}
+	return false
 }

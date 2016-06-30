@@ -75,3 +75,20 @@ func TestNDSolicitationDecoder(t *testing.T) {
 		t.Error("Decoding NDS Failed")
 	}
 }
+
+// Test ND Solicitation multicast Address Validation
+func TestNDSMulticast(t *testing.T) {
+	var b byte
+	b = 0xfe
+
+	// b is not multicast address, fail the test case if true is returned
+	if IsNDSolicitationMulticastAddr(b) {
+		t.Error("byte is not ipv6 muticast address", b)
+	}
+
+	b = 0xff
+	// b is multicast address, fail the test case if false is returned
+	if !IsNDSolicitationMulticastAddr(b) {
+		t.Error("byte is ipv6 muticast address", b)
+	}
+}
