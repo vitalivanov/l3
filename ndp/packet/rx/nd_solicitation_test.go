@@ -91,3 +91,25 @@ func TestNDSMulticast(t *testing.T) {
 		t.Error("byte is ipv6 muticast address", b)
 	}
 }
+
+// Test ND Solicitation src ip Address Validation
+func TestNDSIpAddress(t *testing.T) {
+	srcIP := net.IP{0}
+	dstIP := net.IP{0xff, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0xff, 0x10, 0x78, 0x2e}
+
+	err := ValidateIpAddrs(srcIP, dstIP)
+	if err != nil {
+		t.Error("Validation of ip address failed with error", err)
+	}
+
+	srcIP = net.IP{1}
+	err = ValidateIpAddrs(srcIP, dstIP)
+	if err != nil {
+		t.Error("Validation of ip address", srcIP, "failed with error", err)
+	}
+	dstIP = net.IP{0xfe, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xc0, 0x00, 0x54, 0xff, 0xfe, 0xf5, 0x00, 0x01}
+	err = ValidateIpAddrs(srcIP, dstIP)
+	if err != nil {
+		t.Error("Validation of ip address", srcIP, "dst Ip", dstIP, "failed with error", err)
+	}
+}

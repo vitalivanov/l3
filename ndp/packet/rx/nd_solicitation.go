@@ -24,8 +24,10 @@ package rx
 
 import (
 	"encoding/binary"
+	"errors"
+	"fmt"
 	"net"
-	"reflect"
+	_ "reflect"
 )
 
 type NDSolicitation struct {
@@ -70,16 +72,26 @@ func DecodeNDSolicitation(payload []byte, nds *NDSolicitation) error {
  *  FF or 0xff, so compare that with the Target address first byte.
  */
 func IsNDSolicitationMulticastAddr(in net.IP) bool {
-	if reflect.DeepEqual(in[0], IPV6_MULTICAST_BYTE) {
+	if in.IsMulticast() {
 		return true
 	}
 	return false
 }
 
 /*
+ *
+ *  Range for Solicited Node Multicast Address from RFC 4291 FF02:0:0:0:0:1:FF00:0000 to FF02:0:0:0:0:1:FFFF:FFFF
  *  if srcIp == "::", i.e Unspecified address then dstIP should be solicited-node address FF02:0:0:0:0:1:FFXX:XXXX
  *  if srcIP == "::", then there should not be any source link-layer option in message
  */
-func ValidateIpAddrs(srcIP net.IP, dstIP net.IP) {
-
+func ValidateIpAddrs(srcIP net.IP, dstIP net.IP) error {
+	if srcIP.IsUnspecified() {
+		if !(dstIP[0] == IPV6_MULTICAST_BYTE && dstIP[1]&0x0f == 0x02 &&
+			dstIP[12]&0x0f == 0x01 && dstIP[13] == IPV6_MULTICAST_BYTE) {
+			return errors.New(fmt.Sprintln("Destination IP address",
+				dstIP.String(), "is not Solicited-Node Multicast Address"))
+		}
+		// @TODO: need to add support for source link-layer address option
+	}
+	return nil
 }
