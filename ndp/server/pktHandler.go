@@ -43,7 +43,7 @@ func (svr *NDPServer) ReceivedNdpPkts(ifIndex int32) {
 			if !ok {
 				continue
 			}
-			debug.Logger.Info(fmt.Sprintln("Process incoming packets", pkt))
+			svr.RxPktCh <- &RxPktInfo{pkt, ipPort.IfIndex}
 		case <-ipPort.PcapBase.PcapCtrl:
 			svr.DeletePcapHandler(ipPort.PcapBase.PcapHandle)
 			svr.L3Port[ifIndex] = ipPort

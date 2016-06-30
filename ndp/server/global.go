@@ -23,6 +23,7 @@
 package server
 
 import (
+	"github.com/google/gopacket"
 	"l3/ndp/config"
 	"time"
 	"utils/asicdClient" // this is switch plugin need to change the name
@@ -35,6 +36,11 @@ const (
 	NDP_IP_STATE_DOWN   = "DOWN"
 )
 
+type RxPktInfo struct {
+	pkt     gopacket.Packet
+	ifIndex int32
+}
+
 type NDPServer struct {
 	SwitchPlugin asicdClient.AsicdClientIntf
 
@@ -44,6 +50,8 @@ type NDPServer struct {
 
 	//IPV6 Create/Delete Notification Channel
 	Ipv6Ch chan *config.IPv6IntfInfo
+	//Received Pkt Channel
+	RxPktCh chan *RxPktInfo
 
 	ndpIntfStateSlice     []int32
 	ndpUpIntfStateSlice   []int32

@@ -23,9 +23,32 @@
 package packet
 
 import (
-	_ "github.com/google/gopacket/pcap"
+	"github.com/google/gopacket"
 )
 
-type NDPPort struct {
-	IntfRef string
+/*
+ * Validation Conditions are defined below:
+ *  - The IP Hop Limit field has a value of 255, i.e., the packet
+ *   could not possibly have been forwarded by a router.
+ *
+ *  - ICMP Checksum is valid.
+ *
+ *  - ICMP Code is 0.
+ *
+ *  - ICMP length (derived from the IP length) is 24 or more octets.
+ *
+ *  - Target Address is not a multicast address.
+ *
+ *  - All included options have a length that is greater than zero.
+ *
+ *  - If the IP source address is the unspecified address, the IP
+ *    destination address is a solicited-node multicast address.
+ *
+ *  - If the IP source address is the unspecified address, there is no
+ *    source link-layer address option in the message.
+ */
+func ValidateNdSolicitation(pkt gopacket.Packet) (valid bool) {
+	// first decode ip packet
+
+	return valid
 }
