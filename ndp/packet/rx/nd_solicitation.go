@@ -22,6 +22,7 @@
 //
 package rx
 
+/*
 import (
 	"errors"
 	"github.com/google/gopacket"
@@ -30,37 +31,4 @@ import (
 	_ "net"
 	_ "time"
 )
-
-/*
- *               NEIGHBOR SOLICITATION MESSAGE FORMAT
- *
- *    0                   1                   2                   3
- *    0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |     Type      |     Code      |          Checksum             |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |                           Reserved                            |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |                                                               |
- *   +                                                               +
- *   |                                                               |
- *   +                       Target Address                          +
- *   |                                                               |
- *   +                                                               +
- *   |                                                               |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |   Options ...
- *   +-+-+-+-+-+-+-+-+-+-+-+-
- *
- *  API: given a packet it will fill in ip header and nd solicitation header
- */
-func GetIpAndNdSolicitationHeader(pkt gopacket.Packet, ipHdr *layers.IPv6, ndHdr *layers.ICMPv6) error {
-	ipLayer := pkt.Layer(layers.LayerTypeIPv6)
-	if ipLayer == nil {
-		return errors.New("Invalid IPv6 layer")
-	}
-	*ipHdr = *ipLayer.(*layers.IPv6)
-	ipPayload := ipLayer.LayerPayload()
-	ndHdr.DecodeFromBytes(ipPayload, nil)
-	return nil
-}
+*/

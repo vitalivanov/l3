@@ -20,7 +20,7 @@
 // |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
 // |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
 //
-package rx
+package packet
 
 import (
 	"fmt"
@@ -60,42 +60,43 @@ func NDPTestNewLogger(name string, tag string, listenToConfig bool) (*logging.Wr
 	return srLogger, err
 }
 
-func DeepCheckIPv6Hdr(ipHdr, ipv6Want *layers.IPv6, t *testing.T) {
-	if !reflect.DeepEqual(ipHdr.Version, ipv6Want.Version) {
-		t.Error("Version mismatch", ipHdr.Version, ipv6Want.Version)
+func DeepCheckIPv6Hdr(ipv6Hdr, ipv6Want *layers.IPv6, t *testing.T) {
+	if !reflect.DeepEqual(ipv6Hdr.Version, ipv6Want.Version) {
+		t.Error("Version mismatch", ipv6Hdr.Version, ipv6Want.Version)
 	}
-	if !reflect.DeepEqual(ipHdr.TrafficClass, ipv6Want.TrafficClass) {
+	if !reflect.DeepEqual(ipv6Hdr.TrafficClass, ipv6Want.TrafficClass) {
 		t.Error("TrafficClass mismatch")
 	}
-	if !reflect.DeepEqual(ipHdr.HopLimit, ipv6Want.HopLimit) {
+	if !reflect.DeepEqual(ipv6Hdr.HopLimit, ipv6Want.HopLimit) {
 		t.Error("HopLimit mismatch")
 	}
-	if !reflect.DeepEqual(ipHdr.SrcIP, ipv6Want.SrcIP) {
+	if !reflect.DeepEqual(ipv6Hdr.SrcIP, ipv6Want.SrcIP) {
 		t.Error("SrcIP mismatch")
 	}
-	if !reflect.DeepEqual(ipHdr.DstIP, ipv6Want.DstIP) {
+	if !reflect.DeepEqual(ipv6Hdr.DstIP, ipv6Want.DstIP) {
 		t.Error("DstIP mismatch")
 	}
-	if !reflect.DeepEqual(ipHdr.NextHeader, ipv6Want.NextHeader) {
+	if !reflect.DeepEqual(ipv6Hdr.NextHeader, ipv6Want.NextHeader) {
 		t.Error("NextHeader mismatch")
 	}
-	if !reflect.DeepEqual(ipHdr.Length, ipv6Want.Length) {
+	if !reflect.DeepEqual(ipv6Hdr.Length, ipv6Want.Length) {
 		t.Error("lenght mismatch")
 	}
+	t.Log("IPv6 Header Successfully Verified")
 }
 
-func DeepCheckNDHdr(ndHeader, ndWant *layers.ICMPv6, t *testing.T) {
-	if !reflect.DeepEqual(ndHeader.TypeCode, ndWant.TypeCode) {
+func DeepCheckNDHdr(icmpv6Hdr, ndWant *layers.ICMPv6, t *testing.T) {
+	if !reflect.DeepEqual(icmpv6Hdr.TypeCode, ndWant.TypeCode) {
 		t.Error("TypeCode MisMatch")
 	}
-	if !reflect.DeepEqual(ndHeader.Checksum, ndWant.Checksum) {
+	if !reflect.DeepEqual(icmpv6Hdr.Checksum, ndWant.Checksum) {
 		t.Error("Checksum MisMatch")
 	}
-
+	t.Log("ICMPv6 Header Successfully Verified")
 }
 
 // Test ND Solicitation message Decoder
-func TestICMPv6NDSolicitation(t *testing.T) {
+func TestIPv6AndICMPv6Header(t *testing.T) {
 	var err error
 	logger, err := NDPTestNewLogger("ndpd", "NDPTEST", true)
 	if err != nil {
@@ -106,15 +107,12 @@ func TestICMPv6NDSolicitation(t *testing.T) {
 	if p.ErrorLayer() != nil {
 		t.Error("Failed to decode packet:", p.ErrorLayer().Error())
 	}
-	ndHeader := &layers.ICMPv6{}
-	ipHdr := &layers.IPv6{}
-	err = GetIpAndNdSolicitationHeader(p, ipHdr, ndHeader)
+	icmpv6Hdr := &layers.ICMPv6{}
+	ipv6Hdr := &layers.IPv6{}
+	err = getIpAndICMPv6Hdr(p, ipv6Hdr, icmpv6Hdr)
 	if err != nil {
-		t.Error("Decoding ND Solicitation message failed", err)
-	} else {
-		t.Log("Decoding ND Solicitation message success")
+		t.Error("Decoding ipv6 and icmpv6 header failed", err)
 	}
-	t.Log(ipHdr)
 	ipv6Want := &layers.IPv6{
 		Version:      6,
 		TrafficClass: 0xe0,
@@ -129,6 +127,6 @@ func TestICMPv6NDSolicitation(t *testing.T) {
 		TypeCode: 0x8700,
 		Checksum: 0x673c,
 	}
-	DeepCheckIPv6Hdr(ipHdr, ipv6Want, t)
-	DeepCheckNDHdr(ndHeader, ndWant, t)
+	DeepCheckIPv6Hdr(ipv6Hdr, ipv6Want, t)
+	DeepCheckNDHdr(icmpv6Hdr, ndWant, t)
 }

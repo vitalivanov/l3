@@ -145,7 +145,7 @@ func (svr *NDPServer) EventsListener() {
 			if !exists {
 				continue
 			}
-			packet.ValidateNdSolicitation(inPkt.pkt)
+			packet.Validate(inPkt.pkt)
 		}
 	}
 }

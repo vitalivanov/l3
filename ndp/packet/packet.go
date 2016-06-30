@@ -23,8 +23,44 @@
 package packet
 
 import (
+	"errors"
 	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
 )
+
+/*
+ *               NEIGHBOR SOLICITATION MESSAGE FORMAT
+ *
+ *    0                   1                   2                   3
+ *    0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+ *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ *   |     Type      |     Code      |          Checksum             |
+ *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ *   |                           Reserved                            |
+ *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ *   |                                                               |
+ *   +                                                               +
+ *   |                                                               |
+ *   +                       Target Address                          +
+ *   |                                                               |
+ *   +                                                               +
+ *   |                                                               |
+ *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ *   |   Options ...
+ *   +-+-+-+-+-+-+-+-+-+-+-+-
+ *
+ *  API: given a packet it will fill in ip header and icmpv6
+ */
+func getIpAndICMPv6Hdr(pkt gopacket.Packet, ipv6Hdr *layers.IPv6, icmpv6Hdr *layers.ICMPv6) error {
+	ipLayer := pkt.Layer(layers.LayerTypeIPv6)
+	if ipLayer == nil {
+		return errors.New("Invalid IPv6 layer")
+	}
+	*ipv6Hdr = *ipLayer.(*layers.IPv6)
+	ipPayload := ipLayer.LayerPayload()
+	icmpv6Hdr.DecodeFromBytes(ipPayload, nil)
+	return nil
+}
 
 /*
  * Validation Conditions are defined below:
@@ -47,8 +83,10 @@ import (
  *  - If the IP source address is the unspecified address, there is no
  *    source link-layer address option in the message.
  */
-func ValidateNdSolicitation(pkt gopacket.Packet) (valid bool) {
-	// first decode ip packet
-
+func Validate(pkt gopacket.Packet) (valid bool) {
+	// first decode ipv6 & icmpv6 header
+	icmpv6Hdr := &layers.ICMPv6{}
+	ipv6Hdr := &layers.IPv6{}
+	getIpAndICMPv6Hdr(pkt, ipv6Hdr, icmpv6Hdr)
 	return valid
 }
