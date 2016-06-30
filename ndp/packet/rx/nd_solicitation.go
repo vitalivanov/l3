@@ -31,6 +31,7 @@ import (
 type NDSolicitation struct {
 	Reserved      uint32
 	TargetAddress net.IP
+	Options       []byte
 }
 
 const (
@@ -68,9 +69,17 @@ func DecodeNDSolicitation(payload []byte, nds *NDSolicitation) error {
  *  According to RFC 2375 https://tools.ietf.org/html/rfc2375 all ipv6 multicast address have first byte as
  *  FF or 0xff, so compare that with the Target address first byte.
  */
-func IsNDSolicitationMulticastAddr(in byte) bool {
-	if reflect.DeepEqual(in, IPV6_MULTICAST_BYTE) {
+func IsNDSolicitationMulticastAddr(in net.IP) bool {
+	if reflect.DeepEqual(in[0], IPV6_MULTICAST_BYTE) {
 		return true
 	}
 	return false
+}
+
+/*
+ *  if srcIp == "::", i.e Unspecified address then dstIP should be solicited-node address FF02:0:0:0:0:1:FFXX:XXXX
+ *  if srcIP == "::", then there should not be any source link-layer option in message
+ */
+func ValidateIpAddrs(srcIP net.IP, dstIP net.IP) {
+
 }

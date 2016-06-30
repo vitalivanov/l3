@@ -28,6 +28,7 @@ import (
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"l3/ndp/packet/rx"
+	"net"
 )
 
 /*
@@ -95,7 +96,7 @@ func validateIPv6Hdr(hdr *layers.IPv6) error {
 	return nil
 }
 
-func validateICMPv6Hdr(hdr *layers.ICMPv6) error {
+func validateICMPv6Hdr(hdr *layers.ICMPv6, srcIP net.IP, dstIP net.IP) error {
 	nds := &rx.NDSolicitation{}
 	typeCode := hdr.TypeCode
 	if typeCode.Code() != ICMPv6_CODE {
@@ -104,10 +105,11 @@ func validateICMPv6Hdr(hdr *layers.ICMPv6) error {
 	switch typeCode.Type() {
 	case layers.ICMPv6TypeNeighborSolicitation:
 		rx.DecodeNDSolicitation(hdr.LayerPayload(), nds)
-		if rx.IsNDSolicitationMulticastAddr(nds.TargetAddress[0]) {
+		if rx.IsNDSolicitationMulticastAddr(nds.TargetAddress) {
 			return errors.New(fmt.Sprintln("Targent Address specified", nds.TargetAddress,
 				"is a multicast address"))
 		}
+		rx.ValidateIpAddrs(srcIP, dstIP)
 
 	case layers.ICMPv6TypeRouterSolicitation:
 		return errors.New("Router Solicitation is not yet supported")
@@ -132,6 +134,6 @@ func Validate(pkt gopacket.Packet) error {
 	if err != nil {
 		return err
 	}
-	err = validateICMPv6Hdr(icmpv6Hdr)
+	err = validateICMPv6Hdr(icmpv6Hdr, ipv6Hdr.SrcIP, ipv6Hdr.DstIP)
 	return nil
 }

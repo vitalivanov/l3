@@ -78,15 +78,14 @@ func TestNDSolicitationDecoder(t *testing.T) {
 
 // Test ND Solicitation multicast Address Validation
 func TestNDSMulticast(t *testing.T) {
-	var b byte
-	b = 0xfe
+	b := net.IP{0xfe, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xc0, 0x00, 0x54, 0xff, 0xfe, 0xf5, 0x00, 0x01}
 
 	// b is not multicast address, fail the test case if true is returned
 	if IsNDSolicitationMulticastAddr(b) {
 		t.Error("byte is not ipv6 muticast address", b)
 	}
 
-	b = 0xff
+	b[0] = 0xff
 	// b is multicast address, fail the test case if false is returned
 	if !IsNDSolicitationMulticastAddr(b) {
 		t.Error("byte is ipv6 muticast address", b)
