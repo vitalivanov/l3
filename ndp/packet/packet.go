@@ -92,7 +92,11 @@ func validateIPv6Hdr(hdr *layers.IPv6) error {
 }
 
 func validateICMPv6Hdr(hdr *layers.ICMPv6) error {
-	switch hdr.TypeCode {
+	typeCode := hdr.TypeCode
+	if typeCode.Code() != ICMPv6_CODE {
+		return errors.New(fmt.Sprintln("Invalid Code", typeCode.Code()))
+	}
+	switch typeCode.Type() {
 	case layers.ICMPv6TypeNeighborSolicitation:
 
 	case layers.ICMPv6TypeRouterSolicitation:
