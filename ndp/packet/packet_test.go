@@ -113,6 +113,8 @@ func TestIPv6AndICMPv6Header(t *testing.T) {
 	if err != nil {
 		t.Error("Decoding ipv6 and icmpv6 header failed", err)
 	}
+	//t.Log("ICMPv6 contents are", icmpv6Hdr.LayerContents())
+	//t.Log("ICMPv6 Payload are", icmpv6Hdr.LayerPayload())
 	ipv6Want := &layers.IPv6{
 		Version:      6,
 		TrafficClass: 0xe0,

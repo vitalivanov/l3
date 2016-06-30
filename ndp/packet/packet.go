@@ -24,6 +24,7 @@ package packet
 
 import (
 	"errors"
+	"fmt"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 )
@@ -63,7 +64,7 @@ func getIpAndICMPv6Hdr(pkt gopacket.Packet, ipv6Hdr *layers.IPv6, icmpv6Hdr *lay
 }
 
 /*
- * Validation Conditions are defined below:
+ * Validation Conditions are defined below, if anyone of them do not satisfy discard the packet:
  *  - The IP Hop Limit field has a value of 255, i.e., the packet
  *   could not possibly have been forwarded by a router.
  *
@@ -83,10 +84,40 @@ func getIpAndICMPv6Hdr(pkt gopacket.Packet, ipv6Hdr *layers.IPv6, icmpv6Hdr *lay
  *  - If the IP source address is the unspecified address, there is no
  *    source link-layer address option in the message.
  */
-func Validate(pkt gopacket.Packet) (valid bool) {
+func validateIPv6Hdr(hdr *layers.IPv6) error {
+	if hdr.HopLimit != HOP_LIMIT {
+		return errors.New(fmt.Sprintln("Invalid Hop Limit", hdr.HopLimit))
+	}
+	return nil
+}
+
+func validateICMPv6Hdr(hdr *layers.ICMPv6) error {
+	switch hdr.TypeCode {
+	case layers.ICMPv6TypeNeighborSolicitation:
+
+	case layers.ICMPv6TypeRouterSolicitation:
+		return errors.New("Router Solicitation is not yet supported")
+	}
+	return nil
+}
+
+/* API: Get IPv6 & ICMPv6 Header
+ *      Does Validation of IPv6
+ *      Does Validation of ICMPv6
+ */
+func Validate(pkt gopacket.Packet) error {
 	// first decode ipv6 & icmpv6 header
 	icmpv6Hdr := &layers.ICMPv6{}
 	ipv6Hdr := &layers.IPv6{}
-	getIpAndICMPv6Hdr(pkt, ipv6Hdr, icmpv6Hdr)
-	return valid
+	var err error
+	err = getIpAndICMPv6Hdr(pkt, ipv6Hdr, icmpv6Hdr)
+	if err != nil {
+		return err
+	}
+	err = validateIPv6Hdr(ipv6Hdr)
+	if err != nil {
+		return err
+	}
+	err = validateICMPv6Hdr(icmpv6Hdr)
+	return nil
 }
