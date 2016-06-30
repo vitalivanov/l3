@@ -81,10 +81,10 @@ func getIpAndICMPv6Hdr(pkt gopacket.Packet, ipv6Hdr *layers.IPv6, icmpv6Hdr *lay
  *  - All included options have a length that is greater than zero.
  *
  *  - If the IP source address is the unspecified address, the IP
- *    destination address is a solicited-node multicast address.
+ *    destination address is a solicited-node multicast address. <- done
  *
  *  - If the IP source address is the unspecified address, there is no
- *    source link-layer address option in the message.
+ *    source link-layer address option in the message. <- @TODO: need to be done later
  */
 func validateIPv6Hdr(hdr *layers.IPv6) error {
 	if hdr.HopLimit != HOP_LIMIT {
@@ -109,7 +109,10 @@ func validateICMPv6Hdr(hdr *layers.ICMPv6, srcIP net.IP, dstIP net.IP) error {
 			return errors.New(fmt.Sprintln("Targent Address specified", nds.TargetAddress,
 				"is a multicast address"))
 		}
-		rx.ValidateIpAddrs(srcIP, dstIP)
+		err := rx.ValidateIpAddrs(srcIP, dstIP)
+		if err != nil {
+			return err
+		}
 
 	case layers.ICMPv6TypeRouterSolicitation:
 		return errors.New("Router Solicitation is not yet supported")
