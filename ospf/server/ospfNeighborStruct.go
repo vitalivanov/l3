@@ -281,7 +281,11 @@ func (server *OSPFServer) neighborExist(nbrKey NeighborConfKey) bool {
 
 func (server *OSPFServer) initNeighborMdata(intf IntfConfKey) {
 	nbrMdata := newospfNbrMdata()
-	intfConf, _ := server.IntfConfMap[intf]
+	intfConf, exist := server.IntfConfMap[intf]
+	if !exist {
+		server.logger.Err(fmt.Sprintln("Init NbrData:Intf doesnt exsit. Can not initialise nbr mdata. key ", intf))
+		return
+	}
 	nbrMdata.nbrList = []NeighborConfKey{}
 	nbrMdata.intf = intf
 	nbrMdata.areaId = convertIPv4ToUint32(intfConf.IfAreaId)
@@ -385,7 +389,7 @@ func (server *OSPFServer) CheckNeighborFullEvent(nbrKey NeighborConfKey) {
 }
 
 
-func (server *OSPFServer) UpdateNeighborList(nbrKey NeighborConfKey, lsaKey LsaKey) {
+func (server *OSPFServer) UpdateNeighborList(nbrKey NeighborConfKey) {
     nbrConf, exists := server.NeighborConfigMap[nbrKey]
 	if exists {
         if nbrConf.OspfNbrState == config.NbrFull {

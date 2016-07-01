@@ -534,7 +534,7 @@ func (server *OSPFServer) DecodeLSAUpd(msg ospfNeighborLSAUpdMsg) {
 		server.ospfNbrLsaAckSendCh <- *lsaAckMsg
 
 		index = end_index
-		server.UpdateNeighborList(msg.nbrKey, *lsa_key)
+		server.UpdateNeighborList(msg.nbrKey)
 
 	}
 }

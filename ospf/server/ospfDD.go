@@ -359,6 +359,10 @@ func (server *OSPFServer) ProcessRxDbdPkt(data []byte, ospfHdrMd *OspfHdrMetadat
 		ospfNbrDBDData: *ospfdbd_data,
 	}
 	server.logger.Info(fmt.Sprintln("DBD: nbr key ", ipaddr, key.IntfIdx))
+	if ospfNeighborIPToMAC == nil {
+		server.logger.Info(fmt.Sprintln("DBD: ospfNeighborIPToMAC is NULL. Check if nbr thread is running."))
+		return nil
+	}
 	ospfNeighborIPToMAC[dbdNbrMsg.ospfNbrConfKey] = srcMAC
 	//fmt.Println(" lsa_header length = ", len(ospfdbd_data.lsa_headers))
 	dbdNbrMsg.ospfNbrDBDData.lsa_headers = []ospfLSAHeader{}
