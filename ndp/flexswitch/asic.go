@@ -24,10 +24,7 @@ package flexswitch
 
 import (
 	"asicd/asicdCommonDefs"
-	"encoding/json"
-	"fmt"
 	"l3/ndp/api"
-	"l3/ndp/debug"
 	"sync"
 	"utils/commonDefs"
 )
@@ -46,12 +43,14 @@ func initAsicdNotification() commonDefs.AsicdNotification {
 		commonDefs.NOTIFY_LOGICAL_INTF_CREATE:       false,
 		commonDefs.NOTIFY_LOGICAL_INTF_DELETE:       false,
 		commonDefs.NOTIFY_LOGICAL_INTF_UPDATE:       true,
-		commonDefs.NOTIFY_IPV4INTF_CREATE:           true,
-		commonDefs.NOTIFY_IPV4INTF_DELETE:           true,
+		commonDefs.NOTIFY_IPV4INTF_CREATE:           false,
+		commonDefs.NOTIFY_IPV4INTF_DELETE:           false,
+		commonDefs.NOTIFY_IPV6INTF_CREATE:           true,
+		commonDefs.NOTIFY_IPV6INTF_DELETE:           true,
 		commonDefs.NOTIFY_LAG_CREATE:                true,
 		commonDefs.NOTIFY_LAG_DELETE:                true,
 		commonDefs.NOTIFY_LAG_UPDATE:                true,
-		commonDefs.NOTIFY_IPV4NBR_MAC_MOVE:          true,
+		commonDefs.NOTIFY_IPV4NBR_MAC_MOVE:          false,
 		commonDefs.NOTIFY_IPV4_ROUTE_CREATE_FAILURE: false,
 		commonDefs.NOTIFY_IPV4_ROUTE_DELETE_FAILURE: false,
 	}
@@ -62,7 +61,6 @@ func GetSwitchInst() *commonDefs.AsicdClientStruct {
 	once.Do(func() {
 		notifyMap := initAsicdNotification()
 		notifyHdl := &AsicNotificationHdl{}
-		notifyHdl.AsicdSubSocketCh = make(chan commonDefs.AsicdNotifyMsg)
 		switchInst = &commonDefs.AsicdClientStruct{
 			NHdl: notifyHdl,
 			NMap: notifyMap,
@@ -72,7 +70,6 @@ func GetSwitchInst() *commonDefs.AsicdClientStruct {
 }
 
 func (notifyHdl *AsicNotificationHdl) ProcessNotification(msg commonDefs.AsicdNotifyMsg) {
-	//notifyHdl.AsicdSubSocketCh <- msg
 	switch msg.(type) {
 	case commonDefs.L2IntfStateNotifyMsg:
 		l2Msg := msg.(commonDefs.L2IntfStateNotifyMsg)
@@ -109,30 +106,5 @@ func (notifyHdl *AsicNotificationHdl) ProcessNotification(msg commonDefs.AsicdNo
 		}
 		//case commonDefs.IPv4NbrMacMoveNotifyMsg:
 		//	macMoveMsg := msg.(commonDefs.IPv4NbrMacMoveNotifyMsg)
-	}
-}
-
-func ProcessMsg(rxBuf []byte) {
-	var err error
-	var msg asicdCommonDefs.AsicdNotification
-	err = json.Unmarshal(rxBuf, &msg)
-	if err != nil {
-		debug.Logger.Err(fmt.Sprintln("Unable to Unmarshal asicd msg:", msg.Msg))
-		return
-	}
-	switch msg.MsgType {
-	case asicdCommonDefs.NOTIFY_L2INTF_STATE_CHANGE:
-		var l2IntfStateNotifyMsg asicdCommonDefs.L2IntfStateNotifyMsg
-		err = json.Unmarshal(msg.Msg, &l2IntfStateNotifyMsg)
-		if err != nil {
-			debug.Logger.Err(fmt.Sprintln("Unable to Unmarshal l2 intf",
-				"state change:", msg.Msg))
-			break
-		}
-		if l2IntfStateNotifyMsg.IfState == asicdCommonDefs.INTF_STATE_UP {
-			//api.SendPortStateChange(l2IntfStateNotifyMsg.IfIndex, "UP")
-		} else {
-			//api.SendPortStateChange(l2IntfStateNotifyMsg.IfIndex, "DOWN")
-		}
 	}
 }

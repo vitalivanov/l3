@@ -26,21 +26,18 @@ import (
 	"fmt"
 	"l3/ndp/config"
 	"l3/ndp/debug"
+	"l3/ndp/packet"
 	_ "models/objects"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 	"utils/asicdClient"
-	"utils/logging"
 )
 
-func NDPNewServer(sPlugin asicdClient.AsicdClientIntf, logger *logging.Writer) *NDPServer {
+func NDPNewServer(sPlugin asicdClient.AsicdClientIntf) *NDPServer {
 	svr := &NDPServer{}
-	//svr.DmnBase = baseObj
-	//svr.DmnBase.NewServer()                      // Allocate memory to channels
 	svr.SwitchPlugin = sPlugin
-	debug.NDPSetLogger(logger) // @TODO: Change this to interface and move it to util
 	return svr
 }
 
@@ -78,6 +75,7 @@ func (svr *NDPServer) InitGlobalDS() {
 	svr.PhyPort = make(map[int32]config.PortInfo, NDP_SYSTEM_PORT_MAP_CAPACITY)
 	svr.L3Port = make(map[int32]config.IPv6IntfInfo, NDP_SYSTEM_PORT_MAP_CAPACITY)
 	svr.Ipv6Ch = make(chan *config.IPv6IntfInfo)
+	svr.RxPktCh = make(chan *RxPktInfo)
 	svr.SnapShotLen = 1024
 	svr.Promiscuous = false
 	svr.Timeout = 1 * time.Second
@@ -86,6 +84,8 @@ func (svr *NDPServer) InitGlobalDS() {
 func (svr *NDPServer) DeInitGlobalDS() {
 	svr.PhyPort = nil
 	svr.L3Port = nil
+	svr.Ipv6Ch = nil
+	svr.RxPktCh = nil
 }
 
 func (svr *NDPServer) InitSystemPortInfo(portInfo *config.PortInfo) {
@@ -137,8 +137,20 @@ func (svr *NDPServer) EventsListener() {
 		select {
 		case ipv6Notify := <-svr.Ipv6Ch:
 			svr.HandleIPv6Notification(ipv6Notify)
+		case inPkt, ok := <-svr.RxPktCh:
+			if !ok {
+				continue
+			}
+			_, exists := svr.L3Port[inPkt.ifIndex]
+			if !exists {
+				continue
+			}
+			err := packet.Validate(inPkt.pkt)
+			if err != nil {
+				debug.Logger.Err(fmt.Sprintln("Validating Pkt Failed:", err))
+				continue
+			}
 		}
-
 	}
 }
 

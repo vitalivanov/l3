@@ -20,50 +20,12 @@
 // |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
 // |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
 //
-package server
-
-import (
-	"github.com/google/gopacket"
-	"l3/ndp/config"
-	"time"
-	"utils/asicdClient" // this is switch plugin need to change the name
-)
+package packet
 
 const (
-	NDP_PORT_STATE_UP   = "UP"
-	NDP_PORT_STATE_DOWN = "DOWN"
-	NDP_IP_STATE_UP     = "UP"
-	NDP_IP_STATE_DOWN   = "DOWN"
-)
-
-type RxPktInfo struct {
-	pkt     gopacket.Packet
-	ifIndex int32
-}
-
-type NDPServer struct {
-	SwitchPlugin asicdClient.AsicdClientIntf
-
-	// System Ports information, key is IntfRef
-	PhyPort map[int32]config.PortInfo
-	L3Port  map[int32]config.IPv6IntfInfo
-
-	//IPV6 Create/Delete Notification Channel
-	Ipv6Ch chan *config.IPv6IntfInfo
-	//Received Pkt Channel
-	RxPktCh chan *RxPktInfo
-
-	ndpIntfStateSlice     []int32
-	ndpUpIntfStateSlice   []int32
-	ndpL3IntfStateSlice   []int32
-	ndpUpL3IntfStateSlice []int32
-
-	//Pcap Default config values
-	SnapShotLen int32
-	Promiscuous bool
-	Timeout     time.Duration
-}
-
-const (
-	NDP_SYSTEM_PORT_MAP_CAPACITY = 50
+	HOP_LIMIT                    = 255
+	ICMPv6_CODE                  = 0
+	ICMPv6_MIN_LENGTH            = 24
+	ICMP_HDR_LENGTH              = 8
+	ICMP_PSEUDO_NEXT_HEADER byte = 58
 )

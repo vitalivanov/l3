@@ -23,49 +23,93 @@
 package rx
 
 import (
-	_ "fmt"
-	"github.com/google/gopacket"
-	"github.com/google/gopacket/layers"
-	_ "github.com/google/gopacket/pcap"
+	"fmt"
+	"infra/sysd/sysdCommonDefs"
+	"l3/ndp/debug"
+	"log/syslog"
+	"net"
 	"reflect"
 	"testing"
+	"utils/logging"
 )
 
 var testPkt = []byte{
-	0x33, 0x33, 0xff, 0xf5, 0x00, 0x00, 0xc2, 0x00, 0x54, 0xf5, 0x00, 0x00, 0x86, 0xdd, 0x6e, 0x00,
-	0x00, 0x00, 0x00, 0x18, 0x3a, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x01, 0xff, 0xf5, 0x00, 0x00, 0x87, 0x00, 0x67, 0x3c, 0x00, 0x00, 0x00, 0x00, 0xfe, 0x80,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xc0, 0x00, 0x54, 0xff, 0xfe, 0xf5, 0x00, 0x00,
+	0xfe, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xc0, 0x00, 0x54, 0xff, 0xfe, 0xf5, 0x00, 0x01,
+}
+
+func NDPTestNewLogger(name string, tag string, listenToConfig bool) (*logging.Writer, error) {
+	var err error
+	srLogger := new(logging.Writer)
+	srLogger.MyComponentName = name
+
+	srLogger.SysLogger, err = syslog.New(syslog.LOG_INFO|syslog.LOG_DAEMON, tag)
+	if err != nil {
+		fmt.Println("Failed to initialize syslog - ", err)
+		return srLogger, err
+	}
+
+	srLogger.GlobalLogging = true
+	srLogger.MyLogLevel = sysdCommonDefs.INFO
+	return srLogger, err
 }
 
 // Test ND Solicitation message Decoder
-func TestICMPv6PayloadDecode(t *testing.T) {
+func TestNDSolicitationDecoder(t *testing.T) {
 	var err error
-	p := gopacket.NewPacket(testPkt, layers.LinkTypeEthernet, gopacket.Default)
-	if p.ErrorLayer() != nil {
-		t.Error("Failed to decode packet:", p.ErrorLayer().Error())
-	}
-	t.Log("Calling GetNdSolicitationHeader")
-	ndHeader := &layers.ICMPv6{}
-	err = GetNdSolicitationHeader(p, ndHeader)
+	logger, err := NDPTestNewLogger("ndpd", "NDPTEST", true)
 	if err != nil {
-		t.Error("Decoding ND Solicitation message failed", err)
-	} else {
-		t.Log("Decoding ND Solicitation message success")
+		t.Error("creating logger failed")
 	}
-	want := layers.ICMPv6{
-		TypeCode: 0x8700,
-		Checksum: 0x673c,
+	debug.NDPSetLogger(logger)
+	nds := &NDSolicitation{}
+	err = DecodeNDSolicitation(testPkt, nds)
+	if err != nil {
+		t.Error("Decoding ipv6 and icmpv6 header failed", err)
 	}
-	t.Log("ndHeader type:", ndHeader.TypeCode)
-	t.Log("want type:", want.TypeCode)
-	if !reflect.DeepEqual(ndHeader.TypeCode, want.TypeCode) {
-		t.Error("TypeCode MisMatch")
+	ndWant := &NDSolicitation{
+		TargetAddress: net.IP{0xfe, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xc0, 0x00, 0x54, 0xff, 0xfe, 0xf5, 0x00, 0x01},
 	}
-	t.Log("ndHeader Checksum:", ndHeader.Checksum)
-	t.Log("want Checksum:", want.Checksum)
-	if !reflect.DeepEqual(ndHeader.Checksum, want.Checksum) {
-		t.Error("Checksum MisMatch")
+	if !reflect.DeepEqual(nds, ndWant) {
+		t.Error("Decoding NDS Failed")
+	}
+}
+
+// Test ND Solicitation multicast Address Validation
+func TestNDSMulticast(t *testing.T) {
+	b := net.IP{0xfe, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xc0, 0x00, 0x54, 0xff, 0xfe, 0xf5, 0x00, 0x01}
+
+	// b is not multicast address, fail the test case if true is returned
+	if IsNDSolicitationMulticastAddr(b) {
+		t.Error("byte is not ipv6 muticast address", b)
+	}
+
+	b[0] = 0xff
+	// b is multicast address, fail the test case if false is returned
+	if !IsNDSolicitationMulticastAddr(b) {
+		t.Error("byte is ipv6 muticast address", b)
+	}
+}
+
+// Test ND Solicitation src ip Address Validation
+func TestNDSIpAddress(t *testing.T) {
+	srcIP := net.IP{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
+	dstIP := net.IP{0xff, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0xff, 0x10, 0x78, 0x2e}
+	t.Log("SrcIP->", srcIP.String(), "DstIP->", dstIP.String())
+	err := ValidateIpAddrs(srcIP, dstIP)
+	if err != nil {
+		t.Error("Validation of ip address failed with error", err)
+	}
+
+	srcIP = net.IP{0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
+	t.Log("SrcIP->", srcIP.String(), "DstIP->", dstIP.String())
+	err = ValidateIpAddrs(srcIP, dstIP)
+	if err != nil {
+		t.Error("Validation of ip address", srcIP, "failed with error", err)
+	}
+	dstIP = net.IP{0xfe, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xc0, 0x00, 0x54, 0xff, 0xfe, 0xf5, 0x00, 0x01}
+	t.Log("SrcIP->", srcIP.String(), "DstIP->", dstIP.String())
+	err = ValidateIpAddrs(srcIP, dstIP)
+	if err != nil {
+		t.Error("Validation of ip address", srcIP, "dst Ip", dstIP, "failed with error", err)
 	}
 }

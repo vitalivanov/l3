@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"github.com/google/gopacket/pcap"
 	"infra/sysd/sysdCommonDefs"
+	"l3/ndp/debug"
 	"log/syslog"
 	"testing"
 	"utils/logging"
@@ -87,9 +88,9 @@ func TestPcapCreate(t *testing.T) {
 	if err != nil {
 		t.Error("creating logger failed")
 	}
-	svr := NDPNewServer(nil, logger)
+	debug.NDPSetLogger(logger)
+	svr := NDPNewServer(nil)
 	svr.InitGlobalDS()
-	// @TODO: get the system linux name
 	err = svr.CreatePcapHandler("lo", pcapHdl)
 	if err != nil {
 		t.Error("Pcap Create Failed", err)

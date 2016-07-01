@@ -28,45 +28,42 @@ import (
 	"fmt"
 	"git.apache.org/thrift.git/lib/go/thrift"
 	"io/ioutil"
+	"l3/ndp/debug"
 	"ndpd"
 	"strconv"
-	"utils/logging"
 )
 
-//func NewConfigHandler() *NDPDServicesProcessor {
 func NewConfigHandler() *ConfigHandler {
 	handler := &ConfigHandler{}
-	//	processor := ndpd.NewNDPDServicesProcessor(handler)
-	//	return processor
 	return handler
 }
 
-func NewConfigPlugin(handler *ConfigHandler, fileName string, logger *logging.Writer) *ConfigPlugin {
-	l := &ConfigPlugin{handler, fileName, logger}
+func NewConfigPlugin(handler *ConfigHandler, fileName string) *ConfigPlugin {
+	l := &ConfigPlugin{handler, fileName}
 	return l
 }
 
-func (cfg *ConfigPlugin) Start() error {
+func (cfg *ConfigPlugin) StartConfigListener() error {
 	fileName := cfg.fileName + "clients.json"
 
 	clientJson, err := getClient(fileName, "ndpd")
 	if err != nil || clientJson == nil {
 		return err
 	}
-	cfg.logger.Info(fmt.Sprintln("Got Client Info for", clientJson.Name, " port", clientJson.Port))
+	debug.Logger.Info(fmt.Sprintln("Got Client Info for", clientJson.Name, " port", clientJson.Port))
 	// create processor, transport and protocol for server
 	processor := ndpd.NewNDPDServicesProcessor(cfg.handler)
 	transportFactory := thrift.NewTBufferedTransportFactory(8192)
 	protocolFactory := thrift.NewTBinaryProtocolFactoryDefault()
 	transport, err := thrift.NewTServerSocket("localhost:" + strconv.Itoa(clientJson.Port))
 	if err != nil {
-		cfg.logger.Info(fmt.Sprintln("StartServer: NewTServerSocket failed with error:", err))
+		debug.Logger.Info(fmt.Sprintln("StartServer: NewTServerSocket failed with error:", err))
 		return err
 	}
 	server := thrift.NewTSimpleServer4(processor, transport, transportFactory, protocolFactory)
 	err = server.Serve()
 	if err != nil {
-		cfg.logger.Err(fmt.Sprintln("Failed to start the listener, err:", err))
+		debug.Logger.Err(fmt.Sprintln("Failed to start the listener, err:", err))
 		return err
 	}
 	return nil

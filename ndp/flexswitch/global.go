@@ -22,17 +22,9 @@
 //
 package flexswitch
 
-import (
-	"asicdServices"
-	nanomsg "github.com/op/go-nanomsg"
-	"utils/commonDefs"
-	"utils/logging"
-)
-
 type ConfigPlugin struct {
 	handler  *ConfigHandler
 	fileName string
-	logger   *logging.Writer
 }
 
 type ClientJson struct {
@@ -44,10 +36,4 @@ type ConfigHandler struct {
 }
 
 type AsicNotificationHdl struct {
-	AsicdSubSocketCh chan commonDefs.AsicdNotifyMsg
-}
-
-type AsicPlugin struct {
-	asicdClient    *asicdServices.ASICDServicesClient
-	asicdSubSocket *nanomsg.SubSocket
 }
