@@ -23,7 +23,7 @@
 package rx
 
 import (
-	"encoding/binary"
+	_ "encoding/binary"
 	"errors"
 	"fmt"
 	"net"
@@ -31,7 +31,6 @@ import (
 )
 
 type NDSolicitation struct {
-	Reserved      uint32
 	TargetAddress net.IP
 	Options       []byte
 }
@@ -45,8 +44,6 @@ const (
  *    0                   1                   2                   3
  *    0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
  *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |                           Reserved                            |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
  *   |                                                               |
  *   +                                                               +
  *   |                                                               |
@@ -59,11 +56,10 @@ const (
  *   +-+-+-+-+-+-+-+-+-+-+-+-
  */
 func DecodeNDSolicitation(payload []byte, nds *NDSolicitation) error {
-	nds.Reserved = uint32(binary.BigEndian.Uint32(payload[0:4]))
 	if nds.TargetAddress == nil {
 		nds.TargetAddress = make(net.IP, IPV6_ADDRESS_BYTES, IPV6_ADDRESS_BYTES)
 	}
-	copy(nds.TargetAddress, payload[4:20])
+	copy(nds.TargetAddress, payload[:])
 	return nil
 }
 
@@ -87,7 +83,7 @@ func IsNDSolicitationMulticastAddr(in net.IP) bool {
 func ValidateIpAddrs(srcIP net.IP, dstIP net.IP) error {
 	if srcIP.IsUnspecified() {
 		if !(dstIP[0] == IPV6_MULTICAST_BYTE && dstIP[1]&0x0f == 0x02 &&
-			dstIP[12]&0x0f == 0x01 && dstIP[13] == IPV6_MULTICAST_BYTE) {
+			dstIP[11]&0x0f == 0x01 && dstIP[12] == IPV6_MULTICAST_BYTE) {
 			return errors.New(fmt.Sprintln("Destination IP address",
 				dstIP.String(), "is not Solicited-Node Multicast Address"))
 		}

@@ -113,8 +113,6 @@ func TestIPv6AndICMPv6Header(t *testing.T) {
 	if err != nil {
 		t.Error("Decoding ipv6 and icmpv6 header failed", err)
 	}
-	//t.Log("ICMPv6 contents are", icmpv6Hdr.LayerContents())
-	//t.Log("ICMPv6 Payload are", icmpv6Hdr.LayerPayload())
 	ipv6Want := &layers.IPv6{
 		Version:      6,
 		TrafficClass: 0xe0,
@@ -131,13 +129,65 @@ func TestIPv6AndICMPv6Header(t *testing.T) {
 	}
 	DeepCheckIPv6Hdr(ipv6Hdr, ipv6Want, t)
 	DeepCheckNDHdr(icmpv6Hdr, ndWant, t)
-	err = validateChecksum(ipv6Hdr, icmpv6Hdr)
+}
+
+func TestValidateIpv6hdr(t *testing.T) {
+	p := gopacket.NewPacket(testPkt, layers.LinkTypeEthernet, gopacket.Default)
+	if p.ErrorLayer() != nil {
+		t.Error("Failed to decode packet:", p.ErrorLayer().Error())
+	}
+	icmpv6Hdr := &layers.ICMPv6{}
+	ipv6Hdr := &layers.IPv6{}
+	err := getIpAndICMPv6Hdr(p, ipv6Hdr, icmpv6Hdr)
 	if err != nil {
-		t.Error("Validating Checksum failed", err)
+		t.Error("Decoding ipv6 and icmpv6 header failed", err)
+	}
+	validateIPv6Hdr(ipv6Hdr)
+	if err != nil {
+		t.Error("Validating IPv6 Hdr failed", err)
 	}
 }
 
-/*
+func TestValidateICMPv6Checksum(t *testing.T) {
+	p := gopacket.NewPacket(testPkt, layers.LinkTypeEthernet, gopacket.Default)
+	if p.ErrorLayer() != nil {
+		t.Error("Failed to decode packet:", p.ErrorLayer().Error())
+	}
+	icmpv6Hdr := &layers.ICMPv6{}
+	ipv6Hdr := &layers.IPv6{}
+	err := getIpAndICMPv6Hdr(p, ipv6Hdr, icmpv6Hdr)
+	if err != nil {
+		t.Error("Decoding ipv6 and icmpv6 header failed", err)
+	}
+	/*
+		err = validateChecksum(ipv6Hdr, icmpv6Hdr)
+		if err != nil {
+			t.Error("Validating Checksum failed", err)
+		}
+	*/
+}
+
+func TestValidateICMPv6Hdr(t *testing.T) {
+	p := gopacket.NewPacket(testPkt, layers.LinkTypeEthernet, gopacket.Default)
+	if p.ErrorLayer() != nil {
+		t.Error("Failed to decode packet:", p.ErrorLayer().Error())
+	}
+	icmpv6Hdr := &layers.ICMPv6{}
+	ipv6Hdr := &layers.IPv6{}
+	err := getIpAndICMPv6Hdr(p, ipv6Hdr, icmpv6Hdr)
+	if err != nil {
+		t.Error("Decoding ipv6 and icmpv6 header failed", err)
+	}
+	t.Log("SrcIP->", ipv6Hdr.SrcIP.String(), "DstIP->", ipv6Hdr.DstIP.String())
+	for idx, _ := range ipv6Hdr.DstIP {
+		t.Log(idx, "---->", ipv6Hdr.DstIP[idx])
+	}
+	err = validateICMPv6Hdr(icmpv6Hdr, ipv6Hdr.SrcIP, ipv6Hdr.DstIP)
+	if err != nil {
+		t.Error("Validating ICMPv6 Header failed:", err)
+	}
+}
+
 func TestValidatePkt(t *testing.T) {
 	p := gopacket.NewPacket(testPkt, layers.LinkTypeEthernet, gopacket.Default)
 	if p.ErrorLayer() != nil {
@@ -149,4 +199,3 @@ func TestValidatePkt(t *testing.T) {
 		t.Error("Failed to Validate Packet, Error:", err)
 	}
 }
-*/
