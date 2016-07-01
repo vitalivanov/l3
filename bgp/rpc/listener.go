@@ -1028,3 +1028,56 @@ func (h *BGPHandler) DeleteBGPPolicyDefinition(cfg *bgpd.BGPPolicyDefinition) (v
 	h.bgpPolicyMgr.DefinitionDelCh <- cfg.Name
 	return val, err
 }
+
+func (h *BGPHandler) validateBGPAggregate(bgpAgg *bgpd.BGPAggregate) (aggConf config.BGPAggregate, err error) {
+	if bgpAgg == nil {
+		return aggConf, err
+	}
+
+	_, _, err = net.ParseCIDR(bgpAgg.IpPrefix)
+	if err != nil {
+		err = errors.New(fmt.Sprintf("BGPAggregate: IP %s is not valid", bgpAgg.IpPrefix))
+		h.logger.Info(fmt.Sprintln("SendBGPAggregate: IP", bgpAgg.IpPrefix, "is not valid"))
+		return aggConf, err
+	}
+
+	aggConf = config.BGPAggregate{
+		IPPrefix:        bgpAgg.IpPrefix,
+		GenerateASSet:   bgpAgg.GenerateASSet,
+		SendSummaryOnly: bgpAgg.SendSummaryOnly,
+	}
+	return aggConf, nil
+}
+
+func (h *BGPHandler) SendBGPAggregate(oldConfig *bgpd.BGPAggregate, newConfig *bgpd.BGPAggregate, attrSet []bool) (
+	bool, error) {
+	oldAgg, err := h.validateBGPAggregate(oldConfig)
+	if err != nil {
+		return false, err
+	}
+
+	newAgg, err := h.validateBGPAggregate(newConfig)
+	if err != nil {
+		return false, err
+	}
+
+	h.server.AddAggCh <- server.AggUpdate{oldAgg, newAgg, attrSet}
+	return true, err
+}
+
+func (h *BGPHandler) CreateBGPAggregate(bgpAgg *bgpd.BGPAggregate) (bool, error) {
+	h.logger.Info(fmt.Sprintln("Create global config attrs:", bgpAgg))
+	return h.SendBGPAggregate(nil, bgpAgg, make([]bool, 0))
+}
+
+func (h *BGPHandler) UpdateBGPAggregate(origA *bgpd.BGPAggregate, updatedA *bgpd.BGPAggregate, attrSet []bool,
+	op []*bgpd.PatchOpInfo) (bool, error) {
+	h.logger.Info(fmt.Sprintln("Update global config attrs:", updatedA, "old config:", origA))
+	return h.SendBGPAggregate(origA, updatedA, attrSet)
+}
+
+func (h *BGPHandler) DeleteBGPAggregate(bgpAgg *bgpd.BGPAggregate) (bool, error) {
+	h.logger.Info(fmt.Sprintln("Delete global config attrs:", bgpAgg))
+	h.server.RemAggCh <- bgpAgg.IpPrefix
+	return true, nil
+}
