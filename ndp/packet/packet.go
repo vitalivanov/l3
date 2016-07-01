@@ -23,6 +23,7 @@
 package packet
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"github.com/google/gopacket"
@@ -100,54 +101,63 @@ func validateIPv6Hdr(hdr *layers.IPv6) error {
 	return nil
 }
 
+type ICMPv6PseudoHeader struct {
+	SrcIP      net.IP
+	DstIP      net.IP
+	Length     []byte
+	NextHeader []byte
+}
+
+func checksum(b []byte) uint16 {
+	csumcv := len(b) - 1 // checksum coverage
+	s := uint32(0)
+	for i := 0; i < csumcv; i += 2 {
+		s += uint32(b[i+1])<<8 | uint32(b[i])
+	}
+	if csumcv&1 == 0 {
+		s += uint32(b[csumcv])
+	}
+	s = s>>16 + s&0xffff
+	s = s + s>>16
+	return ^uint16(s)
+}
+
 func validateChecksum(ipHdr *layers.IPv6, icmpv6Hdr *layers.ICMPv6) error {
-	var chksumlen uint32
 	var buf []byte
-	var rv uint16
-	// Copy source IP address into buf (128 bits)
-	buf = append(buf, ipHdr.SrcIP...)
-	// Copy destination IP address into buf (128 bits)
-	buf = append(buf, ipHdr.DstIP...)
-	// Copy Upper Layer Packet length into buf (32 bits).
-	// Should not be greater than 65535 (i.e., 2 bytes).
-	buf = append(buf, 0)
-	buf = append(buf, 0)
-	buf = append(buf, byte((ICMP_HDR_LENGTH+len(icmpv6Hdr.LayerPayload()))/256))
-	buf = append(buf, byte((ICMP_HDR_LENGTH+len(icmpv6Hdr.LayerPayload()))%256))
-	// Copy zero field to buf (24 bits)
-	buf = append(buf, 0)
-	buf = append(buf, 0)
-	buf = append(buf, 0)
-	// Copy next header field to buf (8 bits)
-	buf = append(buf, byte(ipHdr.NextHeader))
-	// Copy ICMPv6 type to buf (8 bits)
-	// Copy ICMPv6 code to buf (8 bits)
+	//var chksumlen uint32
+	//buf := []byte{icmpv6Hdr.TypeCode.Type(), icmpv6Hdr.TypeCode.Code(), 0, 0}
+	pseudo := ICMPv6PseudoHeader{
+		SrcIP: ipHdr.SrcIP,
+		DstIP: ipHdr.DstIP,
+	}
+	pseudo.Length = make([]byte, 4, 4)
+	pseudo.NextHeader = make([]byte, 4, 4)
+	binary.BigEndian.PutUint32(pseudo.Length, uint32(len(icmpv6Hdr.LayerPayload())))
+	binary.BigEndian.PutUint32(pseudo.NextHeader, uint32(ipHdr.NextHeader))
+	buf = append(buf, pseudo.SrcIP...)
+	buf = append(buf, pseudo.DstIP...)
+	buf = append(buf, pseudo.Length...)
+	buf = append(buf, pseudo.NextHeader...)
 	buf = append(buf, icmpv6Hdr.TypeCode.Type())
 	buf = append(buf, icmpv6Hdr.TypeCode.Code())
-	// Copy ICMPv6 ID to buf (16 bits)
-	buf = append(buf, 0)
-	buf = append(buf, 0)
-	// Copy ICMPv6 sequence number to buff (16 bits)
-	buf = append(buf, 0)
-	buf = append(buf, 0)
-	// Copy ICMPv6 checksum to buf (16 bits)
-	// Zero, since we don't know it yet.
-	buf = append(buf, 0)
-	buf = append(buf, 0)
-	// Copy ICMPv6 payload to buf
+	buf = append(buf, 0) // checksum
 	buf = append(buf, icmpv6Hdr.LayerPayload()...)
 	// Pad to the next 16-bit boundary
 	for idx := 0; idx < len(icmpv6Hdr.LayerPayload())%2; idx++ {
 		buf = append(buf, 0)
 	}
+	/*
+		chksumlen = 0
+		for idx := 0; idx < len(buf); idx += 2 {
+			chksumlen += uint32(buf[idx] << 8)
+			if idx+1 < len(buf) {
+				chksumlen += uint32(buf[idx+1])
+			}
+		}
+		rv := ^uint16((chksumlen >> 16) + chksumlen)
+	*/
 
-	chksumlen = 0
-	for idx := 0; idx < len(buf); idx += 2 {
-		chksumlen += uint32(buf[idx] << 8)
-		chksumlen += uint32(buf[idx+1])
-	}
-
-	rv = ^uint16((chksumlen >> 16) + chksumlen)
+	rv := checksum(buf)
 	if rv != icmpv6Hdr.Checksum {
 		return errors.New(fmt.Sprintln("Calculated Checksum", rv,
 			"is different then recevied Checksum", icmpv6Hdr.Checksum))
