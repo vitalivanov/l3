@@ -31,6 +31,10 @@ import (
 	"net"
 )
 
+const (
+	ICMP_HDR_LENGTH = 8
+)
+
 /*
  *			ICMPv6 MESSAGE FORMAT
  *
@@ -96,12 +100,76 @@ func validateIPv6Hdr(hdr *layers.IPv6) error {
 	return nil
 }
 
+func validateChecksum(ipHdr *layers.IPv6, icmpv6Hdr *layers.ICMPv6) error {
+	var chksumlen uint32
+	var buf []byte
+	var rv uint16
+	// Copy source IP address into buf (128 bits)
+	buf = append(buf, ipHdr.SrcIP...)
+	// Copy destination IP address into buf (128 bits)
+	buf = append(buf, ipHdr.DstIP...)
+	// Copy Upper Layer Packet length into buf (32 bits).
+	// Should not be greater than 65535 (i.e., 2 bytes).
+	buf = append(buf, 0)
+	buf = append(buf, 0)
+	buf = append(buf, byte((ICMP_HDR_LENGTH+len(icmpv6Hdr.LayerPayload()))/256))
+	buf = append(buf, byte((ICMP_HDR_LENGTH+len(icmpv6Hdr.LayerPayload()))%256))
+	// Copy zero field to buf (24 bits)
+	buf = append(buf, 0)
+	buf = append(buf, 0)
+	buf = append(buf, 0)
+	// Copy next header field to buf (8 bits)
+	buf = append(buf, byte(ipHdr.NextHeader))
+	// Copy ICMPv6 type to buf (8 bits)
+	// Copy ICMPv6 code to buf (8 bits)
+	buf = append(buf, icmpv6Hdr.TypeCode.Type())
+	buf = append(buf, icmpv6Hdr.TypeCode.Code())
+	// Copy ICMPv6 ID to buf (16 bits)
+	buf = append(buf, 0)
+	buf = append(buf, 0)
+	// Copy ICMPv6 sequence number to buff (16 bits)
+	buf = append(buf, 0)
+	buf = append(buf, 0)
+	// Copy ICMPv6 checksum to buf (16 bits)
+	// Zero, since we don't know it yet.
+	buf = append(buf, 0)
+	buf = append(buf, 0)
+	// Copy ICMPv6 payload to buf
+	buf = append(buf, icmpv6Hdr.LayerPayload()...)
+	// Pad to the next 16-bit boundary
+	for idx := 0; idx < len(icmpv6Hdr.LayerPayload())%2; idx++ {
+		buf = append(buf, 0)
+	}
+
+	chksumlen = 0
+	for idx := 0; idx < len(buf); idx += 2 {
+		chksumlen += uint32(buf[idx] << 8)
+		chksumlen += uint32(buf[idx+1])
+	}
+
+	rv = ^uint16((chksumlen >> 16) + chksumlen)
+	if rv != icmpv6Hdr.Checksum {
+		return errors.New(fmt.Sprintln("Calculated Checksum", rv,
+			"is different then recevied Checksum", icmpv6Hdr.Checksum))
+	}
+	return nil
+}
+
 func validateICMPv6Hdr(hdr *layers.ICMPv6, srcIP net.IP, dstIP net.IP) error {
 	nds := &rx.NDSolicitation{}
 	typeCode := hdr.TypeCode
 	if typeCode.Code() != ICMPv6_CODE {
 		return errors.New(fmt.Sprintln("Invalid Code", typeCode.Code()))
 	}
+	/*
+		cksum, err := hdr.ComputeChecksum()
+		if err != nil {
+			return err
+		}
+		if cksum != hdr.Checksum {
+			return errors.New(fmt.Sprintln("Mismatch in checksum, got:", cksum, "want:", hdr.Checksum))
+		}
+	*/
 	switch typeCode.Type() {
 	case layers.ICMPv6TypeNeighborSolicitation:
 		rx.DecodeNDSolicitation(hdr.LayerPayload(), nds)

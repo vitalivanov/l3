@@ -131,4 +131,22 @@ func TestIPv6AndICMPv6Header(t *testing.T) {
 	}
 	DeepCheckIPv6Hdr(ipv6Hdr, ipv6Want, t)
 	DeepCheckNDHdr(icmpv6Hdr, ndWant, t)
+	err = validateChecksum(ipv6Hdr, icmpv6Hdr)
+	if err != nil {
+		t.Error("Validating Checksum failed", err)
+	}
 }
+
+/*
+func TestValidatePkt(t *testing.T) {
+	p := gopacket.NewPacket(testPkt, layers.LinkTypeEthernet, gopacket.Default)
+	if p.ErrorLayer() != nil {
+		t.Error("Failed to decode packet:", p.ErrorLayer().Error())
+	}
+
+	err := Validate(p)
+	if err != nil {
+		t.Error("Failed to Validate Packet, Error:", err)
+	}
+}
+*/
