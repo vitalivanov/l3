@@ -147,7 +147,7 @@ func (svr *NDPServer) EventsListener() {
 			}
 			err := packet.Validate(inPkt.pkt)
 			if err != nil {
-				debug.Logger.Err("Validating Pkt Failed:", err)
+				debug.Logger.Err(fmt.Sprintln("Validating Pkt Failed:", err))
 				continue
 			}
 		}
