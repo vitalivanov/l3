@@ -23,7 +23,7 @@
 package packet
 
 import (
-	"encoding/binary"
+	_ "encoding/binary"
 	"errors"
 	"fmt"
 	"github.com/google/gopacket"
@@ -33,7 +33,8 @@ import (
 )
 
 const (
-	ICMP_HDR_LENGTH = 8
+	ICMP_HDR_LENGTH              = 8
+	ICMP_PSEUDO_NEXT_HEADER byte = 58
 )
 
 /*
@@ -101,13 +102,6 @@ func validateIPv6Hdr(hdr *layers.IPv6) error {
 	return nil
 }
 
-type ICMPv6PseudoHeader struct {
-	SrcIP      net.IP
-	DstIP      net.IP
-	Length     []byte
-	NextHeader []byte
-}
-
 func checksum(b []byte) uint16 {
 	csumcv := len(b) - 1 // checksum coverage
 	s := uint32(0)
@@ -118,44 +112,74 @@ func checksum(b []byte) uint16 {
 		s += uint32(b[csumcv])
 	}
 	s = s>>16 + s&0xffff
+	//s = s&0xffff + s>>16
 	s = s + s>>16
 	return ^uint16(s)
 }
 
+/*
+ *	          ICMPv6 PSEUDO-HDR MESSAGE FORMAT
+ *
+ *    0                   1                   2                   3
+ *    0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+ * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ * |                                                               |
+ * +                                                               +
+ * |                                                               |
+ * +                         Source Address                        +
+ * |                                                               |
+ * +                                                               +
+ * |                                                               |
+ * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ * |                                                               |
+ * +                                                               +
+ * |                                                               |
+ * +                      Destination Address                      +
+ * |                                                               |
+ * +                                                               +
+ * |                                                               |
+ * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ * |                   Upper-Layer Packet Length                   |
+ * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ * |                      zero                     |  Next Header  |
+ * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ */
 func validateChecksum(ipHdr *layers.IPv6, icmpv6Hdr *layers.ICMPv6) error {
 	var buf []byte
-	//var chksumlen uint32
-	//buf := []byte{icmpv6Hdr.TypeCode.Type(), icmpv6Hdr.TypeCode.Code(), 0, 0}
-	pseudo := ICMPv6PseudoHeader{
-		SrcIP: ipHdr.SrcIP,
-		DstIP: ipHdr.DstIP,
-	}
-	pseudo.Length = make([]byte, 4, 4)
-	pseudo.NextHeader = make([]byte, 4, 4)
-	binary.BigEndian.PutUint32(pseudo.Length, uint32(len(icmpv6Hdr.LayerPayload())))
-	binary.BigEndian.PutUint32(pseudo.NextHeader, uint32(ipHdr.NextHeader))
-	buf = append(buf, pseudo.SrcIP...)
-	buf = append(buf, pseudo.DstIP...)
-	buf = append(buf, pseudo.Length...)
-	buf = append(buf, pseudo.NextHeader...)
+	/*
+	 *   PSEUDO HEADER BYTE START
+	 */
+	buf = append(buf, ipHdr.SrcIP...)
+	buf = append(buf, ipHdr.DstIP...)
+	buf = append(buf, 0)
+	buf = append(buf, 0)
+	buf = append(buf, byte((ICMP_HDR_LENGTH+len(icmpv6Hdr.LayerPayload()))/256))
+	buf = append(buf, byte((ICMP_HDR_LENGTH+len(icmpv6Hdr.LayerPayload()))%256))
+	buf = append(buf, 0)
+	buf = append(buf, 0)
+	buf = append(buf, 0)
+	buf = append(buf, ICMP_PSEUDO_NEXT_HEADER)
+	/*
+	 *   PSEUDO HEADER BYTE END
+	 */
+
+	/*
+	 *   ICMPv6 HEADER BYTE START
+	 */
 	buf = append(buf, icmpv6Hdr.TypeCode.Type())
 	buf = append(buf, icmpv6Hdr.TypeCode.Code())
-	buf = append(buf, 0) // checksum
+	//Adding zero bytes for checksum (2bytes) and reserved (4 bytes)
+	for idx := 0; idx < 7; idx++ {
+		buf = append(buf, 0)
+	}
 	buf = append(buf, icmpv6Hdr.LayerPayload()...)
 	// Pad to the next 16-bit boundary
 	for idx := 0; idx < len(icmpv6Hdr.LayerPayload())%2; idx++ {
 		buf = append(buf, 0)
 	}
 	/*
-		chksumlen = 0
-		for idx := 0; idx < len(buf); idx += 2 {
-			chksumlen += uint32(buf[idx] << 8)
-			if idx+1 < len(buf) {
-				chksumlen += uint32(buf[idx+1])
-			}
-		}
-		rv := ^uint16((chksumlen >> 16) + chksumlen)
-	*/
+	 *   ICMPv6 HEADER BYTE END
+	 */
 
 	rv := checksum(buf)
 	if rv != icmpv6Hdr.Checksum {
