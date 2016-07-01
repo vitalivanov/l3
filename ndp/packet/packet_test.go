@@ -26,7 +26,6 @@ import (
 	"fmt"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
-	_ "github.com/google/gopacket/pcap"
 	"infra/sysd/sysdCommonDefs"
 	"l3/ndp/debug"
 	"log/syslog"
@@ -159,12 +158,10 @@ func TestValidateICMPv6Checksum(t *testing.T) {
 	if err != nil {
 		t.Error("Decoding ipv6 and icmpv6 header failed", err)
 	}
-	/*
-		err = validateChecksum(ipv6Hdr, icmpv6Hdr)
-		if err != nil {
-			t.Error("Validating Checksum failed", err)
-		}
-	*/
+	err = validateChecksum(ipv6Hdr, icmpv6Hdr)
+	if err != nil {
+		t.Error("Validating Checksum failed", err)
+	}
 }
 
 func TestValidateICMPv6Hdr(t *testing.T) {
@@ -179,9 +176,11 @@ func TestValidateICMPv6Hdr(t *testing.T) {
 		t.Error("Decoding ipv6 and icmpv6 header failed", err)
 	}
 	t.Log("SrcIP->", ipv6Hdr.SrcIP.String(), "DstIP->", ipv6Hdr.DstIP.String())
-	for idx, _ := range ipv6Hdr.DstIP {
-		t.Log(idx, "---->", ipv6Hdr.DstIP[idx])
-	}
+	/*
+		for idx, _ := range ipv6Hdr.DstIP {
+			t.Log(idx, "---->", ipv6Hdr.DstIP[idx])
+		}
+	*/
 	err = validateICMPv6Hdr(icmpv6Hdr, ipv6Hdr.SrcIP, ipv6Hdr.DstIP)
 	if err != nil {
 		t.Error("Validating ICMPv6 Header failed:", err)
