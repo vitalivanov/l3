@@ -23,7 +23,9 @@
 package packet
 
 const (
-	HOP_LIMIT         = 255
-	ICMPv6_CODE       = 0
-	ICMPv6_MIN_LENGTH = 24
+	HOP_LIMIT                    = 255
+	ICMPv6_CODE                  = 0
+	ICMPv6_MIN_LENGTH            = 24
+	ICMP_HDR_LENGTH              = 8
+	ICMP_PSEUDO_NEXT_HEADER byte = 58
 )

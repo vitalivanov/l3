@@ -23,18 +23,12 @@
 package packet
 
 import (
-	_ "encoding/binary"
 	"errors"
 	"fmt"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"l3/ndp/packet/rx"
 	"net"
-)
-
-const (
-	ICMP_HDR_LENGTH              = 8
-	ICMP_PSEUDO_NEXT_HEADER byte = 58
 )
 
 /*
@@ -141,7 +135,7 @@ func validateChecksum(ipHdr *layers.IPv6, icmpv6Hdr *layers.ICMPv6) error {
 	 */
 	buf = append(buf, icmpv6Hdr.TypeCode.Type())
 	buf = append(buf, icmpv6Hdr.TypeCode.Code())
-	//Adding zero bytes for calculateChecksum (2bytes) and reserved (4 bytes)
+	//Adding zero bytes for calculateChecksum (2 bytes) and reserved (4 bytes)
 	for idx := 0; idx < 6; idx++ {
 		buf = append(buf, 0)
 	}
