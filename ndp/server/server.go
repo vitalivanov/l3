@@ -137,15 +137,15 @@ func (svr *NDPServer) EventsListener() {
 		select {
 		case ipv6Notify := <-svr.Ipv6Ch:
 			svr.HandleIPv6Notification(ipv6Notify)
-		case inPkt, ok := <-svr.RxPktCh:
+		case rxChInfo, ok := <-svr.RxPktCh:
 			if !ok {
 				continue
 			}
-			_, exists := svr.L3Port[inPkt.ifIndex]
+			_, exists := svr.L3Port[rxChInfo.ifIndex]
 			if !exists {
 				continue
 			}
-			err := packet.Validate(inPkt.pkt)
+			err := packet.Validate(rxChInfo.pkt)
 			if err != nil {
 				debug.Logger.Err(fmt.Sprintln("Validating Pkt Failed:", err))
 				continue
