@@ -26,7 +26,6 @@ import (
 	"fmt"
 	"l3/ndp/config"
 	"l3/ndp/debug"
-	"l3/ndp/packet"
 	_ "models/objects"
 	"os"
 	"os/signal"
@@ -93,7 +92,7 @@ func (svr *NDPServer) InitSystemPortInfo(portInfo *config.PortInfo) {
 		return
 	}
 	svr.PhyPort[portInfo.IfIndex] = *portInfo
-	svr.ndpIntfStateSlice = append(svr.ndpIntfStateSlice, portInfo.IfIndex)
+	//svr.ndpIntfStateSlice = append(svr.ndpIntfStateSlice, portInfo.IfIndex)
 }
 
 func (svr *NDPServer) InitSystemIPIntf(entry *config.IPv6IntfInfo, ipInfo *config.IPv6IntfInfo) {
@@ -113,14 +112,11 @@ func (svr *NDPServer) InitSystemIPIntf(entry *config.IPv6IntfInfo, ipInfo *confi
  *	After the information is collected, if the oper state is up then we will start rx/tx
  */
 func (svr *NDPServer) InitSystem() {
-	/*
-		//we really should not be carrying for system port state...???
-		portStates := svr.GetPorts()
-		for _, port := range portStates {
-			svr.InitSystemPortInfo(port)
-		}
+	portStates := svr.GetPorts()
+	for _, port := range portStates {
+		svr.InitSystemPortInfo(port)
+	}
 
-	*/
 	ipIntfs := svr.GetIPIntf()
 	for _, ipIntf := range ipIntfs {
 		ipPort := svr.L3Port[ipIntf.IfIndex]

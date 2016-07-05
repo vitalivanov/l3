@@ -28,6 +28,7 @@ import (
 	"github.com/google/gopacket/layers"
 	"l3/ndp/config"
 	"l3/ndp/debug"
+	"l3/ndp/packet"
 )
 
 /*
@@ -109,15 +110,15 @@ func (svr *NDPServer) StopRxTx(ifIndex int32) {
 func (svr *NDPServer) ProcessRxPkt(ifIndex int32, pkt gopacket.Packet) {
 	_, exists := svr.L3Port[ifIndex]
 	if !exists {
-		continue
+		return
 	}
 	nbrInfo := &config.NeighborInfo{}
 	err := packet.ValidateAndParse(nbrInfo, pkt)
 	if err != nil {
 		debug.Logger.Err(fmt.Sprintln("Validating Pkt Failed:", err))
-		continue
+		return
 	}
 	// ipaddr, macAddr, vlanId, ifIndex
-	_, err = srv.SwitchPlugin.CreateIPv6Neighbor()
+	//_, err = svr.SwitchPlugin.CreateIPv6Neighbor()
 
 }
