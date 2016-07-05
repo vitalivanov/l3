@@ -101,6 +101,7 @@ func (svr *NDPServer) GetVlans() {
 		entry.IfIndex = vlanState.IfIndex
 		entry.OperState = vlanState.OperState
 		svr.VlanInfo[vlanState.VlanId] = entry
+		svr.VlanIfIdxVlanIdMap[vlanState.IfIndex] = vlanState.VlanId //cached the info for ipv6 neighbor create
 	}
 	return
 }
@@ -191,4 +192,21 @@ func (svr *NDPServer) DeleteL3IntfFromUpState(ifIndex int32) {
 			break
 		}
 	}
+}
+
+/*
+ *    API: It will populate correct vlan information which will be used for ipv6 neighbor create
+ */
+func (svr *NDPServer) PopulateVlanInfo(nbrInfo *config.NeighborInfo, ifIndex int32) {
+	// check if the ifIndex is present in the reverse map..
+	vlanId, exists := svr.VlanIfIdxVlanIdMap[ifIndex]
+	if exists {
+		// if the entry exists then use the vlanId from reverse map
+		nbrInfo.VlanId = vlanId
+	} else {
+		// @TODO: move this to plugin specific
+		// in this case use system reserved Vlan id which is -1
+		nbrInfo.VlanId = -1
+	}
+	nbrInfo.IfIndex = ifIndex
 }

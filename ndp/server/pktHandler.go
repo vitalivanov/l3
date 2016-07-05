@@ -104,7 +104,9 @@ func (svr *NDPServer) StopRxTx(ifIndex int32) {
 /*
  *	ProcessRxPkt
  *		        a) Check for runtime information
- *			b) Validate & Parse Pkt, which gives ipAddr, MacAddr, VlanId, ifIndex
+ *			b) Validate & Parse Pkt, which gives ipAddr, MacAddr
+ *			c) PopulateVlanInfo will check if the port is untagged port or not and based of that
+ *			   vlan id will be selected
  *			c) CreateIPv6 Neighbor entry
  */
 func (svr *NDPServer) ProcessRxPkt(ifIndex int32, pkt gopacket.Packet) {
@@ -118,7 +120,8 @@ func (svr *NDPServer) ProcessRxPkt(ifIndex int32, pkt gopacket.Packet) {
 		debug.Logger.Err(fmt.Sprintln("Validating Pkt Failed:", err))
 		return
 	}
-	// ipaddr, macAddr, vlanId, ifIndex
-	//_, err = svr.SwitchPlugin.CreateIPv6Neighbor()
 
+	svr.PopulateVlanInfo(nbrInfo, ifIndex)
+	// ipaddr, macAddr, vlanId, ifIndex
+	_, err = svr.SwitchPlugin.CreateIPv6Neighbor(nbrInfo.IpAddr, nbrInfo.MacAddr, nbrInfo.VlanId, nbrInfo.IfIndex)
 }

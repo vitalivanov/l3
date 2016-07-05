@@ -60,7 +60,7 @@ type IPv6IntfInfo struct {
 type NeighborInfo struct {
 	IpAddr  string
 	MacAddr string
-	VlanId  string
+	VlanId  int32
 	IfIndex int32
 }
 

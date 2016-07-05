@@ -74,6 +74,7 @@ func (svr *NDPServer) InitGlobalDS() {
 	svr.PhyPort = make(map[int32]config.PortInfo, NDP_SYSTEM_PORT_MAP_CAPACITY)
 	svr.L3Port = make(map[int32]config.IPv6IntfInfo, NDP_SYSTEM_PORT_MAP_CAPACITY)
 	svr.VlanInfo = make(map[int32]config.VlanInfo, NDP_SYSTEM_PORT_MAP_CAPACITY)
+	svr.VlanIfIdxVlanIdMap = make(map[int32]int32, NDP_SYSTEM_PORT_MAP_CAPACITY)
 	svr.Ipv6Ch = make(chan *config.IPv6IntfInfo)
 	svr.RxPktCh = make(chan *RxPktInfo)
 	svr.SnapShotLen = 1024
