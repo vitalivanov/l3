@@ -48,7 +48,7 @@ func NewLocRibPolicyEngine(logger *logging.Writer) *LocRibPolicyEngine {
 	return policyEngine
 }
 
-func (eng *LocRibPolicyEngine) CreatePolicyDefinition(defCfg utilspolicy.PolicyDefinitionConfig) {
+func (eng *LocRibPolicyEngine) CreatePolicyDefinition(defCfg utilspolicy.PolicyDefinitionConfig) error {
 	defCfg.Extensions = PolicyExtensions{}
-	eng.PolicyEngine.CreatePolicyDefinition(defCfg)
+	return eng.PolicyEngine.CreatePolicyDefinition(defCfg)
 }

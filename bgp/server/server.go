@@ -25,6 +25,7 @@
 package server
 
 import (
+	"errors"
 	"fmt"
 	"l3/bgp/config"
 	"l3/bgp/fsm"
@@ -40,10 +41,17 @@ import (
 	"sync/atomic"
 	"utils/logging"
 	"utils/netUtils"
+	"utils/patriciaDB"
 	utilspolicy "utils/policy"
 	"utils/policy/policyCommonDefs"
 	"utils/statedbclient"
 )
+
+type GlobalUpdate struct {
+	OldConfig config.GlobalConfig
+	NewConfig config.GlobalConfig
+	AttrSet   []bool
+}
 
 type PeerUpdate struct {
 	OldPeer config.NeighborConfig
@@ -82,7 +90,7 @@ type BGPServer struct {
 	listener         *net.TCPListener
 	ifaceMgr         *utils.InterfaceMgr
 	BgpConfig        config.Bgp
-	GlobalConfigCh   chan config.GlobalConfig
+	GlobalConfigCh   chan GlobalUpdate
 	AddPeerCh        chan PeerUpdate
 	RemPeerCh        chan string
 	AddPeerGroupCh   chan PeerGroupUpdate
@@ -125,7 +133,7 @@ func NewBGPServer(logger *logging.Writer, policyManager *bgppolicy.BGPPolicyMana
 	bgpServer.ifaceMgr = utils.NewInterfaceMgr(logger)
 	bgpServer.BgpConfig = config.Bgp{}
 	bgpServer.GlobalCfgDone = false
-	bgpServer.GlobalConfigCh = make(chan config.GlobalConfig)
+	bgpServer.GlobalConfigCh = make(chan GlobalUpdate)
 	bgpServer.AddPeerCh = make(chan PeerUpdate)
 	bgpServer.RemPeerCh = make(chan string)
 	bgpServer.AddPeerGroupCh = make(chan PeerGroupUpdate)
@@ -168,6 +176,7 @@ func NewBGPServer(logger *logging.Writer, policyManager *bgppolicy.BGPPolicyMana
 	locRibPE.SetActionFuncs(bgpServer.actionFuncMap)
 	locRibPE.SetTraverseFuncs(bgpServer.TraverseAndApplyBGPRib, bgpServer.TraverseAndReverseBGPRib)
 	bgpServer.locRibPE = locRibPE
+	bgpServer.policyManager.AddPolicyEngine(bgpServer.locRibPE)
 
 	return bgpServer
 }
@@ -568,7 +577,7 @@ func (server *BGPServer) UpdateRouteAndPolicyDB(policyDetails utilspolicy.Policy
 
 func (server *BGPServer) TraverseAndApplyBGPRib(data interface{}, updateFunc utilspolicy.PolicyApplyfunc) {
 	server.logger.Info(fmt.Sprintf("BGPServer:TraverseRibForPolicies - start"))
-	policy := data.(utilspolicy.Policy)
+	policy := data.(utilspolicy.ApplyPolicyInfo)
 	updated := make(map[*bgprib.Path][]*bgprib.Destination, 10)
 	withdrawn := make([]*bgprib.Destination, 0, 10)
 	updatedAddPaths := make([]*bgprib.Destination, 0)
@@ -756,6 +765,7 @@ func (server *BGPServer) UpdatePeerGroupInPeers(groupName string, peerGroup *con
 		peer.Init()
 	}
 }
+
 func (server *BGPServer) SetupRedistribution(gConf config.GlobalConfig) {
 	server.logger.Info("SetUpRedistribution")
 	if gConf.Redistribution == nil || len(gConf.Redistribution) == 0 {
@@ -779,6 +789,113 @@ func (server *BGPServer) SetupRedistribution(gConf config.GlobalConfig) {
 		server.routeMgr.ApplyPolicy("BGP", gConf.Redistribution[i].Policy, "Redistribution", conditions)
 	}
 }
+
+func (server *BGPServer) DeleteAgg(ipPrefix string) error {
+	server.locRibPE.DeletePolicyDefinition(ipPrefix)
+	server.locRibPE.DeletePolicyStmt(ipPrefix)
+	server.locRibPE.DeletePolicyCondition(ipPrefix)
+	return nil
+}
+
+func (server *BGPServer) AddOrUpdateAgg(oldConf config.BGPAggregate, newConf config.BGPAggregate, attrSet []bool) error {
+	server.logger.Info("AddOrUpdateAgg")
+	var err error
+
+	if oldConf.IPPrefix != "" {
+		// Delete the policy
+		server.DeleteAgg(oldConf.IPPrefix)
+	}
+
+	if newConf.IPPrefix != "" {
+		// Create the policy
+		name := newConf.IPPrefix
+		tokens := strings.Split(newConf.IPPrefix, "/")
+		prefixLen := tokens[1]
+		prefixLenInt, err := strconv.Atoi(prefixLen)
+		if err != nil {
+			server.logger.Err(fmt.Sprintf("Failed to convert prefex len %s to int with error %s", prefixLen, err))
+			return err
+		}
+
+		cond := utilspolicy.PolicyConditionConfig{
+			Name:          name,
+			ConditionType: "MatchDstIpPrefix",
+			MatchDstIpPrefixConditionInfo: utilspolicy.PolicyDstIpMatchPrefixSetCondition{
+				Prefix: utilspolicy.PolicyPrefix{
+					IpPrefix:        newConf.IPPrefix,
+					MasklengthRange: prefixLen + "-32",
+				},
+			},
+		}
+
+		_, err = server.locRibPE.CreatePolicyCondition(cond)
+		if err != nil {
+			server.logger.Err(fmt.Sprintf("Failed to create policy condition for aggregate %s with error %s", name, err))
+			return err
+		}
+
+		stmt := utilspolicy.PolicyStmtConfig{Name: name, MatchConditions: "all"}
+		stmt.Conditions = make([]string, 1)
+		stmt.Conditions[0] = name
+		stmt.Actions = make([]string, 1)
+		stmt.Actions[0] = "permit"
+		err = server.locRibPE.CreatePolicyStmt(stmt)
+		if err != nil {
+			server.logger.Err(fmt.Sprintf("Failed to create policy statement for aggregate %s with error %s", name, err))
+			server.locRibPE.DeletePolicyCondition(name)
+			return err
+		}
+
+		def := utilspolicy.PolicyDefinitionConfig{Name: name, Precedence: prefixLenInt, MatchType: "all"}
+		def.PolicyDefinitionStatements = make([]utilspolicy.PolicyDefinitionStmtPrecedence, 1)
+		policyDefinitionStatement := utilspolicy.PolicyDefinitionStmtPrecedence{
+			Precedence: 1,
+			Statement:  name,
+		}
+		def.PolicyDefinitionStatements[0] = policyDefinitionStatement
+		def.Extensions = bgppolicy.PolicyExtensions{}
+		err = server.locRibPE.CreatePolicyDefinition(def)
+		if err != nil {
+			server.logger.Err(fmt.Sprintf("Failed to create policy definition for aggregate %s with error %s", name, err))
+			server.locRibPE.DeletePolicyStmt(name)
+			server.locRibPE.DeletePolicyCondition(name)
+			return err
+		}
+
+		err = server.UpdateAggPolicy(name, server.locRibPE, newConf)
+		return err
+	}
+	return err
+}
+
+func (server *BGPServer) UpdateAggPolicy(policyName string, pe bgppolicy.BGPPolicyEngine, aggConf config.BGPAggregate) error {
+	server.logger.Debug(fmt.Sprintln("UpdateApplyPolicy"))
+	var err error
+	var policyAction utilspolicy.PolicyAction
+	conditionNameList := make([]string, 0)
+
+	policyEngine := pe.GetPolicyEngine()
+	policyDB := policyEngine.PolicyDB
+
+	nodeGet := policyDB.Get(patriciaDB.Prefix(policyName))
+	if nodeGet == nil {
+		server.logger.Err(fmt.Sprintln("Policy ", policyName, " not defined"))
+		return errors.New(fmt.Sprintf("Policy %s not found in policy engine", policyName))
+	}
+	node := nodeGet.(utilspolicy.Policy)
+
+	aggregateActionInfo := utilspolicy.PolicyAggregateActionInfo{aggConf.GenerateASSet, aggConf.SendSummaryOnly}
+	policyAction = utilspolicy.PolicyAction{
+		Name:       aggConf.IPPrefix,
+		ActionType: policyCommonDefs.PolicyActionTypeAggregate,
+		ActionInfo: aggregateActionInfo,
+	}
+
+	server.logger.Debug(fmt.Sprintln("Calling applypolicy with conditionNameList: ", conditionNameList))
+	pe.UpdateApplyPolicy(utilspolicy.ApplyPolicyInfo{node, policyAction, conditionNameList}, true)
+	return err
+}
+
 func (server *BGPServer) copyGlobalConf(gConf config.GlobalConfig) {
 	server.BgpConfig.Global.Config.AS = gConf.AS
 	server.BgpConfig.Global.Config.RouterId = gConf.RouterId
@@ -857,7 +974,7 @@ func (server *BGPServer) constructBGPGlobalState(gConf *config.GlobalConfig) {
 func (server *BGPServer) listenChannelUpdates() {
 	for {
 		select {
-		case gConf := <-server.GlobalConfigCh:
+		case globalUpdate := <-server.GlobalConfigCh:
 			for peerIP, peer := range server.PeerMap {
 				server.logger.Info(fmt.Sprintf("Cleanup peer %s", peerIP))
 				peer.Cleanup()
@@ -866,6 +983,7 @@ func (server *BGPServer) listenChannelUpdates() {
 				"will get cleaned up"))
 			runtime.Gosched()
 
+			gConf := globalUpdate.NewConfig
 			packet.SetNextHopPathAttrs(server.ConnRoutesPath.PathAttrs, gConf.RouterId)
 			server.RemoveRoutesFromAllNeighbor()
 			server.copyGlobalConf(gConf)
@@ -986,6 +1104,16 @@ func (server *BGPServer) listenChannelUpdates() {
 			}
 			delete(server.BgpConfig.PeerGroups, groupName)
 			server.UpdatePeerGroupInPeers(groupName, nil)
+
+		case aggUpdate := <-server.AddAggCh:
+			oldAgg := aggUpdate.OldAgg
+			newAgg := aggUpdate.NewAgg
+			if newAgg.IPPrefix != "" {
+				server.AddOrUpdateAgg(oldAgg, newAgg, aggUpdate.AttrSet)
+			}
+
+		case ipPrefix := <-server.RemAggCh:
+			server.DeleteAgg(ipPrefix)
 
 		case tcpConn := <-server.acceptCh:
 			server.logger.Info(fmt.Sprintln("Connected to", tcpConn.RemoteAddr().String()))
@@ -1144,7 +1272,8 @@ func (server *BGPServer) listenChannelUpdates() {
 }
 
 func (server *BGPServer) StartServer() {
-	gConf := <-server.GlobalConfigCh
+	globalUpdate := <-server.GlobalConfigCh
+	gConf := globalUpdate.NewConfig
 	server.GlobalCfgDone = true
 	server.logger.Info(fmt.Sprintln("Recieved global conf:", gConf))
 	server.BgpConfig.Global.Config = gConf
