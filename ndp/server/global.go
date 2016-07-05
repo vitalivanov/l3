@@ -45,8 +45,9 @@ type NDPServer struct {
 	SwitchPlugin asicdClient.AsicdClientIntf
 
 	// System Ports information, key is IntfRef
-	PhyPort map[int32]config.PortInfo
-	L3Port  map[int32]config.IPv6IntfInfo
+	PhyPort  map[int32]config.PortInfo
+	L3Port   map[int32]config.IPv6IntfInfo
+	VlanInfo map[int32]config.VlanInfo
 
 	//IPV6 Create/Delete Notification Channel
 	Ipv6Ch chan *config.IPv6IntfInfo

@@ -73,6 +73,7 @@ func (svr *NDPServer) OSSignalHandle() {
 func (svr *NDPServer) InitGlobalDS() {
 	svr.PhyPort = make(map[int32]config.PortInfo, NDP_SYSTEM_PORT_MAP_CAPACITY)
 	svr.L3Port = make(map[int32]config.IPv6IntfInfo, NDP_SYSTEM_PORT_MAP_CAPACITY)
+	svr.VlanInfo = make(map[int32]config.VlanInfo, NDP_SYSTEM_PORT_MAP_CAPACITY)
 	svr.Ipv6Ch = make(chan *config.IPv6IntfInfo)
 	svr.RxPktCh = make(chan *RxPktInfo)
 	svr.SnapShotLen = 1024
@@ -85,14 +86,6 @@ func (svr *NDPServer) DeInitGlobalDS() {
 	svr.L3Port = nil
 	svr.Ipv6Ch = nil
 	svr.RxPktCh = nil
-}
-
-func (svr *NDPServer) InitSystemPortInfo(portInfo *config.PortInfo) {
-	if portInfo == nil {
-		return
-	}
-	svr.PhyPort[portInfo.IfIndex] = *portInfo
-	//svr.ndpIntfStateSlice = append(svr.ndpIntfStateSlice, portInfo.IfIndex)
 }
 
 func (svr *NDPServer) InitSystemIPIntf(entry *config.IPv6IntfInfo, ipInfo *config.IPv6IntfInfo) {
@@ -113,21 +106,18 @@ func (svr *NDPServer) InitSystemIPIntf(entry *config.IPv6IntfInfo, ipInfo *confi
  */
 func (svr *NDPServer) InitSystem() {
 	// Get ports information
-	portStates := svr.GetPorts()
-	for _, port := range portStates {
-		svr.InitSystemPortInfo(port)
-	}
+	svr.GetPorts()
 
 	// Get vlans information
+	svr.GetVlans()
 
 	// Get IP Information
-	ipIntfs := svr.GetIPIntf()
-	for _, ipIntf := range ipIntfs {
-		ipPort := svr.L3Port[ipIntf.IfIndex]
-		svr.InitSystemIPIntf(&ipPort, ipIntf)
-		svr.L3Port[ipIntf.IfIndex] = ipPort
-		if ipPort.OperState == NDP_IP_STATE_UP {
-			svr.StartRxTx(ipIntf)
+	svr.GetIPIntf()
+
+	// Check status of IP Interface and then start RX/TX for that ip interface
+	for _, ipIntf := range svr.L3Port {
+		if ipIntf.OperState == NDP_IP_STATE_UP {
+			svr.StartRxTx(&ipIntf)
 		}
 	}
 }
