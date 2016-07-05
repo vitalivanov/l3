@@ -59,10 +59,18 @@ func TestOSPFDBDecode(t *testing.T) {
 	}
 	fmt.Println("\n Get Server object")
 	server := getServerObject()
+	initAttr()
 	go startDummyChannels(server)
 	if server != nil {
-		fmt.Printf("Send message to neighbor data")
+		fmt.Printf("Decode DB: 3) Send message to neighbor data")
 		server.neighborDBDEventCh <- dbdNbrMsg
+		fmt.Printf("Decode DB: 4) Process received dbd data")
+		server.ProcessRxDbdPkt(data, &ospfHdrMd, &ipHdrMd, key, srcMAC)
+		fmt.Printf("Decode DB: 5)Encode DB packet ")
+		server.initDefaultIntfConf(key, ipIntfProp, ifType)
+		intConf := server.IntfConfMap[key]
+		pkt := server.BuildDBDPkt(key, intConf, nbrConf, *ospfdbd_data, dstMAC)
+		fmt.Printf("Decode DB: Obtained decoded packet as ", pkt)
 	}
 
 }
