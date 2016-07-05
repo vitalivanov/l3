@@ -112,11 +112,15 @@ func (svr *NDPServer) InitSystemIPIntf(entry *config.IPv6IntfInfo, ipInfo *confi
  *	After the information is collected, if the oper state is up then we will start rx/tx
  */
 func (svr *NDPServer) InitSystem() {
+	// Get ports information
 	portStates := svr.GetPorts()
 	for _, port := range portStates {
 		svr.InitSystemPortInfo(port)
 	}
 
+	// Get vlans information
+
+	// Get IP Information
 	ipIntfs := svr.GetIPIntf()
 	for _, ipIntf := range ipIntfs {
 		ipPort := svr.L3Port[ipIntf.IfIndex]
