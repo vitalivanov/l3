@@ -27,6 +27,7 @@ import (
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"infra/sysd/sysdCommonDefs"
+	"l3/ndp/config"
 	"l3/ndp/debug"
 	"log/syslog"
 	"net"
@@ -92,6 +93,22 @@ func DeepCheckNDHdr(icmpv6Hdr, ndWant *layers.ICMPv6, t *testing.T) {
 		t.Error("Checksum MisMatch")
 	}
 	t.Log("ICMPv6 Header Successfully Verified")
+}
+
+func TestEthLayer(t *testing.T) {
+	p := gopacket.NewPacket(testPkt, layers.LinkTypeEthernet, gopacket.Default)
+	if p.ErrorLayer() != nil {
+		t.Error("Failed to decode packet:", p.ErrorLayer().Error())
+	}
+	eth := &layers.Ethernet{}
+	err := getEthLayer(p, eth)
+	if err != nil {
+		t.Error("failed to get ethener layer", err)
+	}
+
+	if (eth.SrcMAC).String() != "c2:00:54:f5:00:00" {
+		t.Error("Src Mac", (eth.SrcMAC).String(), "doesn't match with existing raw byte src mac")
+	}
 }
 
 // Test ND Solicitation message Decoder
@@ -187,14 +204,64 @@ func TestValidateICMPv6Hdr(t *testing.T) {
 	}
 }
 
+func TestPopulateNeighborInfo(t *testing.T) {
+	nbrInfo := &config.NeighborInfo{}
+	populateNeighborInfo(nbrInfo, nil, nil, nil)
+	if nbrInfo.IpAddr != "" {
+		t.Error("nil error check failed")
+	}
+	p := gopacket.NewPacket(testPkt, layers.LinkTypeEthernet, gopacket.Default)
+	if p.ErrorLayer() != nil {
+		t.Error("Failed to decode packet:", p.ErrorLayer().Error())
+	}
+	icmpv6Hdr := &layers.ICMPv6{}
+	ipv6Hdr := &layers.IPv6{}
+	err := getIpAndICMPv6Hdr(p, ipv6Hdr, icmpv6Hdr)
+	if err != nil {
+		t.Error("Decoding ipv6 and icmpv6 header failed", err)
+	}
+	eth := &layers.Ethernet{}
+	err = getEthLayer(p, eth)
+	if err != nil {
+		t.Error("failed to get ethener layer", err)
+	}
+	populateNeighborInfo(nbrInfo, eth, nil, nil)
+	if nbrInfo.IpAddr != "" {
+		t.Error("nil error check failed")
+	}
+	populateNeighborInfo(nbrInfo, nil, ipv6Hdr, nil)
+	if nbrInfo.IpAddr != "" {
+		t.Error("nil error check failed")
+	}
+	populateNeighborInfo(nbrInfo, nil, nil, icmpv6Hdr)
+	if nbrInfo.IpAddr != "" {
+		t.Error("nil error check failed")
+	}
+	populateNeighborInfo(nbrInfo, eth, ipv6Hdr, icmpv6Hdr)
+	if nbrInfo.MacAddr != "c2:00:54:f5:00:00" {
+		t.Error("Src Mac copy to NeighborInfo failed")
+	}
+
+	if nbrInfo.IpAddr != "::" {
+		t.Error("src ip address copy failed")
+	}
+}
+
 func TestValidatePkt(t *testing.T) {
 	p := gopacket.NewPacket(testPkt, layers.LinkTypeEthernet, gopacket.Default)
 	if p.ErrorLayer() != nil {
 		t.Error("Failed to decode packet:", p.ErrorLayer().Error())
 	}
-
-	err := Validate(p)
+	nbrInfo := &config.NeighborInfo{}
+	err := ValidateAndParse(nbrInfo, p)
 	if err != nil {
 		t.Error("Failed to Validate Packet, Error:", err)
+	}
+	if nbrInfo.MacAddr != "c2:00:54:f5:00:00" {
+		t.Error("Src Mac copy to NeighborInfo failed")
+	}
+
+	if nbrInfo.IpAddr != "::" {
+		t.Error("src ip address copy failed")
 	}
 }

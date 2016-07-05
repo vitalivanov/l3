@@ -56,3 +56,10 @@ type IPv6IntfInfo struct {
 	OperState string
 	MsgType   string
 }
+
+type NeighborInfo struct {
+	IpAddr  string
+	MacAddr string
+	VlanId  string
+	IfIndex int32
+}

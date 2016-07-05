@@ -141,15 +141,7 @@ func (svr *NDPServer) EventsListener() {
 			if !ok {
 				continue
 			}
-			_, exists := svr.L3Port[rxChInfo.ifIndex]
-			if !exists {
-				continue
-			}
-			err := packet.Validate(rxChInfo.pkt)
-			if err != nil {
-				debug.Logger.Err(fmt.Sprintln("Validating Pkt Failed:", err))
-				continue
-			}
+			svr.ProcessRxPkt(rxChInfo.ifIndex, rxChInfo.pkt)
 		}
 	}
 }

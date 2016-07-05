@@ -99,3 +99,25 @@ func (svr *NDPServer) StopRxTx(ifIndex int32) {
 	// Delete Entry from Slice
 	svr.DeleteL3IntfFromUpState(ipPort.IfIndex)
 }
+
+/*
+ *	ProcessRxPkt
+ *		        a) Check for runtime information
+ *			b) Validate & Parse Pkt, which gives ipAddr, MacAddr, VlanId, ifIndex
+ *			c) CreateIPv6 Neighbor entry
+ */
+func (svr *NDPServer) ProcessRxPkt(ifIndex int32, pkt gopacket.Packet) {
+	_, exists := svr.L3Port[ifIndex]
+	if !exists {
+		continue
+	}
+	nbrInfo := &config.NeighborInfo{}
+	err := packet.ValidateAndParse(nbrInfo, pkt)
+	if err != nil {
+		debug.Logger.Err(fmt.Sprintln("Validating Pkt Failed:", err))
+		continue
+	}
+	// ipaddr, macAddr, vlanId, ifIndex
+	_, err = srv.SwitchPlugin.CreateIPv6Neighbor()
+
+}

@@ -27,9 +27,19 @@ import (
 	"fmt"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
+	"l3/ndp/config"
 	"l3/ndp/packet/rx"
 	"net"
 )
+
+func getEthLayer(pkt gopacket.Packet, eth *layers.Ethernet) error {
+	ethLayer := pkt.Layer(layers.LayerTypeEthernet)
+	if ethLayer == nil {
+		return errors.New("Decoding ethernet layer failed")
+	}
+	*eth = *ethLayer.(*layers.Ethernet)
+	return nil
+}
 
 /*
  *			ICMPv6 MESSAGE FORMAT
@@ -180,6 +190,14 @@ func validateICMPv6Hdr(hdr *layers.ICMPv6, srcIP net.IP, dstIP net.IP) error {
 	return nil
 }
 
+func populateNeighborInfo(nbrInfo *config.NeighborInfo, eth *layers.Ethernet, ipv6Hdr *layers.IPv6, icmpv6Hdr *layers.ICMPv6) {
+	if eth == nil || ipv6Hdr == nil || icmpv6Hdr == nil {
+		return
+	}
+	nbrInfo.MacAddr = (eth.SrcMAC).String()
+	nbrInfo.IpAddr = (ipv6Hdr.SrcIP).String()
+}
+
 /* API: Get IPv6 & ICMPv6 Header
  *      Does Validation of IPv6
  *      Does Validation of ICMPv6
@@ -203,11 +221,18 @@ func validateICMPv6Hdr(hdr *layers.ICMPv6, srcIP net.IP, dstIP net.IP) error {
  *  - If the IP source address is the unspecified address, there is no
  *    source link-layer address option in the message. <- @TODO: need to be done later
  */
-func Validate(pkt gopacket.Packet) error {
-	// first decode ipv6 & icmpv6 header
+func ValidateAndParse(nbrInfo *config.NeighborInfo, pkt gopacket.Packet) error {
+	// first decode all the layers
 	icmpv6Hdr := &layers.ICMPv6{}
 	ipv6Hdr := &layers.IPv6{}
+	eth := &layers.Ethernet{}
 	var err error
+
+	// Get Ethernet Layer
+	err = getEthLayer(pkt, eth)
+	if err != nil {
+		return err
+	}
 
 	// First get ipv6 and icmp6 information
 	err = getIpAndICMPv6Hdr(pkt, ipv6Hdr, icmpv6Hdr)
@@ -232,5 +257,8 @@ func Validate(pkt gopacket.Packet) error {
 	if err != nil {
 		return err
 	}
+
+	// Populate Neighbor Information
+	populateNeighborInfo(nbrInfo, eth, ipv6Hdr, icmpv6Hdr)
 	return nil
 }
