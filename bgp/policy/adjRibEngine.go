@@ -48,7 +48,7 @@ func NewAdjRibPolicyEngine(logger *logging.Writer) *AdjRibPPolicyEngine {
 	return policyEngine
 }
 
-func (eng *AdjRibPPolicyEngine) CreatePolicyDefinition(defCfg utilspolicy.PolicyDefinitionConfig) {
+func (eng *AdjRibPPolicyEngine) CreatePolicyDefinition(defCfg utilspolicy.PolicyDefinitionConfig) error {
 	defCfg.Extensions = AdjRibPolicyExtensions{}
-	eng.PolicyEngine.CreatePolicyDefinition(defCfg)
+	return eng.PolicyEngine.CreatePolicyDefinition(defCfg)
 }

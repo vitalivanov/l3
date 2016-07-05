@@ -67,6 +67,10 @@ func NewPolicyManager(logger *logging.Writer, pMgr config.PolicyMgrIntf) *BGPPol
 	return PolicyManager
 }
 
+func (eng *BGPPolicyManager) AddPolicyEngine(bgpPE BGPPolicyEngine) {
+	eng.policyEngines = append(eng.policyEngines, bgpPE)
+}
+
 func (eng *BGPPolicyManager) StartPolicyEngine() {
 	eng.policyPlugin.Start()
 	for {

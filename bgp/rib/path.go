@@ -314,7 +314,8 @@ func (p *Path) SetReachabilityInfo(reachabilityInfo *ReachabilityInfo) {
 }
 
 func (p *Path) IsReachable() bool {
-	if p.IsLocal() || (p.reachabilityInfo != nil && p.reachabilityInfo.NextHop != "") {
+	if p.routeType == RouteTypeStatic || p.routeType == RouteTypeConnected || p.routeType == RouteTypeIGP ||
+		(p.reachabilityInfo != nil && p.reachabilityInfo.NextHop != "") {
 		return true
 	}
 	return false
