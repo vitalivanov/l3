@@ -447,8 +447,8 @@ func (d *Destination) SelectRouteForLocRib(addPathCount int) (RouteAction, bool,
 					} else {
 						updatedPaths = append(updatedPaths, path)
 					}
-					d.logger.Info(fmt.Sprintf("Destination %s route from %s is from a better source type, ",
-						"old type=%d, new type=%d\n", d.NLRI.GetPrefix(), peerIP, routeSrc, currPathSource))
+					d.logger.Info(fmt.Sprintf("Destination %s route from %s is from a better source type, "+
+						"old type=%d, new type=%d", d.NLRI.GetPrefix(), peerIP, routeSrc, currPathSource))
 					routeSrc = currPathSource
 					continue
 				} else {
