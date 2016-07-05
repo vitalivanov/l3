@@ -28,6 +28,7 @@ import (
 	"github.com/google/gopacket/layers"
 	"l3/ndp/config"
 	"l3/ndp/debug"
+	"l3/ndp/packet"
 )
 
 /*
@@ -98,4 +99,29 @@ func (svr *NDPServer) StopRxTx(ifIndex int32) {
 		"ip address", ipPort.IpAddr, "is done"))
 	// Delete Entry from Slice
 	svr.DeleteL3IntfFromUpState(ipPort.IfIndex)
+}
+
+/*
+ *	ProcessRxPkt
+ *		        a) Check for runtime information
+ *			b) Validate & Parse Pkt, which gives ipAddr, MacAddr
+ *			c) PopulateVlanInfo will check if the port is untagged port or not and based of that
+ *			   vlan id will be selected
+ *			c) CreateIPv6 Neighbor entry
+ */
+func (svr *NDPServer) ProcessRxPkt(ifIndex int32, pkt gopacket.Packet) {
+	_, exists := svr.L3Port[ifIndex]
+	if !exists {
+		return
+	}
+	nbrInfo := &config.NeighborInfo{}
+	err := packet.ValidateAndParse(nbrInfo, pkt)
+	if err != nil {
+		debug.Logger.Err(fmt.Sprintln("Validating Pkt Failed:", err))
+		return
+	}
+
+	svr.PopulateVlanInfo(nbrInfo, ifIndex)
+	// ipaddr, macAddr, vlanId, ifIndex
+	_, err = svr.SwitchPlugin.CreateIPv6Neighbor(nbrInfo.IpAddr, nbrInfo.MacAddr, nbrInfo.VlanId, nbrInfo.IfIndex)
 }

@@ -33,16 +33,15 @@ import (
 /*
  * API: will return all system port information
  */
-func (svr *NDPServer) GetPorts() []*config.PortInfo {
+func (svr *NDPServer) GetPorts() {
 	debug.Logger.Info("Get Port State List")
-	portStates := make([]*config.PortInfo, 0)
 	portsInfo, err := svr.SwitchPlugin.GetAllPortState()
 	if err != nil {
 		debug.Logger.Err(fmt.Sprintln("Failed to get all ports from system, ERROR:", err))
-		return portStates
+		return
 	}
 	for _, obj := range portsInfo {
-		port := &config.PortInfo{
+		port := config.PortInfo{
 			IntfRef:   obj.IntfRef,
 			IfIndex:   obj.IfIndex,
 			OperState: obj.OperState,
@@ -56,35 +55,79 @@ func (svr *NDPServer) GetPorts() []*config.PortInfo {
 			port.MacAddr = pObj.MacAddr
 			port.Description = pObj.Description
 		}
-		portStates = append(portStates, port)
+		svr.PhyPort[port.IfIndex] = port
 	}
 
 	debug.Logger.Info("Done with Port State list")
-	return portStates
+	return
+}
+
+/*
+ * API: will return all system vlan information
+ */
+func (svr *NDPServer) GetVlans() {
+	debug.Logger.Info("Get Vlan Information")
+
+	// Get Vlan State Information
+	vlansStateInfo, err := svr.SwitchPlugin.GetAllVlanState()
+	if err != nil {
+		debug.Logger.Err(fmt.Sprintln("Failed to get system vlan information, ERROR:", err))
+		return
+	}
+
+	// Get Vlan Config Information
+	vlansConfigInfo, err := svr.SwitchPlugin.GetAllVlan()
+	if err != nil {
+		debug.Logger.Err(fmt.Sprintln("Failed to get system vlan config information, ERROR:", err))
+	}
+
+	// Store untag port information
+	for _, vlanConfig := range vlansConfigInfo {
+		entry := svr.VlanInfo[vlanConfig.VlanId]
+		entry.UntagPortsMap = make(map[int]bool)
+		for _, untagIntf := range vlanConfig.UntagIfIndexList {
+			entry.UntagPortsMap[int(untagIntf)] = true
+		}
+		svr.VlanInfo[vlanConfig.VlanId] = entry
+	}
+
+	// store vlan state information like name, ifIndex, operstate
+	for _, vlanState := range vlansStateInfo {
+		entry, ok := svr.VlanInfo[vlanState.VlanId]
+		if !ok {
+			debug.Logger.Warning(fmt.Sprintln("config object for vlan", vlanState.VlanId, "not found"))
+		}
+		entry.Name = vlanState.VlanName
+		entry.IfIndex = vlanState.IfIndex
+		entry.OperState = vlanState.OperState
+		svr.VlanInfo[vlanState.VlanId] = entry
+		svr.VlanIfIdxVlanIdMap[vlanState.IfIndex] = vlanState.VlanId //cached the info for ipv6 neighbor create
+	}
+	return
 }
 
 /*
  * API: will return all system L3 interfaces information
  */
-func (svr *NDPServer) GetIPIntf() []*config.IPv6IntfInfo {
+func (svr *NDPServer) GetIPIntf() {
 	debug.Logger.Info("Get IPv6 Interface List")
-	ipStates := make([]*config.IPv6IntfInfo, 0)
 	ipsInfo, err := svr.SwitchPlugin.GetAllIPv6IntfState()
 	if err != nil {
 		debug.Logger.Err(fmt.Sprintln("Failed to get all ipv6 interfaces from system, ERROR:", err))
-		return ipStates
+		return
 	}
 	for _, obj := range ipsInfo {
-		ipInfo := &config.IPv6IntfInfo{
+		ipInfo := config.IPv6IntfInfo{
 			IntfRef:   obj.IntfRef,
 			IfIndex:   obj.IfIndex,
 			OperState: obj.OperState,
 			IpAddr:    obj.IpAddr,
 		}
-		ipStates = append(ipStates, ipInfo)
+		svr.L3Port[ipInfo.IfIndex] = ipInfo
+		svr.ndpL3IntfStateSlice = append(svr.ndpL3IntfStateSlice, ipInfo.IfIndex)
 	}
 	debug.Logger.Info("Done with IPv6 State list")
-	return ipStates
+	return
 }
 
 /*
@@ -149,4 +192,21 @@ func (svr *NDPServer) DeleteL3IntfFromUpState(ifIndex int32) {
 			break
 		}
 	}
+}
+
+/*
+ *    API: It will populate correct vlan information which will be used for ipv6 neighbor create
+ */
+func (svr *NDPServer) PopulateVlanInfo(nbrInfo *config.NeighborInfo, ifIndex int32) {
+	// check if the ifIndex is present in the reverse map..
+	vlanId, exists := svr.VlanIfIdxVlanIdMap[ifIndex]
+	if exists {
+		// if the entry exists then use the vlanId from reverse map
+		nbrInfo.VlanId = vlanId
+	} else {
+		// @TODO: move this to plugin specific
+		// in this case use system reserved Vlan id which is -1
+		nbrInfo.VlanId = -1
+	}
+	nbrInfo.IfIndex = ifIndex
 }

@@ -26,7 +26,6 @@ import (
 	"fmt"
 	"l3/ndp/config"
 	"l3/ndp/debug"
-	"l3/ndp/packet"
 	_ "models/objects"
 	"os"
 	"os/signal"
@@ -74,6 +73,8 @@ func (svr *NDPServer) OSSignalHandle() {
 func (svr *NDPServer) InitGlobalDS() {
 	svr.PhyPort = make(map[int32]config.PortInfo, NDP_SYSTEM_PORT_MAP_CAPACITY)
 	svr.L3Port = make(map[int32]config.IPv6IntfInfo, NDP_SYSTEM_PORT_MAP_CAPACITY)
+	svr.VlanInfo = make(map[int32]config.VlanInfo, NDP_SYSTEM_PORT_MAP_CAPACITY)
+	svr.VlanIfIdxVlanIdMap = make(map[int32]int32, NDP_SYSTEM_PORT_MAP_CAPACITY)
 	svr.Ipv6Ch = make(chan *config.IPv6IntfInfo)
 	svr.RxPktCh = make(chan *RxPktInfo)
 	svr.SnapShotLen = 1024
@@ -86,14 +87,6 @@ func (svr *NDPServer) DeInitGlobalDS() {
 	svr.L3Port = nil
 	svr.Ipv6Ch = nil
 	svr.RxPktCh = nil
-}
-
-func (svr *NDPServer) InitSystemPortInfo(portInfo *config.PortInfo) {
-	if portInfo == nil {
-		return
-	}
-	svr.PhyPort[portInfo.IfIndex] = *portInfo
-	svr.ndpIntfStateSlice = append(svr.ndpIntfStateSlice, portInfo.IfIndex)
 }
 
 func (svr *NDPServer) InitSystemIPIntf(entry *config.IPv6IntfInfo, ipInfo *config.IPv6IntfInfo) {
@@ -113,21 +106,19 @@ func (svr *NDPServer) InitSystemIPIntf(entry *config.IPv6IntfInfo, ipInfo *confi
  *	After the information is collected, if the oper state is up then we will start rx/tx
  */
 func (svr *NDPServer) InitSystem() {
-	/*
-		//we really should not be carrying for system port state...???
-		portStates := svr.GetPorts()
-		for _, port := range portStates {
-			svr.InitSystemPortInfo(port)
-		}
+	// Get ports information
+	svr.GetPorts()
 
-	*/
-	ipIntfs := svr.GetIPIntf()
-	for _, ipIntf := range ipIntfs {
-		ipPort := svr.L3Port[ipIntf.IfIndex]
-		svr.InitSystemIPIntf(&ipPort, ipIntf)
-		svr.L3Port[ipIntf.IfIndex] = ipPort
-		if ipPort.OperState == NDP_IP_STATE_UP {
-			svr.StartRxTx(ipIntf)
+	// Get vlans information
+	svr.GetVlans()
+
+	// Get IP Information
+	svr.GetIPIntf()
+
+	// Check status of IP Interface and then start RX/TX for that ip interface
+	for _, ipIntf := range svr.L3Port {
+		if ipIntf.OperState == NDP_IP_STATE_UP {
+			svr.StartRxTx(&ipIntf)
 		}
 	}
 }
@@ -137,19 +128,11 @@ func (svr *NDPServer) EventsListener() {
 		select {
 		case ipv6Notify := <-svr.Ipv6Ch:
 			svr.HandleIPv6Notification(ipv6Notify)
-		case inPkt, ok := <-svr.RxPktCh:
+		case rxChInfo, ok := <-svr.RxPktCh:
 			if !ok {
 				continue
 			}
-			_, exists := svr.L3Port[inPkt.ifIndex]
-			if !exists {
-				continue
-			}
-			err := packet.Validate(inPkt.pkt)
-			if err != nil {
-				debug.Logger.Err(fmt.Sprintln("Validating Pkt Failed:", err))
-				continue
-			}
+			svr.ProcessRxPkt(rxChInfo.ifIndex, rxChInfo.pkt)
 		}
 	}
 }

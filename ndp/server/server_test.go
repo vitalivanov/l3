@@ -52,7 +52,6 @@ func NDPTestNewLogger(name string, tag string, listenToConfig bool) (*logging.Wr
 func TestInvalidInitPortInfo(t *testing.T) {
 	svr := &NDPServer{}
 	svr.InitGlobalDS()
-	svr.InitSystemPortInfo(nil)
 
 	if len(svr.PhyPort) > 0 {
 		t.Error("There should not be any elements in the system port map", len(svr.PhyPort))
