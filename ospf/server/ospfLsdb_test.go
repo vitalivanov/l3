@@ -25,75 +25,40 @@ package server
 
 import (
 	"fmt"
-	"l3/ospf/config"
+	//"l3/ospf/config"
 	"testing"
 )
 
-func initTestParams() {
+func initLsdbTestParams() {
 	fmt.Println("\n Get Server object")
 	ospf = getServerObject()
 	initAttr()
 	go startDummyChannels(ospf)
 }
 
-func TestOspfIntfFSM(t *testing.T) {
-	fmt.Println("**************** INTF FSM ************")
-	initTestParams()
-	for index := 1; index < 11; index++ {
-		err := intfFSMTestLogic(index)
+func TestOspfLsdb(t *testing.T) {
+	fmt.Println("\n**************** LSDB ************\n")
+	initLsdbTestParams()
+	for index := 1; index < 21; index++ {
+		err := lsdbTestLogic(index)
 		if err != SUCCESS {
 			fmt.Println("Failed test case for interface FSM")
 		}
 	}
 }
 
-func intfFSMTestLogic(tNum int) int {
-	ospf.initDefaultIntfConf(key, ipIntfProp, ifType)
+func lsdbTestLogic(tNum int) int {
+	areaId := uint32(2)
 	switch tNum {
 	case 1:
-		fmt.Println(tNum, ": Running StartOspfIntfFSM")
-		ospf.StartOspfIntfFSM(key)
-
+		fmt.Println(tNum, ": Running initLSDatabase ")
+		ospf.initLSDatabase(areaId)
 	case 2:
-		fmt.Println(tNum, ": Running StartOspfP2PIntfFSM")
-		//	ospf.StartOspfP2PIntfFSM(key)
+		 fmt.Println(tNum, ": Running insertSummaryLsa ")
+//		ospf.insertSummaryLsa(lsdbKey, lsaKey, lsaSummary)
 
-	case 3:
-		fmt.Println(tNum, ": Running processNbrDownEvent")
-		ospf.processNbrDownEvent(msg, key, false) // broadcast network
-
-	case 4:
-		fmt.Println(tNum, ": Running processNbrFullStateMsg")
-		ospf.processNbrFullStateMsg(msgNbrFull, key)
-
-	case 5:
-		fmt.Println(tNum, ": Running ElectBDR")
-		electedBDR, electedRtrId := ospf.ElectBDR(key)
-		fmt.Println("Elected BDR ", electedBDR, " electedRtrId ", electedRtrId)
-
-	case 6:
-		fmt.Println(tNum, ": Running ElectDR")
-		BDR := []byte{10, 1, 1, 2}
-		RtrIdBDR := uint32(2)
-		dr, drid := ospf.ElectDR(key, BDR, RtrIdBDR)
-		fmt.Println("Elected DR ", dr, " Router id ", drid)
-
-	case 7:
-		fmt.Println(tNum, ": Running ElectBDRAndDR")
-		ospf.IntfConfMap[key] = intf
-		ospf.ElectBDRAndDR(key)
-
-	case 8:
-		fmt.Println(tNum, ": Running createAndSendEventsIntfFSM")
-		oldState := config.Down
-		newState := config.DesignatedRouter
-		oldRtr := uint32(2)
-		oldBdr := uint32(10)
-		ospf.createAndSendEventsIntfFSM(key, oldState, newState, oldRtr, oldBdr)
-
-	case 9:
-		fmt.Println(tNum, ": Running StopOspfIntfFSM")
-		//	ospf.StopOspfIntfFSM(key)
 	}
+
 	return SUCCESS
+
 }

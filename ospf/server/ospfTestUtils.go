@@ -57,6 +57,10 @@ var intConf IntfConf
 var dstMAC net.HardwareAddr
 var ospf *OSPFServer
 
+/* Area conf */
+var areaConf config.AreaConf
+var areaConfKey AreaConfKey
+
 /* Intf FSM */
 var msg NbrStateChangeMsg
 var msgNbrFull NbrFullStateMsg
@@ -72,6 +76,12 @@ var nbrDbdMsg ospfNeighborDBDMsg
 var nbrLsaReqMsg ospfNeighborLSAreqMsg
 
 var req ospfLSAReq
+
+/* Lsdb */
+var areaId uint32
+var lsdbKey LsdbKey
+var lsaSummary LsaKey
+var summaryLsa SummaryLsa
 
 func OSPFNewLogger(name string, tag string, listenToConfig bool) (*logging.Writer, error) {
 	var err error
@@ -98,6 +108,18 @@ func initAttr() {
 	ifType = int(config.Broadcast)
 	srcMAC = net.HardwareAddr{0x01, 0x00, 0x50, 0x00, 0x00, 0x07}
 	dstMAC = net.HardwareAddr{0x24, 00, 0x50, 0x00, 0x00, 0x05}
+
+	areaConfKey = AreaConfKey{
+		AreaId: config.AreaId("10.0.0.0"),
+	}
+	areaConf = config.AreaConf{
+		AreaId:                 config.AreaId("10.0.0.0"),
+		AuthType:               config.AuthType(1),
+		ImportAsExtern:         config.ImportAsExtern(1),
+		AreaSummary:            config.AreaSummary(2),
+		StubDefaultCost:        int32(20),
+		AreaNssaTranslatorRole: config.NssaTranslatorRole(1),
+	}
 
 	hellodata = OSPFHelloData{
 		netmask:             []byte{10, 0, 0, 0},
@@ -254,6 +276,37 @@ func initAttr() {
 			req,
 		},
 		nbrKey: nbrKey,
+	}
+	initLsdbData()
+
+}
+
+func initLsdbData() {
+	areaid := convertAreaOrRouterIdUint32("10.0.0.0")
+	netmask := convertAreaOrRouterIdUint32("255.0.0.0")
+	lsid := convertAreaOrRouterIdUint32("10.1.1.1")
+	lsdbKey = LsdbKey{
+		AreaId: areaid,
+	}
+
+	lsaSummary = LsaKey{
+		LSType:    uint8(Summary3LSA),
+		LSId:      lsid,
+		AdvRouter: lsid,
+	}
+
+	lsamdata := LsaMetadata{
+		LSAge:         uint16(1),
+		Options:       uint8(0),
+		LSSequenceNum: int(1800),
+		LSChecksum:    uint16(12),
+		LSLen:         uint16(100),
+	}
+
+	summaryLsa = SummaryLsa{
+		LsaMd:   lsamdata,
+		Netmask: netmask,
+		Metric:  uint32(20),
 	}
 }
 

@@ -38,6 +38,7 @@ func initNbrTestParams() {
 }
 
 func TestOspfNbrFSM(t *testing.T) {
+	fmt.Println("\n**************** NEIGHBOR FSM ************\n")
 	initNbrTestParams()
 	for index := 1; index < 21; index++ {
 		err := nbrFSMTestLogic(index)
