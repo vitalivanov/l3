@@ -25,6 +25,7 @@ package server
 
 import (
 	"fmt"
+	"l3/ospf/config"
 	"testing"
 )
 
@@ -38,7 +39,7 @@ func initNbrTestParams() {
 
 func TestOspfNbrFSM(t *testing.T) {
 	initNbrTestParams()
-	for index := 1; index < 11; index++ {
+	for index := 1; index < 21; index++ {
 		err := nbrFSMTestLogic(index)
 		if err != SUCCESS {
 			fmt.Println("Failed test case for interface FSM")
@@ -79,6 +80,104 @@ func nbrFSMTestLogic(tNum int) int {
 		go ospf.UpdateNeighborConf()
 		ospf.UpdateNeighborList(nbrKey)
 		ospf.neighborConfStopCh <- true
+
+	case 7:
+		fmt.Println(tNum, ": Running exchangePacketDiscardCheck")
+		discard := ospf.exchangePacketDiscardCheck(ospfNbrEntry, nbrDbPkt)
+		if discard {
+			fmt.Println("NbrTest : Packet discarded. ")
+		}
+
+	case 8:
+		fmt.Println(tNum, ": Running verifyDuplicatePacket")
+		isdDup := ospf.verifyDuplicatePacket(ospfNbrEntry, nbrDbPkt)
+		if isdDup {
+			fmt.Println("NbrTest: Packet is duplicate.")
+		}
+
+	case 9:
+		fmt.Println(tNum, ": Running adjacancyEstablishementCheck")
+		ok := ospf.adjacancyEstablishementCheck(false, false)
+		if !ok {
+			fmt.Println("NbrTest: Dont establish adjacency as its neither DR or BDR.")
+		}
+
+	case 10:
+		fmt.Println(tNum, ": Running processNeighborExstart")
+		ospf.processNeighborExstart(nbrKey, ospfNbrEntry, nbrDbPkt)
+
+	case 11:
+		fmt.Println(tNum, ": Running processDBDEvent exstart")
+		ospfNbrEntry.OspfNbrState = config.NbrExchangeStart
+		nbrDbPkt.ibit = true
+		nbrDbPkt.msbit = true
+		ospfNbrEntry.ospfNbrSeqNum = 2002
+		nbrDbPkt.ibit = true
+		nbrDbPkt.msbit = false
+		nbrDbPkt.dd_sequence_number = 2002
+		ospf.NeighborConfigMap[nbrKey] = ospfNbrEntry
+		ospf.processDBDEvent(nbrKey, nbrDbPkt)
+
+	case 12:
+		fmt.Println(tNum, ": Running processDBDEvent exchange")
+		ospfNbrEntry.OspfNbrState = config.NbrExchange
+		nbrDbPkt.ibit = false
+		nbrDbPkt.msbit = true
+		ospfNbrEntry.ospfNbrSeqNum = 2002
+		nbrDbPkt.ibit = false
+		nbrDbPkt.msbit = false
+		nbrDbPkt.dd_sequence_number = 2002
+		ospf.NeighborConfigMap[nbrKey] = ospfNbrEntry
+		ospf.processDBDEvent(nbrKey, nbrDbPkt)
+
+	case 13:
+		fmt.Println(tNum, ": Running processDBDEvent NbrLoading")
+		ospfNbrEntry.OspfNbrState = config.NbrLoading
+		nbrDbPkt.ibit = false
+		nbrDbPkt.msbit = true
+		ospfNbrEntry.ospfNbrSeqNum = 2002
+		nbrDbPkt.ibit = false
+		nbrDbPkt.msbit = false
+		nbrDbPkt.dd_sequence_number = 2002
+		ospf.NeighborConfigMap[nbrKey] = ospfNbrEntry
+		ospf.processDBDEvent(nbrKey, nbrDbPkt)
+
+	case 14:
+		fmt.Println(tNum, ": Running processDBDEvent NbrFull")
+		ospfNbrEntry.OspfNbrState = config.NbrFull
+		nbrDbPkt.ibit = false
+		nbrDbPkt.msbit = true
+		ospfNbrEntry.ospfNbrSeqNum = 2002
+		nbrDbPkt.ibit = false
+		nbrDbPkt.msbit = false
+		nbrDbPkt.dd_sequence_number = 2002
+		ospf.NeighborConfigMap[nbrKey] = ospfNbrEntry
+		ospf.processDBDEvent(nbrKey, nbrDbPkt)
+
+	case 15:
+		fmt.Println(tNum, ": Running ProcessNbrStateMachine")
+		go ospf.ProcessNbrStateMachine()
+		ospf.neighborHelloEventCh <- nbrIntfMsg
+		ospf.NeighborConfigMap[nbrKey] = ospfNbrEntry
+
+		fmt.Println("   Add existing Nbr ")
+		ospf.neighborHelloEventCh <- nbrIntfMsg
+
+		fmt.Println(" Check dbd processing ")
+		ospf.neighborDBDEventCh <- nbrDbdMsg
+
+		fmt.Println(" INtf down event ")
+		ospf.neighborIntfEventCh <- key
+
+		fmt.Println("Stop nbr processing routine ")
+		ospf.neighborFSMCtrlCh <- false
+
+	case 16:
+		fmt.Println(tNum, ": Running ProcessRxNbrPkt ")
+		go ospf.ProcessRxNbrPkt()
+		ospfNbrEntry.OspfNbrState = config.NbrFull
+		ospf.NeighborConfigMap[nbrKey] = ospfNbrEntry
+		ospf.neighborLSAReqEventCh <- nbrLsaReqMsg
 	}
 	return SUCCESS
 }
