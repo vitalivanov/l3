@@ -33,8 +33,7 @@ import (
 
 func main() {
 	// @TODO: read plugin from json file
-	plugin := "Flexswitch"
-	fmt.Println("NDP: initializing neighbor discovery base information")
+	plugin := ""
 
 	/* Steps before starting client
 	 *   1) Init Switch Plugin
@@ -47,7 +46,7 @@ func main() {
 	switch plugin {
 	case "OvsDB":
 
-	default:
+	default: //Flexswitch
 		//@TODO: need to make the object as singleton
 		ndpBase := dmnBase.NewBaseDmn("ndpd", "NDP")
 		status := ndpBase.Init()
@@ -59,17 +58,23 @@ func main() {
 		asicHdl := flexswitch.GetSwitchInst()
 		asicHdl.Logger = ndpBase.GetLogger()
 		debug.NDPSetLogger(ndpBase.GetLogger()) // @TODO: Change this to interface and move it to util
+		debug.Logger.Info("Initializing switch plugin")
 		// connect to server and do the initializing
-		switchPlugin := ndpBase.InitSwitch(plugin, "ndpd", "NDP", *asicHdl)
+		switchPlugin := ndpBase.InitSwitch("Flexswitch", "ndpd", "NDP", *asicHdl)
 		// create north bound config listener
+		debug.Logger.Info("Creating NB Config Plugin")
 		lPlugin := flexswitch.NewConfigPlugin(flexswitch.NewConfigHandler(), ndpBase.ParamsDir)
 		// create new ndp server and cache the information for switch/asicd plugin
+		debug.Logger.Info("Creating NDP Server")
 		ndpServer := server.NDPNewServer(switchPlugin)
 		// Init API layer after server is created
+		debug.Logger.Info("Starting API Layer for NDP server")
 		api.Init(ndpServer)
 		// build basic NDP server information
+		debug.Logger.Info("Starting NDP Server")
 		ndpServer.NDPStartServer()
 		ndpBase.StartKeepAlive()
+		debug.Logger.Info("Starting Config Listener for FlexSwitch Plugin")
 		lPlugin.StartConfigListener()
 	}
 }

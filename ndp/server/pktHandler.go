@@ -124,4 +124,8 @@ func (svr *NDPServer) ProcessRxPkt(ifIndex int32, pkt gopacket.Packet) {
 	svr.PopulateVlanInfo(nbrInfo, ifIndex)
 	// ipaddr, macAddr, vlanId, ifIndex
 	_, err = svr.SwitchPlugin.CreateIPv6Neighbor(nbrInfo.IpAddr, nbrInfo.MacAddr, nbrInfo.VlanId, nbrInfo.IfIndex)
+	if err != nil {
+		debug.Logger.Err(fmt.Sprintln("create ipv6 neigbor failed for", nbrInfo, "error is", err))
+	}
+	return
 }
