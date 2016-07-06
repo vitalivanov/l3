@@ -73,7 +73,8 @@ func areaTestLogic(tNum int) int {
 			ospf.initAreaStateSlice(areaConfKey)
 		}
 
-	case 4: fmt.Println(tNum, ": Running areaStateRefresh ")
+	case 4:
+		fmt.Println(tNum, ": Running areaStateRefresh ")
 		ospf.areaStateRefresh()
 
 	case 5:
@@ -95,10 +96,22 @@ func areaTestLogic(tNum int) int {
 		fmt.Println(tNum, ": Running isStubArea ")
 		err := ospf.processAreaConfig(areaConf)
 		if err == nil {
-		stub := ospf.isStubArea(areaConfKey.AreaId)
-		fmt.Println(" Is stub area : ", stub)
+			stub := ospf.isStubArea(areaConfKey.AreaId)
+			fmt.Println(" Is stub area : ", stub)
 		}
-	
+
+	case 8:
+		fmt.Println(tNum, ": Running initOspfGlobalConfDefault ")
+		ospf.initOspfGlobalConfDefault()
+
+	case 9:
+		fmt.Println(tNum, ": Running processASBdrRtrStatus")
+		ospf.processASBdrRtrStatus(true)
+
+	case 10:
+		fmt.Println(tNum, ": Running processGlobalConfig ")
+		ospf.processGlobalConfig(gConf)
+
 	}
 
 	return SUCCESS

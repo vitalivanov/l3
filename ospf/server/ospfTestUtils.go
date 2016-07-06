@@ -57,6 +57,9 @@ var intConf IntfConf
 var dstMAC net.HardwareAddr
 var ospf *OSPFServer
 
+/* Global conf */
+var gConf config.GlobalConf
+
 /* Area conf */
 var areaConf config.AreaConf
 var areaConfKey AreaConfKey
@@ -80,7 +83,7 @@ var req ospfLSAReq
 /* Lsdb */
 var areaId uint32
 var lsdbKey LsdbKey
-var lsaSummary LsaKey
+var summaryKey LsaKey
 var summaryLsa SummaryLsa
 
 func OSPFNewLogger(name string, tag string, listenToConfig bool) (*logging.Writer, error) {
@@ -120,6 +123,14 @@ func initAttr() {
 		StubDefaultCost:        int32(20),
 		AreaNssaTranslatorRole: config.NssaTranslatorRole(1),
 	}
+
+	gConf.RouterId = "20.0.1.1"
+	gConf.AdminStat = config.Disabled
+	gConf.ASBdrRtrStatus = true
+	gConf.TOSSupport = false
+	gConf.RestartSupport = config.None
+	gConf.RestartInterval = 40
+	gConf.ReferenceBandwidth = 100
 
 	hellodata = OSPFHelloData{
 		netmask:             []byte{10, 0, 0, 0},
@@ -225,7 +236,7 @@ func initAttr() {
 		isStateUpdate:          true,
 		OspfNbrInactivityTimer: time.Now(),
 		OspfNbrDeadTimer:       40,
-		ospfNbrSeqNum:          2001,
+		ospfNbrSeqNum:          2002,
 		isSeqNumUpdate:         true,
 		isMaster:               true,
 		isMasterUpdate:         true,
@@ -289,7 +300,7 @@ func initLsdbData() {
 		AreaId: areaid,
 	}
 
-	lsaSummary = LsaKey{
+	summaryKey = LsaKey{
 		LSType:    uint8(Summary3LSA),
 		LSId:      lsid,
 		AdvRouter: lsid,
@@ -300,7 +311,7 @@ func initLsdbData() {
 		Options:       uint8(0),
 		LSSequenceNum: int(1800),
 		LSChecksum:    uint16(12),
-		LSLen:         uint16(100),
+		LSLen:         uint16(28),
 	}
 
 	summaryLsa = SummaryLsa{
@@ -371,6 +382,9 @@ func startDummyChannels(server *OSPFServer) {
 
 		case data := <-server.DbEventOp:
 			fmt.Println("Received data from DbEventOp", data)
+
+		case data := <-server.DbLsdbOp:
+			fmt.Println("Received data on DbLsdbOp", data)
 		}
 	}
 

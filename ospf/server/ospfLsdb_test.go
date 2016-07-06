@@ -53,9 +53,11 @@ func lsdbTestLogic(tNum int) int {
 	case 1:
 		fmt.Println(tNum, ": Running initLSDatabase ")
 		ospf.initLSDatabase(areaId)
+
 	case 2:
-		 fmt.Println(tNum, ": Running insertSummaryLsa ")
-//		ospf.insertSummaryLsa(lsdbKey, lsaKey, lsaSummary)
+		fmt.Println(tNum, ": Running insertSummaryLsa ")
+		ospf.initLSDatabase(lsdbKey.AreaId)
+		ospf.insertSummaryLsa(lsdbKey, summaryKey, summaryLsa)
 
 	}
 
