@@ -112,8 +112,7 @@ func (adjRib *AdjRib) GetReachabilityInfo(path *Path) *ReachabilityInfo {
 		return reachabilityInfo
 	}
 
-	adjRib.logger.Info(fmt.Sprintf("GetReachabilityInfo: Reachability info not cached",
-		"for Next hop %s", ipStr))
+	adjRib.logger.Info(fmt.Sprintf("GetReachabilityInfo: Reachability info not cached for Next hop %s", ipStr))
 	ribdReachabilityInfo, err := adjRib.routeMgr.GetNextHopInfo(ipStr)
 	if err != nil {
 		adjRib.logger.Info(fmt.Sprintf("NEXT_HOP[%s] is not reachable", ipStr))
@@ -567,32 +566,53 @@ func (adjRib *AdjRib) AddRouteToAggregate(ip *packet.IPPrefix, aggIP *packet.IPP
 		aggPath.addPathToAggregate(ip.Prefix.String(), path, bgpAgg.GenerateASSet)
 		aggDest.setUpdateAggPath(srcIP, AggregatePathId)
 		aggDest.addAggregatedDests(ip.Prefix.String(), dest)
-		action, addPathsMod, addRoutes, updRoutes, delRoutes :=
-			aggDest.SelectRouteForLocRib(addPathCount)
-		withdrawn, updated, updatedAddPaths = adjRib.updateRibOutInfo(action, addPathsMod,
-			addRoutes, updRoutes, delRoutes, aggDest, withdrawn, updated, updatedAddPaths)
-		if action == RouteActionAdd || action == RouteActionReplace {
-			dest.aggPath = aggPath
-		}
 	} else {
 		adjRib.logger.Info(fmt.Sprintf("AdjRib:AddRouteToAggregate - aggIP %v,",
 			"agg path NOT found, create new path", aggIP))
 		op = adjRib.stateDBMgr.AddObject
 		pathAttrs := packet.ConstructPathAttrForAggRoutes(path.PathAttrs, bgpAgg.GenerateASSet)
-		packet.SetNextHopPathAttrs(pathAttrs, ifaceIP)
+		if ifaceIP != nil {
+			packet.SetNextHopPathAttrs(pathAttrs, ifaceIP)
+		}
 		packet.SetPathAttrAggregator(pathAttrs, adjRib.gConf.AS, adjRib.gConf.RouterId)
 		aggPath = NewPath(path.rib, nil, pathAttrs, false, true, RouteTypeAgg)
 		aggPath.setAggregatedPath(ip.Prefix.String(), path)
 		aggDest, _ := adjRib.GetDest(aggIP, true)
 		aggDest.AddOrUpdatePath(srcIP, AggregatePathId, aggPath)
 		aggDest.addAggregatedDests(ip.Prefix.String(), dest)
-		action, addPathsMod, addRoutes, updRoutes, delRoutes :=
-			aggDest.SelectRouteForLocRib(addPathCount)
-		withdrawn, updated, updatedAddPaths = adjRib.updateRibOutInfo(action, addPathsMod,
-			addRoutes, updRoutes, delRoutes, aggDest, withdrawn, updated, updatedAddPaths)
-		if action == RouteActionAdd || action == RouteActionReplace {
-			dest.aggPath = aggPath
+	}
+
+	reachabilityInfo := adjRib.GetReachabilityInfo(aggPath)
+	aggPath.SetReachabilityInfo(reachabilityInfo)
+
+	nextHopStr := aggPath.GetNextHop().String()
+	if reachabilityInfo == nil {
+		adjRib.logger.Info(fmt.Sprintf("ProcessUpdate - next hop %s is not reachable",
+			nextHopStr))
+
+		if _, ok := adjRib.unreachablePaths[nextHopStr]; !ok {
+			adjRib.unreachablePaths[nextHopStr] = make(map[*Path]map[*Destination][]uint32)
 		}
+
+		if _, ok := adjRib.unreachablePaths[nextHopStr][aggPath]; !ok {
+			adjRib.unreachablePaths[nextHopStr][aggPath] = make(map[*Destination][]uint32)
+		}
+	}
+
+	action, addPathsMod, addRoutes, updRoutes, delRoutes :=
+		aggDest.SelectRouteForLocRib(addPathCount)
+	withdrawn, updated, updatedAddPaths = adjRib.updateRibOutInfo(action, addPathsMod,
+		addRoutes, updRoutes, delRoutes, aggDest, withdrawn, updated, updatedAddPaths)
+	if action == RouteActionAdd || action == RouteActionReplace {
+		dest.aggPath = aggPath
+	}
+
+	if reachabilityInfo != nil {
+		adjRib.logger.Info(fmt.Sprintf("ProcessUpdate - next hop %s is reachable,",
+			"so process previously unreachable routes", nextHopStr))
+		updated, withdrawn, updatedAddPaths =
+			adjRib.ProcessRoutesForReachableRoutes(nextHopStr, reachabilityInfo,
+				addPathCount, updated, withdrawn, updatedAddPaths)
 	}
 
 	op(adjRib.GetRouteStateConfigObj(dest.GetBGPRoute()))
