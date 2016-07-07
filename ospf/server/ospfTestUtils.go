@@ -43,6 +43,10 @@ var hello []byte
 var lsaupd []byte
 var lsareq []byte
 var lsaack []byte
+var lsa_network []byte
+var lsa_router []byte
+var lsa_summary []byte
+var lsa_asExt []byte
 
 var ospfHdrMd OspfHdrMetadata
 var ipHdrMd IpHdrMetadata
@@ -56,6 +60,13 @@ var nbrKey NeighborConfKey
 var intConf IntfConf
 var dstMAC net.HardwareAddr
 var ospf *OSPFServer
+
+/* Global conf */
+var gConf config.GlobalConf
+
+/* Area conf */
+var areaConf config.AreaConf
+var areaConfKey AreaConfKey
 
 /* Intf FSM */
 var msg NbrStateChangeMsg
@@ -72,6 +83,12 @@ var nbrDbdMsg ospfNeighborDBDMsg
 var nbrLsaReqMsg ospfNeighborLSAreqMsg
 
 var req ospfLSAReq
+
+/* Lsdb */
+var areaId uint32
+var lsdbKey LsdbKey
+var summaryKey LsaKey
+var summaryLsa SummaryLsa
 
 func OSPFNewLogger(name string, tag string, listenToConfig bool) (*logging.Writer, error) {
 	var err error
@@ -98,6 +115,26 @@ func initAttr() {
 	ifType = int(config.Broadcast)
 	srcMAC = net.HardwareAddr{0x01, 0x00, 0x50, 0x00, 0x00, 0x07}
 	dstMAC = net.HardwareAddr{0x24, 00, 0x50, 0x00, 0x00, 0x05}
+
+	areaConfKey = AreaConfKey{
+		AreaId: config.AreaId("10.0.0.0"),
+	}
+	areaConf = config.AreaConf{
+		AreaId:                 config.AreaId("10.0.0.0"),
+		AuthType:               config.AuthType(1),
+		ImportAsExtern:         config.ImportAsExtern(1),
+		AreaSummary:            config.AreaSummary(2),
+		StubDefaultCost:        int32(20),
+		AreaNssaTranslatorRole: config.NssaTranslatorRole(1),
+	}
+
+	gConf.RouterId = "20.0.1.1"
+	gConf.AdminStat = config.Disabled
+	gConf.ASBdrRtrStatus = true
+	gConf.TOSSupport = false
+	gConf.RestartSupport = config.None
+	gConf.RestartInterval = 40
+	gConf.ReferenceBandwidth = 100
 
 	hellodata = OSPFHelloData{
 		netmask:             []byte{10, 0, 0, 0},
@@ -203,7 +240,7 @@ func initAttr() {
 		isStateUpdate:          true,
 		OspfNbrInactivityTimer: time.Now(),
 		OspfNbrDeadTimer:       40,
-		ospfNbrSeqNum:          2001,
+		ospfNbrSeqNum:          2002,
 		isSeqNumUpdate:         true,
 		isMaster:               true,
 		isMasterUpdate:         true,
@@ -255,6 +292,37 @@ func initAttr() {
 		},
 		nbrKey: nbrKey,
 	}
+	initLsdbData()
+
+}
+
+func initLsdbData() {
+	areaid := convertAreaOrRouterIdUint32("10.0.0.0")
+	netmask := convertAreaOrRouterIdUint32("255.0.0.0")
+	lsid := convertAreaOrRouterIdUint32("10.1.1.1")
+	lsdbKey = LsdbKey{
+		AreaId: areaid,
+	}
+
+	summaryKey = LsaKey{
+		LSType:    uint8(Summary3LSA),
+		LSId:      lsid,
+		AdvRouter: lsid,
+	}
+
+	lsamdata := LsaMetadata{
+		LSAge:         uint16(1),
+		Options:       uint8(0),
+		LSSequenceNum: int(1800),
+		LSChecksum:    uint16(12),
+		LSLen:         uint16(28),
+	}
+
+	summaryLsa = SummaryLsa{
+		LsaMd:   lsamdata,
+		Netmask: netmask,
+		Metric:  uint32(20),
+	}
 }
 
 func initPacketData() {
@@ -277,6 +345,18 @@ func initPacketData() {
 
 	lsaack = []byte{0x00, 0x01, 0x22, 0x01, 0x05, 0x05,
 		0x05, 0x05, 0x05, 0x05, 0x05, 0x05, 0x80, 0x00, 0x00, 0x06, 0x78, 0xac, 0x00, 0x30}
+
+	lsa_network = []byte{0x01, 0xbe, 0x22, 0x02, 0x0a, 0x00, 0x14, 0x02, 0x05, 0x05, 0x05, 0x05, 0x80, 0x00,
+		0x00, 0x01, 0xf6, 0xed, 0x00, 0x20, 0xff, 0xff, 0xff, 0xfc, 0x05, 0x05, 0x05, 0x05, 0x04, 0x04,
+		0x04, 0x04}
+
+	lsa_router = []byte{0x01, 0xbe, 0x22, 0x01, 0x05, 0x05, 0x05, 0x05, 0x05, 0x05, 0x05, 0x05, 0x80, 0x00, 0x00, 0x04, 0x7c, 0xaa, 0x00, 0x30, 0x00, 0x00, 0x00, 0x02, 0xc0, 0xa8, 0x14, 0x00, 0xff, 0xff, 0xff, 0x00, 0x03, 0x00, 0x00, 0x0a, 0x0a, 0x00, 0x14, 0x02, 0x0a, 0x00, 0x14, 0x02, 0x02, 0x00, 0x00, 0x0a}
+
+	lsa_summary = []byte{0x00, 0x0b, 0x22, 0x03, 0xc0, 0xa8, 0x0a, 0x00, 0x04, 0x04, 0x04, 0x04, 0x80, 0x00, 0x00, 0x01, 0x1e, 0x7d, 0x00, 0x1c, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00, 0x1e}
+
+	lsa_asExt = []byte{0x00, 0xc5, 0x20, 0x05, 0xac, 0x10, 0x02, 0x00, 0x02, 0x02,
+		0x02, 0x02, 0x80, 0x00, 0x00, 0x01, 0x33, 0x56, 0x00, 0x24, 0xff, 0xff, 0xff, 0x00, 0x80, 0x00,
+		0x00, 0x64, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
 }
 
 func startDummyIntfChannels(key IntfConfKey) {
@@ -318,6 +398,16 @@ func startDummyChannels(server *OSPFServer) {
 
 		case data := <-server.DbEventOp:
 			fmt.Println("Received data from DbEventOp", data)
+
+		case data := <-server.DbLsdbOp:
+			fmt.Println("Received data on DbLsdbOp", data)
+
+		case data := <-server.StartCalcSPFCh:
+			fmt.Println("Recieved data on StartCalcSPFCh ", data)
+			server.DoneCalcSPFCh <- true
+
+		case data := <-server.ospfNbrLsaUpdSendCh:
+			fmt.Println("Received data on ospfNbrLsaUpdSendCh ", data)
 		}
 	}
 

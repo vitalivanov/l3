@@ -37,6 +37,7 @@ func initTestParams() {
 }
 
 func TestOspfIntfFSM(t *testing.T) {
+	fmt.Println("**************** INTF FSM ************")
 	initTestParams()
 	for index := 1; index < 11; index++ {
 		err := intfFSMTestLogic(index)

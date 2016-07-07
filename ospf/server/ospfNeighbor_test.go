@@ -26,6 +26,7 @@ package server
 import (
 	"fmt"
 	"l3/ospf/config"
+	"sync"
 	"testing"
 )
 
@@ -38,6 +39,7 @@ func initNbrTestParams() {
 }
 
 func TestOspfNbrFSM(t *testing.T) {
+	fmt.Println("\n**************** NEIGHBOR FSM ************\n")
 	initNbrTestParams()
 	for index := 1; index < 21; index++ {
 		err := nbrFSMTestLogic(index)
@@ -49,6 +51,7 @@ func TestOspfNbrFSM(t *testing.T) {
 
 func nbrFSMTestLogic(tNum int) int {
 	ospf.initDefaultIntfConf(key, ipIntfProp, ifType)
+	ospf.updateGlobalConf(gConf)
 	switch tNum {
 	case 1:
 		fmt.Println(tNum, ": Running Neighbor create")
@@ -103,29 +106,37 @@ func nbrFSMTestLogic(tNum int) int {
 		}
 
 	case 10:
+		ospf.IntfConfMap[key] = intf
+		go ospf.UpdateNeighborConf()
+		nbrConfMsg.ospfNbrEntry.OspfNbrState = config.NbrExchangeStart
+		ospf.neighborConfCh <- nbrConfMsg
+		nbrDbPkt.ibit = true
+		nbrDbPkt.msbit = true
 		fmt.Println(tNum, ": Running processNeighborExstart")
+
 		ospf.processNeighborExstart(nbrKey, ospfNbrEntry, nbrDbPkt)
+		ospf.neighborConfStopCh <- true
 
 	case 11:
 		fmt.Println(tNum, ": Running processDBDEvent exstart")
 		ospfNbrEntry.OspfNbrState = config.NbrExchangeStart
-		nbrDbPkt.ibit = true
-		nbrDbPkt.msbit = true
+
 		ospfNbrEntry.ospfNbrSeqNum = 2002
 		nbrDbPkt.ibit = true
-		nbrDbPkt.msbit = false
+		nbrDbPkt.msbit = true
 		nbrDbPkt.dd_sequence_number = 2002
+
+		ospfNbrEntry.db_summary_list_mutex = &sync.Mutex{}
 		ospf.NeighborConfigMap[nbrKey] = ospfNbrEntry
 		ospf.processDBDEvent(nbrKey, nbrDbPkt)
 
 	case 12:
 		fmt.Println(tNum, ": Running processDBDEvent exchange")
 		ospfNbrEntry.OspfNbrState = config.NbrExchange
-		nbrDbPkt.ibit = false
-		nbrDbPkt.msbit = true
+
 		ospfNbrEntry.ospfNbrSeqNum = 2002
 		nbrDbPkt.ibit = false
-		nbrDbPkt.msbit = false
+		nbrDbPkt.msbit = true
 		nbrDbPkt.dd_sequence_number = 2002
 		ospf.NeighborConfigMap[nbrKey] = ospfNbrEntry
 		ospf.processDBDEvent(nbrKey, nbrDbPkt)
@@ -133,11 +144,9 @@ func nbrFSMTestLogic(tNum int) int {
 	case 13:
 		fmt.Println(tNum, ": Running processDBDEvent NbrLoading")
 		ospfNbrEntry.OspfNbrState = config.NbrLoading
-		nbrDbPkt.ibit = false
-		nbrDbPkt.msbit = true
 		ospfNbrEntry.ospfNbrSeqNum = 2002
 		nbrDbPkt.ibit = false
-		nbrDbPkt.msbit = false
+		nbrDbPkt.msbit = true
 		nbrDbPkt.dd_sequence_number = 2002
 		ospf.NeighborConfigMap[nbrKey] = ospfNbrEntry
 		ospf.processDBDEvent(nbrKey, nbrDbPkt)
@@ -145,11 +154,9 @@ func nbrFSMTestLogic(tNum int) int {
 	case 14:
 		fmt.Println(tNum, ": Running processDBDEvent NbrFull")
 		ospfNbrEntry.OspfNbrState = config.NbrFull
-		nbrDbPkt.ibit = false
-		nbrDbPkt.msbit = true
 		ospfNbrEntry.ospfNbrSeqNum = 2002
 		nbrDbPkt.ibit = false
-		nbrDbPkt.msbit = false
+		nbrDbPkt.msbit = true
 		nbrDbPkt.dd_sequence_number = 2002
 		ospf.NeighborConfigMap[nbrKey] = ospfNbrEntry
 		ospf.processDBDEvent(nbrKey, nbrDbPkt)
