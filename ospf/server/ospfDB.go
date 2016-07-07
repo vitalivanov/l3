@@ -403,6 +403,9 @@ func (server *OSPFServer) DelLsdbEntry(entry LsdbSliceEnt) error {
 	obj.LsdbRouterId = convertUint32ToIPv4(entry.AdvRtr)
 
 	objects.ConvertThriftToospfdOspfLsdbEntryStateObj(obj, &dbObj)
+	if server.dbHdl == nil {
+		return errors.New(fmt.Sprintln("dbHdl is nil"))
+	}
 	err := dbObj.DeleteObjectFromDb(server.dbHdl)
 	if err != nil {
 		server.logger.Err(fmt.Sprintln("DB: LSDB Failed to delete object in db , err ", err))
@@ -423,6 +426,9 @@ func (server *OSPFServer) AddOspfEventState(eventType string, eventInfo string) 
 	obj.EventType = eventType
 
 	objects.ConvertThriftToospfdOspfEventStateObj(obj, &dbObj)
+	if server.dbHdl == nil {
+		 return errors.New(fmt.Sprintln("dbHdl is nil")) 
+	}
 	err := dbObj.StoreObjectInDb(server.dbHdl)
         if err != nil {
                 server.logger.Err(fmt.Sprintln("DB: Failed to add event object in db , err ", err))

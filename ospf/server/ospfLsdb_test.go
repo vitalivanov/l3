@@ -25,7 +25,7 @@ package server
 
 import (
 	"fmt"
-	//"l3/ospf/config"
+	"l3/ospf/config"
 	"testing"
 )
 
@@ -59,8 +59,99 @@ func lsdbTestLogic(tNum int) int {
 		ospf.initLSDatabase(lsdbKey.AreaId)
 		ospf.insertSummaryLsa(lsdbKey, summaryKey, summaryLsa)
 
+	case 3:
+		fmt.Println(tNum, ": Running processRecvdRouterLsa ")
+		ospf.initLSDatabase(lsdbKey.AreaId)
+		ospf.processRecvdRouterLsa(lsa_router, lsdbKey.AreaId)
+		ospf.processRecvdLsa(lsa_router, lsdbKey.AreaId)
+		ospf.processDeleteLsa(lsa_router, lsdbKey.AreaId)
+
+	case 4:
+		fmt.Println(tNum, ": Running processRecvdNetworkLsa")
+		ospf.initLSDatabase(lsdbKey.AreaId)
+
+		ospf.processRecvdNetworkLsa(lsa_network, lsdbKey.AreaId)
+		ospf.processRecvdLsa(lsa_network, lsdbKey.AreaId)
+		ospf.processDeleteLsa(lsa_network, lsdbKey.AreaId)
+
+	case 5:
+		fmt.Println(tNum, ": Running processRecvdSummaryLsa ")
+		ospf.initLSDatabase(lsdbKey.AreaId)
+		ospf.processRecvdSummaryLsa(lsa_summary, lsdbKey.AreaId, Summary3LSA)
+		ospf.processRecvdLsa(lsa_summary, lsdbKey.AreaId)
+		ospf.processDeleteLsa(lsa_summary, lsdbKey.AreaId)
+
+	case 6:
+		fmt.Println(tNum, ": Running processRecvdASExternalLsa ")
+		ospf.initLSDatabase(lsdbKey.AreaId)
+		ospf.processRecvdASExternalLsa(lsa_asExt, lsdbKey.AreaId)
+		ospf.processRecvdLsa(lsa_asExt, lsdbKey.AreaId)
+		ospf.processDeleteLsa(lsa_asExt, lsdbKey.AreaId)
+
+	case 7:
+		fmt.Println(tNum, ": Running processLSDatabaseUpdates")
+		checkLSDatabaseUpdates()
+
 	}
 
 	return SUCCESS
 
+}
+
+func checkLSDatabaseUpdates() {
+	ospf.StartLSDatabase()
+	ospf.initLSDatabase(lsdbKey.AreaId)
+	lsdb_msg := NewLsdbUpdateMsg()
+	lsdb_msg.AreaId = lsdbKey.AreaId
+	lsdb_msg.Data = make([]byte, len(lsa_router))
+	copy(lsdb_msg.Data, lsa_router)
+	lsdb_msg.MsgType = LsdbAdd
+
+	ospf.LsdbUpdateCh <- *lsdb_msg
+
+	lsdb_msg.MsgType = LsdbDel
+	ospf.LsdbUpdateCh <- *lsdb_msg
+	lsdb_msg.MsgType = LsdbUpdate
+	ospf.LsdbUpdateCh <- *lsdb_msg
+	ospf.ospfGlobalConf.AreaBdrRtrStatus = true
+	msg := NetworkLSAChangeMsg{
+		areaId:  lsdbKey.AreaId,
+		intfKey: key,
+	}
+	ospf.IntfStateChangeCh <- msg
+
+	nbrMdata := newospfNbrMdata()
+	nbrMdata.areaId = lsdbKey.AreaId
+	nbrMdata.intf = key
+	nbrMdata.isDR = true
+	nbrMdata.nbrList = nil
+	ospf.IntfConfMap[key] = intf
+	/* CHECK why blocked */
+	//ospf.CreateNetworkLSACh <- *nbrMdata
+	ospf.processNeighborFullEvent(*nbrMdata)
+
+	msg1 := DrChangeMsg{
+		areaId:   lsdbKey.AreaId,
+		intfKey:  key,
+		oldstate: config.OtherDesignatedRouter,
+		newstate: config.BackupDesignatedRouter,
+	}
+	//ospf.NetworkDRChangeCh <- msg1
+	ospf.processDrBdrChangeMsg(msg1)
+
+	routemdata := RouteMdata{
+		ipaddr: 2,
+		mask:   100,
+		metric: 10,
+		isDel:  false,
+	}
+	//	ospf.ExternalRouteNotif <- routemdata
+	ospf.processExtRouteUpd(routemdata)
+
+	msg2 := maxAgeLsaMsg{
+		lsaKey:   summaryKey,
+		msg_type: delMaxAgeLsa,
+	}
+	//	ospf.maxAgeLsaCh <- msg2
+	ospf.processMaxAgeLsaMsg(msg2)
 }

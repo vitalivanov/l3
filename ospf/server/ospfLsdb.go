@@ -345,7 +345,7 @@ func (server *OSPFServer) generateNetworkLSA(areaId uint32, key IntfConfKey, isD
 	attachedRtr = append(attachedRtr, selfRtrId)
 
 	numOfAttachedRtr := len(attachedRtr)
-	if numOfAttachedRtr == 1 {
+	if numOfAttachedRtr <= 1 {
 		return
 	}
 
@@ -460,10 +460,10 @@ func (server *OSPFServer) generateRouterLSA(areaId uint32) {
 			continue
 		}
 		msg := DbEventMsg{
-                	eventType: config.LSA,
-                	eventInfo: "Generate router LSA " + ent.IfIpAddr.String(),
-        	}
-        	server.DbEventOp <- msg
+			eventType: config.LSA,
+			eventInfo: "Generate router LSA " + ent.IfIpAddr.String(),
+		}
+		server.DbEventOp <- msg
 
 		if ent.IfFSMState <= config.Waiting {
 			server.logger.Info(fmt.Sprintln("LSDB: If is in waiting. Skip.", ent.IfIpAddr))
