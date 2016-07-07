@@ -28,6 +28,7 @@ func printHelloData(pkt OSPFHelloData) {
 }
 
 func TestOspfHelloDecode(t *testing.T) {
+	fmt.Println("**************** HELLO PROTOCOL ************")
 	initHelloTestParams()
 	for index := 1; index < 21; index++ {
 		err := helloTestLogic(index)
