@@ -68,7 +68,7 @@ func getRouteSource(routeType uint8) uint8 {
 }
 
 type Path struct {
-	rib              *AdjRib
+	rib              *LocRib
 	logger           *logging.Writer
 	NeighborConf     *base.NeighborConf
 	PathAttrs        []packet.BGPPathAttr
@@ -82,10 +82,11 @@ type Path struct {
 	AggregatedPaths  map[string]*Path
 }
 
-func NewPath(adjRib *AdjRib, peer *base.NeighborConf, pa []packet.BGPPathAttr, withdrawn bool, updated bool, routeType uint8) *Path {
+func NewPath(locRib *LocRib, peer *base.NeighborConf, pa []packet.BGPPathAttr, withdrawn bool, updated bool,
+	routeType uint8) *Path {
 	path := &Path{
-		rib:             adjRib,
-		logger:          adjRib.logger,
+		rib:             locRib,
+		logger:          locRib.logger,
 		NeighborConf:    peer,
 		PathAttrs:       pa,
 		withdrawn:       withdrawn,
@@ -343,8 +344,8 @@ func (p *Path) addPathToAggregate(destIP string, path *Path, generateASSet bool)
 
 	if _, ok := p.AggregatedPaths[destIP]; ok {
 		if !isMEDEqual {
-			p.logger.Info(fmt.Sprintln("addPathToAggregate: MED", med, "in the new path", path, "is not the same as the MED",
-				aggMED, "in the agg path, remove the old path..."))
+			p.logger.Info(fmt.Sprintln("addPathToAggregate: MED", med, "in the new path", path,
+				"is not the same as the MED", aggMED, "in the agg path, remove the old path..."))
 			delete(p.AggregatedPaths, destIP)
 			p.removePathFromAggregate(destIP, generateASSet)
 		} else {

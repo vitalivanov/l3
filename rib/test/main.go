@@ -29,6 +29,9 @@ func main() {
 		case "deletev4":
 			fmt.Println("Delete v4 route test")
 			routeThriftTest.Deletev4Routes(ribdClient)
+                case "scale":
+                        fmt.Println("Scale route test")
+                        routeThriftTest.Scale(ribdClient)
 		}
 	}
 }
