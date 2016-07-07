@@ -265,9 +265,11 @@ func (p *Peer) updatePathAttrs(bgpMsg *packet.BGPMessage, path *bgprib.Path) boo
 		packet.Convert4ByteTo2ByteASPath(bgpMsg)
 	}
 
+	removeRRPathAttrs := true
 	if p.NeighborConf.IsInternal() {
 		if path.NeighborConf != nil && (path.NeighborConf.IsRouteReflectorClient() ||
 			p.NeighborConf.IsRouteReflectorClient()) {
+			removeRRPathAttrs = false
 			packet.AddOriginatorId(bgpMsg, path.NeighborConf.BGPId)
 			packet.AddClusterId(bgpMsg, path.NeighborConf.RunningConf.RouteReflectorClusterId)
 		} else {
@@ -282,6 +284,11 @@ func (p *Peer) updatePathAttrs(bgpMsg *packet.BGPMessage, path *bgprib.Path) boo
 		packet.PrependAS(bgpMsg, p.NeighborConf.RunningConf.LocalAS, p.NeighborConf.ASSize)
 		packet.SetNextHop(bgpMsg, p.NeighborConf.Neighbor.Transport.Config.LocalAddress)
 		packet.RemoveLocalPref(bgpMsg)
+	}
+
+	if removeRRPathAttrs {
+		packet.RemoveOriginatorId(bgpMsg)
+		packet.RemoveClusterList(bgpMsg)
 	}
 
 	return true
