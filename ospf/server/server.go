@@ -204,6 +204,7 @@ func NewOSPFServer(logger *logging.Writer) *OSPFServer {
 	ospfServer.neighborConfCh = make(chan ospfNeighborConfMsg)
 	ospfServer.neighborConfStopCh = make(chan bool)
 	ospfServer.neighborSliceStartCh = make(chan bool)
+	ospfServer.neighborFSMCtrlCh = make(chan bool)
 	ospfServer.AreaStateMutex = sync.RWMutex{}
 	ospfServer.AreaStateMap = make(map[AreaConfKey]AreaState)
 	ospfServer.AreaStateSlice = []AreaConfKey{}

@@ -57,7 +57,7 @@ func Createv4RouteList() {
 	ipv4RouteList = append(ipv4RouteList,ribd.IPv4Route{
 		DestinationNw: "40.1.10.0",
 		NetworkMask:   "255.255.255.0",
-		NextHop:       []*ribd.NextHopInfo{&ribd.NextHopInfo{NextHopIp: "40.1.1.2", NextHopIntRef: "lo1"}},
+		NextHop:       []*ribd.NextHopInfo{&ribd.NextHopInfo{NextHopIp: "11.1.10.2"}},
 		Protocol:      "STATIC",
 	})
 
