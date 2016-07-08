@@ -53,19 +53,18 @@ func lsdbTestLogic(tNum int) int {
 	case 1:
 		fmt.Println(tNum, ": Running initLSDatabase ")
 		ospf.initLSDatabase(areaId)
-
 	case 2:
 		fmt.Println(tNum, ": Running insertSummaryLsa ")
 		ospf.initLSDatabase(lsdbKey.AreaId)
 		ospf.insertSummaryLsa(lsdbKey, summaryKey, summaryLsa)
-
+		ospf.lsdbStateRefresh()
 	case 3:
 		fmt.Println(tNum, ": Running processRecvdRouterLsa ")
 		ospf.initLSDatabase(lsdbKey.AreaId)
 		ospf.processRecvdRouterLsa(lsa_router, lsdbKey.AreaId)
 		ospf.processRecvdLsa(lsa_router, lsdbKey.AreaId)
 		ospf.processDeleteLsa(lsa_router, lsdbKey.AreaId)
-
+		ospf.lsdbStateRefresh()
 	case 4:
 		fmt.Println(tNum, ": Running processRecvdNetworkLsa")
 		ospf.initLSDatabase(lsdbKey.AreaId)
@@ -73,24 +72,26 @@ func lsdbTestLogic(tNum int) int {
 		ospf.processRecvdNetworkLsa(lsa_network, lsdbKey.AreaId)
 		ospf.processRecvdLsa(lsa_network, lsdbKey.AreaId)
 		ospf.processDeleteLsa(lsa_network, lsdbKey.AreaId)
-
+		ospf.lsdbStateRefresh()
 	case 5:
 		fmt.Println(tNum, ": Running processRecvdSummaryLsa ")
 		ospf.initLSDatabase(lsdbKey.AreaId)
 		ospf.processRecvdSummaryLsa(lsa_summary, lsdbKey.AreaId, Summary3LSA)
 		ospf.processRecvdLsa(lsa_summary, lsdbKey.AreaId)
 		ospf.processDeleteLsa(lsa_summary, lsdbKey.AreaId)
-
+		ospf.lsdbStateRefresh()
 	case 6:
 		fmt.Println(tNum, ": Running processRecvdASExternalLsa ")
 		ospf.initLSDatabase(lsdbKey.AreaId)
 		ospf.processRecvdASExternalLsa(lsa_asExt, lsdbKey.AreaId)
 		ospf.processRecvdLsa(lsa_asExt, lsdbKey.AreaId)
 		ospf.processDeleteLsa(lsa_asExt, lsdbKey.AreaId)
+		ospf.lsdbStateRefresh()
 
 	case 7:
 		fmt.Println(tNum, ": Running processLSDatabaseUpdates")
 		checkLSDatabaseUpdates()
+		ospf.lsdbStateRefresh()
 
 	}
 
