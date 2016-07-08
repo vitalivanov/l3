@@ -36,19 +36,21 @@ type PolicyActionFunc struct {
 }
 
 type BGPPolicyEngine interface {
-	CreatePolicyCondition(utilspolicy.PolicyConditionConfig)
-	CreatePolicyStmt(utilspolicy.PolicyStmtConfig)
-	CreatePolicyDefinition(utilspolicy.PolicyDefinitionConfig)
-	CreatePolicyAction(utilspolicy.PolicyActionConfig)
-	DeletePolicyCondition(string)
-	DeletePolicyStmt(string)
-	DeletePolicyDefinition(string)
-	DeletePolicyAction(string)
+	CreatePolicyCondition(utilspolicy.PolicyConditionConfig) (bool, error)
+	CreatePolicyStmt(utilspolicy.PolicyStmtConfig) error
+	CreatePolicyDefinition(utilspolicy.PolicyDefinitionConfig) error
+	CreatePolicyAction(utilspolicy.PolicyActionConfig) (bool, error)
+	DeletePolicyCondition(string) (bool, error)
+	DeletePolicyStmt(string) error
+	DeletePolicyDefinition(string) error
+	DeletePolicyAction(string) (bool, error)
+	UpdateApplyPolicy(utilspolicy.ApplyPolicyInfo, bool)
 	SetTraverseFuncs(utilspolicy.EntityTraverseAndApplyPolicyfunc, utilspolicy.EntityTraverseAndReversePolicyfunc)
 	SetActionFuncs(map[int]PolicyActionFunc)
 	SetEntityUpdateFunc(utilspolicy.EntityUpdatefunc)
 	SetIsEntityPresentFunc(utilspolicy.PolicyCheckfunc)
 	SetGetPolicyEntityMapIndexFunc(utilspolicy.GetPolicyEnityMapIndexFunc)
+	GetPolicyEngine() *utilspolicy.PolicyEngineDB
 }
 
 type BasePolicyEngine struct {
@@ -109,34 +111,42 @@ func (eng *BasePolicyEngine) SetGetPolicyEntityMapIndexFunc(policyEntityKeyFunc 
 	}
 }
 
-func (eng *BasePolicyEngine) CreatePolicyCondition(condCfg utilspolicy.PolicyConditionConfig) {
-	eng.PolicyEngine.CreatePolicyDstIpMatchPrefixSetCondition(condCfg)
+func (eng *BasePolicyEngine) CreatePolicyCondition(condCfg utilspolicy.PolicyConditionConfig) (bool, error) {
+	return eng.PolicyEngine.CreatePolicyDstIpMatchPrefixSetCondition(condCfg)
 }
 
-func (eng *BasePolicyEngine) CreatePolicyStmt(stmtCfg utilspolicy.PolicyStmtConfig) {
-	eng.PolicyEngine.CreatePolicyStatement(stmtCfg)
+func (eng *BasePolicyEngine) CreatePolicyStmt(stmtCfg utilspolicy.PolicyStmtConfig) error {
+	return eng.PolicyEngine.CreatePolicyStatement(stmtCfg)
 }
 
-func (eng *BasePolicyEngine) CreatePolicyAction(actionCfg utilspolicy.PolicyActionConfig) {
-	eng.PolicyEngine.CreatePolicyAggregateAction(actionCfg)
+func (eng *BasePolicyEngine) CreatePolicyAction(actionCfg utilspolicy.PolicyActionConfig) (bool, error) {
+	return eng.PolicyEngine.CreatePolicyAggregateAction(actionCfg)
 }
 
-func (eng *BasePolicyEngine) DeletePolicyCondition(conditionName string) {
+func (eng *BasePolicyEngine) DeletePolicyCondition(conditionName string) (bool, error) {
 	conditionCfg := utilspolicy.PolicyConditionConfig{Name: conditionName}
-	eng.PolicyEngine.DeletePolicyCondition(conditionCfg)
+	return eng.PolicyEngine.DeletePolicyCondition(conditionCfg)
 }
 
-func (eng *BasePolicyEngine) DeletePolicyStmt(stmtName string) {
+func (eng *BasePolicyEngine) DeletePolicyStmt(stmtName string) error {
 	stmtCfg := utilspolicy.PolicyStmtConfig{Name: stmtName}
-	eng.PolicyEngine.DeletePolicyStatement(stmtCfg)
+	return eng.PolicyEngine.DeletePolicyStatement(stmtCfg)
 }
 
-func (eng *BasePolicyEngine) DeletePolicyDefinition(policyName string) {
+func (eng *BasePolicyEngine) DeletePolicyDefinition(policyName string) error {
 	policyCfg := utilspolicy.PolicyDefinitionConfig{Name: policyName}
-	eng.PolicyEngine.DeletePolicyDefinition(policyCfg)
+	return eng.PolicyEngine.DeletePolicyDefinition(policyCfg)
 }
 
-func (eng *BasePolicyEngine) DeletePolicyAction(actionName string) {
+func (eng *BasePolicyEngine) DeletePolicyAction(actionName string) (bool, error) {
 	actionCfg := utilspolicy.PolicyActionConfig{Name: actionName}
-	eng.PolicyEngine.DeletePolicyAction(actionCfg)
+	return eng.PolicyEngine.DeletePolicyAction(actionCfg)
+}
+
+func (eng *BasePolicyEngine) UpdateApplyPolicy(info utilspolicy.ApplyPolicyInfo, apply bool) {
+	eng.PolicyEngine.UpdateApplyPolicy(info, apply)
+}
+
+func (eng *BasePolicyEngine) GetPolicyEngine() *utilspolicy.PolicyEngineDB {
+	return eng.PolicyEngine
 }

@@ -62,8 +62,8 @@ type ArpState struct {
 
 type ResolveIPv4 struct {
 	TargetIP string
-	IfType   int
-	IfId     int
+	//	IfType   int
+	IfId int
 }
 
 type DeleteResolvedIPv4 struct {
