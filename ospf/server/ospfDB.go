@@ -113,7 +113,10 @@ func (server *OSPFServer) ReadOspfCfgFromDB() {
 func (server *OSPFServer) readGlobalConfFromDB() {
 	server.logger.Info("Reading global object from DB")
 	var dbObj objects.OspfGlobal
-
+	if server.dbHdl == nil {
+		server.logger.Err("Null db handle . No global config read from db.")
+		return
+	}
 	objList, err := server.dbHdl.GetAllObjFromDb(dbObj)
 	if err != nil {
 		server.logger.Err("DB query failed for OspfGlobal")
@@ -151,6 +154,10 @@ func (server *OSPFServer) applyOspfGlobalConf(conf *ospfd.OspfGlobal) error {
 func (server *OSPFServer) readAreaConfFromDB() {
 	server.logger.Info("Reading area object from DB")
 	var dbObj objects.OspfAreaEntry
+	if server.dbHdl == nil {
+		server.logger.Err("Null db handle. No Area conf read from db.")
+		return
+	}
 
 	objList, err := server.dbHdl.GetAllObjFromDb(dbObj)
 	if err != nil {
@@ -188,6 +195,10 @@ func (server *OSPFServer) applyOspfAreaConf(conf *ospfd.OspfAreaEntry) error {
 func (server *OSPFServer) readIntfConfFromDB() {
 	server.logger.Info("Reading interface object from DB")
 	var dbObj objects.OspfIfEntry
+	if server.dbHdl == nil {
+		server.logger.Err("Null db handle. No Intf conf to be read from db.")
+		return
+	}
 
 	objList, err := server.dbHdl.GetAllObjFromDb(dbObj)
 	if err != nil {
@@ -282,6 +293,11 @@ func (server *OSPFServer) AddIPv4RoutesState(entry RoutingTblEntryKey) error {
 	obj.LSOrigin.AdvRouter = int32(rEntry.RoutingTblEnt.LSOrigin.AdvRouter)
 
 	objects.ConvertThriftToospfdOspfIPv4RouteStateObj(obj, &dbObj)
+
+	if server.dbHdl == nil {
+		return errors.New(fmt.Sprintln("Null db object or db handle"))
+	}
+
 	err := dbObj.StoreObjectInDb(server.dbHdl)
 	if err != nil {
 		server.logger.Err(fmt.Sprintln("DB: Failed to add object in db , err ", err))

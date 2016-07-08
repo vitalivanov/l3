@@ -668,6 +668,11 @@ func (server *OSPFServer) DeleteRoute(rKey RoutingTblEntryKey) {
 		}
 		cfg.NextHop = make([]*ribd.NextHopInfo, 0)
 		cfg.NextHop = append(cfg.NextHop, &nextHopInfo)
+		if server.ribdClient.ClientHdl == nil {
+			server.logger.Err("Nil ribd handle. Can not delete route. ")
+			return
+		}
+
 		ret, err := server.ribdClient.ClientHdl.DeleteIPv4Route(&cfg)
 		//destNetIp, networkMask, routeType, nextHopIp)
 		if err != nil {
