@@ -60,6 +60,7 @@ var nbrKey NeighborConfKey
 var intConf IntfConf
 var dstMAC net.HardwareAddr
 var ospf *OSPFServer
+var eventMsg DbEventMsg
 
 /* Global conf */
 var gConf config.GlobalConf
@@ -89,6 +90,17 @@ var areaId uint32
 var lsdbKey LsdbKey
 var summaryKey LsaKey
 var summaryLsa SummaryLsa
+var val LsdbSliceEnt
+var lsdbMsg DbLsdbMsg
+
+/* Routing table */
+var rKey RoutingTblEntryKey
+var rEntry GlobalRoutingTblEntry
+var entry RoutingTblEntry
+var nextHop NextHop
+var nhmap map[NextHop]bool
+var areaRoutingTable AreaRoutingTbl
+var areaidkey AreaIdKey
 
 func OSPFNewLogger(name string, tag string, listenToConfig bool) (*logging.Writer, error) {
 	var err error
@@ -292,7 +304,13 @@ func initAttr() {
 		},
 		nbrKey: nbrKey,
 	}
+	eventMsg = DbEventMsg{
+		eventType: config.ADJACENCY,
+	}
+	eventMsg.eventInfo = "SeqNumberMismatch. Nbr should be master "
+
 	initLsdbData()
+	initRoutingTable()
 
 }
 
@@ -323,6 +341,62 @@ func initLsdbData() {
 		Netmask: netmask,
 		Metric:  uint32(20),
 	}
+	val.AreaId = lsdbKey.AreaId
+	val.LSType = summaryKey.LSType
+	val.LSId = summaryKey.LSId
+	val.AdvRtr = summaryKey.AdvRouter
+
+	lsdbMsg = DbLsdbMsg{
+		entry: val,
+		op:    true,
+	}
+
+}
+
+func initRoutingTable() {
+	rKey = RoutingTblEntryKey{
+		DestType: Network,
+		AddrMask: 0,
+		DestId:   0,
+	}
+
+	nhmap = make(map[NextHop]bool)
+	nextHop = NextHop{
+		IfIPAddr:  uint32(2345),
+		IfIdx:     uint32(10),
+		NextHopIP: uint32(222),
+		AdvRtr:    uint32(120),
+	}
+
+	nhmap[nextHop] = true
+
+	entry = RoutingTblEntry{
+		OptCapabilities: uint8(1),  // Optional Capabilities
+		PathType:        IntraArea, // Path Type
+		Cost:            uint16(20),
+		Type2Cost:       uint16(10),
+		LSOrigin:        summaryKey,
+		NumOfPaths:      10,
+		NextHops:        nhmap,
+	}
+
+	rEntry = GlobalRoutingTblEntry{
+		AreaId:        lsdbKey.AreaId,
+		RoutingTblEnt: entry,
+	}
+
+	ospf.GlobalRoutingTbl[rKey] = rEntry
+
+	ospf.OldGlobalRoutingTbl = ospf.GlobalRoutingTbl
+	ospf.TempGlobalRoutingTbl = ospf.GlobalRoutingTbl
+	areaRoutingTable.RoutingTblMap = make(map[RoutingTblEntryKey]RoutingTblEntry)
+	areaRoutingTable.RoutingTblMap[rKey] = entry
+
+	areaidkey = AreaIdKey {
+		AreaId : lsdbKey.AreaId,
+	}
+	ospf.TempAreaRoutingTbl[areaidkey] = areaRoutingTable
+
 }
 
 func initPacketData() {
@@ -408,6 +482,9 @@ func startDummyChannels(server *OSPFServer) {
 
 		case data := <-server.ospfNbrLsaUpdSendCh:
 			fmt.Println("Received data on ospfNbrLsaUpdSendCh ", data)
+		
+		//case data := <-server.StartCalcSPFCh:
+		//	fmt.Println("Received data on StartCalcSPFCh ", data)
 		}
 	}
 
