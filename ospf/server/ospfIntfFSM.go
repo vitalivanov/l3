@@ -31,7 +31,11 @@ import (
 )
 
 func (server *OSPFServer) StartOspfIntfFSM(key IntfConfKey) {
-	ent, _ := server.IntfConfMap[key]
+	ent, ok := server.IntfConfMap[key]
+	if !ok {
+		server.logger.Err(fmt.Sprintln("IntfFSM: IntfConfMap doesnt exist for key ", key))
+		return
+	}
 	areaId := convertIPv4ToUint32(ent.IfAreaId)
 	msg := NetworkLSAChangeMsg{
 		areaId: areaId,
@@ -220,11 +224,8 @@ func (server *OSPFServer) StartOspfBroadcastIntfFSM(key IntfConfKey) {
 func (server *OSPFServer) processNbrDownEvent(msg NbrStateChangeMsg,
 	key IntfConfKey, p2p bool) {
 	ent, _ := server.IntfConfMap[key]
-	/*
-		nbrKey := NeighborKey{
-			RouterId: msg.RouterId,
-		} */
-	neighborEntry, exist := ent.NeighborMap[msg.nbrKey]
+	
+        neighborEntry, exist := ent.NeighborMap[msg.nbrKey]
 	if exist {
 		oldTwoWayStatus := neighborEntry.TwoWayStatus
 		delete(ent.NeighborMap, msg.nbrKey)
@@ -486,10 +487,6 @@ func (server *OSPFServer) createAndSendEventsIntfFSM(key IntfConfKey,
 	server.logger.Info(fmt.Sprintln("Final Election of BDR:", ent.IfBDRIp, " and DR:", ent.IfDRIp, "new State:", newState))
 
 	areaId := convertIPv4ToUint32(ent.IfAreaId)
-	/*
-		msg := LSAChangeMsg{
-			areaId: areaId,
-		} */
 
 	msg1 := DrChangeMsg{
 		areaId:   areaId,
@@ -502,27 +499,6 @@ func (server *OSPFServer) createAndSendEventsIntfFSM(key IntfConfKey,
 	server.NetworkDRChangeCh <- msg1
 	server.logger.Info(fmt.Sprintln("oldState", oldState, " newState", newState))
 
-	/*
-	   if oldDRtrId != ent.IfDRtrId {
-	           adjOKEvtMsg := AdjOKEvtMsg {
-	                   NewDRtrId:         ent.IfDRtrId,
-	                   OldDRtrId:         oldDRtrId,
-	                   NewBDRtrId:        ent.IfBDRtrId,
-	                   OldBDRtrId:        oldBDRtrId,
-	           }
-	           server.logger.Info("Intf State Machine: Sending AdjOK Event to NBR State Machine because of DR change")
-	           server.AdjOKEvtCh <- adjOKEvtMsg
-	   } else if oldBDRtrId != ent.IfBDRtrId {
-	           adjOKEvtMsg := AdjOKEvtMsg {
-	                   NewDRtrId:         ent.IfDRtrId,
-	                   OldDRtrId:         oldDRtrId,
-	                   NewBDRtrId:        ent.IfBDRtrId,
-	                   OldBDRtrId:        oldBDRtrId,
-	           }
-	           server.logger.Info("Intf State Machine: Sending AdjOK Event to NBR State Machine because of BDR change")
-	           server.AdjOKEvtCh <- adjOKEvtMsg
-	   }
-	*/
 }
 
 func (server *OSPFServer) StopOspfIntfFSM(key IntfConfKey) {

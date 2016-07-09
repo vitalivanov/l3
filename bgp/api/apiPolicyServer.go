@@ -24,14 +24,13 @@
 package api
 
 import (
-	"models/objects"
+	bgppolicy "l3/bgp/policy"
 	"sync"
 	utilspolicy "utils/policy"
 )
 
 type PolicyApiLayer struct {
-	conditionAddCh chan utilspolicy.PolicyConditionConfig
-	conditionDelCh chan string
+	policyManager *bgppolicy.BGPPolicyManager
 }
 
 var bgppolicyapi *PolicyApiLayer = nil
@@ -49,35 +48,43 @@ func getPolicyInstance() *PolicyApiLayer {
 /*  Initialize bgp api layer with the channels that will be used for communicating
  *  with the policy engine server
  */
-func InitPolicy(conditionAddCh chan utilspolicy.PolicyConditionConfig,
-	conditionDelCh chan string) {
+func InitPolicy(policyEngine *bgppolicy.BGPPolicyManager) {
 	bgppolicyapi = getPolicyInstance()
-	bgppolicyapi.conditionAddCh = conditionAddCh
-	bgppolicyapi.conditionDelCh = conditionDelCh
-}
-func convertModelsToPolicyConditionConfig(
-	cfg *objects.PolicyCondition) utilspolicy.PolicyConditionConfig {
-	condition := utilspolicy.PolicyConditionConfig{}
-	if cfg == nil {
-		return condition
-	}
-	destIPMatch := utilspolicy.PolicyDstIpMatchPrefixSetCondition{
-		Prefix: utilspolicy.PolicyPrefix{
-			IpPrefix:        cfg.IpPrefix,
-			MasklengthRange: cfg.MaskLengthRange,
-		},
-	}
-	return utilspolicy.PolicyConditionConfig{
-		Name:                          cfg.Name,
-		ConditionType:                 cfg.ConditionType,
-		MatchDstIpPrefixConditionInfo: destIPMatch,
-	}
+	bgppolicyapi.policyManager = policyEngine
 }
 
-func SendPolicyConditionNotification(add *objects.PolicyCondition, remove *objects.PolicyCondition, update *objects.PolicyCondition) {
-	if add != nil { //conditionAdd
-		bgppolicyapi.conditionAddCh <- convertModelsToPolicyConditionConfig(add)
-	} else if remove != nil {
-		bgppolicyapi.conditionDelCh <- (convertModelsToPolicyConditionConfig(remove)).Name
-	}
+func AddPolicyCondition(condition utilspolicy.PolicyConditionConfig) {
+	bgppolicyapi.policyManager.ConditionCfgCh <- condition
+}
+
+func RemovePolicyCondition(conditionName string) {
+	bgppolicyapi.policyManager.ConditionDelCh <- conditionName
+}
+
+func UpdatePolicyCondition(condition utilspolicy.PolicyConditionConfig) {
+	return
+}
+
+func AddPolicyStmt(stmt utilspolicy.PolicyStmtConfig) {
+	bgppolicyapi.policyManager.StmtCfgCh <- stmt
+}
+
+func RemovePolicyStmt(stmtName string) {
+	bgppolicyapi.policyManager.StmtDelCh <- stmtName
+}
+
+func UpdatePolicyStmt(stmt utilspolicy.PolicyStmtConfig) {
+	return
+}
+
+func AddPolicyDefinition(definition utilspolicy.PolicyDefinitionConfig) {
+	bgppolicyapi.policyManager.DefinitionCfgCh <- definition
+}
+
+func RemovePolicyDefinition(definitionName string) {
+	bgppolicyapi.policyManager.DefinitionDelCh <- definitionName
+}
+
+func UpdatePolicyDefinition(definition utilspolicy.PolicyDefinitionConfig) {
+	return
 }

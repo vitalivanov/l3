@@ -97,7 +97,10 @@ func (server *OSPFServer) BuildHelloPkt(ent IntfConf) []byte {
 	           interfacing to such an area must have the E-bit clear in
 	           their Hello packets
 	*/
-
+	if ent.IfAreaId == nil {
+	    server.logger.Info(fmt.Sprintln("HELLO: Null area id for intfkey ", ent))
+            return nil
+	}
 	areaId := config.AreaId(convertIPInByteToString(ent.IfAreaId))
 	isStub := server.isStubArea(areaId)
 	option := uint8(2)

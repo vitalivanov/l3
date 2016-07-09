@@ -27,11 +27,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	nanomsg "github.com/op/go-nanomsg"
 	"l3/bgp/api"
 	"l3/rib/ribdCommonDefs"
 	"models/objects"
 	"utils/logging"
+	utilspolicy "utils/policy"
+
+	nanomsg "github.com/op/go-nanomsg"
 )
 
 /*  Init policy manager with specific needs
@@ -83,28 +85,175 @@ func (mgr *FSPolicyMgr) setupSubSocket(address string) (*nanomsg.SubSocket, erro
 	}
 	return socket, nil
 }
-func (mgr *FSPolicyMgr) handlePolicyConditionUpdates(msg ribdCommonDefs.RibdNotifyMsg) {
-	policyCondition := objects.PolicyCondition{}
-	updateMsg := "Add"
-	if msg.MsgType == ribdCommonDefs.NOTIFY_POLICY_CONDITION_DELETED {
-		updateMsg = "Remove"
-	} else if msg.MsgType == ribdCommonDefs.NOTIFY_POLICY_CONDITION_UPDATED {
-		updateMsg = "Update"
+
+func convertModelsToPolicyConditionConfig(cfg *objects.PolicyCondition) *utilspolicy.PolicyConditionConfig {
+	if cfg == nil {
+		return nil
 	}
-	err := json.Unmarshal(msg.MsgBuf, &policyCondition)
-	if err != nil {
-		mgr.logger.Err(fmt.Sprintf(
-			"Unmarshal RIB policy condition update failed with err %s", err))
+
+	destIPMatch := utilspolicy.PolicyDstIpMatchPrefixSetCondition{
+		Prefix: utilspolicy.PolicyPrefix{
+			IpPrefix:        cfg.IpPrefix,
+			MasklengthRange: cfg.MaskLengthRange,
+		},
 	}
-	mgr.logger.Info(fmt.Sprintln(updateMsg, "Policy Condition ", policyCondition.Name, " type: ", policyCondition.ConditionType))
-	if msg.MsgType == ribdCommonDefs.NOTIFY_POLICY_CONDITION_CREATED {
-		api.SendPolicyConditionNotification(&policyCondition, nil, nil)
-	} else if msg.MsgType == ribdCommonDefs.NOTIFY_POLICY_CONDITION_DELETED {
-		api.SendPolicyConditionNotification(nil, &policyCondition, nil)
-	} else if msg.MsgType == ribdCommonDefs.NOTIFY_POLICY_CONDITION_UPDATED {
-		api.SendPolicyConditionNotification(nil, nil, &policyCondition)
+
+	return &utilspolicy.PolicyConditionConfig{
+		Name:                          cfg.Name,
+		ConditionType:                 cfg.ConditionType,
+		MatchDstIpPrefixConditionInfo: destIPMatch,
 	}
 }
+
+func (mgr *FSPolicyMgr) handlePolicyConditionUpdates(msg ribdCommonDefs.RibdNotifyMsg) {
+	policyCondition := objects.PolicyCondition{}
+	var updateMsg string
+	switch msg.MsgType {
+	case ribdCommonDefs.NOTIFY_POLICY_CONDITION_CREATED:
+		updateMsg = "Add"
+	case ribdCommonDefs.NOTIFY_POLICY_CONDITION_DELETED:
+		updateMsg = "Remove"
+	case ribdCommonDefs.NOTIFY_POLICY_CONDITION_UPDATED:
+		updateMsg = "Update"
+	default:
+		mgr.logger.Err(fmt.Sprintf("Unknown policy condition notification type %d", msg.MsgType))
+		return
+	}
+
+	err := json.Unmarshal(msg.MsgBuf, &policyCondition)
+	if err != nil {
+		mgr.logger.Err(fmt.Sprintf("Unmarshal RIB policy condition update failed with err %s", err))
+		return
+	}
+
+	mgr.logger.Info(fmt.Sprintln(updateMsg, "Policy Condition", policyCondition.Name, "type:",
+		policyCondition.ConditionType))
+	condition := convertModelsToPolicyConditionConfig(&policyCondition)
+	if condition == nil {
+		mgr.logger.Err(fmt.Sprintln(updateMsg, "Policy Condition", policyCondition.Name, "conversion failed"))
+		return
+	}
+
+	if msg.MsgType == ribdCommonDefs.NOTIFY_POLICY_CONDITION_CREATED {
+		api.AddPolicyCondition(*condition)
+	} else if msg.MsgType == ribdCommonDefs.NOTIFY_POLICY_CONDITION_DELETED {
+		api.RemovePolicyCondition(condition.Name)
+	} else if msg.MsgType == ribdCommonDefs.NOTIFY_POLICY_CONDITION_UPDATED {
+		api.UpdatePolicyCondition(*condition)
+	}
+}
+
+func convertModelsToPolicyStmtConfig(cfg *objects.PolicyStmt) *utilspolicy.PolicyStmtConfig {
+	if cfg == nil {
+		return nil
+	}
+
+	actions := make([]string, 1)
+	actions[0] = cfg.Action
+
+	return &utilspolicy.PolicyStmtConfig{
+		Name:            cfg.Name,
+		MatchConditions: cfg.MatchConditions,
+		Conditions:      cfg.Conditions,
+		Actions:         actions,
+	}
+}
+
+func (mgr *FSPolicyMgr) handlePolicyStmtUpdates(msg ribdCommonDefs.RibdNotifyMsg) {
+	policyStmt := objects.PolicyStmt{}
+	var updateMsg string
+	switch msg.MsgType {
+	case ribdCommonDefs.NOTIFY_POLICY_STMT_CREATED:
+		updateMsg = "Add"
+	case ribdCommonDefs.NOTIFY_POLICY_STMT_DELETED:
+		updateMsg = "Remove"
+	case ribdCommonDefs.NOTIFY_POLICY_STMT_UPDATED:
+		updateMsg = "Update"
+	default:
+		mgr.logger.Err(fmt.Sprintf("Unknown policy statement notification type %d", msg.MsgType))
+		return
+	}
+
+	err := json.Unmarshal(msg.MsgBuf, &policyStmt)
+	if err != nil {
+		mgr.logger.Err(fmt.Sprintf("Unmarshal RIB policy condition update failed with err %s", err))
+		return
+	}
+
+	mgr.logger.Info(fmt.Sprintln(updateMsg, "Policy statement", policyStmt.Name))
+	stmt := convertModelsToPolicyStmtConfig(&policyStmt)
+	if stmt == nil {
+		mgr.logger.Err(fmt.Sprintln(updateMsg, "Policy statement", policyStmt.Name, "conversion failed"))
+		return
+	}
+
+	if msg.MsgType == ribdCommonDefs.NOTIFY_POLICY_STMT_CREATED {
+		api.AddPolicyStmt(*stmt)
+	} else if msg.MsgType == ribdCommonDefs.NOTIFY_POLICY_STMT_DELETED {
+		api.RemovePolicyStmt(stmt.Name)
+	} else if msg.MsgType == ribdCommonDefs.NOTIFY_POLICY_STMT_UPDATED {
+		api.UpdatePolicyStmt(*stmt)
+	}
+}
+
+func convertModelsToPolicyDefintionConfig(cfg *objects.PolicyDefinition) *utilspolicy.PolicyDefinitionConfig {
+	if cfg == nil {
+		return nil
+	}
+	stmtPrecedenceList := make([]utilspolicy.PolicyDefinitionStmtPrecedence, 0)
+	for i := 0; i < len(cfg.StatementList); i++ {
+		stmtPrecedence := utilspolicy.PolicyDefinitionStmtPrecedence{
+			Precedence: int(cfg.StatementList[i].Priority),
+			Statement:  cfg.StatementList[i].Statement,
+		}
+		stmtPrecedenceList = append(stmtPrecedenceList, stmtPrecedence)
+	}
+
+	return &utilspolicy.PolicyDefinitionConfig{
+		Name:                       cfg.Name,
+		Precedence:                 int(cfg.Priority),
+		MatchType:                  cfg.MatchType,
+		PolicyDefinitionStatements: stmtPrecedenceList,
+	}
+}
+
+func (mgr *FSPolicyMgr) handlePolicyDefinitionUpdates(msg ribdCommonDefs.RibdNotifyMsg) {
+	policyDefinition := objects.PolicyDefinition{}
+	var updateMsg string
+	switch msg.MsgType {
+	case ribdCommonDefs.NOTIFY_POLICY_DEFINITION_CREATED:
+		updateMsg = "Add"
+	case ribdCommonDefs.NOTIFY_POLICY_DEFINITION_DELETED:
+		updateMsg = "Remove"
+	case ribdCommonDefs.NOTIFY_POLICY_DEFINITION_UPDATED:
+		updateMsg = "Update"
+	default:
+		mgr.logger.Err(fmt.Sprintf("Unknown policy definition notification type %d", msg.MsgType))
+		return
+	}
+
+	err := json.Unmarshal(msg.MsgBuf, &policyDefinition)
+	if err != nil {
+		mgr.logger.Err(fmt.Sprintf("Unmarshal RIB policy definition update failed with err %s", err))
+		return
+	}
+
+	mgr.logger.Info(fmt.Sprintln(updateMsg, "Policy definition", policyDefinition.Name))
+	condition := convertModelsToPolicyDefintionConfig(&policyDefinition)
+	if condition == nil {
+		mgr.logger.Err(fmt.Sprintln(updateMsg, "Policy definition", policyDefinition.Name, "conversion failed"))
+		return
+	}
+
+	if msg.MsgType == ribdCommonDefs.NOTIFY_POLICY_DEFINITION_CREATED {
+		api.AddPolicyDefinition(*condition)
+	} else if msg.MsgType == ribdCommonDefs.NOTIFY_POLICY_DEFINITION_DELETED {
+		api.RemovePolicyDefinition(condition.Name)
+	} else if msg.MsgType == ribdCommonDefs.NOTIFY_POLICY_DEFINITION_UPDATED {
+		api.UpdatePolicyDefinition(*condition)
+	}
+}
+
 func (mgr *FSPolicyMgr) handlePolicyUpdates(rxBuf []byte) {
 	reader := bytes.NewReader(rxBuf)
 	decoder := json.NewDecoder(reader)

@@ -21,63 +21,34 @@
 // |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
 //
 
-package api
+// adjRibEngine.go
+package policy
 
 import (
-	"l3/bgp/config"
-	"l3/bgp/server"
-	"sync"
+	bgprib "l3/bgp/rib"
+	"utils/logging"
+	utilspolicy "utils/policy"
 )
 
-type ApiLayer struct {
-	server *server.BGPServer
+type AdjRibPolicyExtensions struct {
+	HitCounter    int
+	RouteList     []string
+	RouteInfoList []*bgprib.AdjRIBRoute
 }
 
-var bgpapi *ApiLayer = nil
-var once sync.Once
-
-/*  Singleton instance should be accesible only within api
- */
-func getInstance() *ApiLayer {
-	once.Do(func() {
-		bgpapi = &ApiLayer{}
-	})
-	return bgpapi
+type AdjRibPPolicyEngine struct {
+	BasePolicyEngine
 }
 
-/*  Initialize bgp api layer with the channels that will be used for communicating
- *  with the server
- */
-func Init(server *server.BGPServer) {
-	bgpapi = getInstance()
-	bgpapi.server = server
-}
-
-/*  Send bfd state information from bfd manager to server
- */
-func SendBfdNotification(DestIp string, State bool, Oper config.Operation) {
-	bgpapi.server.BfdCh <- config.BfdInfo{
-		DestIp: DestIp,
-		State:  State,
-		Oper:   Oper,
+func NewAdjRibPolicyEngine(logger *logging.Writer) *AdjRibPPolicyEngine {
+	policyEngine := &AdjRibPPolicyEngine{
+		BasePolicyEngine: NewBasePolicyEngine(logger, utilspolicy.NewPolicyEngineDB(logger)),
 	}
+	policyEngine.SetGetPolicyEntityMapIndexFunc(getPolicyEnityKey)
+	return policyEngine
 }
 
-/*  Send interface state notification to server
- */
-func SendIntfNotification(ifIndex int32, ipAddr string, state config.Operation) {
-	bgpapi.server.IntfCh <- config.IntfStateInfo{
-		Idx:    ifIndex,
-		IPAddr: ipAddr,
-		State:  state,
-	}
-}
-
-/*  Send Routes information to server
- */
-func SendRouteNotification(add []*config.RouteInfo, remove []*config.RouteInfo) {
-	bgpapi.server.RoutesCh <- &config.RouteCh{
-		Add:    add,
-		Remove: remove,
-	}
+func (eng *AdjRibPPolicyEngine) CreatePolicyDefinition(defCfg utilspolicy.PolicyDefinitionConfig) error {
+	defCfg.Extensions = AdjRibPolicyExtensions{}
+	return eng.PolicyEngine.CreatePolicyDefinition(defCfg)
 }
