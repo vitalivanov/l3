@@ -164,6 +164,67 @@ func (svr *NDPServer) DeletePcapHandler(pHdl *pcap.Handle) {
 	}
 }
 
+/*
+ *  API: given an ifIndex, it will search portMap (fpPort1, fpPort2, etc) to get the name or it will do
+ *	 reverse search for vlanMap (vlan ifIndex ---> to vlanId) and from that we will get the name
+ */
+func (svr *NDPServer) GetIntfRefName(ifIndex int32) string {
+	portEnt, exists := svr.PhyPort[ifIndex]
+	if exists {
+		return portEnt.Name
+	}
+	vlanId, exists := svr.VlanIfIdxVlanIdMap[ifIndex]
+	if exists {
+		vlanInfo, exists := svr.VlanInfo[vlanId]
+		if exists {
+			return vlanInfo.Name
+		}
+	}
+	return INTF_REF_NOT_FOUND
+}
+
+/*  API: will handle IPv6 notifications received from switch/asicd
+ *      Msg types
+ *	    1) Create:
+ *		    Create an entry in the map
+ *	    2) Delete:
+ *		    delete an entry from the map
+ */
+func (svr *NDPServer) CreateIPIntf(obj *config.IPIntfNotification) {
+	ipInfo, exists := svr.L3Port[obj.IfIndex]
+	switch obj.Operation {
+	case config.CONFIG_CREATE:
+		if exists {
+			debug.Logger.Err(fmt.Sprintln("Received create notification for ifIndex", obj.IfIndex,
+				"when entry already exist in the database. Dumping IpAddr for debugging info.",
+				"Received Ip:", obj.IpAddr, "stored Ip:", ipInfo.IpAddr))
+			return
+		}
+		ipInfo = config.IPv6IntfInfo{
+			IfIndex: obj.IfIndex,
+			IpAddr:  obj.IpAddr,
+		}
+		ipInfo.IntfRef = svr.GetIntfRefName(ipInfo.IfIndex)
+		if ipInfo.IntfRef == INTF_REF_NOT_FOUND {
+			debug.Logger.Alert(fmt.Sprintln("Couldn't find name for ifIndex:", ipInfo.IfIndex,
+				"and hence pcap create will be failure"))
+		}
+		debug.Logger.Info(fmt.Sprintln("Created IP inteface", ipInfo.IntfRef, "ifIndex:", ipInfo.IfIndex))
+		svr.L3Port[ipInfo.IfIndex] = ipInfo
+		svr.ndpL3IntfStateSlice = append(svr.ndpL3IntfStateSlice, ipInfo.IfIndex)
+	case config.CONFIG_DELETE:
+		//@TODO: need to handle delete cases
+	}
+}
+
+/*  API: will handle l2/physical notifications received from switch/asicd
+ *	  Update map entry and then call state notification
+ *
+ */
+func (svr *NDPServer) HandlePhyPortStateNotification(msg *config.StateNotification) {
+	//@TODO: do we need to handle this case... i don't think so
+}
+
 /*  API: will handle IPv6 notifications received from switch/asicd
  *      Msg types
  *	    1) Create:
@@ -171,11 +232,12 @@ func (svr *NDPServer) DeletePcapHandler(pHdl *pcap.Handle) {
  *	    2) Delete:
  *		     Stop Rx/Tx in this case
  */
-func (svr *NDPServer) HandleIPv6Notification(msg *config.IPv6IntfInfo) {
-	switch msg.MsgType {
-	case "CREATE":
-		svr.StartRxTx(msg)
-	case "DELETE":
+func (svr *NDPServer) HandleStateNotification(msg *config.StateNotification) {
+	debug.Logger.Info(fmt.Sprintln("Received State:", msg.State, "for ifIndex:", msg.IfIndex))
+	switch msg.State {
+	case config.STATE_UP:
+		svr.StartRxTx(msg.IfIndex)
+	case config.STATE_DOWN:
 		svr.StopRxTx(msg.IfIndex)
 	}
 }
