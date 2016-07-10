@@ -133,25 +133,20 @@ func (svr *NDPServer) GetIPIntf() {
 /*
  * API: will create pcap handler for each port
  */
-func (svr *NDPServer) CreatePcapHandler(name string, pHdl *pcap.Handle) error {
-	// create pcap handler if there is none created right now
-	if pHdl != nil {
-		debug.Logger.Warning("Pcap already exists for port " + name)
-		return nil //errors.New("Pcap already exists for port " + name)
-	}
-	pHdl, err := pcap.OpenLive(name, svr.SnapShotLen, svr.Promiscuous, svr.Timeout)
+func (svr *NDPServer) CreatePcapHandler(name string) (pHdl *pcap.Handle, err error) {
+	pHdl, err = pcap.OpenLive(name, svr.SnapShotLen, svr.Promiscuous, svr.Timeout)
 	if err != nil {
 		debug.Logger.Err(fmt.Sprintln("Creating Pcap Handler failed for", name, "Error:", err))
-		return err
+		return pHdl, err
 	}
 	filter := "(ip6[6] == 0x3a) and (ip6[40] >= 133 && ip6[40] <= 137)"
 	err = pHdl.SetBPFFilter(filter)
 	if err != nil {
 		debug.Logger.Err(fmt.Sprintln("Creating BPF Filter failed Error", err))
 		pHdl = nil
-		return err
+		return pHdl, err
 	}
-	return err
+	return pHdl, err
 }
 
 /*

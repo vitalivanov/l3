@@ -36,6 +36,10 @@ import (
  */
 func (svr *NDPServer) ReceivedNdpPkts(ifIndex int32) {
 	ipPort, _ := svr.L3Port[ifIndex]
+	if ipPort.PcapBase.PcapHandle == nil {
+		debug.Logger.Err(fmt.Sprintln("pcap handler for port:", ipPort.IntfRef, "is not valid. ABORT!!!!"))
+		return
+	}
 	src := gopacket.NewPacketSource(ipPort.PcapBase.PcapHandle, layers.LayerTypeEthernet)
 	in := src.Packets()
 	for {
@@ -69,12 +73,18 @@ func (svr *NDPServer) StartRxTx(ifIndex int32) {
 			ifIndex, "is not allowed"))
 		return
 	}
-	err := svr.CreatePcapHandler(ipPort.IntfRef, ipPort.PcapBase.PcapHandle)
-	if err != nil {
-		return
-	}
 	svr.L3Port[ifIndex] = ipPort
-	debug.Logger.Info(fmt.Sprintln("Start rx/tx for ifIndex:", ipPort.IfIndex, "ip address", ipPort.IpAddr))
+	// create pcap handler if there is none created right now
+	if ipPort.PcapBase.PcapHandle == nil {
+		var err error
+		ipPort.PcapBase.PcapHandle, err = svr.CreatePcapHandler(ipPort.IntfRef)
+		if err != nil {
+			return
+		}
+		svr.L3Port[ifIndex] = ipPort
+	}
+	debug.Logger.Info(fmt.Sprintln("Start rx/tx for port:", ipPort.IntfRef, "ifIndex:", ipPort.IfIndex,
+		"ip address", ipPort.IpAddr))
 
 	// Spawn go routines for rx & tx
 	go svr.ReceivedNdpPkts(ipPort.IfIndex)
