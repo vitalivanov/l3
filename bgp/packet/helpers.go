@@ -474,6 +474,10 @@ func AddOriginatorId(updateMsg *BGPMessage, id net.IP) bool {
 	return true
 }
 
+func RemoveOriginatorId(updateMsg *BGPMessage) {
+	removePathAttr(updateMsg, BGPPathAttrTypeOriginatorId)
+}
+
 func AddClusterId(updateMsg *BGPMessage, id uint32) bool {
 	body := updateMsg.Body.(*BGPUpdate)
 	var pa BGPPathAttr
@@ -508,6 +512,10 @@ func AddClusterId(updateMsg *BGPMessage, id uint32) bool {
 	}
 
 	return false
+}
+
+func RemoveClusterList(updateMsg *BGPMessage) {
+	removePathAttr(updateMsg, BGPPathAttrTypeClusterList)
 }
 
 func ConvertIPBytesToUint(bytes []byte) uint32 {
