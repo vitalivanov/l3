@@ -34,7 +34,7 @@ import (
 func handleClient(client *ribd.RIBDServicesClient) (err error) {
 	fmt.Println("handleClient")
 	var count int = 1
-	var maxCount int = 30000
+	var maxCount int = 50000
 	intByt2 := 1
 	intByt3 := 1
 	byte1 := "22"
@@ -60,11 +60,11 @@ func handleClient(client *ribd.RIBDServicesClient) (err error) {
 		rtNet := byte1 + "." + byte2 + "." + byte3 + "." + byte4
 		route.DestinationNw = rtNet
 		route.NetworkMask = "255.255.255.0"
-                route.NextHop = make([]*ribd.NextHopInfo,0)
-                nh := ribd.NextHopInfo{
-                          NextHopIp : "11.1.10.2",
-                      }
-                route.NextHop = append(route.NextHop,&nh)
+		route.NextHop = make([]*ribd.NextHopInfo, 0)
+		nh := ribd.NextHopInfo{
+			NextHopIp: "11.1.10.2",
+		}
+		route.NextHop = append(route.NextHop, &nh)
 		route.Protocol = "STATIC"
 		//fmt.Println("Creating Route ", route)
 		rv := client.OnewayCreateIPv4Route(&route)
@@ -151,7 +151,7 @@ func handleBulkClient(client *ribd.RIBDServicesClient) (err error) {
 }
 
 //func main() {
-func Scale(ribdClient *ribd.RIBDServicesClient){
+func Scale(ribdClient *ribd.RIBDServicesClient) {
 	/*ribdClient := testutils.GetRIBdClient()
 	if ribdClient == nil {
 		fmt.Println("RIBd client nil")
