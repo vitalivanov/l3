@@ -37,7 +37,7 @@ import (
 )
 
 const BGP_INTERNAL_PREF = 100
-const BGP_EXTERNAL_PREF = 50
+const BGP_EXTERNAL_PREF = 100
 
 type PathAndRoute struct {
 	Path
@@ -480,15 +480,22 @@ func (d *Destination) SelectRouteForLocRib(addPathCount int) (RouteAction, bool,
 				"routes[%s]\n", updatedPaths))
 		}
 
+		d.logger.Info(fmt.Sprintln("before mod, ecmpPaths =", ecmpPaths))
 		addPathsUpdated = d.updateAddPaths(addPaths)
 		d.removeAndPrepend(&ecmpPaths, updatedPaths[0])
-		d.logger.Info(fmt.Sprintln("ecmpPaths =", ecmpPaths))
+		d.logger.Info(fmt.Sprintln("after mod, ecmpPaths =", ecmpPaths))
 
 		for idx, paths := range ecmpPaths {
 			found := false
-			for _, path := range paths {
+			for pathIdx, path := range paths {
+				// If the first path (best path) in the first sub list is not already installed, break out
+				if idx == 0 && pathIdx > 0 {
+					break
+				}
 				if route, ok := d.ecmpPaths[path]; ok {
 					// Update path
+					d.logger.Info(fmt.Sprintf("Destination %s path %v at [%d][%d] found in ecmp paths %v",
+						d.NLRI.GetPrefix(), path, idx, pathIdx, d.ecmpPaths))
 					found = true
 					firstRoute = false
 					if (idx == 0) && path.IsAggregate() {
@@ -504,6 +511,8 @@ func (d *Destination) SelectRouteForLocRib(addPathCount int) (RouteAction, bool,
 				// Add route
 				newRoute := d.pathRouteMap[paths[0]]
 				if newRoute == nil {
+					d.logger.Info(fmt.Sprintf("Destination %s path %v NOT found in path route map %v",
+						d.NLRI.GetPrefix(), paths[0], d.pathRouteMap))
 					continue
 				}
 				newRoute.setAction(RouteActionAdd)
@@ -525,6 +534,8 @@ func (d *Destination) SelectRouteForLocRib(addPathCount int) (RouteAction, bool,
 
 		d.LocRibPath = ecmpPaths[0][0]
 		d.LocRibPathRoute = d.ecmpPaths[d.LocRibPath]
+		d.logger.Info(fmt.Sprintf("Destination %s loc rib path %v route %v, d.ecmpPaths %v ecmpPaths %v",
+			d.NLRI.GetPrefix(), d.LocRibPath, d.LocRibPathRoute, d.ecmpPaths, ecmpPaths))
 	} else {
 		if d.LocRibPath != nil {
 			// Remove route
@@ -991,6 +1002,7 @@ func (d *Destination) getECMPPaths(updatedPaths []*Path) [][]*Path {
 	ecmpPathMap := make(map[string][]*Path)
 
 	for _, path := range updatedPaths {
+		d.logger.Info(fmt.Sprintln("getECMPPaths: path =", path, "next hop =", path.reachabilityInfo.NextHop))
 		if _, ok := ecmpPathMap[path.reachabilityInfo.NextHop]; !ok {
 			ecmpPathMap[path.reachabilityInfo.NextHop] = make([]*Path, 1)
 			ecmpPathMap[path.reachabilityInfo.NextHop][0] = path
