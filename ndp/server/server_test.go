@@ -90,12 +90,11 @@ func TestPcapCreate(t *testing.T) {
 	debug.NDPSetLogger(logger)
 	svr := NDPNewServer(nil)
 	svr.InitGlobalDS()
-	err = svr.CreatePcapHandler("lo", pcapHdl)
+	pcapHdl, err = svr.CreatePcapHandler("lo")
 	if err != nil {
 		t.Error("Pcap Create Failed", err)
 	}
 	svr.DeletePcapHandler(pcapHdl)
-	if pcapHdl != nil {
-		t.Error("Deleting Pcap Handle Failed")
-	}
+	pcapHdl = nil
+	svr.DeletePcapHandler(pcapHdl)
 }

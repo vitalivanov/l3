@@ -155,7 +155,6 @@ func (svr *NDPServer) CreatePcapHandler(name string) (pHdl *pcap.Handle, err err
 func (svr *NDPServer) DeletePcapHandler(pHdl *pcap.Handle) {
 	if pHdl != nil {
 		pHdl.Close()
-		pHdl = nil
 	}
 }
 
