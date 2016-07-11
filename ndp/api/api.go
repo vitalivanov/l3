@@ -50,21 +50,32 @@ func Init(svr *server.NDPServer) {
 }
 
 func SendL2PortNotification(ifIndex int32, state string) {
-
+	ndpApi.server.PhyPortStateCh <- &config.StateNotification{
+		IfIndex: ifIndex,
+		State:   state,
+	}
 }
 
 func SendL3PortNotification(ifIndex int32, state string) {
-
-}
-
-func SendVlanNotification(vlanId uint16, vlanName, state string) {
-
-}
-
-func SendIPv6Notfication(ifIndex int32, ipaddr, msgType string) {
-	ndpApi.server.Ipv6Ch <- &config.IPv6IntfInfo{
+	ndpApi.server.IpStateCh <- &config.StateNotification{
 		IfIndex: ifIndex,
-		IpAddr:  ipaddr,
-		MsgType: msgType,
+		State:   state,
+	}
+}
+
+func SendVlanNotification(oper string, vlanId int32, vlanName string, untagPorts []int32) {
+	ndpApi.server.VlanCh <- &config.VlanNotification{
+		Operation:  oper,
+		VlanId:     vlanId,
+		VlanName:   vlanName,
+		UntagPorts: untagPorts,
+	}
+}
+
+func SendIPIntfNotfication(ifIndex int32, ipaddr, msgType string) {
+	ndpApi.server.IpIntfCh <- &config.IPIntfNotification{
+		IfIndex:   ifIndex,
+		IpAddr:    ipaddr,
+		Operation: msgType,
 	}
 }

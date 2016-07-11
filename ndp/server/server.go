@@ -75,7 +75,10 @@ func (svr *NDPServer) InitGlobalDS() {
 	svr.L3Port = make(map[int32]config.IPv6IntfInfo, NDP_SYSTEM_PORT_MAP_CAPACITY)
 	svr.VlanInfo = make(map[int32]config.VlanInfo, NDP_SYSTEM_PORT_MAP_CAPACITY)
 	svr.VlanIfIdxVlanIdMap = make(map[int32]int32, NDP_SYSTEM_PORT_MAP_CAPACITY)
-	svr.Ipv6Ch = make(chan *config.IPv6IntfInfo)
+	svr.PhyPortStateCh = make(chan *config.StateNotification)
+	svr.IpIntfCh = make(chan *config.IPIntfNotification)
+	svr.IpStateCh = make(chan *config.StateNotification)
+	svr.VlanCh = make(chan *config.VlanNotification)
 	svr.RxPktCh = make(chan *RxPktInfo)
 	svr.SnapShotLen = 1024
 	svr.Promiscuous = false
@@ -85,7 +88,10 @@ func (svr *NDPServer) InitGlobalDS() {
 func (svr *NDPServer) DeInitGlobalDS() {
 	svr.PhyPort = nil
 	svr.L3Port = nil
-	svr.Ipv6Ch = nil
+	svr.PhyPortStateCh = nil
+	svr.IpIntfCh = nil
+	svr.IpStateCh = nil
+	svr.VlanCh = nil
 	svr.RxPktCh = nil
 }
 
@@ -117,8 +123,8 @@ func (svr *NDPServer) InitSystem() {
 
 	// Check status of IP Interface and then start RX/TX for that ip interface
 	for _, ipIntf := range svr.L3Port {
-		if ipIntf.OperState == NDP_IP_STATE_UP {
-			svr.StartRxTx(&ipIntf)
+		if ipIntf.OperState == config.STATE_UP {
+			svr.StartRxTx(ipIntf.IfIndex)
 		}
 	}
 }
@@ -126,8 +132,12 @@ func (svr *NDPServer) InitSystem() {
 func (svr *NDPServer) EventsListener() {
 	for {
 		select {
-		case ipv6Notify := <-svr.Ipv6Ch:
-			svr.HandleIPv6Notification(ipv6Notify)
+		case phyPortStateCh := <-svr.PhyPortStateCh:
+			svr.HandlePhyPortStateNotification(phyPortStateCh)
+		case ipIntfNotify := <-svr.IpIntfCh:
+			svr.CreateIPIntf(ipIntfNotify)
+		case ipStateCh := <-svr.IpStateCh:
+			svr.HandleStateNotification(ipStateCh)
 		case rxChInfo, ok := <-svr.RxPktCh:
 			if !ok {
 				continue

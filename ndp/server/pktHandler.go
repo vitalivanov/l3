@@ -36,6 +36,10 @@ import (
  */
 func (svr *NDPServer) ReceivedNdpPkts(ifIndex int32) {
 	ipPort, _ := svr.L3Port[ifIndex]
+	if ipPort.PcapBase.PcapHandle == nil {
+		debug.Logger.Err(fmt.Sprintln("pcap handler for port:", ipPort.IntfRef, "is not valid. ABORT!!!!"))
+		return
+	}
 	src := gopacket.NewPacketSource(ipPort.PcapBase.PcapHandle, layers.LayerTypeEthernet)
 	in := src.Packets()
 	for {
@@ -60,24 +64,31 @@ func (svr *NDPServer) ReceivedNdpPkts(ifIndex int32) {
  *		       c) Create Pcap Handler & add the entry to up interface slice
  *		       d) Start receiving Packets
  */
-func (svr *NDPServer) StartRxTx(msg *config.IPv6IntfInfo) {
-	ipPort, exists := svr.L3Port[msg.IfIndex]
+func (svr *NDPServer) StartRxTx(ifIndex int32) {
+	ipPort, exists := svr.L3Port[ifIndex]
 	if !exists {
 		// This will copy msg (intRef, ifIndex, ipAddr) into ipPort
 		// And also create an entry into the ndpL3IntfStateSlice
-		svr.InitSystemIPIntf(&ipPort, msg)
-	}
-	err := svr.CreatePcapHandler(ipPort.IntfRef, ipPort.PcapBase.PcapHandle)
-	if err != nil {
+		debug.Logger.Err(fmt.Sprintln("Starting RX/TX for interface which was not created, ifIndex:",
+			ifIndex, "is not allowed"))
 		return
 	}
-	svr.L3Port[msg.IfIndex] = ipPort
+	svr.L3Port[ifIndex] = ipPort
+	// create pcap handler if there is none created right now
+	if ipPort.PcapBase.PcapHandle == nil {
+		var err error
+		ipPort.PcapBase.PcapHandle, err = svr.CreatePcapHandler(ipPort.IntfRef)
+		if err != nil {
+			return
+		}
+		svr.L3Port[ifIndex] = ipPort
+	}
 	debug.Logger.Info(fmt.Sprintln("Start rx/tx for port:", ipPort.IntfRef, "ifIndex:", ipPort.IfIndex,
 		"ip address", ipPort.IpAddr))
 
 	// Spawn go routines for rx & tx
 	go svr.ReceivedNdpPkts(ipPort.IfIndex)
-	svr.ndpUpL3IntfStateSlice = append(svr.ndpUpL3IntfStateSlice, msg.IfIndex)
+	svr.ndpUpL3IntfStateSlice = append(svr.ndpUpL3IntfStateSlice, ifIndex)
 }
 
 /*
