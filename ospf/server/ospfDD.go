@@ -108,7 +108,7 @@ func newDbdMsg(key NeighborConfKey, dbd_data ospfDatabaseDescriptionData) ospfNe
 	return dbdNbrMsg
 }
 
-func decodeDatabaseDescriptionData(data []byte, dbd_data *ospfDatabaseDescriptionData, pktlen uint16) {
+func DecodeDatabaseDescriptionData(data []byte, dbd_data *ospfDatabaseDescriptionData, pktlen uint16) {
 	dbd_data.interface_mtu = binary.BigEndian.Uint16(data[0:2])
 	dbd_data.options = data[2]
 	dbd_data.dd_sequence_number = binary.BigEndian.Uint32(data[4:8])
@@ -341,14 +341,13 @@ func (server *OSPFServer) ProcessRxDbdPkt(data []byte, ospfHdrMd *OspfHdrMetadat
 	ospfdbd_data.lsa_headers = []ospfLSAHeader{}
 	//routerId := convertIPv4ToUint32(ospfHdrMd.routerId)
 	pktlen := ospfHdrMd.pktlen
-	/*  TODO check min length
-	 */
+
 	if pktlen < OSPF_DBD_MIN_SIZE+OSPF_HEADER_SIZE {
 		server.logger.Warning(fmt.Sprintln("DBD WARNING: Packet < min DBD length. pktlen ", pktlen,
 			" min_dbd_len ", OSPF_DBD_MIN_SIZE+OSPF_HEADER_SIZE))
 	}
 
-	decodeDatabaseDescriptionData(data, ospfdbd_data, pktlen)
+	DecodeDatabaseDescriptionData(data, ospfdbd_data, pktlen)
 	//ipaddr := convertIPInByteToString(ipHdrMd.srcIP)
 	ipaddr := net.IPv4(ipHdrMd.srcIP[0], ipHdrMd.srcIP[1], ipHdrMd.srcIP[2], ipHdrMd.srcIP[3])
 
@@ -360,6 +359,10 @@ func (server *OSPFServer) ProcessRxDbdPkt(data []byte, ospfHdrMd *OspfHdrMetadat
 		ospfNbrDBDData: *ospfdbd_data,
 	}
 	server.logger.Info(fmt.Sprintln("DBD: nbr key ", ipaddr, key.IntfIdx))
+	if ospfNeighborIPToMAC == nil {
+		server.logger.Info(fmt.Sprintln("DBD: ospfNeighborIPToMAC is NULL. Check if nbr thread is running."))
+		return nil
+	}
 	ospfNeighborIPToMAC[dbdNbrMsg.ospfNbrConfKey] = srcMAC
 	//fmt.Println(" lsa_header length = ", len(ospfdbd_data.lsa_headers))
 	dbdNbrMsg.ospfNbrDBDData.lsa_headers = []ospfLSAHeader{}
