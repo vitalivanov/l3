@@ -90,6 +90,13 @@ var areaId uint32
 var lsdbKey LsdbKey
 var summaryKey LsaKey
 var summaryLsa SummaryLsa
+
+var routerKey LsaKey
+var routerLsa RouterLsa
+var lin []LinkDetail
+var networkKey LsaKey
+var networkLsa NetworkLsa
+
 var val LsdbSliceEnt
 var lsdbMsg DbLsdbMsg
 
@@ -101,6 +108,14 @@ var nextHop NextHop
 var nhmap map[NextHop]bool
 var areaRoutingTable AreaRoutingTbl
 var areaidkey AreaIdKey
+var vKeyR VertexKey
+var vKeyN VertexKey
+var vKeyT VertexKey
+
+var vertexR Vertex
+var vertexN Vertex
+var vertexT Vertex
+var treeVertex TreeVertex
 
 func OSPFNewLogger(name string, tag string, listenToConfig bool) (*logging.Writer, error) {
 	var err error
@@ -341,6 +356,57 @@ func initLsdbData() {
 		Netmask: netmask,
 		Metric:  uint32(20),
 	}
+
+	routerKey = LsaKey{
+		LSType:    uint8(RouterLSA),
+		LSId:      lsid,
+		AdvRouter: lsid,
+	}
+
+	link := make([]LinkDetail, 2)
+
+	link1 := LinkDetail{
+		LinkId:     uint32(1234), /* Link ID */
+		LinkData:   uint32(1),    /* Link Data */
+		LinkType:   TransitLink,  /* Link Type */
+		NumOfTOS:   uint8(0),     /* # TOS Metrics */
+		LinkMetric: uint16(20),   /* Metric */
+	}
+
+	link = append(link, link1)
+	link1.LinkId = uint32(lsid)
+	link1.LinkData = 1
+	link1.LinkType = StubLink
+	link = append(link, link1)
+
+	link1.LinkId = uint32(lsid)
+	link1.LinkData = 1
+	link1.LinkType = P2PLink
+	link = append(link, link1)
+
+	routerLsa = RouterLsa{
+		LsaMd:       lsamdata,
+		BitV:        true,
+		BitE:        true,
+		BitB:        true,
+		NumOfLinks:  3,
+		LinkDetails: link,
+	}
+
+	networkKey = LsaKey{
+		LSType:    uint8(NetworkLSA),
+		LSId:      lsid,
+		AdvRouter: lsid,
+	}
+
+	att := []uint32{12, 11, 10}
+
+	networkLsa = NetworkLsa{
+		LsaMd:       lsamdata,
+		Netmask:     uint32(10), /* Network Mask */
+		AttachedRtr: att,
+	}
+
 	val.AreaId = lsdbKey.AreaId
 	val.LSType = summaryKey.LSType
 	val.LSId = summaryKey.LSId
@@ -349,6 +415,43 @@ func initLsdbData() {
 	lsdbMsg = DbLsdbMsg{
 		entry: val,
 		op:    true,
+	}
+	vKeyR = VertexKey{
+		Type:   RouterVertex,
+		ID:     routerKey.LSId,
+		AdvRtr: lsid,
+	}
+
+	vKeyN = VertexKey{
+		Type:   SNetworkVertex,
+		ID:     networkKey.LSId,
+		AdvRtr: lsid,
+	}
+
+	vKeyT = VertexKey{
+		Type:   SNetworkVertex,
+		ID:     networkKey.LSId,
+		AdvRtr: lsid,
+	}
+
+	vertexR = Vertex{
+		NbrVertexKey:  []VertexKey{vKeyN},
+		NbrVertexCost: []uint16{10},
+		LsaKey:        routerKey,
+		AreaId:        lsdbKey.AreaId,
+		Visited:       false,
+		LinkStateId:   lsid,
+		NetMask:       uint32(0),
+	}
+	vertexR.LinkData = make(map[VertexKey]uint32)
+	vertexR.LinkData[vKeyR] = link1.LinkData
+
+	p := []VertexKey{vKeyR, vKeyN, vKeyT}
+
+	treeVertex = TreeVertex{
+		Paths:      []Path{p},
+		Distance:   uint16(20),
+		NumOfPaths: 3,
 	}
 
 }
@@ -392,8 +495,8 @@ func initRoutingTable() {
 	areaRoutingTable.RoutingTblMap = make(map[RoutingTblEntryKey]RoutingTblEntry)
 	areaRoutingTable.RoutingTblMap[rKey] = entry
 
-	areaidkey = AreaIdKey {
-		AreaId : lsdbKey.AreaId,
+	areaidkey = AreaIdKey{
+		AreaId: lsdbKey.AreaId,
 	}
 	ospf.TempAreaRoutingTbl[areaidkey] = areaRoutingTable
 
@@ -482,9 +585,9 @@ func startDummyChannels(server *OSPFServer) {
 
 		case data := <-server.ospfNbrLsaUpdSendCh:
 			fmt.Println("Received data on ospfNbrLsaUpdSendCh ", data)
-		
-		//case data := <-server.StartCalcSPFCh:
-		//	fmt.Println("Received data on StartCalcSPFCh ", data)
+
+			//case data := <-server.StartCalcSPFCh:
+			//	fmt.Println("Received data on StartCalcSPFCh ", data)
 		}
 	}
 
