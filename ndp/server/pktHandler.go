@@ -50,7 +50,7 @@ func (svr *NDPServer) ReceivedNdpPkts(ifIndex int32) {
 			}
 			svr.RxPktCh <- &RxPktInfo{pkt, ipPort.IfIndex}
 		case <-ipPort.PcapBase.PcapCtrl:
-			svr.DeletePcapHandler(ipPort.PcapBase.PcapHandle)
+			svr.DeletePcapHandler(&ipPort.PcapBase.PcapHandle)
 			svr.L3Port[ifIndex] = ipPort
 			ipPort.PcapBase.PcapCtrl <- true
 			return

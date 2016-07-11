@@ -152,9 +152,10 @@ func (svr *NDPServer) CreatePcapHandler(name string) (pHdl *pcap.Handle, err err
 /*
  * API: will delete pcap handler for each port
  */
-func (svr *NDPServer) DeletePcapHandler(pHdl *pcap.Handle) {
-	if pHdl != nil {
-		pHdl.Close()
+func (svr *NDPServer) DeletePcapHandler(pHdl **pcap.Handle) {
+	if *pHdl != nil {
+		(*pHdl).Close()
+		*pHdl = nil
 	}
 }
 

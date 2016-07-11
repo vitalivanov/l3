@@ -94,7 +94,8 @@ func TestPcapCreate(t *testing.T) {
 	if err != nil {
 		t.Error("Pcap Create Failed", err)
 	}
-	svr.DeletePcapHandler(pcapHdl)
-	pcapHdl = nil
-	svr.DeletePcapHandler(pcapHdl)
+	svr.DeletePcapHandler(&pcapHdl)
+	if pcapHdl != nil {
+		t.Error("Failed to set nil")
+	}
 }
