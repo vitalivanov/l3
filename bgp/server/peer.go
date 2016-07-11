@@ -273,7 +273,6 @@ func (p *Peer) updatePathAttrs(bgpMsg *packet.BGPMessage, path *bgprib.Path) boo
 			packet.AddOriginatorId(bgpMsg, path.NeighborConf.BGPId)
 			packet.AddClusterId(bgpMsg, path.NeighborConf.RunningConf.RouteReflectorClusterId)
 		} else {
-			packet.SetNextHop(bgpMsg, p.NeighborConf.Neighbor.Transport.Config.LocalAddress)
 			packet.SetLocalPref(bgpMsg, path.GetPreference())
 		}
 	} else {
