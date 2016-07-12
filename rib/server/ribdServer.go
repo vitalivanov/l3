@@ -30,16 +30,17 @@ import (
 	//	"database/sql"
 	"encoding/json"
 	"fmt"
-	"os"
-	"syscall"
 	"git.apache.org/thrift.git/lib/go/thrift"
 	"github.com/op/go-nanomsg"
 	"io/ioutil"
 	"l3/rib/ribdCommonDefs"
 	"net"
+	"os"
+	"os/signal"
 	"ribd"
 	"ribdInt"
 	"strconv"
+	"syscall"
 	"time"
 	"utils/dbutils"
 	"utils/ipcutils"
@@ -53,15 +54,16 @@ type RouteConfigInfo struct {
 	OrigRoute *ribd.IPv4Route
 	NewRoute  *ribd.IPv4Route
 	Attrset   []bool
-	Op        string   //"add"/"del"/"update"
+	Op        string //"add"/"del"/"update"
 }
 type RIBdServerConfig struct {
 	OrigConfigObject interface{}
 	NewConfigObject  interface{}
 	AttrSet          []bool
-	Op               string   //"add"/"del"/"update/get"
+	Op               string //"add"/"del"/"update/get"
 	PatchOp          []*ribd.PatchOpInfo
 }
+
 /*type PatchUpdateRouteInfo struct {
 	OrigRoute *ribd.IPv4Route
 	NewRoute  *ribd.IPv4Route
@@ -85,26 +87,26 @@ type ApplyPolicyInfo struct {
 	Conditions []*ribdInt.ConditionInfo
 }
 type RIBDServer struct {
-	Logger                       *logging.Writer
-	PolicyEngineDB               *policy.PolicyEngineDB
-	GlobalPolicyEngineDB         *policy.PolicyEngineDB
-	TrackReachabilityCh          chan TrackReachabilityInfo
-	RouteConfCh                  chan RIBdServerConfig
-	AsicdRouteCh                 chan RIBdServerConfig
-	ArpdRouteCh                  chan RIBdServerConfig
-	NotificationChannel          chan NotificationMsg
-	NextHopInfoMap               map[NextHopInfoKey]NextHopInfo
-	PolicyConditionConfCh        chan RIBdServerConfig
-	PolicyActionConfCh           chan RIBdServerConfig
-	PolicyStmtConfCh             chan RIBdServerConfig
-	PolicyDefinitionConfCh       chan RIBdServerConfig
-	PolicyApplyCh                chan ApplyPolicyInfo
-	PolicyUpdateApplyCh          chan ApplyPolicyInfo
-	DBRouteCh                    chan RIBdServerConfig
-	AcceptConfig                 bool
-	ServerUpCh                   chan bool
-	DBReadDone                   chan bool
-	DbHdl                        *dbutils.DBUtil
+	Logger                 *logging.Writer
+	PolicyEngineDB         *policy.PolicyEngineDB
+	GlobalPolicyEngineDB   *policy.PolicyEngineDB
+	TrackReachabilityCh    chan TrackReachabilityInfo
+	RouteConfCh            chan RIBdServerConfig
+	AsicdRouteCh           chan RIBdServerConfig
+	ArpdRouteCh            chan RIBdServerConfig
+	NotificationChannel    chan NotificationMsg
+	NextHopInfoMap         map[NextHopInfoKey]NextHopInfo
+	PolicyConditionConfCh  chan RIBdServerConfig
+	PolicyActionConfCh     chan RIBdServerConfig
+	PolicyStmtConfCh       chan RIBdServerConfig
+	PolicyDefinitionConfCh chan RIBdServerConfig
+	PolicyApplyCh          chan ApplyPolicyInfo
+	PolicyUpdateApplyCh    chan ApplyPolicyInfo
+	DBRouteCh              chan RIBdServerConfig
+	AcceptConfig           bool
+	ServerUpCh             chan bool
+	DBReadDone             chan bool
+	DbHdl                  *dbutils.DBUtil
 	//RouteInstallCh                 chan RouteParams
 }
 
@@ -179,7 +181,7 @@ var PolicyEngineDB *policy.PolicyEngineDB
 var PARAMSDIR string
 
 /*
-    Handle Interface down event
+   Handle Interface down event
 */
 func (ribdServiceHandler *RIBDServer) ProcessL3IntfDownEvent(ipAddr string) {
 	logger.Debug("processL3IntfDownEvent")
@@ -195,14 +197,14 @@ func (ribdServiceHandler *RIBDServer) ProcessL3IntfDownEvent(ipAddr string) {
 	logger.Info(fmt.Sprintln(" processL3IntfDownEvent for  ipaddr ", ipAddrStr, " mask ", ipMaskStr))
 	for i := 0; i < len(ConnectedRoutes); i++ {
 		if ConnectedRoutes[i].Ipaddr == ipAddrStr && ConnectedRoutes[i].Mask == ipMaskStr {
-			logger.Info(fmt.Sprintln("Delete this route with destAddress = ",ConnectedRoutes[i].Ipaddr," nwMask = ", ConnectedRoutes[i].Mask))
+			logger.Info(fmt.Sprintln("Delete this route with destAddress = ", ConnectedRoutes[i].Ipaddr, " nwMask = ", ConnectedRoutes[i].Mask))
 			deleteV4Route(ConnectedRoutes[i].Ipaddr, ConnectedRoutes[i].Mask, "CONNECTED", ConnectedRoutes[i].NextHopIp, FIBOnly, ribdCommonDefs.RoutePolicyStateChangeNoChange)
 		}
 	}
 }
 
 /*
-    Handle Interface up event
+   Handle Interface up event
 */
 func (ribdServiceHandler *RIBDServer) ProcessL3IntfUpEvent(ipAddr string) {
 	logger.Debug("processL3IntfUpEvent")
@@ -215,11 +217,11 @@ func (ribdServiceHandler *RIBDServer) ProcessL3IntfUpEvent(ipAddr string) {
 	copy(ipMask, ipNet.Mask)
 	ipAddrStr := ip.String()
 	ipMaskStr := net.IP(ipMask).String()
-	logger.Info(fmt.Sprintln(" processL3IntfUpEvent for  ipaddr ",ipAddrStr, " mask ",  ipMaskStr))
+	logger.Info(fmt.Sprintln(" processL3IntfUpEvent for  ipaddr ", ipAddrStr, " mask ", ipMaskStr))
 	for i := 0; i < len(ConnectedRoutes); i++ {
 		logger.Info(fmt.Sprintln("Current state of this connected route is ", ConnectedRoutes[i].IsValid))
 		if ConnectedRoutes[i].Ipaddr == ipAddrStr && ConnectedRoutes[i].Mask == ipMaskStr && ConnectedRoutes[i].IsValid == false {
-			logger.Info(fmt.Sprintln("Add this route with destAddress = ",ConnectedRoutes[i].Ipaddr," nwMask = " , ConnectedRoutes[i].Mask))
+			logger.Info(fmt.Sprintln("Add this route with destAddress = ", ConnectedRoutes[i].Ipaddr, " nwMask = ", ConnectedRoutes[i].Mask))
 
 			ConnectedRoutes[i].IsValid = true
 			policyRoute := ribdInt.Routes{Ipaddr: ConnectedRoutes[i].Ipaddr, Mask: ConnectedRoutes[i].Mask, NextHopIp: ConnectedRoutes[i].NextHopIp, IfIndex: ConnectedRoutes[i].IfIndex, Metric: ConnectedRoutes[i].Metric, Prototype: ConnectedRoutes[i].Prototype}
@@ -282,7 +284,7 @@ func getVlanInfo() {
 			logger.Info("0 objects returned from GetBulkVlan")
 			return
 		}
-		logger.Info(fmt.Sprintln("len(bulkInfo.GetBulkVlan)  = ",len(bulkInfo.VlanStateList)," num objects returned = " , bulkInfo.Count))
+		logger.Info(fmt.Sprintln("len(bulkInfo.GetBulkVlan)  = ", len(bulkInfo.VlanStateList), " num objects returned = ", bulkInfo.Count))
 		for i := 0; i < int(bulkInfo.Count); i++ {
 			ifId := (bulkInfo.VlanStateList[i].IfIndex)
 			logger.Info(fmt.Sprintln("vlan = ", bulkInfo.VlanStateList[i].VlanId, "ifId = ", ifId))
@@ -319,7 +321,7 @@ func getPortInfo() {
 			logger.Println("0 objects returned from GetBulkPortState")
 			return
 		}
-		logger.Info(fmt.Sprintln("len(bulkInfo.PortStateList)  = ",len(bulkInfo.PortStateList), " num objects returned = ",  bulkInfo.Count))
+		logger.Info(fmt.Sprintln("len(bulkInfo.PortStateList)  = ", len(bulkInfo.PortStateList), " num objects returned = ", bulkInfo.Count))
 		for i := 0; i < int(bulkInfo.Count); i++ {
 			ifId := bulkInfo.PortStateList[i].IfIndex
 			logger.Info(fmt.Sprintln("ifId = ", ifId))
@@ -352,8 +354,8 @@ func (ribdServiceHandler *RIBDServer) AcceptConfigActions() {
 	getConnectedRoutes()
 	//ribdServiceHandler.UpdateRoutesFromDB()
 	//update dbRouteCh to fetch route data
-	ribdServiceHandler.DBRouteCh <- RIBdServerConfig{Op:"fetch"}
-	dbRead := <- ribdServiceHandler.DBReadDone
+	ribdServiceHandler.DBRouteCh <- RIBdServerConfig{Op: "fetch"}
+	dbRead := <-ribdServiceHandler.DBReadDone
 	logger.Debug(fmt.Sprintln("Received dbread: ", dbRead))
 	if dbRead != true {
 		logger.Err("DB read failed")
@@ -530,7 +532,21 @@ func NewRIBDServicesHandler(dbHdl *dbutils.DBUtil, loggerC *logging.Writer) *RIB
 	GlobalPolicyEngineDB = ribdServicesHandler.InitializeGlobalPolicyDB()
 	return ribdServicesHandler
 }
+func (s *RIBDServer) InitServer() {
+	sigChan := make(chan os.Signal, 1)
+	signalList := []os.Signal{syscall.SIGHUP}
+	signal.Notify(sigChan, signalList...)
+	go s.SigHandler(sigChan)
+	go s.StartRouteProcessServer()
+	go s.StartDBServer()
+	go s.StartPolicyServer()
+	go s.NotificationServer()
+	go s.StartAsicdServer()
+	go s.StartArpdServer()
+
+}
 func (ribdServiceHandler *RIBDServer) StartServer(paramsDir string) {
+	ribdServiceHandler.InitServer()
 	DummyRouteInfoRecord.protocol = PROTOCOL_NONE
 	configFile := paramsDir + "/clients.json"
 	logger.Debug(fmt.Sprintln("configfile = ", configFile))
