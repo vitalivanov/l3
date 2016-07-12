@@ -56,6 +56,7 @@ func (svr *NDPServer) GetPorts() {
 			port.Description = pObj.Description
 		}
 		svr.PhyPort[port.IfIndex] = port
+		svr.SwitchMacMapEntries[port.MacAddr] = true
 	}
 
 	debug.Logger.Info("Done with Port State list")
