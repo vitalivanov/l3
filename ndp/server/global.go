@@ -42,10 +42,11 @@ type NDPServer struct {
 	SwitchPlugin asicdClient.AsicdClientIntf
 
 	// System Ports information, key is IntfRef
-	PhyPort            map[int32]config.PortInfo     // key is l2 ifIndex
-	L3Port             map[int32]config.IPv6IntfInfo // key is l3 ifIndex
-	VlanInfo           map[int32]config.VlanInfo     // key is vlanId
-	VlanIfIdxVlanIdMap map[int32]int32               //reverse map for ifIndex ----> vlanId, used during ipv6 neig create
+	PhyPort             map[int32]config.PortInfo     // key is l2 ifIndex
+	L3Port              map[int32]config.IPv6IntfInfo // key is l3 ifIndex
+	VlanInfo            map[int32]config.VlanInfo     // key is vlanId
+	VlanIfIdxVlanIdMap  map[int32]int32               //reverse map for ifIndex ----> vlanId, used during ipv6 neig create
+	SwitchMacMapEntries map[string]bool               // cache entry for all mac addresses on a switch
 
 	// Physical Port/ L2 Port State Notification
 	PhyPortStateCh chan *config.StateNotification

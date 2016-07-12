@@ -50,7 +50,7 @@ func (svr *NDPServer) ReceivedNdpPkts(ifIndex int32) {
 			}
 			svr.RxPktCh <- &RxPktInfo{pkt, ipPort.IfIndex}
 		case <-ipPort.PcapBase.PcapCtrl:
-			svr.DeletePcapHandler(ipPort.PcapBase.PcapHandle)
+			svr.DeletePcapHandler(&ipPort.PcapBase.PcapHandle)
 			svr.L3Port[ifIndex] = ipPort
 			ipPort.PcapBase.PcapCtrl <- true
 			return
@@ -113,6 +113,16 @@ func (svr *NDPServer) StopRxTx(ifIndex int32) {
 }
 
 /*
+ *	CheckSrcMac
+ *		        a) Check for packet src mac and validate it against ifIndex mac addr
+ *			    if it is same then discard the packet
+ */
+func (svr *NDPServer) CheckSrcMac(macAddr string) bool {
+	_, exists := svr.SwitchMacMapEntries[macAddr]
+	return exists
+}
+
+/*
  *	ProcessRxPkt
  *		        a) Check for runtime information
  *			b) Validate & Parse Pkt, which gives ipAddr, MacAddr
@@ -126,13 +136,19 @@ func (svr *NDPServer) ProcessRxPkt(ifIndex int32, pkt gopacket.Packet) {
 		return
 	}
 	nbrInfo := &config.NeighborInfo{}
+	debug.Logger.Info("Processing RX Pkt")
 	err := packet.ValidateAndParse(nbrInfo, pkt)
 	if err != nil {
-		debug.Logger.Err(fmt.Sprintln("Validating Pkt Failed:", err))
+		debug.Logger.Err(fmt.Sprintln("Validating and parsing Pkt Failed:", err))
 		return
 	}
-
+	switchMac := svr.CheckSrcMac(nbrInfo.MacAddr)
+	if switchMac {
+		debug.Logger.Info(fmt.Sprintln("Received Packet from same port and hence ignoring the packet:", nbrInfo))
+		return
+	}
 	svr.PopulateVlanInfo(nbrInfo, ifIndex)
+	debug.Logger.Info(fmt.Sprintln("Calling create ipv6 neighgor and nbrinfo is", nbrInfo))
 	// ipaddr, macAddr, vlanId, ifIndex
 	_, err = svr.SwitchPlugin.CreateIPv6Neighbor(nbrInfo.IpAddr, nbrInfo.MacAddr, nbrInfo.VlanId, nbrInfo.IfIndex)
 	if err != nil {

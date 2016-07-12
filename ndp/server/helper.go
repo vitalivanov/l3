@@ -56,6 +56,7 @@ func (svr *NDPServer) GetPorts() {
 			port.Description = pObj.Description
 		}
 		svr.PhyPort[port.IfIndex] = port
+		svr.SwitchMacMapEntries[port.MacAddr] = true
 	}
 
 	debug.Logger.Info("Done with Port State list")
@@ -152,9 +153,10 @@ func (svr *NDPServer) CreatePcapHandler(name string) (pHdl *pcap.Handle, err err
 /*
  * API: will delete pcap handler for each port
  */
-func (svr *NDPServer) DeletePcapHandler(pHdl *pcap.Handle) {
-	if pHdl != nil {
-		pHdl.Close()
+func (svr *NDPServer) DeletePcapHandler(pHdl **pcap.Handle) {
+	if *pHdl != nil {
+		(*pHdl).Close()
+		*pHdl = nil
 	}
 }
 
