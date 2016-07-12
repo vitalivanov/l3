@@ -36,6 +36,7 @@ import (
 	"l3/rib/ribdCommonDefs"
 	"net"
 	"os"
+	"os/signal"
 	"ribd"
 	"ribdInt"
 	"strconv"
@@ -531,7 +532,21 @@ func NewRIBDServicesHandler(dbHdl *dbutils.DBUtil, loggerC *logging.Writer) *RIB
 	GlobalPolicyEngineDB = ribdServicesHandler.InitializeGlobalPolicyDB()
 	return ribdServicesHandler
 }
+func (s *RIBDServer) InitServer() {
+	sigChan := make(chan os.Signal, 1)
+	signalList := []os.Signal{syscall.SIGHUP}
+	signal.Notify(sigChan, signalList...)
+	go s.SigHandler(sigChan)
+	go s.StartRouteProcessServer()
+	go s.StartDBServer()
+	go s.StartPolicyServer()
+	go s.NotificationServer()
+	go s.StartAsicdServer()
+	go s.StartArpdServer()
+
+}
 func (ribdServiceHandler *RIBDServer) StartServer(paramsDir string) {
+	ribdServiceHandler.InitServer()
 	DummyRouteInfoRecord.protocol = PROTOCOL_NONE
 	configFile := paramsDir + "/clients.json"
 	logger.Debug(fmt.Sprintln("configfile = ", configFile))
