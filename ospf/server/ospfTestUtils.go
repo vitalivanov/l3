@@ -111,6 +111,7 @@ var networkLsa NetworkLsa
 var lsa_reqs []ospfLSAReq
 var val LsdbSliceEnt
 var lsdbMsg DbLsdbMsg
+var ackTxMsg ospfNeighborAckTxMsg
 
 /* Routing table */
 var rKey RoutingTblEntryKey
@@ -349,6 +350,9 @@ func initAttr() {
 	}
 
 	ack_msg = newospfNeighborLSAAckMsg()
+	
+	ackTxMsg.lsa_headers_byte = lsaack
+	ackTxMsg.nbrKey = nbrKey
 
 	eventMsg = DbEventMsg{
 		eventType: config.ADJACENCY,

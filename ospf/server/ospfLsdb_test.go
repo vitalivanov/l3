@@ -26,6 +26,7 @@ package server
 import (
 	"fmt"
 	"l3/ospf/config"
+	"net"
 	"testing"
 )
 
@@ -36,6 +37,8 @@ func initLsdbTestParams() {
 	ospf.IntfConfMap[key] = intf
 	ospf.processGlobalConfig(gConf)
 	ospf.InitNeighborStateMachine()
+	ospfNeighborIPToMAC = make(map[NeighborConfKey]net.HardwareAddr)
+	ospfNeighborIPToMAC[nbrKey] = dstMAC
 	go startDummyChannels(ospf)
 }
 
@@ -60,7 +63,6 @@ func lsdbTestLogic(tNum int) int {
 		fmt.Println(tNum, ": Running insertSummaryLsa ")
 		ospf.initLSDatabase(lsdbKey.AreaId)
 		ospf.insertSummaryLsa(lsdbKey, summaryKey, summaryLsa)
-		ospf.lsdbStateRefresh()
 	case 3:
 		fmt.Println(tNum, ": Running processRecvdRouterLsa ")
 		ospf.initLSDatabase(lsdbKey.AreaId)
@@ -69,7 +71,6 @@ func lsdbTestLogic(tNum int) int {
 		ospf.processRecvdLsa(lsa_fake, lsdbKey.AreaId)
 		ospf.processDeleteLsa(lsa_router, lsdbKey.AreaId)
 		ospf.processDeleteLsa(lsa_fake, lsdbKey.AreaId)
-		ospf.lsdbStateRefresh()
 	case 4:
 		fmt.Println(tNum, ": Running processRecvdNetworkLsa")
 		ospf.initLSDatabase(lsdbKey.AreaId)
@@ -77,30 +78,29 @@ func lsdbTestLogic(tNum int) int {
 		ospf.processRecvdNetworkLsa(lsa_network, lsdbKey.AreaId)
 		ospf.processRecvdLsa(lsa_network, lsdbKey.AreaId)
 		ospf.processDeleteLsa(lsa_network, lsdbKey.AreaId)
-		ospf.lsdbStateRefresh()
 	case 5:
 		fmt.Println(tNum, ": Running processRecvdSummaryLsa ")
 		ospf.initLSDatabase(lsdbKey.AreaId)
 		ospf.processRecvdSummaryLsa(lsa_summary, lsdbKey.AreaId, Summary3LSA)
 		ospf.processRecvdLsa(lsa_summary, lsdbKey.AreaId)
 		ospf.processDeleteLsa(lsa_summary, lsdbKey.AreaId)
-		ospf.lsdbStateRefresh()
 	case 6:
 		fmt.Println(tNum, ": Running processRecvdASExternalLsa ")
 		ospf.initLSDatabase(lsdbKey.AreaId)
 		ospf.processRecvdASExternalLsa(lsa_asExt, lsdbKey.AreaId)
 		ospf.processRecvdLsa(lsa_asExt, lsdbKey.AreaId)
 		ospf.processDeleteLsa(lsa_asExt, lsdbKey.AreaId)
-		ospf.lsdbStateRefresh()
 
 	case 7:
 		fmt.Println(tNum, ": Running processLSDatabaseUpdates")
 		checkLSDatabaseUpdates()
-		ospf.lsdbStateRefresh()
 
 	case 8:
 		fmt.Println(tNum, ": Running LSAPKT tests ")
 		checkLsaPktApis()
+	case 9:
+		fmt.Println(tNum, ": Running LSA decode tests ")
+		checkLsaDecodeApis()
 	}
 
 	return SUCCESS
@@ -189,76 +189,127 @@ func checkLsaPktApis() {
 	index := ospf.BuildAndSendLSAReq(nbrKey, nbrConf)
 	fmt.Println("Nbr lsa req list index ", index)
 
-	lsaPkt = ospf.BuildLsaUpdPkt(key, intf, dstMAC, dstIP, len(lsa_router), lsa_router) 
+	lsaPkt = ospf.BuildLsaUpdPkt(key, intf, dstMAC, dstIP, len(lsa_router), lsa_router)
 	fmt.Println("Encoded LSA pkt :", lsaPkt)
-	
+
 	err := ospf.ProcessRxLsaUpdPkt(lsa_router, &ospfHdrMd, &ipHdrMd, key)
 	if err != nil {
 		fmt.Println("Failed to process received Rx LSA packet.", err)
 	}
-	
+
 	/* LSA upd */
 	lsaupd_msg := ospfNeighborLSAUpdMsg{
 		nbrKey: nbrKey,
-		data: lsa_update,
-		areaId:lsdbKey.AreaId,
+		data:   lsa_update,
+		areaId: lsdbKey.AreaId,
 	}
 
-nbrConf.OspfNbrState = config.NbrFull
-ospf.NeighborConfigMap[nbrKey] = nbrConf
+	nbrConf.OspfNbrState = config.NbrFull
+	ospf.NeighborConfigMap[nbrKey] = nbrConf
 
 	ospf.DecodeLSAUpd(lsaupd_msg)
 
-ospf.selfGenLsaCheck(routerKey)
-ospf.lsaUpdDiscardCheck(nbrConf, lsa_router)
+	ospf.selfGenLsaCheck(routerKey)
+	ospf.lsaUpdDiscardCheck(nbrConf, lsa_router)
 
-/* LSA ack */
-lsaAck  := ospf.BuildLSAAckPkt(key, intf, nbrConf, dstMAC, dstIP, len(lsaack), lsaack)
-fmt.Println("Encoded lsa ack packet ", lsaAck)
+	/* LSA ack */
+	lsaAck := ospf.BuildLSAAckPkt(key, intf, nbrConf, dstMAC, dstIP, len(lsaack), lsaack)
+	fmt.Println("Encoded lsa ack packet ", lsaAck)
 
-ospf.ProcessRxLSAAckPkt(lsaack, &ospfHdrMd, &ipHdrMd, key)
-lsa_headers := []ospfLSAHeader{}
-lsa_headers = append(lsa_headers, lsaHeader)
-  lsaHeader = getLsaHeaderFromLsa(routerLsa.LsaMd.LSAge, routerLsa.LsaMd.Options, NetworkLSA,
-                routerKey.LSId, routerKey.AdvRouter, uint32(routerLsa.LsaMd.LSSequenceNum),
-                routerLsa.LsaMd.LSChecksum, routerLsa.LsaMd.LSLen)
-lsa_headers = append(lsa_headers, lsaHeader)
-ack_msg.lsa_headers = lsa_headers
-ack_msg.nbrKey = nbrKey
+	ospf.ProcessRxLSAAckPkt(lsaack, &ospfHdrMd, &ipHdrMd, key)
+	lsa_headers := []ospfLSAHeader{}
+	lsa_headers = append(lsa_headers, lsaHeader)
+	lsaHeader = getLsaHeaderFromLsa(routerLsa.LsaMd.LSAge, routerLsa.LsaMd.Options, NetworkLSA,
+		routerKey.LSId, routerKey.AdvRouter, uint32(routerLsa.LsaMd.LSSequenceNum),
+		routerLsa.LsaMd.LSChecksum, routerLsa.LsaMd.LSLen)
+	lsa_headers = append(lsa_headers, lsaHeader)
+	ack_msg.lsa_headers = lsa_headers
+	ack_msg.nbrKey = nbrKey
 
-ospf.DecodeLSAAck(*ack_msg)
+	ospf.DecodeLSAAck(*ack_msg)
 
-/* LSA req */
-ospfHdrMd.pktlen = uint16(len(lsareq) + OSPF_HEADER_SIZE)
-err = ospf.ProcessRxLSAReqPkt(lsareq, &ospfHdrMd, &ipHdrMd, key)
-if err != nil {
-	fmt.Println("Failed to process rx LSA req pkt ", err)
+	/* LSA req */
+	ospfHdrMd.pktlen = uint16(len(lsareq) + OSPF_HEADER_SIZE)
+	err = ospf.ProcessRxLSAReqPkt(lsareq, &ospfHdrMd, &ipHdrMd, key)
+	if err != nil {
+		fmt.Println("Failed to process rx LSA req pkt ", err)
 	}
-nbrConf.OspfNbrState = config.NbrFull
-ospf.DecodeLSAReq(nbrLsaReqMsg)
-ospf.generateLsaUpdUnicast(req, nbrKey, lsdbKey.AreaId)
-req.ls_type = uint32(NetworkLSA)
-ospf.generateLsaUpdUnicast(req, nbrKey, lsdbKey.AreaId)
-req.ls_type = uint32(Summary4LSA)
-ospf.generateLsaUpdUnicast(req, nbrKey, lsdbKey.AreaId)
-req.ls_type = uint32(Summary3LSA)
-ospf.generateLsaUpdUnicast(req, nbrKey, lsdbKey.AreaId)
-req.ls_type = uint32(ASExternalLSA)
-ospf.generateLsaUpdUnicast(req, nbrKey, lsdbKey.AreaId)
-req.ls_type = uint32(10) //fake type
-ospf.generateLsaUpdUnicast(req, nbrKey, lsdbKey.AreaId)
+	nbrConf.OspfNbrState = config.NbrFull
+	ospf.DecodeLSAReq(nbrLsaReqMsg)
+	ospf.generateLsaUpdUnicast(req, nbrKey, lsdbKey.AreaId)
+	req.ls_type = uint32(NetworkLSA)
+	ospf.generateLsaUpdUnicast(req, nbrKey, lsdbKey.AreaId)
+	req.ls_type = uint32(Summary4LSA)
+	ospf.generateLsaUpdUnicast(req, nbrKey, lsdbKey.AreaId)
+	req.ls_type = uint32(Summary3LSA)
+	ospf.generateLsaUpdUnicast(req, nbrKey, lsdbKey.AreaId)
+	req.ls_type = uint32(ASExternalLSA)
+	ospf.generateLsaUpdUnicast(req, nbrKey, lsdbKey.AreaId)
+	req.ls_type = uint32(10) //fake type
+	ospf.generateLsaUpdUnicast(req, nbrKey, lsdbKey.AreaId)
 
-discard := ospf.lsaReqPacketDiscardCheck(nbrConf, req)
-if discard {
-	fmt.Println("Discard this packet ")
+	discard := ospf.lsaReqPacketDiscardCheck(nbrConf, req)
+	if discard {
+		fmt.Println("Discard this packet ")
 	}
-discard = ospf.lsaAckPacketDiscardCheck(nbrConf)
+	discard = ospf.lsaAckPacketDiscardCheck(nbrConf)
+
+	/* LSA sanity checks */
+	discard = ospf.lsaAddCheck(lsaHeader, nbrConf)
+
+	ospf.lsaReTxTimerCheck(nbrKey)
+
+	ospf.processTxLsaAck(ackTxMsg)
+
+}
+
+func checkLsaDecodeApis() {
+	ospf.initLSDatabase(areaId)
+	lsDbEnt, _ := ospf.AreaLsdb[lsdbKey] 
+	 selfOrigLsaEnt, _ := ospf.AreaSelfOrigLsa[lsdbKey]   
+
+	routerLsa := &RouterLsa{}
+	lsaKey := &LsaKey{}
+	decodeRouterLsa(lsa_router, routerLsa, lsaKey)
+	routerLsa_byte := encodeRouterLsa(*routerLsa, *lsaKey)
+fmt.Println("Encoded router LSA ", routerLsa_byte)
+	rlsa, ret := ospf.getRouterLsaFromLsdb(lsdbKey.AreaId, *lsaKey)
+	fmt.Println("Lsa from db(lsa, ret) ", rlsa, ret)
+	lsDbEnt.RouterLsaMap[*lsaKey] = *routerLsa
+	selfOrigLsaEnt[*lsaKey] = true
+
+	networkLsa := &NetworkLsa{}
+	decodeNetworkLsa(lsa_network, networkLsa, lsaKey)
+	networkLsa_byte := encodeNetworkLsa(*networkLsa, *lsaKey)
+	fmt.Println("Encoded network LSA ", networkLsa_byte)
+	nlsa, ret := ospf.getRouterLsaFromLsdb(lsdbKey.AreaId, *lsaKey)
+	fmt.Println("Lsa from db(lsa, ret) ", nlsa, ret)
+	lsDbEnt.NetworkLsaMap[*lsaKey] = *networkLsa
+	selfOrigLsaEnt[*lsaKey] = true
+
+	summaryLsa := &SummaryLsa{}
+	decodeSummaryLsa(lsa_summary, summaryLsa, lsaKey)
+	symmaryLsa_byte := encodeSummaryLsa(*summaryLsa, *lsaKey)
+	fmt.Println("Encoded summary LSA ", symmaryLsa_byte)
+	slsa, ret := ospf.getSummaryLsaFromLsdb(lsdbKey.AreaId, *lsaKey)
+	fmt.Println("Lsa from db(lsa, ret) ", slsa, ret)
+	lsDbEnt.Summary3LsaMap[*lsaKey] = *summaryLsa
+	selfOrigLsaEnt[*lsaKey] = true
+
+	asexternalLsa := &ASExternalLsa{}
+	decodeASExternalLsa(lsa_asExt, asexternalLsa, lsaKey)
+	asexternalLsa_byte := encodeASExternalLsa(*asexternalLsa, *lsaKey)
+	fmt.Println("Encoded as external LSA ", asexternalLsa_byte)
+	alsa, ret := ospf.getASExternalLsaFromLsdb(lsdbKey.AreaId, *lsaKey)
+	fmt.Println("Lsa from db(lsa, ret) ", alsa, ret)
+	lsDbEnt.ASExternalLsaMap[*lsaKey] = *asexternalLsa
+	selfOrigLsaEnt[*lsaKey] = true
+
+	ospf.AreaLsdb[lsdbKey] = lsDbEnt
+	ospf.AreaSelfOrigLsa[lsdbKey] = selfOrigLsaEnt
+
+	ospf.processMaxAgeLSA(lsdbKey, lsDbEnt)
 	
-/* LSA sanity checks */
-discard = ospf.lsaAddCheck(lsaHeader, nbrConf)
-
-ospf.lsaReTxTimerCheck(nbrKey)
-
-
-
+	ospf.lsdbStateRefresh()
+	ospf.lsdbSelfLsaRefresh()
 }
