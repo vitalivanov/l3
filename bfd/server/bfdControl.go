@@ -156,25 +156,6 @@ const (
 	BFD_POLL           = 0x20 // Poll message
 )
 
-var BfdControlPacketDefaults = BfdControlPacket{
-	Version:    DEFAULT_BFD_VERSION,
-	Diagnostic: DIAG_NONE,
-	State:      STATE_DOWN,
-	Poll:       false,
-	Final:      false,
-	ControlPlaneIndependent:   false,
-	AuthPresent:               false,
-	Demand:                    false,
-	Multipoint:                false,
-	DetectMult:                DEFAULT_DETECT_MULTI,
-	MyDiscriminator:           0,
-	YourDiscriminator:         0,
-	DesiredMinTxInterval:      DEFAULT_DESIRED_MIN_TX_INTERVAL,
-	RequiredMinRxInterval:     DEFAULT_REQUIRED_MIN_RX_INTERVAL,
-	RequiredMinEchoRxInterval: DEFAULT_REQUIRED_MIN_ECHO_RX_INTERVAL,
-	AuthHeader:                nil,
-}
-
 /*
  * Create a control packet
  */

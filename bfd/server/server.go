@@ -69,11 +69,6 @@ type RibdClient struct {
 	ClientHdl *ribd.RIBDServicesClient
 }
 
-type IpIntfProperty struct {
-	IpAddr  net.IP
-	NetMask []byte
-}
-
 type BfdSessionMgmt struct {
 	DestIp    string
 	ParamName string
