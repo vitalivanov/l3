@@ -240,13 +240,13 @@ var BGPPathAttrTypeFlagsMap = map[BGPPathAttrType][]BGPPathAttrFlag{
 	BGPPathAttrTypeMultiExitDisc:   []BGPPathAttrFlag{BGPPathAttrFlagOptional, BGPPathAttrFlagAllMinusExtendedLen},
 	BGPPathAttrTypeLocalPref:       []BGPPathAttrFlag{BGPPathAttrFlagTransitive, BGPPathAttrFlagAllMinusExtendedLen},
 	BGPPathAttrTypeAtomicAggregate: []BGPPathAttrFlag{BGPPathAttrFlagTransitive, BGPPathAttrFlagAllMinusExtendedLen},
-	BGPPathAttrTypeAggregator:      []BGPPathAttrFlag{BGPPathAttrFlagOptional & BGPPathAttrFlagTransitive, BGPPathAttrFlagAllMinusExtendedLen},
+	BGPPathAttrTypeAggregator:      []BGPPathAttrFlag{BGPPathAttrFlagOptional | BGPPathAttrFlagTransitive, BGPPathAttrFlagAllMinusExtendedLen},
 	BGPPathAttrTypeOriginatorId:    []BGPPathAttrFlag{BGPPathAttrFlagOptional, BGPPathAttrFlagAllMinusExtendedLen},
 	BGPPathAttrTypeClusterList:     []BGPPathAttrFlag{BGPPathAttrFlagOptional, BGPPathAttrFlagAllMinusExtendedLen},
 	BGPPathAttrTypeMPReachNLRI:     []BGPPathAttrFlag{BGPPathAttrFlagOptional, BGPPathAttrFlagAllMinusExtendedLen},
 	BGPPathAttrTypeMPUnreachNLRI:   []BGPPathAttrFlag{BGPPathAttrFlagOptional, BGPPathAttrFlagAllMinusExtendedLen},
-	BGPPathAttrTypeAS4Path:         []BGPPathAttrFlag{BGPPathAttrFlagOptional & BGPPathAttrFlagTransitive, BGPPathAttrFlagAllMinusExtendedLen},
-	BGPPathAttrTypeAS4Aggregator:   []BGPPathAttrFlag{BGPPathAttrFlagOptional & BGPPathAttrFlagTransitive, BGPPathAttrFlagAllMinusExtendedLen},
+	BGPPathAttrTypeAS4Path:         []BGPPathAttrFlag{BGPPathAttrFlagOptional | BGPPathAttrFlagTransitive, BGPPathAttrFlagAllMinusExtendedLen},
+	BGPPathAttrTypeAS4Aggregator:   []BGPPathAttrFlag{BGPPathAttrFlagOptional | BGPPathAttrFlagTransitive, BGPPathAttrFlagAllMinusExtendedLen},
 }
 
 var BGPPathAttrTypeLenMap = map[BGPPathAttrType]uint16{
@@ -255,8 +255,7 @@ var BGPPathAttrTypeLenMap = map[BGPPathAttrType]uint16{
 	BGPPathAttrTypeMultiExitDisc:   4,
 	BGPPathAttrTypeLocalPref:       4,
 	BGPPathAttrTypeAtomicAggregate: 0,
-	BGPPathAttrTypeAggregator:      6,
-	BGPPathAttrTypeAS4Aggregator:   6,
+	BGPPathAttrTypeAS4Aggregator:   8,
 }
 
 type BGPMessageError struct {
@@ -1731,6 +1730,18 @@ func (m *BGPPathAttrMultiExitDisc) New() BGPPathAttr {
 	return &BGPPathAttrMultiExitDisc{}
 }
 
+func NewBGPPathAttrMultiExitDisc() *BGPPathAttrMultiExitDisc {
+	return &BGPPathAttrMultiExitDisc{
+		BGPPathAttrBase: BGPPathAttrBase{
+			Flags:          0x80,
+			Code:           BGPPathAttrTypeMultiExitDisc,
+			Length:         4,
+			BGPPathAttrLen: 3,
+		},
+		Value: 0,
+	}
+}
+
 type BGPPathAttrLocalPref struct {
 	BGPPathAttrBase
 	Value uint32
@@ -1802,15 +1813,90 @@ func NewBGPPathAttrAtomicAggregate() *BGPPathAttrAtomicAggregate {
 	}
 }
 
+type BGPAggregatorAS interface {
+	Clone() BGPAggregatorAS
+	Encode(pkt []byte) error
+	Decode(pkt []byte, data interface{}) error
+	GetLen() uint16
+	GetAS() uint32
+}
+
+type BGPAggregator2ByteAS struct {
+	AS uint16
+}
+
+func (a *BGPAggregator2ByteAS) Clone() BGPAggregatorAS {
+	x := *a
+	return &x
+}
+
+func (a *BGPAggregator2ByteAS) Encode(pkt []byte) error {
+	binary.BigEndian.PutUint16(pkt[:], a.AS)
+	return nil
+}
+
+func (a *BGPAggregator2ByteAS) Decode(pkt []byte, data interface{}) error {
+	if len(pkt) < 2 {
+		return BGPMessageError{BGPUpdateMsgError, BGPAttrLenError, nil, "Not enough data to decode 2 byte Aggregator"}
+	}
+
+	a.AS = binary.BigEndian.Uint16(pkt[:2])
+	return nil
+}
+
+func (a *BGPAggregator2ByteAS) GetLen() uint16 {
+	return 2
+}
+
+func (a *BGPAggregator2ByteAS) GetAS() uint32 {
+	return uint32(a.AS)
+}
+
+func NewBGPAggregator2ByteAS() *BGPAggregator2ByteAS {
+	return &BGPAggregator2ByteAS{}
+}
+
+type BGPAggregator4ByteAS struct {
+	AS uint32
+}
+
+func (a *BGPAggregator4ByteAS) Clone() BGPAggregatorAS {
+	x := *a
+	return &x
+}
+
+func (a *BGPAggregator4ByteAS) Encode(pkt []byte) error {
+	binary.BigEndian.PutUint32(pkt[:], a.AS)
+	return nil
+}
+
+func (a *BGPAggregator4ByteAS) Decode(pkt []byte, data interface{}) error {
+	a.AS = binary.BigEndian.Uint32(pkt[:4])
+	return nil
+}
+
+func (a *BGPAggregator4ByteAS) GetLen() uint16 {
+	return 4
+}
+
+func (a *BGPAggregator4ByteAS) GetAS() uint32 {
+	return a.AS
+}
+
+func NewBGPAggregator4ByteAS() *BGPAggregator4ByteAS {
+	return &BGPAggregator4ByteAS{}
+}
+
 type BGPPathAttrAggregator struct {
 	BGPPathAttrBase
-	AS uint16
+	AS BGPAggregatorAS
 	IP net.IP
 }
 
 func (a *BGPPathAttrAggregator) Clone() BGPPathAttr {
 	x := *a
 	x.BGPPathAttrBase = a.BGPPathAttrBase.Clone()
+	x.AS = a.AS.Clone()
 	x.IP = make(net.IP, len(a.IP), cap(a.IP))
 	copy(x.IP, a.IP)
 	return &x
@@ -1822,8 +1908,12 @@ func (a *BGPPathAttrAggregator) Encode() ([]byte, error) {
 		return pkt, err
 	}
 
-	binary.BigEndian.PutUint16(pkt[a.BGPPathAttrBase.BGPPathAttrLen:], a.AS)
-	copy(pkt[a.BGPPathAttrBase.BGPPathAttrLen+2:], a.IP)
+	err = a.AS.Encode(pkt[a.BGPPathAttrLen:])
+	if err != nil {
+		return pkt, err
+	}
+
+	copy(pkt[a.BGPPathAttrBase.BGPPathAttrLen+a.AS.GetLen():], a.IP)
 	return pkt, nil
 }
 
@@ -1833,9 +1923,27 @@ func (a *BGPPathAttrAggregator) Decode(pkt []byte, data interface{}) error {
 		return err
 	}
 
-	a.AS = binary.BigEndian.Uint16(pkt[a.BGPPathAttrLen : a.BGPPathAttrLen+2])
+	peerAttrs := data.(BGPPeerAttrs)
+	asSize := peerAttrs.ASSize
+	if a.BGPPathAttrBase.Length < uint16(asSize+4) {
+		return BGPMessageError{BGPUpdateMsgError, BGPAttrLenError, pkt[:a.BGPPathAttrBase.TotalLen()], "Bad Attribute Length"}
+	}
+
+	var aggAS BGPAggregatorAS
+	if asSize == 2 {
+		aggAS = NewBGPAggregator2ByteAS()
+	} else {
+		aggAS = NewBGPAggregator4ByteAS()
+	}
+
+	err = aggAS.Decode(pkt[a.BGPPathAttrLen:], data)
+	if err != nil {
+		return err
+	}
+
+	a.AS = aggAS
 	a.IP = make(net.IP, 4)
-	copy(a.IP, pkt[a.BGPPathAttrLen+2:a.BGPPathAttrLen+6])
+	copy(a.IP, pkt[a.BGPPathAttrLen+a.AS.GetLen():])
 	return nil
 }
 
@@ -1843,28 +1951,34 @@ func (a *BGPPathAttrAggregator) New() BGPPathAttr {
 	return &BGPPathAttrAggregator{}
 }
 
+func (a *BGPPathAttrAggregator) SetBGPAggregatorAS(aggAS BGPAggregatorAS) {
+	a.AS = aggAS
+	a.Length += aggAS.GetLen()
+}
+
 func NewBGPPathAttrAggregator() *BGPPathAttrAggregator {
 	return &BGPPathAttrAggregator{
 		BGPPathAttrBase: BGPPathAttrBase{
 			Flags:          BGPPathAttrFlagTransitive | BGPPathAttrFlagOptional,
 			Code:           BGPPathAttrTypeAggregator,
-			Length:         6,
+			Length:         4,
 			BGPPathAttrLen: 3,
 		},
-		AS: 0,
 		IP: net.IP{},
 	}
 }
 
 type BGPPathAttrAS4Aggregator struct {
 	BGPPathAttrBase
-	AS uint32
+	AS *BGPAggregator4ByteAS
 	IP net.IP
 }
 
 func (a *BGPPathAttrAS4Aggregator) Clone() BGPPathAttr {
 	x := *a
 	x.BGPPathAttrBase = a.BGPPathAttrBase.Clone()
+	aggAS := a.AS.Clone()
+	x.AS = aggAS.(*BGPAggregator4ByteAS)
 	x.IP = make(net.IP, len(a.IP), cap(a.IP))
 	copy(x.IP, a.IP)
 	return &x
@@ -1876,8 +1990,12 @@ func (a *BGPPathAttrAS4Aggregator) Encode() ([]byte, error) {
 		return pkt, err
 	}
 
-	binary.BigEndian.PutUint32(pkt[a.BGPPathAttrBase.BGPPathAttrLen:], a.AS)
-	copy(pkt[a.BGPPathAttrBase.BGPPathAttrLen+4:], a.IP)
+	err = a.AS.Encode(pkt[a.BGPPathAttrLen:])
+	if err != nil {
+		return pkt, err
+	}
+
+	copy(pkt[a.BGPPathAttrBase.BGPPathAttrLen+a.AS.GetLen():], a.IP)
 	return pkt, nil
 }
 
@@ -1887,9 +2005,15 @@ func (a *BGPPathAttrAS4Aggregator) Decode(pkt []byte, data interface{}) error {
 		return err
 	}
 
-	a.AS = binary.BigEndian.Uint32(pkt[a.BGPPathAttrLen : a.BGPPathAttrLen+4])
+	aggAS := NewBGPAggregator4ByteAS()
+	err = aggAS.Decode(pkt[a.BGPPathAttrLen:], data)
+	if err != nil {
+		return err
+	}
+
+	a.AS = aggAS
 	a.IP = make(net.IP, 4)
-	copy(a.IP, pkt[a.BGPPathAttrLen+4:a.BGPPathAttrLen+8])
+	copy(a.IP, pkt[a.BGPPathAttrLen+a.AS.GetLen():])
 	return nil
 }
 
@@ -1897,15 +2021,20 @@ func (a *BGPPathAttrAS4Aggregator) New() BGPPathAttr {
 	return &BGPPathAttrAS4Aggregator{}
 }
 
+func (a *BGPPathAttrAS4Aggregator) SetBGPAggregatorAS(aggAS *BGPAggregator4ByteAS) {
+	a.AS = aggAS
+}
+
 func NewBGPPathAttrAS4Aggregator() *BGPPathAttrAS4Aggregator {
+	aggAS := &BGPAggregator4ByteAS{}
 	return &BGPPathAttrAS4Aggregator{
 		BGPPathAttrBase: BGPPathAttrBase{
 			Flags:          BGPPathAttrFlagTransitive | BGPPathAttrFlagOptional,
 			Code:           BGPPathAttrTypeAS4Aggregator,
-			Length:         8,
+			Length:         aggAS.GetLen() + 4,
 			BGPPathAttrLen: 3,
 		},
-		AS: 0,
+		AS: aggAS,
 		IP: net.IP{},
 	}
 }
@@ -2122,8 +2251,8 @@ func NewBGPPathAttrMPReachNLRI() *BGPPathAttrMPReachNLRI {
 
 type BGPPathAttrMPUnreachNLRI struct {
 	BGPPathAttrBase
-	AFI  uint16
-	SAFI uint8
+	AFI  AFI
+	SAFI SAFI
 	NLRI [][]byte
 }
 
@@ -2145,9 +2274,9 @@ func (u *BGPPathAttrMPUnreachNLRI) Encode() ([]byte, error) {
 	}
 	idx := int(u.BGPPathAttrBase.BGPPathAttrLen)
 
-	binary.BigEndian.PutUint16(pkt[idx:idx+2], u.AFI)
+	binary.BigEndian.PutUint16(pkt[idx:idx+2], uint16(u.AFI))
 	idx += 2
-	pkt[idx] = u.SAFI
+	pkt[idx] = uint8(u.SAFI)
 	idx++
 
 	for i := 0; i < len(u.NLRI); i++ {
@@ -2164,8 +2293,8 @@ func (u *BGPPathAttrMPUnreachNLRI) Decode(pkt []byte, data interface{}) error {
 	}
 
 	idx := int(u.BGPPathAttrBase.BGPPathAttrLen)
-	u.AFI = binary.BigEndian.Uint16(pkt[idx : idx+2])
-	u.SAFI = pkt[idx+2]
+	u.AFI = AFI(binary.BigEndian.Uint16(pkt[idx : idx+2]))
+	u.SAFI = SAFI(pkt[idx+2])
 	idx += 2
 
 	u.NLRI = make([][]byte, 0)

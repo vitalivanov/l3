@@ -100,3 +100,17 @@ func TestBGPUpdateMessageNLRILenMoreThanMaxAllowed(t *testing.T) {
 		}
 	}
 }
+
+func TestBGPUpdateForConnectedRoutes(t *testing.T) {
+	ip := net.ParseIP("10.1.10.1")
+	pa := ConstructPathAttrForConnRoutes(ip, 1234)
+	nlri := make([]NLRI, 0)
+	dest := ConstructIPPrefix("20.1.20.0", "255.255.255.0")
+	nlri = append(nlri, dest)
+	dest, err := ConstructIPPrefixFromCIDR("30.1.10.10/16")
+	if err != nil {
+		t.Error("ConstructIPPrefixFromCIDR failed with error:", err)
+	}
+	nlri = append(nlri, dest)
+	NewBGPUpdateMessage(make([]NLRI, 0), pa, nlri)
+}
