@@ -186,6 +186,8 @@ func validateICMPv6Hdr(hdr *layers.ICMPv6, srcIP net.IP, dstIP net.IP) error {
 
 	case layers.ICMPv6TypeRouterSolicitation:
 		return errors.New("Router Solicitation is not yet supported")
+	default:
+		return errors.New(fmt.Sprintln("Not Supported ICMPv6 Type:", typeCode.Type()))
 	}
 	return nil
 }
@@ -246,14 +248,14 @@ func ValidateAndParse(nbrInfo *config.NeighborInfo, pkt gopacket.Packet) error {
 		return err
 	}
 
-	// Validating checksum received
-	err = validateChecksum(ipv6Hdr, icmpv6Hdr)
+	// Validating icmpv6 header
+	err = validateICMPv6Hdr(icmpv6Hdr, ipv6Hdr.SrcIP, ipv6Hdr.DstIP)
 	if err != nil {
 		return err
 	}
 
-	// Validating icmpv6 header
-	err = validateICMPv6Hdr(icmpv6Hdr, ipv6Hdr.SrcIP, ipv6Hdr.DstIP)
+	// Validating checksum received
+	err = validateChecksum(ipv6Hdr, icmpv6Hdr)
 	if err != nil {
 		return err
 	}

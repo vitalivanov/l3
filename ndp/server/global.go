@@ -30,10 +30,7 @@ import (
 )
 
 const (
-	NDP_PORT_STATE_UP   = "UP"
-	NDP_PORT_STATE_DOWN = "DOWN"
-	NDP_IP_STATE_UP     = "UP"
-	NDP_IP_STATE_DOWN   = "DOWN"
+	INTF_REF_NOT_FOUND = "Not Found"
 )
 
 type RxPktInfo struct {
@@ -45,13 +42,20 @@ type NDPServer struct {
 	SwitchPlugin asicdClient.AsicdClientIntf
 
 	// System Ports information, key is IntfRef
-	PhyPort            map[int32]config.PortInfo
-	L3Port             map[int32]config.IPv6IntfInfo
-	VlanInfo           map[int32]config.VlanInfo
-	VlanIfIdxVlanIdMap map[int32]int32 //reverse map for ifIndex ----> vlanId, used during ipv6 neig create
+	PhyPort             map[int32]config.PortInfo     // key is l2 ifIndex
+	L3Port              map[int32]config.IPv6IntfInfo // key is l3 ifIndex
+	VlanInfo            map[int32]config.VlanInfo     // key is vlanId
+	VlanIfIdxVlanIdMap  map[int32]int32               //reverse map for ifIndex ----> vlanId, used during ipv6 neig create
+	SwitchMacMapEntries map[string]bool               // cache entry for all mac addresses on a switch
 
+	// Physical Port/ L2 Port State Notification
+	PhyPortStateCh chan *config.StateNotification
 	//IPV6 Create/Delete Notification Channel
-	Ipv6Ch chan *config.IPv6IntfInfo
+	IpIntfCh chan *config.IPIntfNotification
+	// IPv6 Up/Down Notification Channel
+	IpStateCh chan *config.StateNotification
+	// Vlan Create/Delete/Update Notification Channel
+	VlanCh chan *config.VlanNotification
 	//Received Pkt Channel
 	RxPktCh chan *RxPktInfo
 

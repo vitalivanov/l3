@@ -20,62 +20,51 @@
 // |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
 // |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
 //
-package api
+
+package server
 
 import (
-	"l3/ndp/config"
-	"l3/ndp/server"
-	"sync"
+	"fmt"
+	"infra/sysd/sysdCommonDefs"
+	"log/syslog"
+	"utils/dbutils"
+	"utils/logging"
 )
 
-var ndpApi *NDPApiLayer = nil
-var once sync.Once
+var routeServer *RIBDServer
 
-type NDPApiLayer struct {
-	server *server.NDPServer
-}
+func RIBdNewLogger(name string, tag string) (*logging.Writer, error) {
+	var err error
+	srLogger := new(logging.Writer)
+	srLogger.MyComponentName = name
 
-/*  Singleton instance should be accessible only within api
- */
-func getApiInstance() *NDPApiLayer {
-	once.Do(func() {
-		ndpApi = &NDPApiLayer{}
-	})
-	return ndpApi
-}
-
-func Init(svr *server.NDPServer) {
-	ndpApi = getApiInstance()
-	ndpApi.server = svr
-}
-
-func SendL2PortNotification(ifIndex int32, state string) {
-	ndpApi.server.PhyPortStateCh <- &config.StateNotification{
-		IfIndex: ifIndex,
-		State:   state,
+	srLogger.SysLogger, err = syslog.New(syslog.LOG_INFO|syslog.LOG_DAEMON, tag)
+	if err != nil {
+		fmt.Println("Failed to initialize syslog - ", err)
+		return srLogger, err
 	}
+
+	srLogger.GlobalLogging = true
+	srLogger.MyLogLevel = sysdCommonDefs.DEBUG
+	return srLogger, err
 }
 
-func SendL3PortNotification(ifIndex int32, state string) {
-	ndpApi.server.IpStateCh <- &config.StateNotification{
-		IfIndex: ifIndex,
-		State:   state,
+func getServerObject() *RIBDServer {
+	logger, err := RIBdNewLogger("ribd", "RIBDTEST")
+	if err != nil {
+		fmt.Println("ribdtest: creating logger failed")
 	}
-}
-
-func SendVlanNotification(oper string, vlanId int32, vlanName string, untagPorts []int32) {
-	ndpApi.server.VlanCh <- &config.VlanNotification{
-		Operation:  oper,
-		VlanId:     vlanId,
-		VlanName:   vlanName,
-		UntagPorts: untagPorts,
+	dbHdl := dbutils.NewDBUtil(logger)
+	err = dbHdl.Connect()
+	if err != nil {
+		logger.Err("Failed to dial out to Redis server")
+		return nil
 	}
-}
-
-func SendIPIntfNotfication(ifIndex int32, ipaddr, msgType string) {
-	ndpApi.server.IpIntfCh <- &config.IPIntfNotification{
-		IfIndex:   ifIndex,
-		IpAddr:    ipaddr,
-		Operation: msgType,
+	server := NewRIBDServicesHandler(dbHdl, logger)
+	if server == nil {
+		fmt.Sprintln("ribd server object is null ")
+		return nil
 	}
+	routeServer = server
+	return server
 }

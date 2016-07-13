@@ -30,7 +30,7 @@ import (
 	"testing"
 )
 
-func _initNbrTestParams() {
+func initNbrTestParams() {
 	fmt.Println("\n Get Server object")
 	ospf = getServerObject()
 	initAttr()
@@ -38,7 +38,7 @@ func _initNbrTestParams() {
 	ospf.InitNeighborStateMachine()
 }
 
-func _TestOspfNbrFSM(t *testing.T) {
+func TestOspfNbrFSM(t *testing.T) {
 	fmt.Println("\n**************** NEIGHBOR FSM ************\n")
 	initNbrTestParams()
 	for index := 1; index < 21; index++ {
@@ -49,7 +49,7 @@ func _TestOspfNbrFSM(t *testing.T) {
 	}
 }
 
-func _nbrFSMTestLogic(tNum int) int {
+func nbrFSMTestLogic(tNum int) int {
 	ospf.initDefaultIntfConf(key, ipIntfProp, ifType)
 	ospf.updateGlobalConf(gConf)
 	switch tNum {
@@ -60,52 +60,43 @@ func _nbrFSMTestLogic(tNum int) int {
 		ospf.neighborConfCh <- nbrConfMsg
 		ospf.neighborConfStopCh <- true
 
-	case 2:
 		fmt.Println(tNum, ": Running updateLSALists")
 		updateLSALists(nbrKey)
 
-	case 3:
 		fmt.Println(tNum, ": Running initNeighborMdata")
 		ospf.initNeighborMdata(key)
 
-	case 4:
 		fmt.Println(tNum, ": Running updateNeighborMdata")
 		ospf.updateNeighborMdata(key, nbrKey)
 
-	case 5:
 		fmt.Println(tNum, ": Running resetNeighborLists")
 		ospf.IntfConfMap[key] = intf
 		ospf.resetNeighborLists(nbrKey, key)
 
-	case 6:
 		fmt.Println(tNum, ": Running UpdateNeighborList")
 		ospf.IntfConfMap[key] = intf
 		go ospf.UpdateNeighborConf()
 		ospf.UpdateNeighborList(nbrKey)
 		ospf.neighborConfStopCh <- true
 
-	case 7:
 		fmt.Println(tNum, ": Running exchangePacketDiscardCheck")
 		discard := ospf.exchangePacketDiscardCheck(ospfNbrEntry, nbrDbPkt)
 		if discard {
 			fmt.Println("NbrTest : Packet discarded. ")
 		}
 
-	case 8:
 		fmt.Println(tNum, ": Running verifyDuplicatePacket")
 		isdDup := ospf.verifyDuplicatePacket(ospfNbrEntry, nbrDbPkt)
 		if isdDup {
 			fmt.Println("NbrTest: Packet is duplicate.")
 		}
 
-	case 9:
 		fmt.Println(tNum, ": Running adjacancyEstablishementCheck")
 		ok := ospf.adjacancyEstablishementCheck(false, false)
 		if !ok {
 			fmt.Println("NbrTest: Dont establish adjacency as its neither DR or BDR.")
 		}
 
-	case 10:
 		ospf.IntfConfMap[key] = intf
 		go ospf.UpdateNeighborConf()
 		nbrConfMsg.ospfNbrEntry.OspfNbrState = config.NbrExchangeStart
@@ -117,7 +108,6 @@ func _nbrFSMTestLogic(tNum int) int {
 		ospf.processNeighborExstart(nbrKey, ospfNbrEntry, nbrDbPkt)
 		ospf.neighborConfStopCh <- true
 
-	case 11:
 		fmt.Println(tNum, ": Running processDBDEvent exstart")
 		ospfNbrEntry.OspfNbrState = config.NbrExchangeStart
 
@@ -130,7 +120,6 @@ func _nbrFSMTestLogic(tNum int) int {
 		ospf.NeighborConfigMap[nbrKey] = ospfNbrEntry
 		ospf.processDBDEvent(nbrKey, nbrDbPkt)
 
-	case 12:
 		fmt.Println(tNum, ": Running processDBDEvent exchange")
 		ospfNbrEntry.OspfNbrState = config.NbrExchange
 
@@ -141,7 +130,6 @@ func _nbrFSMTestLogic(tNum int) int {
 		ospf.NeighborConfigMap[nbrKey] = ospfNbrEntry
 		ospf.processDBDEvent(nbrKey, nbrDbPkt)
 
-	case 13:
 		fmt.Println(tNum, ": Running processDBDEvent NbrLoading")
 		ospfNbrEntry.OspfNbrState = config.NbrLoading
 		ospfNbrEntry.ospfNbrSeqNum = 2002
@@ -151,7 +139,6 @@ func _nbrFSMTestLogic(tNum int) int {
 		ospf.NeighborConfigMap[nbrKey] = ospfNbrEntry
 		ospf.processDBDEvent(nbrKey, nbrDbPkt)
 
-	case 14:
 		fmt.Println(tNum, ": Running processDBDEvent NbrFull")
 		ospfNbrEntry.OspfNbrState = config.NbrFull
 		ospfNbrEntry.ospfNbrSeqNum = 2002
@@ -161,7 +148,6 @@ func _nbrFSMTestLogic(tNum int) int {
 		ospf.NeighborConfigMap[nbrKey] = ospfNbrEntry
 		ospf.processDBDEvent(nbrKey, nbrDbPkt)
 
-	case 15:
 		fmt.Println(tNum, ": Running ProcessNbrStateMachine")
 		go ospf.ProcessNbrStateMachine()
 		ospf.neighborHelloEventCh <- nbrIntfMsg
@@ -179,7 +165,6 @@ func _nbrFSMTestLogic(tNum int) int {
 		fmt.Println("Stop nbr processing routine ")
 		ospf.neighborFSMCtrlCh <- false
 
-	case 16:
 		fmt.Println(tNum, ": Running ProcessRxNbrPkt ")
 		go ospf.ProcessRxNbrPkt()
 		ospfNbrEntry.OspfNbrState = config.NbrFull

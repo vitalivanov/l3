@@ -20,62 +20,70 @@
 // |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
 // |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
 //
-package api
+
+package server
 
 import (
-	"l3/ndp/config"
-	"l3/ndp/server"
-	"sync"
+        "fmt"
+     //   "l3/ospf/config"
+        "testing"
 )
 
-var ndpApi *NDPApiLayer = nil
-var once sync.Once
-
-type NDPApiLayer struct {
-	server *server.NDPServer
+func initDBTestParams() {
+        fmt.Println("\n Get Server object")
+        ospf = getServerObject()
+        initAttr()
+        go startDummyChannels(ospf)
+	//fmt.Println(" Initialize db ")
+	//ospf.InitializeDB()
+	fmt.Println(" Init DB channels. ")
+	ospf.InitDBChannels()
+	fmt.Println("Start DB listener ")
+	go ospf.StartDBListener()
 }
 
-/*  Singleton instance should be accessible only within api
- */
-func getApiInstance() *NDPApiLayer {
-	once.Do(func() {
-		ndpApi = &NDPApiLayer{}
-	})
-	return ndpApi
+func TestOspfDB(t *testing.T) {
+        fmt.Println("\n**************** STATE DB ************\n")
+        initDBTestParams()
+        for index := 1; index < 21; index++ {
+                err := dbTestLogic(index)
+                if err != SUCCESS {
+                        fmt.Println("Failed test case for state db")
+                }
+        }
 }
 
-func Init(svr *server.NDPServer) {
-	ndpApi = getApiInstance()
-	ndpApi.server = svr
-}
+func dbTestLogic(tNum int) int {
 
-func SendL2PortNotification(ifIndex int32, state string) {
-	ndpApi.server.PhyPortStateCh <- &config.StateNotification{
-		IfIndex: ifIndex,
-		State:   state,
+	switch tNum {
+	case 1:
+	fmt.Println(tNum, ": Running DbReadConfig ")
+	ospf.DbReadConfig <- true
+
+	case 2:
+	fmt.Println(tNum, ": Running DbRouteOp ")
+	msg := DbRouteMsg{ 
+		entry: rKey,
+		op: true,
 	}
+
+	ospf.DbRouteOp<-msg
+	
+	case 3:
+	ospf.DbLsdbOp <- lsdbMsg
+	
+	case 4:
+	ospf.DbEventOp <- eventMsg
+
+	case 5:
+	fmt.Println(tNum, ": Running ReadOspfCfgFromDB ")
+	ospf.ReadOspfCfgFromDB()
+
+	case 6:
+	fmt.Println(tNum, "applyOspfGlobalConf ")
+	//ospf.applyOspfGlobalConf(gConf)
+	}
+	
+return SUCCESS	
 }
 
-func SendL3PortNotification(ifIndex int32, state string) {
-	ndpApi.server.IpStateCh <- &config.StateNotification{
-		IfIndex: ifIndex,
-		State:   state,
-	}
-}
-
-func SendVlanNotification(oper string, vlanId int32, vlanName string, untagPorts []int32) {
-	ndpApi.server.VlanCh <- &config.VlanNotification{
-		Operation:  oper,
-		VlanId:     vlanId,
-		VlanName:   vlanName,
-		UntagPorts: untagPorts,
-	}
-}
-
-func SendIPIntfNotfication(ifIndex int32, ipaddr, msgType string) {
-	ndpApi.server.IpIntfCh <- &config.IPIntfNotification{
-		IfIndex:   ifIndex,
-		IpAddr:    ipaddr,
-		Operation: msgType,
-	}
-}

@@ -28,9 +28,6 @@ import (
 	"fmt"
 	"l3/rib/rpc"
 	"l3/rib/server"
-	"os"
-	"os/signal"
-	"syscall"
 	"utils/dbutils"
 	"utils/keepalive"
 	"utils/logging"
@@ -63,16 +60,6 @@ func main() {
 		logger.Println("routeServer nil")
 		return
 	}
-	sigChan := make(chan os.Signal, 1)
-	signalList := []os.Signal{syscall.SIGHUP}
-	signal.Notify(sigChan, signalList...)
-	go routeServer.SigHandler(sigChan)
-	go routeServer.StartRouteProcessServer()
-	go routeServer.StartDBServer()
-	go routeServer.StartPolicyServer()
-	go routeServer.NotificationServer()
-	go routeServer.StartAsicdServer()
-	go routeServer.StartArpdServer()
 	go routeServer.StartServer(*paramsDir)
 	up := <-routeServer.ServerUpCh
 	//dbHdl.Close()

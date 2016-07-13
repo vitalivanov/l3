@@ -27,6 +27,14 @@ import (
 	"github.com/google/gopacket/pcap"
 )
 
+const (
+	STATE_UP      = "UP"
+	STATE_DOWN    = "DOWN"
+	CONFIG_CREATE = "CREATE"
+	CONFIG_DELETE = "DELETE"
+	CONFIG_UPDATE = "UPDATE"
+)
+
 type PcapBase struct {
 	// Pcap Handler for Each Port
 	PcapHandle *pcap.Handle
@@ -57,6 +65,17 @@ type IPv6IntfInfo struct {
 	MsgType   string
 }
 
+type IPIntfNotification struct {
+	IfIndex   int32
+	IpAddr    string
+	Operation string
+}
+
+type StateNotification struct {
+	IfIndex int32
+	State   string
+}
+
 type NeighborInfo struct {
 	IpAddr  string
 	MacAddr string
@@ -69,4 +88,11 @@ type VlanInfo struct {
 	Name          string       // vlan name
 	UntagPortsMap map[int]bool // key is port ifIndex
 	OperState     string
+}
+
+type VlanNotification struct {
+	VlanId     int32
+	VlanName   string
+	Operation  string
+	UntagPorts []int32
 }

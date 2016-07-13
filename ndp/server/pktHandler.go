@@ -36,6 +36,10 @@ import (
  */
 func (svr *NDPServer) ReceivedNdpPkts(ifIndex int32) {
 	ipPort, _ := svr.L3Port[ifIndex]
+	if ipPort.PcapBase.PcapHandle == nil {
+		debug.Logger.Err(fmt.Sprintln("pcap handler for port:", ipPort.IntfRef, "is not valid. ABORT!!!!"))
+		return
+	}
 	src := gopacket.NewPacketSource(ipPort.PcapBase.PcapHandle, layers.LayerTypeEthernet)
 	in := src.Packets()
 	for {
@@ -46,7 +50,7 @@ func (svr *NDPServer) ReceivedNdpPkts(ifIndex int32) {
 			}
 			svr.RxPktCh <- &RxPktInfo{pkt, ipPort.IfIndex}
 		case <-ipPort.PcapBase.PcapCtrl:
-			svr.DeletePcapHandler(ipPort.PcapBase.PcapHandle)
+			svr.DeletePcapHandler(&ipPort.PcapBase.PcapHandle)
 			svr.L3Port[ifIndex] = ipPort
 			ipPort.PcapBase.PcapCtrl <- true
 			return
@@ -60,24 +64,31 @@ func (svr *NDPServer) ReceivedNdpPkts(ifIndex int32) {
  *		       c) Create Pcap Handler & add the entry to up interface slice
  *		       d) Start receiving Packets
  */
-func (svr *NDPServer) StartRxTx(msg *config.IPv6IntfInfo) {
-	ipPort, exists := svr.L3Port[msg.IfIndex]
+func (svr *NDPServer) StartRxTx(ifIndex int32) {
+	ipPort, exists := svr.L3Port[ifIndex]
 	if !exists {
 		// This will copy msg (intRef, ifIndex, ipAddr) into ipPort
 		// And also create an entry into the ndpL3IntfStateSlice
-		svr.InitSystemIPIntf(&ipPort, msg)
-	}
-	err := svr.CreatePcapHandler(ipPort.IntfRef, ipPort.PcapBase.PcapHandle)
-	if err != nil {
+		debug.Logger.Err(fmt.Sprintln("Starting RX/TX for interface which was not created, ifIndex:",
+			ifIndex, "is not allowed"))
 		return
 	}
-	svr.L3Port[msg.IfIndex] = ipPort
+	svr.L3Port[ifIndex] = ipPort
+	// create pcap handler if there is none created right now
+	if ipPort.PcapBase.PcapHandle == nil {
+		var err error
+		ipPort.PcapBase.PcapHandle, err = svr.CreatePcapHandler(ipPort.IntfRef)
+		if err != nil {
+			return
+		}
+		svr.L3Port[ifIndex] = ipPort
+	}
 	debug.Logger.Info(fmt.Sprintln("Start rx/tx for port:", ipPort.IntfRef, "ifIndex:", ipPort.IfIndex,
 		"ip address", ipPort.IpAddr))
 
 	// Spawn go routines for rx & tx
 	go svr.ReceivedNdpPkts(ipPort.IfIndex)
-	svr.ndpUpL3IntfStateSlice = append(svr.ndpUpL3IntfStateSlice, msg.IfIndex)
+	svr.ndpUpL3IntfStateSlice = append(svr.ndpUpL3IntfStateSlice, ifIndex)
 }
 
 /*
@@ -102,6 +113,16 @@ func (svr *NDPServer) StopRxTx(ifIndex int32) {
 }
 
 /*
+ *	CheckSrcMac
+ *		        a) Check for packet src mac and validate it against ifIndex mac addr
+ *			    if it is same then discard the packet
+ */
+func (svr *NDPServer) CheckSrcMac(macAddr string) bool {
+	_, exists := svr.SwitchMacMapEntries[macAddr]
+	return exists
+}
+
+/*
  *	ProcessRxPkt
  *		        a) Check for runtime information
  *			b) Validate & Parse Pkt, which gives ipAddr, MacAddr
@@ -115,13 +136,19 @@ func (svr *NDPServer) ProcessRxPkt(ifIndex int32, pkt gopacket.Packet) {
 		return
 	}
 	nbrInfo := &config.NeighborInfo{}
+	debug.Logger.Info("Processing RX Pkt")
 	err := packet.ValidateAndParse(nbrInfo, pkt)
 	if err != nil {
-		debug.Logger.Err(fmt.Sprintln("Validating Pkt Failed:", err))
+		debug.Logger.Err(fmt.Sprintln("Validating and parsing Pkt Failed:", err))
 		return
 	}
-
+	switchMac := svr.CheckSrcMac(nbrInfo.MacAddr)
+	if switchMac {
+		debug.Logger.Info(fmt.Sprintln("Received Packet from same port and hence ignoring the packet:", nbrInfo))
+		return
+	}
 	svr.PopulateVlanInfo(nbrInfo, ifIndex)
+	debug.Logger.Info(fmt.Sprintln("Calling create ipv6 neighgor and nbrinfo is", nbrInfo))
 	// ipaddr, macAddr, vlanId, ifIndex
 	_, err = svr.SwitchPlugin.CreateIPv6Neighbor(nbrInfo.IpAddr, nbrInfo.MacAddr, nbrInfo.VlanId, nbrInfo.IfIndex)
 	if err != nil {

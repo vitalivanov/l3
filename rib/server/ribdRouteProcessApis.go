@@ -1347,7 +1347,18 @@ func createRoute(ipType IPType, destNetIp string,
 	routePrototype := int8(routeType)
 	nwAddr := (destNetIpAddr.Mask(net.IPMask(networkMaskAddr))).String() + "/" + strconv.Itoa(prefixLen)
 	logger.Debug(fmt.Sprintln("nwAddr:", nwAddr))
-	routeInfoRecord := RouteInfoRecord{ipType: ipType, destNetIp: destNetIpAddr, networkMask: networkMaskAddr, protocol: routePrototype, nextHopIp: nextHopIpAddr, networkAddr: nwAddr, nextHopIfIndex: nextHopIfIndex, metric: metric, sliceIdx: int(sliceIdx), weight: weight}
+	routeInfoRecord := RouteInfoRecord{
+		ipType:         ipType,
+		destNetIp:      destNetIpAddr,
+		networkMask:    networkMaskAddr,
+		protocol:       routePrototype,
+		nextHopIp:      nextHopIpAddr,
+		networkAddr:    nwAddr,
+		nextHopIfIndex: nextHopIfIndex,
+		metric:         metric,
+		sliceIdx:       int(sliceIdx),
+		weight:         weight,
+	}
 
 	policyRoute := ribdInt.Routes{Ipaddr: destNetIp, Mask: networkMask, NextHopIp: nextHopIp, IfIndex: ribdInt.Int(nextHopIfIndex), Metric: ribdInt.Int(metric), Prototype: ribdInt.Int(routeType), Weight: ribdInt.Int(weight)}
 	routeInfoRecord.resolvedNextHopIpIntf.NextHopIp = routeInfoRecord.nextHopIp.String()
@@ -1670,6 +1681,7 @@ func (m RIBDServer) ProcessRoutePatchUpdateConfig(origconfig *ribd.IPv4Route, ne
 			}
 		default:
 			logger.Err(fmt.Sprintln("Patch update for attribute:", op[idx].Path, " not supported"))
+			err = errors.New(fmt.Sprintln("Operation ", op[idx].Op, " not supported"))
 		}
 	}
 	return ret, err
@@ -1702,7 +1714,7 @@ func (m RIBDServer) ProcessRouteUpdateConfig(origconfig *ribd.IPv4Route, newconf
 		found, routeInfoRecord, index := findRouteWithNextHop(routeInfoRecordList.routeInfoProtocolMap[origconfig.Protocol], origconfig.NextHop[0].NextHopIp)
 		if !found || index == -1 {
 			logger.Debug("Invalid nextHopIP")
-			return val, err
+			return val, errors.New(fmt.Sprintln("Invalid Next Hop IP:", origconfig.NextHop[0].NextHopIp))
 		}
 		objTyp := reflect.TypeOf(*origconfig)
 		for i := 0; i < objTyp.NumField(); i++ {

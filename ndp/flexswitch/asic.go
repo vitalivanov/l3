@@ -25,6 +25,7 @@ package flexswitch
 import (
 	"asicd/asicdCommonDefs"
 	"l3/ndp/api"
+	"l3/ndp/config"
 	"sync"
 	"utils/commonDefs"
 )
@@ -74,37 +75,44 @@ func (notifyHdl *AsicNotificationHdl) ProcessNotification(msg commonDefs.AsicdNo
 	case commonDefs.L2IntfStateNotifyMsg:
 		l2Msg := msg.(commonDefs.L2IntfStateNotifyMsg)
 		if l2Msg.IfState == asicdCommonDefs.INTF_STATE_UP {
-			api.SendL2PortNotification(l2Msg.IfIndex, "UP")
+			api.SendL2PortNotification(l2Msg.IfIndex, config.STATE_UP)
 		} else {
-			api.SendL2PortNotification(l2Msg.IfIndex, "UP")
+			api.SendL2PortNotification(l2Msg.IfIndex, config.STATE_DOWN)
 		}
 	case commonDefs.L3IntfStateNotifyMsg:
 		l3Msg := msg.(commonDefs.L3IntfStateNotifyMsg)
 		if l3Msg.IfState == asicdCommonDefs.INTF_STATE_UP {
-			api.SendL3PortNotification(l3Msg.IfIndex, "UP")
+			api.SendL3PortNotification(l3Msg.IfIndex, config.STATE_UP)
 		} else {
-			api.SendL3PortNotification(l3Msg.IfIndex, "UP")
+			api.SendL3PortNotification(l3Msg.IfIndex, config.STATE_DOWN)
 		}
 	case commonDefs.VlanNotifyMsg:
 		/*
-			vlanMsg := msg.(commonDefs.VlanNotifyMsg)
-			if vlanMsg.IfState == asicdCommonDefs.INTF_STATE_UP {
-				api.SendVlanNotification(vlanMsg.VlanId, vlanMsg.VlanName, "UP")
-			} else {
-				api.SendVlanNotification(vlanMsg.VlanId, vlanMsg.VlanName, "UP")
+			type VlanNotifyMsg struct {
+				MsgType    uint8
+				VlanId     uint16
+				VlanName   string
+				TagPorts   []int32
+				UntagPorts []int32
 			}
 		*/
-		break
-	//case commonDefs.LagNotifyMsg:
-	//	lagMsg := msg.(commonDefs.LagNotifyMsg)
+		vlanMsg := msg.(commonDefs.VlanNotifyMsg)
+		oper := ""
+		switch vlanMsg.MsgType {
+		case commonDefs.NOTIFY_VLAN_CREATE:
+			oper = config.CONFIG_CREATE
+		case commonDefs.NOTIFY_VLAN_DELETE:
+			oper = config.CONFIG_DELETE
+		case commonDefs.NOTIFY_VLAN_UPDATE:
+			oper = config.CONFIG_UPDATE
+		}
+		api.SendVlanNotification(oper, int32(vlanMsg.VlanId), vlanMsg.VlanName, vlanMsg.UntagPorts)
 	case commonDefs.IPv6IntfNotifyMsg:
 		ipv6Msg := msg.(commonDefs.IPv6IntfNotifyMsg)
 		if ipv6Msg.MsgType == commonDefs.NOTIFY_IPV6INTF_CREATE {
-			api.SendIPv6Notfication(ipv6Msg.IfIndex, ipv6Msg.IpAddr, "CREATE")
+			api.SendIPIntfNotfication(ipv6Msg.IfIndex, ipv6Msg.IpAddr, config.CONFIG_CREATE)
 		} else {
-			api.SendIPv6Notfication(ipv6Msg.IfIndex, ipv6Msg.IpAddr, "DELETE")
+			api.SendIPIntfNotfication(ipv6Msg.IfIndex, ipv6Msg.IpAddr, config.CONFIG_DELETE)
 		}
-		//case commonDefs.IPv4NbrMacMoveNotifyMsg:
-		//	macMoveMsg := msg.(commonDefs.IPv4NbrMacMoveNotifyMsg)
 	}
 }
