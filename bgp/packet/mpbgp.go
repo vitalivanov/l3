@@ -160,10 +160,8 @@ func BGPGetMPNextHop(afi AFI) MPNextHop {
 	var nextHop MPNextHop
 	var ok bool
 	if nextHop, ok = BGPAFIToStructMap[afi]; ok {
-		fmt.Printf("BGPGetMPNextHop - found afi")
 		nextHop = nextHop.New()
 	} else {
-		fmt.Printf("BGPGetMPNextHop - MPNextHopUnknown")
 		nextHop = &MPNextHopUnknown{}
 	}
 	return nextHop
@@ -242,14 +240,12 @@ func (r *BGPPathAttrMPReachNLRI) Decode(pkt []byte, data interface{}) error {
 	nextHop.Decode(pkt[idx:])
 	r.NextHop = nextHop
 	idx += int(nextHop.Len() + 1)
-	fmt.Printf("BGPPathAttrMPReachNLRI - afi safi decode done, idx=%d\n", idx)
 
 	r.Reserved = pkt[idx]
 	idx++
 
 	r.NLRI = make([]NLRI, 0)
 	length := uint32(r.BGPPathAttrBase.Length) - 5 - uint32(r.NextHop.Len())
-	fmt.Printf("BGPPathAttrMPReachNLRI - nlri length=%d\n", length)
 	_, err = decodeNLRI(pkt[idx:], &r.NLRI, length, data)
 	return err
 }
