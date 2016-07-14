@@ -100,7 +100,7 @@ func lsdbTestLogic(tNum int) int {
 		checkLsaPktApis()
 	case 9:
 		fmt.Println(tNum, ": Running LSA decode tests ")
-		checkLsaDecodeApis()
+		checkFloodAPIs()
 	}
 
 	return SUCCESS
@@ -263,20 +263,23 @@ func checkLsaPktApis() {
 
 }
 
-func checkLsaDecodeApis() {
+/* UT for LSA decode routines and
+   Flooding */
+func checkFloodAPIs() {
 	ospf.initLSDatabase(areaId)
-	lsDbEnt, _ := ospf.AreaLsdb[lsdbKey] 
-	 selfOrigLsaEnt, _ := ospf.AreaSelfOrigLsa[lsdbKey]   
+	lsDbEnt, _ := ospf.AreaLsdb[lsdbKey]
+	selfOrigLsaEnt, _ := ospf.AreaSelfOrigLsa[lsdbKey]
 
 	routerLsa := &RouterLsa{}
 	lsaKey := &LsaKey{}
 	decodeRouterLsa(lsa_router, routerLsa, lsaKey)
 	routerLsa_byte := encodeRouterLsa(*routerLsa, *lsaKey)
-fmt.Println("Encoded router LSA ", routerLsa_byte)
+	fmt.Println("Encoded router LSA ", routerLsa_byte)
 	rlsa, ret := ospf.getRouterLsaFromLsdb(lsdbKey.AreaId, *lsaKey)
 	fmt.Println("Lsa from db(lsa, ret) ", rlsa, ret)
 	lsDbEnt.RouterLsaMap[*lsaKey] = *routerLsa
 	selfOrigLsaEnt[*lsaKey] = true
+	ospf.regenerateLsa(lsdbKey, *lsaKey)
 
 	networkLsa := &NetworkLsa{}
 	decodeNetworkLsa(lsa_network, networkLsa, lsaKey)
@@ -286,6 +289,7 @@ fmt.Println("Encoded router LSA ", routerLsa_byte)
 	fmt.Println("Lsa from db(lsa, ret) ", nlsa, ret)
 	lsDbEnt.NetworkLsaMap[*lsaKey] = *networkLsa
 	selfOrigLsaEnt[*lsaKey] = true
+	ospf.regenerateLsa(lsdbKey, *lsaKey)
 
 	summaryLsa := &SummaryLsa{}
 	decodeSummaryLsa(lsa_summary, summaryLsa, lsaKey)
@@ -295,6 +299,7 @@ fmt.Println("Encoded router LSA ", routerLsa_byte)
 	fmt.Println("Lsa from db(lsa, ret) ", slsa, ret)
 	lsDbEnt.Summary3LsaMap[*lsaKey] = *summaryLsa
 	selfOrigLsaEnt[*lsaKey] = true
+	ospf.regenerateLsa(lsdbKey, *lsaKey)
 
 	asexternalLsa := &ASExternalLsa{}
 	decodeASExternalLsa(lsa_asExt, asexternalLsa, lsaKey)
@@ -304,12 +309,46 @@ fmt.Println("Encoded router LSA ", routerLsa_byte)
 	fmt.Println("Lsa from db(lsa, ret) ", alsa, ret)
 	lsDbEnt.ASExternalLsaMap[*lsaKey] = *asexternalLsa
 	selfOrigLsaEnt[*lsaKey] = true
+	ospf.regenerateLsa(lsdbKey, *lsaKey)	
+	ospf.processAsExternalLSAFlood(*lsaKey)
+	ospf.floodASExternalLsa(lsa_asExt)
 
 	ospf.AreaLsdb[lsdbKey] = lsDbEnt
 	ospf.AreaSelfOrigLsa[lsdbKey] = selfOrigLsaEnt
 
 	ospf.processMaxAgeLSA(lsdbKey, lsDbEnt)
-	
+
 	ospf.lsdbStateRefresh()
 	ospf.lsdbSelfLsaRefresh()
+	ospf.processLSDatabaseTicker()
+	maxAgeLsaMap = make(map[LsaKey][]byte)
+	maxAgeMsg := maxAgeLsaMsg{
+		lsaKey:   *lsaKey,
+		msg_type: delMaxAgeLsa,
+	}
+	ospf.processMaxAgeLsaMsg(maxAgeMsg)
+
+	/* Flooding */
+	ospf.SendSelfOrigLSA(lsdbKey.AreaId, key)
+	ospf.processFloodMsg(floodMsg)
+	floodMsg.lsOp = LSASELFLOOD
+	ospf.processFloodMsg(floodMsg)
+	floodMsg.lsOp = LSAINTF
+	ospf.processFloodMsg(floodMsg)
+	floodMsg.lsOp = LSAROUTERFLOOD
+	ospf.processFloodMsg(floodMsg)
+	floodMsg.lsOp = LSASUMMARYFLOOD
+	ospf.processFloodMsg(floodMsg)
+	floodMsg.lsOp = LSAEXTFLOOD
+	ospf.processFloodMsg(floodMsg)
+	floodMsg.lsOp = LSAAGE
+	ospf.processFloodMsg(floodMsg)
+
+	ospf.SendRouterLsa(lsdbKey.AreaId, key, routerKey)
+	ospf.constructAndSendLsaAgeFlood()
+	ospf.nbrFloodCheck(nbrKey, key, intf, RouterLSA)
+	ospf.interfaceFloodCheck(key)
+	ospf.processSummaryLSAFlood(lsdbKey.AreaId, routerKey)
+	ospf.floodSummaryLsa(lsa_summary, lsdbKey.AreaId)
+	
 }
