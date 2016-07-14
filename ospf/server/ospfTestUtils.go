@@ -44,6 +44,7 @@ var hello []byte
 var lsaupd []byte
 var lsareq []byte
 var lsaack []byte
+var header []byte
 var lsa_network []byte
 var lsa_router []byte
 var lsa_summary []byte
@@ -96,7 +97,7 @@ var lsa_header1 ospfLSAHeader
 var lsa_header2 ospfLSAHeader
 var ack_msg *ospfNeighborLSAAckMsg
 
-/* Lsdb */
+/* Lsdb and flooding */
 var areaId uint32
 var lsdbKey LsdbKey
 var summaryKey LsaKey
@@ -111,6 +112,8 @@ var networkLsa NetworkLsa
 var lsa_reqs []ospfLSAReq
 var val LsdbSliceEnt
 var lsdbMsg DbLsdbMsg
+var ackTxMsg ospfNeighborAckTxMsg
+var floodMsg ospfFloodMsg
 
 /* Routing table */
 var rKey RoutingTblEntryKey
@@ -350,6 +353,9 @@ func initAttr() {
 
 	ack_msg = newospfNeighborLSAAckMsg()
 
+	ackTxMsg.lsa_headers_byte = lsaack
+	ackTxMsg.nbrKey = nbrKey
+
 	eventMsg = DbEventMsg{
 		eventType: config.ADJACENCY,
 	}
@@ -485,7 +491,16 @@ func initLsdbData() {
 		Distance:   uint16(20),
 		NumOfPaths: 3,
 	}
-
+	floodMsg = ospfFloodMsg{
+		nbrKey:  nbrKey,
+		intfKey: key,
+		areaId:  lsdbKey.AreaId,
+		lsType:  RouterLSA,
+		linkid:  routerKey.LSId,
+		lsaKey:  routerKey,
+		lsOp:    LSAFLOOD,
+		pkt:     lsa_router,
+	}
 }
 
 func initRoutingTable() {
@@ -555,6 +570,7 @@ func initRoutingTable() {
 }
 
 func initPacketData() {
+	header = []byte{0x02, 0x05, 0x00, 0x40, 0x04, 0x04, 0x04, 0x04, 0x00, 0x00, 0x00, 0x14, 0x09, 0x83, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
 	hello = []byte{0x01, 0x00, 0x5e, 0x00, 0x00, 0x05, 0xca, 0x11, 0x09, 0xb3,
 		0x00, 0x1c, 0x08, 0x00, 0x45, 0xc0, 0x00, 0x50, 0x8d, 0xed, 0x00, 0x00,
 		0x01, 0x59, 0x3f, 0x5a, 0x0a, 0x4b, 0x00, 0xfe, 0xe0, 0x00, 0x00, 0x05,
