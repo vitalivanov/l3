@@ -102,6 +102,12 @@ func rTableTestLogic(tNum int) int {
 		ospf.initAreaConfDefault()
 		ospf.processAreaConfig(areaConf)
 		ospf.ConsolidatingRoutingTbl()
+		
+		ospf.GenerateSummaryLsa()
+		lsakey, lsa := ospf.GenerateDefaultSummary3LSA(lsdbKey)
+		fmt.Println("Generated summary LSAs ", "lsaKey ", lsakey," lsa " ,lsa)
+		lsakey, slsa := ospf.GenerateType3SummaryLSA(rKey, rEntry, lsdbKey)
+		fmt.Println("Generated type 3 summary lsa ", "lsakey ", lsakey, " lsa ", slsa)
 	}
 	return SUCCESS
 }

@@ -350,5 +350,7 @@ func checkFloodAPIs() {
 	ospf.interfaceFloodCheck(key)
 	ospf.processSummaryLSAFlood(lsdbKey.AreaId, routerKey)
 	ospf.floodSummaryLsa(lsa_summary, lsdbKey.AreaId)
-	
+
+	ospf.CalcInterAreaRoutes(lsdbKey.AreaId)
+//	ospf.GenerateSummaryLsa()	
 }
