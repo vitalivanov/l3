@@ -13,13 +13,13 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 // ribdAsicdServer.go
 package server
@@ -29,8 +29,34 @@ import (
 	"fmt"
 )
 
+var asicdBulkCount = 3000
+var asicdRouteCount = 0
+var asicdRoutes []*asicdInt.IPv4Route
+var asicdRoute []asicdInt.IPv4Route
+
 func addAsicdRoute(routeInfoRecord RouteInfoRecord) {
 	logger.Info(fmt.Sprintln("addAsicdRoute, weight = ", routeInfoRecord.weight+1))
+	/*	asicdRoute = make([]asicdInt.IPv4Route, asicdBulkCount)
+		if asicdRouteCount == 0 {
+			asicdRoutes = make([]*asicdInt.IPv4Route, 0)
+		}
+		asicdRoute[asicdRouteCount] = asicdInt.IPv4Route{
+			routeInfoRecord.destNetIp.String(),
+			routeInfoRecord.networkMask.String(),
+			[]*asicdInt.IPv4NextHop{
+				&asicdInt.IPv4NextHop{
+					NextHopIp: routeInfoRecord.resolvedNextHopIpIntf.NextHopIp,
+					Weight:    int32(routeInfoRecord.weight + 1),
+				},
+			},
+		}
+		asicdRoutes = append(asicdRoutes, &asicdRoute[asicdRouteCount])
+		asicdRouteCount++
+		if asicdRouteCount == asicdBulkCount {
+			asicdclnt.ClientHdl.OnewayCreateIPv4Route(asicdRoutes)
+			asicdRoutes = nil
+			asicdRouteCount = 0
+		}*/
 	asicdclnt.ClientHdl.OnewayCreateIPv4Route([]*asicdInt.IPv4Route{
 		&asicdInt.IPv4Route{
 			routeInfoRecord.destNetIp.String(),
@@ -67,9 +93,9 @@ func (ribdServiceHandler *RIBDServer) StartAsicdServer() {
 		case route := <-ribdServiceHandler.AsicdRouteCh:
 			logger.Debug(fmt.Sprintln(" received message on AsicdRouteCh, op:", route.Op))
 			if route.Op == "add" {
-			    addAsicdRoute(route.OrigConfigObject.(RouteInfoRecord))
+				addAsicdRoute(route.OrigConfigObject.(RouteInfoRecord))
 			} else if route.Op == "del" {
-			    delAsicdRoute(route.OrigConfigObject.(RouteInfoRecord))
+				delAsicdRoute(route.OrigConfigObject.(RouteInfoRecord))
 			}
 		}
 	}
