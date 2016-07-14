@@ -404,20 +404,18 @@ func TestBGPUpdateEncode(t *testing.T) {
 	mpReachNLRI := NewBGPPathAttrMPReachNLRI()
 	mpReachNLRI.AFI = AfiIP6
 	mpReachNLRI.SAFI = SafiUnicast
-	mpNextHop := net.ParseIP("2001::1")
-	mpReachNLRI.Length = 16
-	mpReachNLRI.NextHop = append(mpReachNLRI.NextHop, mpNextHop...)
-	mpIP := []byte{0x01, 0x02}
-	mpReachNLRI.NLRI = append(mpReachNLRI.NLRI, mpIP[:2])
-	mpReachNLRI.BGPPathAttrBase.Length = 24
+	mpNextHop := NewMPNextHopIP()
+	mpNextHop.SetNextHop(net.ParseIP("2001::1"))
+	mpReachNLRI.SetNextHop(mpNextHop)
+	mpIP := NewIPPrefix(net.ParseIP("1.2.0.0"), 16)
+	mpReachNLRI.AddNLRI(mpIP)
 	pa = append(pa, mpReachNLRI)
 
 	mpUnreachNLRI := NewBGPPathAttrMPUnreachNLRI()
 	mpUnreachNLRI.AFI = AfiIP6
 	mpUnreachNLRI.SAFI = SafiUnicast
-	mpUnreachIP := []byte{0x03, 0x04}
-	mpUnreachNLRI.NLRI = append(mpUnreachNLRI.NLRI, mpUnreachIP[:2])
-	mpUnreachNLRI.BGPPathAttrBase.Length = 6
+	mpUnreachIP := NewIPPrefix(net.ParseIP("3.4.0.0"), 16)
+	mpUnreachNLRI.AddNLRI(mpUnreachIP)
 	pa = append(pa, mpUnreachNLRI)
 
 	updateMsg := NewBGPUpdateMessage(make([]NLRI, 0), pa, nlri)

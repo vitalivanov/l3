@@ -2152,179 +2152,6 @@ func NewBGPPathAttrClusterList() *BGPPathAttrClusterList {
 	}
 }
 
-type BGPPathAttrMPReachNLRI struct {
-	BGPPathAttrBase
-	AFI      AFI
-	SAFI     SAFI
-	Length   uint8
-	NextHop  []byte
-	Reserved byte
-	NLRI     [][]byte
-}
-
-func (r *BGPPathAttrMPReachNLRI) Clone() BGPPathAttr {
-	x := *r
-	x.BGPPathAttrBase = r.BGPPathAttrBase.Clone()
-	x.NextHop = make(net.IP, len(r.NextHop))
-	copy(x.NextHop, r.NextHop)
-	x.NLRI = make([][]byte, len(r.NLRI))
-	for i, nlri := range r.NLRI {
-		x.NLRI[i] = make(net.IP, len(nlri))
-		copy(x.NLRI[i], nlri)
-	}
-	return &x
-}
-
-func (r *BGPPathAttrMPReachNLRI) Encode() ([]byte, error) {
-	pkt, err := r.BGPPathAttrBase.Encode()
-	if err != nil {
-		return pkt, nil
-	}
-	idx := int(r.BGPPathAttrBase.BGPPathAttrLen)
-
-	binary.BigEndian.PutUint16(pkt[idx:idx+2], uint16(r.AFI))
-	idx += 2
-	pkt[idx] = uint8(r.SAFI)
-	idx++
-
-	pkt[idx] = uint8(len(r.NextHop))
-	copy(pkt[idx:], r.NextHop)
-	idx += len(r.NextHop)
-
-	pkt[idx] = 0
-	idx++
-
-	for i := 0; i < len(r.NLRI); i++ {
-		copy(pkt[idx:], r.NLRI[i])
-		idx += len(r.NLRI[i])
-	}
-	return pkt, nil
-}
-
-func (r *BGPPathAttrMPReachNLRI) Decode(pkt []byte, data interface{}) error {
-	err := r.BGPPathAttrBase.Decode(pkt, data)
-	if err != nil {
-		return err
-	}
-
-	idx := int(r.BGPPathAttrBase.BGPPathAttrLen)
-	r.AFI = AFI(binary.BigEndian.Uint16(pkt[idx : idx+2]))
-	r.SAFI = SAFI(pkt[idx+2])
-	r.Length = pkt[idx+3]
-	idx += 3
-
-	r.NextHop = make([]byte, r.Length)
-	copy(r.NextHop, pkt[idx:idx+int(r.Length)])
-	idx += int(r.Length)
-
-	r.Reserved = pkt[idx]
-	idx++
-
-	r.NLRI = make([][]byte, 0)
-	for uint32(idx) < r.TotalLen() {
-		bytes := int((pkt[idx] + 7) / 8)
-		idx++
-		nlri := make([]byte, bytes)
-		copy(nlri[0:], pkt[idx:idx+bytes])
-		r.NLRI = append(r.NLRI, nlri)
-		idx += bytes
-	}
-	return nil
-}
-
-func (r *BGPPathAttrMPReachNLRI) New() BGPPathAttr {
-	return &BGPPathAttrMPReachNLRI{}
-}
-
-func NewBGPPathAttrMPReachNLRI() *BGPPathAttrMPReachNLRI {
-	return &BGPPathAttrMPReachNLRI{
-		BGPPathAttrBase: BGPPathAttrBase{
-			Flags:          BGPPathAttrFlagOptional & BGPPathAttrFlagExtendedLen,
-			Code:           BGPPathAttrTypeMPReachNLRI,
-			Length:         0,
-			BGPPathAttrLen: 4,
-		},
-		NextHop: make([]byte, 0),
-		NLRI:    make([][]byte, 0),
-	}
-}
-
-type BGPPathAttrMPUnreachNLRI struct {
-	BGPPathAttrBase
-	AFI  AFI
-	SAFI SAFI
-	NLRI [][]byte
-}
-
-func (u *BGPPathAttrMPUnreachNLRI) Clone() BGPPathAttr {
-	x := *u
-	x.BGPPathAttrBase = u.BGPPathAttrBase.Clone()
-	x.NLRI = make([][]byte, len(u.NLRI))
-	for i, nlri := range u.NLRI {
-		x.NLRI[i] = make(net.IP, len(nlri))
-		copy(x.NLRI[i], nlri)
-	}
-	return &x
-}
-
-func (u *BGPPathAttrMPUnreachNLRI) Encode() ([]byte, error) {
-	pkt, err := u.BGPPathAttrBase.Encode()
-	if err != nil {
-		return pkt, nil
-	}
-	idx := int(u.BGPPathAttrBase.BGPPathAttrLen)
-
-	binary.BigEndian.PutUint16(pkt[idx:idx+2], uint16(u.AFI))
-	idx += 2
-	pkt[idx] = uint8(u.SAFI)
-	idx++
-
-	for i := 0; i < len(u.NLRI); i++ {
-		copy(pkt[idx:], u.NLRI[i])
-		idx += len(u.NLRI[i])
-	}
-	return pkt, nil
-}
-
-func (u *BGPPathAttrMPUnreachNLRI) Decode(pkt []byte, data interface{}) error {
-	err := u.BGPPathAttrBase.Decode(pkt, data)
-	if err != nil {
-		return err
-	}
-
-	idx := int(u.BGPPathAttrBase.BGPPathAttrLen)
-	u.AFI = AFI(binary.BigEndian.Uint16(pkt[idx : idx+2]))
-	u.SAFI = SAFI(pkt[idx+2])
-	idx += 2
-
-	u.NLRI = make([][]byte, 0)
-	for uint32(idx) < u.TotalLen() {
-		bytes := int((pkt[idx] + 7) / 8)
-		idx++
-		nlri := make([]byte, bytes)
-		copy(nlri[0:], pkt[idx:idx+bytes])
-		u.NLRI = append(u.NLRI, nlri)
-		idx += bytes
-	}
-	return nil
-}
-
-func (o *BGPPathAttrMPUnreachNLRI) New() BGPPathAttr {
-	return &BGPPathAttrMPUnreachNLRI{}
-}
-
-func NewBGPPathAttrMPUnreachNLRI() *BGPPathAttrMPUnreachNLRI {
-	return &BGPPathAttrMPUnreachNLRI{
-		BGPPathAttrBase: BGPPathAttrBase{
-			Flags:          BGPPathAttrFlagOptional & BGPPathAttrFlagExtendedLen,
-			Code:           BGPPathAttrTypeMPUnreachNLRI,
-			Length:         0,
-			BGPPathAttrLen: 4,
-		},
-		NLRI: make([][]byte, 0),
-	}
-}
-
 type BGPPathAttrUnknown struct {
 	BGPPathAttrBase
 	Value []byte
@@ -2448,7 +2275,7 @@ func (msg *BGPUpdate) Encode() ([]byte, error) {
 	return pkt, nil
 }
 
-func (msg *BGPUpdate) decodeIPPrefix(pkt []byte, ipPrefix *[]NLRI, length uint32, data interface{}) (uint32, error) {
+func decodeNLRI(pkt []byte, ipPrefix *[]NLRI, length uint32, data interface{}) (uint32, error) {
 	ptr := uint32(0)
 
 	if length > uint32(len(pkt)) {
@@ -2513,7 +2340,7 @@ func (msg *BGPUpdate) Decode(header *BGPHeader, pkt []byte, data interface{}) er
 	}
 
 	msg.WithdrawnRoutes = make([]NLRI, 0)
-	ipLen, err = msg.decodeIPPrefix(pkt[ptr:], &msg.WithdrawnRoutes, uint32(length), data)
+	ipLen, err = decodeNLRI(pkt[ptr:], &msg.WithdrawnRoutes, uint32(length), data)
 	if err != nil {
 		return BGPMessageError{BGPUpdateMsgError, BGPMalformedAttrList, nil, "Malformed Attributes"}
 	}
@@ -2545,7 +2372,7 @@ func (msg *BGPUpdate) Decode(header *BGPHeader, pkt []byte, data interface{}) er
 
 	msg.NLRI = make([]NLRI, 0)
 	length = int(header.Len()) - 23 - int(msg.WithdrawnRoutesLen) - int(msg.TotalPathAttrLen)
-	ipLen, err = msg.decodeIPPrefix(pkt[ptr:], &msg.NLRI, uint32(length), data)
+	ipLen, err = decodeNLRI(pkt[ptr:], &msg.NLRI, uint32(length), data)
 	if err != nil {
 		return err
 	}
