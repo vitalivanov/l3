@@ -26,8 +26,10 @@ import (
 	"fmt"
 	"github.com/google/gopacket/pcap"
 	"infra/sysd/sysdCommonDefs"
+	"l3/ndp/config"
 	"l3/ndp/debug"
 	"log/syslog"
+	"strconv"
 	"testing"
 	"utils/logging"
 )
@@ -98,4 +100,38 @@ func TestPcapCreate(t *testing.T) {
 	if pcapHdl != nil {
 		t.Error("Failed to set nil")
 	}
+}
+
+// test src mac
+func TestCheckSrcMac(t *testing.T) {
+	svr := &NDPServer{}
+	svr.InitGlobalDS()
+	i := int(0)
+	for i = 0; i < 5; i++ {
+		macStr := "aa:bb:cc:dd:ee:0" + strconv.Itoa(i)
+		svr.SwitchMacMapEntries[macStr] = true
+	}
+	if !svr.CheckSrcMac("aa:bb:cc:dd:ee:01") {
+		t.Error("failed checking src mac 01")
+	}
+
+	if svr.CheckSrcMac("aa:bb:cc:dd:ee:ff") {
+		t.Error("ff src mac entry should not exists")
+	}
+	svr.DeInitGlobalDS()
+}
+
+// test populate vlan
+func TestPopulateVlanIfIndexInfo(t *testing.T) {
+	svr := &NDPServer{}
+	svr.InitGlobalDS()
+	nbrInfo := &config.NeighborInfo{}
+	svr.PopulateVlanInfo(nbrInfo, 1)
+	if nbrInfo.VlanId != -1 {
+		t.Error("Vlan Id", nbrInfo.VlanId, "should not be present")
+	}
+	if nbrInfo.IfIndex != 1 {
+		t.Error("IfIndex is not copied properly need 1 but got", nbrInfo.IfIndex)
+	}
+	svr.DeInitGlobalDS()
 }

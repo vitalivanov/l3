@@ -77,10 +77,11 @@ type StateNotification struct {
 }
 
 type NeighborInfo struct {
-	IpAddr  string
-	MacAddr string
-	VlanId  int32
-	IfIndex int32
+	MacAddr     string
+	VlanId      int32
+	IfIndex     int32
+	IpAddr      string
+	LinkLocalIp string
 }
 
 type VlanInfo struct {

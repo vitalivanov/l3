@@ -166,8 +166,7 @@ func validateChecksum(ipHdr *layers.IPv6, icmpv6Hdr *layers.ICMPv6) error {
 	return nil
 }
 
-func validateICMPv6Hdr(hdr *layers.ICMPv6, srcIP net.IP, dstIP net.IP) error {
-	nds := &rx.NDSolicitation{}
+func validateICMPv6Hdr(hdr *layers.ICMPv6, srcIP net.IP, dstIP net.IP, nds *rx.NDSolicitation) error {
 	typeCode := hdr.TypeCode
 	if typeCode.Code() != ICMPv6_CODE {
 		return errors.New(fmt.Sprintln("Invalid Code", typeCode.Code()))
@@ -192,12 +191,14 @@ func validateICMPv6Hdr(hdr *layers.ICMPv6, srcIP net.IP, dstIP net.IP) error {
 	return nil
 }
 
-func populateNeighborInfo(nbrInfo *config.NeighborInfo, eth *layers.Ethernet, ipv6Hdr *layers.IPv6, icmpv6Hdr *layers.ICMPv6) {
+func populateNeighborInfo(nbrInfo *config.NeighborInfo, eth *layers.Ethernet, ipv6Hdr *layers.IPv6,
+	icmpv6Hdr *layers.ICMPv6, nds *rx.NDSolicitation) {
 	if eth == nil || ipv6Hdr == nil || icmpv6Hdr == nil {
 		return
 	}
 	nbrInfo.MacAddr = (eth.SrcMAC).String()
 	nbrInfo.IpAddr = (ipv6Hdr.SrcIP).String()
+	nbrInfo.LinkLocalIp = nds.TargetAddress.String()
 }
 
 /* API: Get IPv6 & ICMPv6 Header
@@ -228,6 +229,7 @@ func ValidateAndParse(nbrInfo *config.NeighborInfo, pkt gopacket.Packet) error {
 	icmpv6Hdr := &layers.ICMPv6{}
 	ipv6Hdr := &layers.IPv6{}
 	eth := &layers.Ethernet{}
+	nds := rx.NDSolicitation{}
 	var err error
 
 	// Get Ethernet Layer
@@ -249,7 +251,7 @@ func ValidateAndParse(nbrInfo *config.NeighborInfo, pkt gopacket.Packet) error {
 	}
 
 	// Validating icmpv6 header
-	err = validateICMPv6Hdr(icmpv6Hdr, ipv6Hdr.SrcIP, ipv6Hdr.DstIP)
+	err = validateICMPv6Hdr(icmpv6Hdr, ipv6Hdr.SrcIP, ipv6Hdr.DstIP, &nds)
 	if err != nil {
 		return err
 	}
@@ -261,6 +263,6 @@ func ValidateAndParse(nbrInfo *config.NeighborInfo, pkt gopacket.Packet) error {
 	}
 
 	// Populate Neighbor Information
-	populateNeighborInfo(nbrInfo, eth, ipv6Hdr, icmpv6Hdr)
+	populateNeighborInfo(nbrInfo, eth, ipv6Hdr, icmpv6Hdr, &nds)
 	return nil
 }

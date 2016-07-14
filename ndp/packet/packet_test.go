@@ -29,6 +29,7 @@ import (
 	"infra/sysd/sysdCommonDefs"
 	"l3/ndp/config"
 	"l3/ndp/debug"
+	"l3/ndp/packet/rx"
 	"log/syslog"
 	"net"
 	"reflect"
@@ -188,25 +189,30 @@ func TestValidateICMPv6Hdr(t *testing.T) {
 	}
 	icmpv6Hdr := &layers.ICMPv6{}
 	ipv6Hdr := &layers.IPv6{}
+	nds := rx.NDSolicitation{}
 	err := getIpAndICMPv6Hdr(p, ipv6Hdr, icmpv6Hdr)
 	if err != nil {
 		t.Error("Decoding ipv6 and icmpv6 header failed", err)
 	}
-	t.Log("SrcIP->", ipv6Hdr.SrcIP.String(), "DstIP->", ipv6Hdr.DstIP.String())
-	/*
-		for idx, _ := range ipv6Hdr.DstIP {
-			t.Log(idx, "---->", ipv6Hdr.DstIP[idx])
-		}
-	*/
-	err = validateICMPv6Hdr(icmpv6Hdr, ipv6Hdr.SrcIP, ipv6Hdr.DstIP)
+	//t.Log("SrcIP->", ipv6Hdr.SrcIP.String(), "DstIP->", ipv6Hdr.DstIP.String())
+	var testPkt = net.IP{
+		0xfe, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xc0, 0x00, 0x54, 0xff, 0xfe, 0xf5, 0x00, 0x00,
+	}
+	err = validateICMPv6Hdr(icmpv6Hdr, ipv6Hdr.SrcIP, ipv6Hdr.DstIP, &nds)
 	if err != nil {
 		t.Error("Validating ICMPv6 Header failed:", err)
+	}
+	//t.Log("nds information is", nds.TargetAddress)
+	//t.Log("test packet is", testPkt)
+	if !reflect.DeepEqual(nds.TargetAddress, testPkt) {
+		t.Error("Link Local Ip Mismatch:", err)
 	}
 }
 
 func TestPopulateNeighborInfo(t *testing.T) {
 	nbrInfo := &config.NeighborInfo{}
-	populateNeighborInfo(nbrInfo, nil, nil, nil)
+	nds := rx.NDSolicitation{}
+	populateNeighborInfo(nbrInfo, nil, nil, nil, &nds)
 	if nbrInfo.IpAddr != "" {
 		t.Error("nil error check failed")
 	}
@@ -225,19 +231,19 @@ func TestPopulateNeighborInfo(t *testing.T) {
 	if err != nil {
 		t.Error("failed to get ethener layer", err)
 	}
-	populateNeighborInfo(nbrInfo, eth, nil, nil)
+	populateNeighborInfo(nbrInfo, eth, nil, nil, &nds)
 	if nbrInfo.IpAddr != "" {
 		t.Error("nil error check failed")
 	}
-	populateNeighborInfo(nbrInfo, nil, ipv6Hdr, nil)
+	populateNeighborInfo(nbrInfo, nil, ipv6Hdr, nil, &nds)
 	if nbrInfo.IpAddr != "" {
 		t.Error("nil error check failed")
 	}
-	populateNeighborInfo(nbrInfo, nil, nil, icmpv6Hdr)
+	populateNeighborInfo(nbrInfo, nil, nil, icmpv6Hdr, &nds)
 	if nbrInfo.IpAddr != "" {
 		t.Error("nil error check failed")
 	}
-	populateNeighborInfo(nbrInfo, eth, ipv6Hdr, icmpv6Hdr)
+	populateNeighborInfo(nbrInfo, eth, ipv6Hdr, icmpv6Hdr, &nds)
 	if nbrInfo.MacAddr != "c2:00:54:f5:00:00" {
 		t.Error("Src Mac copy to NeighborInfo failed")
 	}
