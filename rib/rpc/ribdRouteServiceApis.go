@@ -64,10 +64,14 @@ func (m RIBDServicesHandler) OnewayCreateIPv4Route(cfg *ribd.IPv4Route) (err err
 /*
    Create Routes in Bulk using Oneway create API
 */
-func (m RIBDServicesHandler) OnewayCreateBulkIPv4Route(cfg []*ribdInt.IPv4Route) (err error) {
+func (m RIBDServicesHandler) OnewayCreateBulkIPv4Route(cfg []*ribdInt.IPv4RouteConfig) (err error) {
 	//logger.Info(fmt.Sprintln("OnewayCreateIPv4Route - Received create route request for ip", cfg.DestinationNw, " mask ", cfg.NetworkMask, "cfg.OutgoingIntfType: ", cfg.OutgoingIntfType, "cfg.OutgoingInterface: ", cfg.OutgoingInterface))
 	logger.Info(fmt.Sprintln("OnewayCreateBulkIPv4Route for ", len(cfg), " routes"))
-	for i := 0; i < len(cfg); i++ {
+	m.server.RouteConfCh <- server.RIBdServerConfig{
+		OrigBulkRouteConfigObject: cfg,
+		Op: "addBulk",
+	}
+	/*for i := 0; i < len(cfg); i++ {
 		newCfg := ribd.IPv4Route{
 			DestinationNw: cfg[i].DestinationNw,
 			NetworkMask:   cfg[i].NetworkMask,
@@ -82,7 +86,7 @@ func (m RIBDServicesHandler) OnewayCreateBulkIPv4Route(cfg []*ribdInt.IPv4Route)
 		}
 		newCfg.NextHop = append(newCfg.NextHop, &nextHop)
 		m.CreateIPv4Route(&newCfg)
-	}
+	}*/
 	return err
 }
 
@@ -251,11 +255,19 @@ func (m RIBDServicesHandler) GetNextHopIfTypeStr(nextHopIfType ribdInt.Int) (nex
 	nhStr, err := m.server.GetNextHopIfTypeStr(nextHopIfType)
 	return nhStr, err
 }
-func (m RIBDServicesHandler) GetRoute(destNetIp string, networkMask string) (route *ribdInt.Routes, err error) {
+func (m RIBDServicesHandler) GetRoute(destNetIp string, networkMask string) (route *ribdInt.IPv4RouteState, err error) {
 	ret, err := m.server.GetRoute(destNetIp, networkMask)
 	return ret, err
 }
 func (m RIBDServicesHandler) GetRouteReachabilityInfo(destNet string) (nextHopIntf *ribdInt.NextHopInfo, err error) {
 	nh, err := m.server.GetRouteReachabilityInfo(destNet)
 	return nh, err
+}
+func (m RIBDServicesHandler) GetTotalRouteCount() (number ribdInt.Int, err error) {
+	num, err := m.server.GetTotalRouteCount()
+	return ribdInt.Int(num), err
+}
+func (m RIBDServicesHandler) GetRouteCreatedTime(number ribdInt.Int) (time string, err error) {
+	time, err = m.server.GetRouteCreatedTime(int(number))
+	return time, err
 }
