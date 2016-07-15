@@ -290,7 +290,6 @@ func (m RIBDServer) GetBulkRouteDistanceState(fromIndex ribd.Int, rcount ribd.In
 	routeDistanceStates.Count = validCount
 	return routeDistanceStates, err
 }
-
 func (m RIBDServer) GetBulkIPv4EventState(fromIndex ribd.Int, rcount ribd.Int) (events *ribd.IPv4EventStateGetInfo, err error) {
 	logger.Debug("GetBulkIPv4EventState")
 	var i, validCount, toIndex ribd.Int
@@ -596,8 +595,8 @@ func (m RIBDServer) GetRouteReachabilityInfo(destNet string) (nextHopIntf *ribdI
 	logger.Debug(fmt.Sprintln("time to get longestPrefixLen = ", duration.Nanoseconds(), " ipAddr of the route: ", nextHopIntf.Ipaddr, " next hop ip of the route = ", nextHopIntf.NextHopIp, " ifIndex: ", nextHopIntf.NextHopIfIndex))
 	return nextHopIntf, err
 }
-func (m RIBDServer) GetRoute(destNetIp string, networkMask string) (route *ribdInt.Routes, err error) {
-	var returnRoute ribdInt.Routes
+func (m RIBDServer) GetRoute(destNetIp string, networkMask string) (route *ribdInt.IPv4RouteState, err error) {
+	var returnRoute ribdInt.IPv4RouteState
 	route = &returnRoute
 	destNetIpAddr, err := getIP(destNetIp)
 	if err != nil {
@@ -624,15 +623,41 @@ func (m RIBDServer) GetRoute(destNetIp string, networkMask string) (route *ribdI
 		return route, err
 	}
 	routeInfoList := routeInfoRecordList.routeInfoProtocolMap[routeInfoRecordList.selectedRouteProtocol]
+	nextHopInfo := make([]ribdInt.RouteNextHopInfo, len(routeInfoList))
+	route.NextHopList = make([]*ribdInt.RouteNextHopInfo, 0)
+	i := 0
+	for _, nh := range routeInfoList {
+		routeInfoRecord := nh
+		nextHopInfo[i].NextHopIp = routeInfoRecord.nextHopIp.String()
+		nextHopInfo[i].NextHopIntRef = strconv.Itoa(int(routeInfoRecord.nextHopIfIndex))
+		intfEntry, ok := IntfIdNameMap[int32(routeInfoRecord.nextHopIfIndex)]
+		if ok {
+			logger.Debug(fmt.Sprintln("Map found for ifndex : ", routeInfoRecord.nextHopIfIndex, "Name = ", intfEntry.name))
+			nextHopInfo[i].NextHopIntRef = intfEntry.name
+		}
+		logger.Debug(fmt.Sprintln("IntfRef = ", nextHopInfo[i].NextHopIntRef))
+		nextHopInfo[i].Weight = int32(routeInfoRecord.weight)
+		route.NextHopList = append(route.NextHopList, &nextHopInfo[i])
+		i++
+
+	}
 	routeInfoRecord := routeInfoList[0]
-	//	routeInfoRecord := routeInfoRecordList.routeInfoList[routeInfoRecordList.selectedRouteIdx]
-	route.Ipaddr = destNetIp
-	route.Mask = networkMask
-	route.NextHopIp = routeInfoRecord.nextHopIp.String()
-	route.IfIndex = ribdInt.Int(routeInfoRecord.nextHopIfIndex)
-	route.Metric = ribdInt.Int(routeInfoRecord.metric)
-	route.Prototype = ribdInt.Int(routeInfoRecord.protocol)
+	route.DestinationNw = routeInfoRecord.networkAddr
+	route.Protocol = routeInfoRecordList.selectedRouteProtocol
+	route.RouteCreatedTime = routeInfoRecord.routeCreatedTime
+	route.RouteUpdatedTime = routeInfoRecord.routeUpdatedTime
 	return route, err
+}
+func (m RIBDServer) GetTotalRouteCount() (number int, err error) {
+	return rtCount, err
+}
+func (m RIBDServer) GetRouteCreatedTime(number int) (time string, err error) {
+	_, ok := routeCreatedTimeMap[number]
+	if !ok {
+		logger.Info(fmt.Sprintln(number, " number of routes not created yet"))
+		return "", errors.New("Not enough routes")
+	}
+	return routeCreatedTimeMap[number], err
 }
 
 /*
@@ -1318,7 +1343,7 @@ func createRoute(ipType IPType, destNetIp string,
 	addType ribd.Int,
 	policyStateChange int,
 	sliceIdx ribd.Int) (rc ribd.Int, err error) {
-	logger.Debug(fmt.Sprintln("createRoute for ip type", ipType, " ip: ", destNetIp, " mask ", networkMask, " next hop ip ", nextHopIp, " nextHopIfIndex : ", nextHopIfIndex, " addType ", addType, " weight ", weight))
+
 
 	callSelectRoute := false
 	destNetIpAddr, err := getIP(destNetIp)
@@ -1365,11 +1390,13 @@ func createRoute(ipType IPType, destNetIp string,
 	routeInfoRecord.resolvedNextHopIpIntf.NextHopIfIndex = ribdInt.Int(routeInfoRecord.nextHopIfIndex)
 
 	nhIntf, resolvedNextHopIntf, res_err := ResolveNextHop(routeInfoRecord.nextHopIp.String())
+	//nhIntf, resolvedNextHopIntf, _ := ResolveNextHop(routeInfoRecord.nextHopIp.String())
 	routeInfoRecord.resolvedNextHopIpIntf = resolvedNextHopIntf
 	logger.Info(fmt.Sprintln("nhIntf ipaddr/mask: ", nhIntf.Ipaddr, ":", nhIntf.Mask, " resolvedNex ", resolvedNextHopIntf.NextHopIp, " nexthop ", nextHopIp, " reachable:", resolvedNextHopIntf.IsReachable))
 
+	rtCount++
 	routeInfoRecord.routeCreatedTime = time.Now().String()
-	logger.Debug(fmt.Sprintln(" destNet:", destNet))
+	routeCreatedTimeMap[rtCount] = routeInfoRecord.routeCreatedTime
 	routeInfoRecordListItem := RouteInfoMap.Get(destNet)
 	if routeInfoRecordListItem == nil {
 		/*
@@ -1418,15 +1445,12 @@ func createRoute(ipType IPType, destNetIp string,
 			OrigConfigObject: RouteDBInfo{routeInfoRecord, newRouteInfoRecordList},
 			Op:               "add",
 		}
-		//RouteServiceHandler.WriteIPv4RouteStateEntryToDB(RouteDBInfo{routeInfoRecord, newRouteInfoRecordList})
 		//update in the event log
 		eventInfo := "Installed " + ReverseRouteProtoTypeMapDB[int(policyRoute.Prototype)] + " route " + policyRoute.Ipaddr + ":" + policyRoute.Mask + " nextHopIp :" + routeInfoRecord.nextHopIp.String() + " in Hardware and RIB "
-		t1 := time.Now()
-		routeEventInfo := RouteEventInfo{timeStamp: t1.String(), eventInfo: eventInfo}
+		routeEventInfo := RouteEventInfo{timeStamp: routeInfoRecord.routeCreatedTime, eventInfo: eventInfo}
 		localRouteEventsDB = append(localRouteEventsDB, routeEventInfo)
 
 		//update the ref count for the next hop ip
-		//nhIntf,err := routeServiceHandler.GetRouteReachabilityInfo(routeInfoRecord.nextHopIp.String())
 		if res_err == nil {
 			nhPrefix, err := getNetowrkPrefixFromStrings(nhIntf.Ipaddr, nhIntf.Mask)
 			if err == nil {
@@ -1475,8 +1499,6 @@ func createRoute(ipType IPType, destNetIp string,
 					return 0, err
 				}
 				//adding equal cost route
-				//routeInfoRecordList.routeInfoProtocolMap[ReverseRouteProtoTypeMapDB[int(routePrototype)]] = append(routeInfoRecordList.routeInfoProtocolMap[ReverseRouteProtoTypeMapDB[int(routePrototype)]], routeInfoRecord)
-				// if routeInfoRecordList.selectedRouteProtocol == ReverseRouteProtoTypeMapDB[int(routePrototype)] {
 				logger.Debug("Adding a equal cost route for the selected route")
 				callSelectRoute = true
 				//}
@@ -1488,9 +1510,6 @@ func createRoute(ipType IPType, destNetIp string,
 		} else if !found {
 			if addType != FIBOnly {
 				callSelectRoute = true
-				//routeInfoRecordList.routeInfoProtocolMap[ReverseRouteProtoTypeMapDB[int(routePrototype)]] = make([]RouteInfoRecord,0)
-				//routeInfoRecordList.routeInfoProtocolMap[ReverseRouteProtoTypeMapDB[int(routePrototype)]] = append(routeInfoRecordList.routeInfoProtocolMap[ReverseRouteProtoTypeMapDB[int(routePrototype)]], routeInfoRecord)
-				//routeInfoRecordList.routeInfoList = append(routeInfoRecordList.routeInfoList, routeInfoRecord)
 			}
 		} else {
 			callSelectRoute = true
@@ -1512,7 +1531,7 @@ func createRoute(ipType IPType, destNetIp string,
 }
 
 func (m RIBDServer) ProcessV4RouteCreateConfig(cfg *ribd.IPv4Route) (val bool, err error) {
-	logger.Debug(fmt.Sprintln("ProcessV4RouteCreate: Received create route request for ip: ", cfg.DestinationNw, " mask ", cfg.NetworkMask, " number of next hops: ", len(cfg.NextHop)))
+	logger.Debug(fmt.Sprintln("ProcessRouteCreateConfig: Received create route request for ip ", cfg.DestinationNw, " mask ", cfg.NetworkMask, " number of next hops: ", len(cfg.NextHop)))
 	newCfg := ribd.IPv4Route{
 		DestinationNw: cfg.DestinationNw,
 		NetworkMask:   cfg.NetworkMask,
@@ -1529,13 +1548,43 @@ func (m RIBDServer) ProcessV4RouteCreateConfig(cfg *ribd.IPv4Route) (val bool, e
 		}
 		newCfg.NextHop = make([]*ribd.NextHopInfo, 0)
 		newCfg.NextHop = append(newCfg.NextHop, &nh)
+		policyRoute := BuildPolicyRouteFromribdIPv4Route(&newCfg)
+		params := BuildRouteParamsFromribdIPv4Route(&newCfg, FIBAndRIB, Invalid, len(destNetSlice))
+		logger.Debug(fmt.Sprintln("createType = ", params.createType, "deleteType = ", params.deleteType))
+		PolicyEngineFilter(policyRoute, policyCommonDefs.PolicyPath_Import, params)
 	}
 
-	policyRoute := BuildPolicyRouteFromribdIPv4Route(&newCfg)
-	params := BuildRouteParamsFromribdIPv4Route(&newCfg, FIBAndRIB, Invalid, len(destNetSlice))
+	return true, err
+}
 
-	logger.Debug(fmt.Sprintln("createType = ", params.createType, "deleteType = ", params.deleteType))
-	PolicyEngineFilter(policyRoute, policyCommonDefs.PolicyPath_Import, params)
+func (m RIBDServer) ProcessBulkRouteCreateConfig(bulkCfg []*ribdInt.IPv4RouteConfig) (val bool, err error) {
+	logger.Debug(fmt.Sprintln("ProcessBulkRouteCreateConfig: Received create route request for  ", len(bulkCfg), " number of routes"))
+	for _, cfg := range bulkCfg {
+
+		newCfg := ribd.IPv4Route{
+			DestinationNw: cfg.DestinationNw,
+			NetworkMask:   cfg.NetworkMask,
+			Protocol:      cfg.Protocol,
+			Cost:          cfg.Cost,
+			NullRoute:     cfg.NullRoute,
+		}
+		for i := 0; i < len(cfg.NextHop); i++ {
+			logger.Debug(fmt.Sprintln("nexthop info: ip: ", cfg.NextHop[i].NextHopIp, " intref: ", cfg.NextHop[i].NextHopIntRef))
+			nh := ribd.NextHopInfo{
+				NextHopIp:     cfg.NextHop[i].NextHopIp,
+				NextHopIntRef: cfg.NextHop[i].NextHopIntRef,
+				Weight:        cfg.NextHop[i].Weight,
+			}
+			newCfg.NextHop = make([]*ribd.NextHopInfo, 0)
+			newCfg.NextHop = append(newCfg.NextHop, &nh)
+	}
+
+			policyRoute := BuildPolicyRouteFromribdIPv4Route(&newCfg)
+			params := BuildRouteParamsFromribdIPv4Route(&newCfg, FIBAndRIB, Invalid, len(destNetSlice))
+
+			logger.Debug(fmt.Sprintln("createType = ", params.createType, "deleteType = ", params.deleteType))
+			PolicyEngineFilter(policyRoute, policyCommonDefs.PolicyPath_Import, params)
+		}
 
 	return true, err
 }
