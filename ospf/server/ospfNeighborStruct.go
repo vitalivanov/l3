@@ -352,19 +352,19 @@ func (server *OSPFServer) resetNeighborLists(nbr NeighborConfKey, intf IntfConfK
 
 func (server *OSPFServer) CheckNeighborFullEvent(nbrKey NeighborConfKey) {
 	nbrConf, exists := server.NeighborConfigMap[nbrKey]
-    nbrFull := true
+	nbrFull := true
 	if exists {
-        reqlist := ospfNeighborRequest_list[nbrKey]
-        if reqlist != nil {
-            for _, ent := range reqlist {
-                if ent.valid == true {
-                    nbrFull = false
-                }
-            }
-        }
-        if !nbrFull  {
-            return
-        }
+		reqlist := ospfNeighborRequest_list[nbrKey]
+		if reqlist != nil {
+			for _, ent := range reqlist {
+				if ent.valid == true {
+					nbrFull = false
+				}
+			}
+		}
+		if !nbrFull {
+			return
+		}
 		nbrConfMsg := ospfNeighborConfMsg{
 			ospfNbrConfKey: nbrKey,
 			ospfNbrEntry: OspfNeighborEntry{
@@ -384,17 +384,16 @@ func (server *OSPFServer) CheckNeighborFullEvent(nbrKey NeighborConfKey) {
 			nbrMsgType: NBRUPD,
 		}
 		server.neighborConfCh <- nbrConfMsg
-        server.logger.Info(fmt.Sprintln("NBREVENT: Nbr FULL ", nbrKey.IPAddr))
+		server.logger.Info(fmt.Sprintln("NBREVENT: Nbr FULL ", nbrKey.IPAddr))
 	}
 }
 
-
 func (server *OSPFServer) UpdateNeighborList(nbrKey NeighborConfKey) {
-    nbrConf, exists := server.NeighborConfigMap[nbrKey]
+	nbrConf, exists := server.NeighborConfigMap[nbrKey]
 	if exists {
-        if nbrConf.OspfNbrState == config.NbrFull {
-            return
-        }
-        server.CheckNeighborFullEvent(nbrKey) 
-    }
+		if nbrConf.OspfNbrState == config.NbrFull {
+			return
+		}
+		server.CheckNeighborFullEvent(nbrKey)
+	}
 }
