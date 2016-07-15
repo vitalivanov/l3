@@ -137,7 +137,6 @@ func (svr *NDPServer) ProcessRxPkt(ifIndex int32, pkt gopacket.Packet) {
 		return
 	}
 	nbrInfo := &config.NeighborInfo{}
-	debug.Logger.Info("Processing RX Pkt")
 	err := packet.ValidateAndParse(nbrInfo, pkt)
 	if err != nil {
 		debug.Logger.Err(fmt.Sprintln("Validating and parsing Pkt Failed:", err))
