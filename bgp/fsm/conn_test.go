@@ -13,16 +13,16 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 // conn_test.go
-package fsmtest
+package fsm
 
 import (
 	"encoding/binary"
@@ -30,7 +30,6 @@ import (
 	"fmt"
 	"l3/bgp/baseobjects"
 	"l3/bgp/config"
-	"l3/bgp/fsm"
 	"l3/bgp/packet"
 	"math"
 	"testing"
@@ -54,10 +53,10 @@ func TestDecodeMessageBGPOpen(t *testing.T) {
 	var peerGroup *config.PeerGroupConfig = nil
 	pConf := config.NeighborConfig{}
 	nConf := base.NewNeighborConf(logger, gConf, peerGroup, pConf)
-	fsmMgr := fsm.NewFSMManager(logger, nConf, make(chan *packet.BGPPktSrc), make(chan fsm.PeerFSMConn),
+	fsmMgr := NewFSMManager(logger, nConf, make(chan *packet.BGPPktSrc), make(chan PeerFSMConn),
 		make(chan config.ReachabilityInfo))
-	stateMachine := fsm.NewFSM(fsmMgr, 0, nConf)
-	peerConn := fsm.NewPeerConn(stateMachine, config.ConnDirOut, nil)
+	stateMachine := NewFSM(fsmMgr, 0, nConf)
+	peerConn := NewPeerConn(stateMachine, config.ConnDirOut, nil)
 
 	for _, strPkt := range strPkts {
 		hexPkt, err := hex.DecodeString(strPkt)

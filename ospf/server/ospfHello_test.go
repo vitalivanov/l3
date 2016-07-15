@@ -91,6 +91,17 @@ func helloTestLogic(tNum int) int {
 	case 8:
 		fmt.Println(tNum, ": Running CreateAndSendHelloRecvdMsg ")
 		ospf.CreateAndSendHelloRecvdMsg(12, &ipHdrMd, &ospfHdrMd, 40, config.Broadcast, false, 1, key)
+	case 9:
+		fmt.Println(tNum, ": Running header APIs.")
+		checkHeaderAPIs()
 	}
 	return SUCCESS
+}
+
+func checkHeaderAPIs() {
+ospfHdr := &OSPFHeader{}
+decodeOspfHdr(header, ospfHdr)
+
+pkt := encodeOspfHdr(*ospfHdr)
+fmt.Println("Encoded header pkt : ", pkt)
 }
