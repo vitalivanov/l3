@@ -21,6 +21,15 @@
 // |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
 //
 
+/* ospfLsdb_test 
+   This test covers 
+   1) LSA encode and decode APIs.
+   2) LSDB operations.
+   3) LSDB timer related APIs.
+   4) Area border router APIs.
+   5) SPF calculation APIs which are driven by LSDB.
+   6) Flooding operations that are driven by LSDB events.
+*/
 package server
 
 import (
@@ -328,6 +337,10 @@ func checkFloodAPIs() {
 	}
 	ospf.processMaxAgeLsaMsg(maxAgeMsg)
 
+	/* AS External LSAs */
+	ospf.HandleASExternalLsa(lsdbKey.AreaId)
+	ospf.CalcASBorderRoutes(lsdbKey.AreaId)
+	ospf.GenerateType4SummaryLSA(rKey, rEntry, lsdbKey)	
 	/* Flooding */
 	ospf.SendSelfOrigLSA(lsdbKey.AreaId, key)
 	ospf.processFloodMsg(floodMsg)
@@ -352,5 +365,41 @@ func checkFloodAPIs() {
 	ospf.floodSummaryLsa(lsa_summary, lsdbKey.AreaId)
 
 	ospf.CalcInterAreaRoutes(lsdbKey.AreaId)
+	
+	/* SPF */
+	checkSPFAPIs(selfOrigLsaEnt)
 //	ospf.GenerateSummaryLsa()	
+}
+
+func checkSPFAPIs(selfOrMap map[LsaKey]bool) {
+	lsaKey, err := findSelfOrigRouterLsaKey(selfOrMap)
+	fmt.Println("Found router Key ", lsaKey, " error ", err)
+
+	network := link1.LinkId & netmask
+	cons := ospf.checkRouterLsaConsistency(lsdbKey.AreaId,lsid, network, netmask)
+	if cons {
+		fmt.Println("Router LSA is not consitent with given lsid, network , netmask ",
+			     lsid,", ", network," ," ,netmask)
+}
+
+var vkey VertexKey 
+//start SPF calculation
+//ospf.spfCalculation()
+//fmt.Println(" Done initialising SPF tables.", done)
+ospf.initialiseSPFStructs()
+vkey , err = ospf.CreateAreaGraph(lsdbKey.AreaId)
+fmt.Println("Area graph created with vertex kay ", vkey)
+ospf.AreaStubs[vKeyR] = sVertex1
+ospf.AreaStubs[vKeyN] = sVertex2
+ospf.AreaStubs[vKeyT] = sVertex3
+
+fmt.Println("Handle stub networks ")
+ospf.HandleStubs(vKeyR, lsdbKey.AreaId)
+err =	ospf.UpdateAreaGraphNetworkLsa(networkLsa, networkKey, lsdbKey.AreaId)
+fmt.Println("Area graph updated with error ", err)
+
+lsaKey, err = ospf.findNetworkLsa(lsdbKey.AreaId, networkKey.LSId)
+ err = ospf.findRouterLsa(lsdbKey.AreaId, routerKey.LSId)
+
+ ospf.UpdateAreaGraphRouterLsa(routerLsa, routerKey, lsdbKey.AreaId)
 }

@@ -64,6 +64,8 @@ var nbrKey NeighborConfKey
 var intConf IntfConf
 var dstMAC net.HardwareAddr
 var dstIP net.IP
+var netmask uint32
+var lsid uint32
 var ospf *OSPFServer
 var eventMsg DbEventMsg
 
@@ -105,6 +107,7 @@ var summaryLsa SummaryLsa
 
 var routerKey LsaKey
 var routerLsa RouterLsa
+var link1 LinkDetail
 var lin []LinkDetail
 var networkKey LsaKey
 var networkLsa NetworkLsa
@@ -134,6 +137,9 @@ var vertexR Vertex
 var vertexN Vertex
 var vertexT Vertex
 var treeVertex TreeVertex
+var sVertex1 StubVertex
+var sVertex2 StubVertex
+var sVertex3 StubVertex
 
 func OSPFNewLogger(name string, tag string, listenToConfig bool) (*logging.Writer, error) {
 	var err error
@@ -369,8 +375,8 @@ func initAttr() {
 
 func initLsdbData() {
 	areaid := convertAreaOrRouterIdUint32("10.0.0.0")
-	netmask := convertAreaOrRouterIdUint32("255.0.0.0")
-	lsid := convertAreaOrRouterIdUint32("10.1.1.1")
+	netmask = convertAreaOrRouterIdUint32("255.0.0.0")
+	lsid = convertAreaOrRouterIdUint32("10.1.1.1")
 	lsdbKey = LsdbKey{
 		AreaId: areaid,
 	}
@@ -403,7 +409,7 @@ func initLsdbData() {
 
 	link := make([]LinkDetail, 2)
 
-	link1 := LinkDetail{
+	link1 = LinkDetail{
 		LinkId:     uint32(1234), /* Link ID */
 		LinkData:   uint32(1),    /* Link Data */
 		LinkType:   TransitLink,  /* Link Type */
@@ -566,6 +572,35 @@ func initRoutingTable() {
 		AreaId: lsdbKey.AreaId,
 	}
 	ospf.TempAreaRoutingTbl[areaidkey] = areaRoutingTable
+
+	sVertex1 = StubVertex {
+	NbrVertexKey:vKeyR,
+	NbrVertexCost:uint16(20),
+	LinkData:uint32(11),
+	LsaKey:routerKey,
+	AreaId:lsdbKey.AreaId,
+	LinkStateId:lsid,
+	}
+	
+	sVertex2 = StubVertex {
+	NbrVertexKey:vKeyN,
+	NbrVertexCost:uint16(20),
+	LinkData:uint32(11),
+	LsaKey:routerKey, 
+	AreaId:lsdbKey.AreaId,
+	LinkStateId:lsid, 
+	}
+
+	sVertex3 = StubVertex {  
+	 NbrVertexKey:vKeyT,
+	NbrVertexCost:uint16(20),
+	LinkData:uint32(11),
+	LsaKey:routerKey,
+	AreaId:lsdbKey.AreaId, 
+	LinkStateId:lsid, 
+	}
+
+	
 
 }
 

@@ -84,6 +84,7 @@ func rTableTestLogic(tNum int) int {
 
 		fmt.Println("Running ExecuteDijkstra")
 		ospf.SPFTree[vKeyR] = treeVertex
+		ospf.SPFTree[vKeyN] = treeVertex
 		ospf.ExecuteDijkstra(vKeyR, lsdbKey.AreaId)
 		ospf.ExecuteDijkstra(vKeyN, lsdbKey.AreaId)
 		ospf.ExecuteDijkstra(vKeyT, lsdbKey.AreaId)
@@ -92,6 +93,9 @@ func rTableTestLogic(tNum int) int {
 		go ospf.spfCalculation()
 		ospf.StartCalcSPFCh <- true
 
+		ospf.UpdateRoutingTbl(vKeyR, lsdbKey.AreaId)
+		ospf.UpdateRoutingTbl(vKeyN, lsdbKey.AreaId)
+		ospf.UpdateRoutingTbl(vKeyT, lsdbKey.AreaId)
 		fmt.Println(" Running routing table display.")
 		ospf.dumpGlobalRoutingTbl()
 
