@@ -36,7 +36,9 @@ func (ribdServiceHandler *RIBDServer) StartRouteProcessServer() {
 		case routeConf := <-ribdServiceHandler.RouteConfCh:
 			logger.Debug(fmt.Sprintln("received message on RouteConfCh channel, op: ", routeConf.Op))
 			if routeConf.Op == "add" {
-				ribdServiceHandler.ProcessV4RouteCreateConfig(routeConf.OrigConfigObject.(*ribd.IPv4Route))
+				ribdServiceHandler.ProcessRouteCreateConfig(routeConf.OrigConfigObject.(*ribd.IPv4Route))
+			} else if routeConf.Op == "addBulk" {
+				ribdServiceHandler.ProcessBulkRouteCreateConfig(routeConf.OrigBulkRouteConfigObject) //.([]*ribd.IPv4Route))
 			} else if routeConf.Op == "del" {
 				ribdServiceHandler.ProcessRouteDeleteConfig(routeConf.OrigConfigObject.(*ribd.IPv4Route))
 			} else if routeConf.Op == "update" {
