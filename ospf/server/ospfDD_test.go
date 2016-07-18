@@ -36,14 +36,14 @@ import (
 )
 
 func initDBDTestParams() {
-        fmt.Println("\n Get Server object")
-        ospf = getServerObject()
-        initAttr()
+	fmt.Println("\n Get Server object")
+	ospf = getServerObject()
+	initAttr()
 	ospf.IntfConfMap[key] = intf
 	ospf.NeighborConfigMap[nbrKey] = nbrConf
-        go startDummyChannels(ospf)
-        ospf.InitNeighborStateMachine()
-	 updateLSALists(nbrKey)
+	go startDummyChannels(ospf)
+	ospf.InitNeighborStateMachine()
+	updateLSALists(nbrKey)
 }
 
 func TestOSPFDBDecode(t *testing.T) {
@@ -66,14 +66,17 @@ func TestOSPFDBDecode(t *testing.T) {
 	fmt.Printf("Decode DB: 2) Min pkt length check ")
 	pktlen = uint16(len(data_less_len))
 
-        /* DB summary list */
+	/* DB summary list */
 	ospfNeighborDBSummary_list[nbrKey] = db_list
 	ospf.ConstructAndSendDbdPacket(nbrKey, true, false, true, uint8(2), uint32(1233), true, false)
-	last, lsaat := ospf.calculateDBLsaAttach(nbrKey, nbrConf)	
+	last, lsaat := ospf.calculateDBLsaAttach(nbrKey, nbrConf)
 	fmt.Println("Db lsa attach yes/no, lsattach index ", last, lsaat)
+	ospf.generateRequestList(nbrKey, nbrConf, *ospfdbd_data)
+
 	/* negative test */
 	DecodeDatabaseDescriptionData(data_less_len, ospfdbd_data, pktlen)
 	ospfNeighborDBSummary_list[nbrKey] = db_list
+	ospf.generateRequestList(nbrKey, nbrConf, *ospfdbd_data)
 	fmt.Printf("Decode DB: Success")
 	dbdNbrMsg := ospfNeighborDBDMsg{
 		ospfNbrConfKey: NeighborConfKey{

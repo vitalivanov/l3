@@ -326,7 +326,9 @@ func checkFloodAPIs() {
 	ospf.AreaSelfOrigLsa[lsdbKey] = selfOrigLsaEnt
 
 	ospf.processMaxAgeLSA(lsdbKey, lsDbEnt)
-
+	ospf.AddLsdbEntry(val)
+	ospf.DelLsdbEntry(val)
+	ospf.AddOspfEventState("Del ls entry", "LSDB")
 	ospf.lsdbStateRefresh()
 	ospf.lsdbSelfLsaRefresh()
 	ospf.processLSDatabaseTicker()
@@ -342,6 +344,10 @@ func checkFloodAPIs() {
 	ospf.CalcASBorderRoutes(lsdbKey.AreaId)
 	ospf.GenerateType4SummaryLSA(rKey, rEntry, lsdbKey)
 	/* Flooding */
+	ospf.generateDbsummary4LsaList(lsdbKey.AreaId)
+	ospf.generateDbsummary3LsaList(lsdbKey.AreaId)
+	ospf.generateDbasExternalList(lsdbKey.AreaId)
+	ospf.generateDbSummaryList(nbrKey)
 	ospf.SendSelfOrigLSA(lsdbKey.AreaId, key)
 	ospf.processFloodMsg(floodMsg)
 	floodMsg.lsOp = LSASELFLOOD
@@ -410,9 +416,9 @@ func checkSPFAPIs(selfOrMap map[LsaKey]bool) {
 
 func initialiseSPFData() {
 	ospf.AreaGraph = make(map[VertexKey]Vertex)
-                ospf.SPFTree = make(map[VertexKey]TreeVertex)
+	ospf.SPFTree = make(map[VertexKey]TreeVertex)
 
- ospf.AreaGraph[vKeyR] = vertexR
-                ospf.AreaGraph[vKeyN] = vertexN
-                ospf.AreaGraph[vKeyT] = vertexT
+	ospf.AreaGraph[vKeyR] = vertexR
+	ospf.AreaGraph[vKeyN] = vertexN
+	ospf.AreaGraph[vKeyT] = vertexT
 }

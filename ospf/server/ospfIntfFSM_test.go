@@ -28,6 +28,7 @@ import (
 	"fmt"
 	"l3/ospf/config"
 	"testing"
+	"time"
 )
 
 func initTestParams() {
@@ -97,6 +98,10 @@ func intfFSMTestLogic() int {
 
 	/*Test infra APIS.*/
 	checkInfraAPIs()
+	ospf.IntfKeySlice = append(ospf.IntfKeySlice, key)
+	ospf.IntfStateTimer = time.NewTimer(time.Second * 2)
+	index, count, intfs := ospf.GetBulkOspfIfEntryState(0, 10)
+	fmt.Println("Getbulk index, count, intfs ", index, " ", count, " ", intfs)
 	return SUCCESS
 }
 

@@ -29,6 +29,8 @@ import (
 	"l3/ospf/config"
 	"log/syslog"
 	"net"
+	"ospfd"
+	"ribdInt"
 	"sync"
 	"time"
 	"utils/commonDefs"
@@ -84,6 +86,7 @@ var gConf config.GlobalConf
 /* Area conf */
 var areaConf config.AreaConf
 var areaConfKey AreaConfKey
+var ospfArea *ospfd.OspfAreaEntry
 
 /* Intf FSM */
 var msg NbrStateChangeMsg
@@ -91,6 +94,7 @@ var msgNbrFull NbrFullStateMsg
 var intf IntfConf
 var hellodata OSPFHelloData
 var ifConf config.InterfaceConf
+var ospfIf *ospfd.OspfIfEntry
 
 /* Nbr FSM */
 var ospfNbrEntry OspfNeighborEntry
@@ -121,6 +125,11 @@ var link1 LinkDetail
 var lin []LinkDetail
 var networkKey LsaKey
 var networkLsa NetworkLsa
+var val1 LsdbSliceEnt
+var val2 LsdbSliceEnt
+var val3 LsdbSliceEnt
+var val4 LsdbSliceEnt
+var val5 LsdbSliceEnt
 
 var lsa_reqs []ospfLSAReq
 var val LsdbSliceEnt
@@ -150,6 +159,8 @@ var treeVertex TreeVertex
 var sVertex1 StubVertex
 var sVertex2 StubVertex
 var sVertex3 StubVertex
+
+var route ribdInt.Routes
 
 func OSPFNewLogger(name string, tag string, listenToConfig bool) (*logging.Writer, error) {
 	var err error
@@ -190,6 +201,13 @@ func initAttr() {
 		AreaNssaTranslatorRole: config.NssaTranslatorRole(1),
 	}
 
+	ospfArea = &ospfd.OspfAreaEntry{
+		AuthType:               int32(areaConf.AuthType),
+		ImportAsExtern:         int32(areaConf.ImportAsExtern),
+		AreaSummary:            int32(areaConf.AreaSummary),
+		AreaNssaTranslatorRole: int32(areaConf.AreaNssaTranslatorRole),
+	}
+
 	gConf.RouterId = "20.0.1.1"
 	gConf.AdminStat = config.Disabled
 	gConf.ASBdrRtrStatus = true
@@ -213,6 +231,21 @@ func initAttr() {
 		IfAuthKey:         string("10.1.10.1"),
 		IfAuthType:        config.AuthType(1),
 	}
+
+	ospfIf = &ospfd.OspfIfEntry{
+		IfIpAddress:       string(ifConf.IfIpAddress),
+		AddressLessIf:     int32(ifConf.AddressLessIf),
+		IfAreaId:          string(ifConf.IfAreaId),
+		IfRtrPriority:     int32(ifConf.IfRtrPriority),
+		IfTransitDelay:    int32(ifConf.IfTransitDelay),
+		IfRetransInterval: int32(ifConf.IfRetransInterval),
+		IfHelloInterval:   int32(ifConf.IfHelloInterval),
+		IfRtrDeadInterval: int32(ifConf.IfRtrDeadInterval),
+		IfPollInterval:    int32(ifConf.IfPollInterval),
+		IfAuthKey:         ifConf.IfAuthKey,
+		IfAuthType:        int32(ifConf.IfAuthType),
+	}
+
 	hellodata = OSPFHelloData{
 		netmask:             []byte{10, 0, 0, 0},
 		helloInterval:       uint16(10),
@@ -464,6 +497,30 @@ func initLsdbData() {
 		Netmask: netmask,
 		Metric:  uint32(20),
 	}
+	val1.AreaId = lsdbKey.AreaId
+	val1.LSType = RouterLSA
+	val1.LSId = lsid
+	val1.AdvRtr = lsid
+
+	val2.AreaId = lsdbKey.AreaId
+	val2.LSType = NetworkLSA
+	val2.LSId = lsid
+	val2.AdvRtr = lsid
+
+	val3.AreaId = lsdbKey.AreaId
+	val3.LSType = Summary3LSA
+	val3.LSId = lsid
+	val3.AdvRtr = lsid
+
+	val4.AreaId = lsdbKey.AreaId
+	val4.LSType = Summary4LSA
+	val4.LSId = lsid
+	val4.AdvRtr = lsid
+
+	val5.AreaId = lsdbKey.AreaId
+	val5.LSType = ASExternalLSA
+	val5.LSId = lsid
+	val5.AdvRtr = lsid
 
 	routerKey = LsaKey{
 		LSType:    uint8(RouterLSA),
@@ -680,6 +737,12 @@ func initRoutingTable() {
 		LinkStateId:   lsid,
 	}
 
+	route = ribdInt.Routes{
+		Ipaddr: "10.1.1.2",
+		Mask:   "10.0.0.0",
+		Metric: 10,
+	}
+
 }
 
 func initPacketData() {
@@ -821,6 +884,10 @@ func startDummyChannels(server *OSPFServer) {
 		case data := <-server.IntfSliceRefreshCh:
 			fmt.Println("Received data on IntfSliceRefreshCh ", data)
 			server.IntfSliceRefreshDoneCh <- true
+		case data := <-server.neighborSliceStartCh:
+			fmt.Println("Received data on neighborSliceStartCh ", data)
+		case data := <-server.ExternalRouteNotif:
+			fmt.Println("Received data on ExternalRouteNotif ", data)
 		}
 	}
 
