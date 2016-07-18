@@ -78,7 +78,7 @@ func NewNeighborConf(logger *logging.Writer, globalConf *config.GlobalConfig, pe
 		conf.Neighbor.State.BfdNeighborState = "down"
 	}
 
-	conf.AfiSafiMap, _ = packet.GetProtocolFromConfig(&conf.Neighbor.AfiSafis)
+	conf.AfiSafiMap, _ = packet.GetProtocolFromConfig(&conf.Neighbor.AfiSafis, conf.Neighbor.NeighborAddress)
 	return &conf
 }
 

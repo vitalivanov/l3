@@ -189,6 +189,43 @@ func (ribdServiceHandler *RIBDServer) ProcessAsicdEvents(sub *nanomsg.SubSocket)
 			ribdServiceHandler.Logger.Info(fmt.Sprintln("Received NOTIFY_IPV4INTF_CREATE ipAddr ", msg.IpAddr, " ifIndex = ", msg.IfIndex, " ifType ", asicdCommonDefs.GetIntfTypeFromIfIndex(msg.IfIndex), " ifId ", asicdCommonDefs.GetIntfIdFromIfIndex(msg.IfIndex)))
 			ribdServiceHandler.ProcessIPv4IntfCreateEvent(msg)
 			break
+		case asicdCommonDefs.NOTIFY_IPV6INTF_CREATE:
+			ribdServiceHandler.Logger.Info("NOTIFY_IPV6INTF_CREATE event")
+			var msg asicdCommonDefs.IPv6IntfNotifyMsg
+			err = json.Unmarshal(Notif.Msg, &msg)
+			if err != nil {
+				ribdServiceHandler.Logger.Info(fmt.Sprintln("Error in reading msg ", err))
+				return
+			}
+			ribdServiceHandler.Logger.Info(fmt.Sprintln("Received NOTIFY_IPV6INTF_CREATE ipAddr ", msg.IpAddr, " ifIndex = ", msg.IfIndex, " ifType ", asicdCommonDefs.GetIntfTypeFromIfIndex(msg.IfIndex), " ifId ", asicdCommonDefs.GetIntfIdFromIfIndex(msg.IfIndex)))
+			var ipMask net.IP
+			ip, ipNet, err := net.ParseCIDR(msg.IpAddr)
+			if err != nil {
+				return
+			}
+			ipMask = make(net.IP, 16)
+			copy(ipMask, ipNet.Mask)
+			ipAddrStr := ip.String()
+			ipMaskStr := net.IP(ipMask).String()
+			ribdServiceHandler.Logger.Info(fmt.Sprintln("Calling createRoute with ipaddr ", ipAddrStr, " mask ", ipMaskStr, " nextHopIntRef: ", strconv.Itoa(int(msg.IfIndex))))
+			cfg := ribd.IPv6Route{
+				DestinationNw: ipAddrStr,
+				Protocol:      "CONNECTED",
+				Cost:          0,
+				NetworkMask:   ipMaskStr,
+			}
+			nextHop := ribd.NextHopInfo{
+				NextHopIp:     "0.0.0.0",
+				NextHopIntRef: strconv.Itoa(int(msg.IfIndex)),
+			}
+			cfg.NextHop = make([]*ribd.NextHopInfo, 0)
+			cfg.NextHop = append(cfg.NextHop, &nextHop)
+
+			ribdServiceHandler.RouteConfCh <- RIBdServerConfig{
+				OrigConfigObject: &cfg,
+				Op:               "addv6",
+			}
+			break
 		case asicdCommonDefs.NOTIFY_IPV4INTF_DELETE:
 			ribdServiceHandler.Logger.Info("NOTIFY_IPV4INTF_DELETE  event")
 			var msg asicdCommonDefs.IPv4IntfNotifyMsg
@@ -199,6 +236,42 @@ func (ribdServiceHandler *RIBDServer) ProcessAsicdEvents(sub *nanomsg.SubSocket)
 			}
 			ribdServiceHandler.Logger.Info(fmt.Sprintln("Received ipv4 intf delete with ipAddr ", msg.IpAddr, " ifIndex = ", msg.IfIndex, " ifType ", asicdCommonDefs.GetIntfTypeFromIfIndex(msg.IfIndex), " ifId ", asicdCommonDefs.GetIntfIdFromIfIndex(msg.IfIndex)))
 			ribdServiceHandler.ProcessIPv4IntfDeleteEvent(msg)
+			break
+		case asicdCommonDefs.NOTIFY_IPV6INTF_DELETE:
+			ribdServiceHandler.Logger.Info("NOTIFY_IPV6INTF_DELETE  event")
+			var msg asicdCommonDefs.IPv6IntfNotifyMsg
+			err = json.Unmarshal(Notif.Msg, &msg)
+			if err != nil {
+				ribdServiceHandler.Logger.Info(fmt.Sprintln("Error in reading msg ", err))
+				return
+			}
+			ribdServiceHandler.Logger.Info(fmt.Sprintln("Received ipv6 intf delete with ipAddr ", msg.IpAddr, " ifIndex = ", msg.IfIndex, " ifType ", asicdCommonDefs.GetIntfTypeFromIfIndex(msg.IfIndex), " ifId ", asicdCommonDefs.GetIntfIdFromIfIndex(msg.IfIndex)))
+			var ipMask net.IP
+			ip, ipNet, err := net.ParseCIDR(msg.IpAddr)
+			if err != nil {
+				return
+			}
+			ipMask = make(net.IP, 16)
+			copy(ipMask, ipNet.Mask)
+			ipAddrStr := ip.String()
+			ipMaskStr := net.IP(ipMask).String()
+			ribdServiceHandler.Logger.Info(fmt.Sprintln("Calling deleteRoute with ipaddr ", ipAddrStr, " mask ", ipMaskStr))
+			cfg := ribd.IPv6Route{
+				DestinationNw: ipAddrStr,
+				Protocol:      "CONNECTED",
+				Cost:          0,
+				NetworkMask:   ipMaskStr,
+			}
+			nextHop := ribd.NextHopInfo{
+				NextHopIp:     "0.0.0.0",
+				NextHopIntRef: strconv.Itoa(int(msg.IfIndex)),
+			}
+			cfg.NextHop = make([]*ribd.NextHopInfo, 0)
+			cfg.NextHop = append(cfg.NextHop, &nextHop)
+			ribdServiceHandler.RouteConfCh <- RIBdServerConfig{
+				OrigConfigObject: &cfg,
+				Op:               "delv6",
+			}
 			break
 		default:
 			logger.Debug("Received unknown event ")

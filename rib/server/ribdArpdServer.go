@@ -34,6 +34,9 @@ func arpdResolveRoute(routeInfoRecord RouteInfoRecord) {
 		return
 	}
 	logger.Debug(fmt.Sprintln(" arpdResolveRoute: Sending ARP Resolve for ", routeInfoRecord.nextHopIp.String(), " routeInfoRecord.nextHopIfIndex ", routeInfoRecord.nextHopIfIndex, " routeInfoRecord.resolvedNextHopIpIntf.NextHopIfIndex ", routeInfoRecord.resolvedNextHopIpIntf.NextHopIfIndex))
+	if routeInfoRecord.ipType == ipv6 {
+		return
+	}
 	arpdclnt.ClientHdl.ResolveArpIPV4(routeInfoRecord.resolvedNextHopIpIntf.NextHopIp, arpdInt.Int(routeInfoRecord.nextHopIfIndex))
 	logger.Debug(fmt.Sprintln("ARP resolve for ", routeInfoRecord.resolvedNextHopIpIntf.NextHopIp, arpdInt.Int(routeInfoRecord.nextHopIfIndex), " returned "))
 }
@@ -42,6 +45,9 @@ func arpdRemoveRoute(routeInfoRecord RouteInfoRecord) {
 		return
 	}
 	logger.Debug(fmt.Sprintln("arpdRemoveRoute: for ", routeInfoRecord.nextHopIp.String()))
+	if routeInfoRecord.ipType == ipv6 {
+		return
+	}
 	arpdclnt.ClientHdl.DeleteResolveArpIPv4(routeInfoRecord.resolvedNextHopIpIntf.NextHopIp)
 	logger.Debug(fmt.Sprintln("ARP remove for ", routeInfoRecord.resolvedNextHopIpIntf.NextHopIp, " returned "))
 }
