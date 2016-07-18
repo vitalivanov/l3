@@ -402,8 +402,7 @@ func (p *Peer) calculateAddPathsAdvertisements(dest *bgprib.Destination, path *b
 	return newUpdated, withdrawList
 }
 
-func (p *Peer) SendUpdate(updated map[*bgprib.Path][]*bgprib.Destination,
-	withdrawn []*bgprib.Destination, withdrawPath *bgprib.Path,
+func (p *Peer) SendUpdate(updated map[*bgprib.Path][]*bgprib.Destination, withdrawn,
 	updatedAddPaths []*bgprib.Destination) {
 	p.logger.Info(fmt.Sprintf("Neighbor %s: Send update message valid routes:%v, withdraw routes:%v",
 		p.NeighborConf.Neighbor.NeighborAddress, updated, withdrawn))

@@ -314,7 +314,7 @@ func (l *LocRib) ProcessRoutesForReachableRoutes(nextHop string, reachabilityInf
 }
 
 func (l *LocRib) ProcessUpdate(neighborConf *base.NeighborConf, pktInfo *packet.BGPPktSrc, addPathCount int) (
-	map[*Path][]*Destination, []*Destination, *Path, []*Destination, bool) {
+	map[*Path][]*Destination, []*Destination, []*Destination, bool) {
 	body := pktInfo.Msg.Body.(*packet.BGPUpdate)
 
 	remPath := NewPath(l, neighborConf, body.PathAttributes, true, false, RouteTypeEGP)
@@ -327,7 +327,7 @@ func (l *LocRib) ProcessUpdate(neighborConf *base.NeighborConf, pktInfo *packet.
 	if !addPath.IsValid() {
 		l.logger.Info(fmt.Sprintf("Received a update with our cluster id %d, Discarding the update.",
 			addPath.NeighborConf.RunningConf.RouteReflectorClusterId))
-		return nil, nil, nil, nil, true
+		return nil, nil, nil, true
 	}
 
 	nextHopStr := addPath.GetNextHop().String()
@@ -353,11 +353,11 @@ func (l *LocRib) ProcessUpdate(neighborConf *base.NeighborConf, pktInfo *packet.
 		updated, withdrawn, updatedAddPaths = l.ProcessRoutesForReachableRoutes(nextHopStr, reachabilityInfo,
 			addPathCount, updated, withdrawn, updatedAddPaths)
 	}
-	return updated, withdrawn, remPath, updatedAddPaths, addedAllPrefixes
+	return updated, withdrawn, updatedAddPaths, addedAllPrefixes
 }
 
 func (l *LocRib) ProcessConnectedRoutes(src string, path *Path, add []packet.NLRI, remove []packet.NLRI,
-	addPathCount int) (map[*Path][]*Destination, []*Destination, *Path, []*Destination) {
+	addPathCount int) (map[*Path][]*Destination, []*Destination, []*Destination) {
 	var removePath *Path
 	removePath = path.Clone()
 	removePath.withdrawn = true
@@ -368,11 +368,11 @@ func (l *LocRib) ProcessConnectedRoutes(src string, path *Path, add []packet.NLR
 	if !addedAllPrefixes {
 		l.logger.Err(fmt.Sprintf("Failed to add connected routes... max prefixes exceeded for connected routes!"))
 	}
-	return updated, withdrawn, removePath, updatedAddPaths
+	return updated, withdrawn, updatedAddPaths
 }
 
 func (l *LocRib) RemoveUpdatesFromNeighbor(peerIP string, neighborConf *base.NeighborConf, addPathCount int) (
-	map[*Path][]*Destination, []*Destination, *Path, []*Destination) {
+	map[*Path][]*Destination, []*Destination, []*Destination) {
 	remPath := NewPath(l, neighborConf, nil, true, false, RouteTypeEGP)
 	withdrawn := make([]*Destination, 0)
 	updated := make(map[*Path][]*Destination)
@@ -399,7 +399,7 @@ func (l *LocRib) RemoveUpdatesFromNeighbor(peerIP string, neighborConf *base.Nei
 	if neighborConf != nil {
 		neighborConf.SetPrefixCount(0)
 	}
-	return updated, withdrawn, remPath, updatedAddPaths
+	return updated, withdrawn, updatedAddPaths
 }
 
 func (l *LocRib) RemoveUpdatesFromAllNeighbors(addPathCount int) {

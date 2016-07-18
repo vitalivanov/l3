@@ -217,11 +217,10 @@ func (server *BGPServer) IsPeerLocal(peerIp string) bool {
 	return server.PeerMap[peerIp].NeighborConf.RunningConf.PeerAS == server.BgpConfig.Global.Config.AS
 }
 
-func (server *BGPServer) SendUpdate(updated map[*bgprib.Path][]*bgprib.Destination,
-	withdrawn []*bgprib.Destination, withdrawPath *bgprib.Path,
+func (server *BGPServer) SendUpdate(updated map[*bgprib.Path][]*bgprib.Destination, withdrawn,
 	updatedAddPaths []*bgprib.Destination) {
 	for _, peer := range server.PeerMap {
-		peer.SendUpdate(updated, withdrawn, withdrawPath, updatedAddPaths)
+		peer.SendUpdate(updated, withdrawn, updatedAddPaths)
 	}
 }
 
@@ -485,10 +484,9 @@ func (server *BGPServer) ApplyAggregateAction(actionInfo interface{},
 	return
 }
 
-func (server *BGPServer) CheckForAggregation(updated map[*bgprib.Path][]*bgprib.Destination,
-	withdrawn []*bgprib.Destination, withdrawPath *bgprib.Path,
-	updatedAddPaths []*bgprib.Destination) (map[*bgprib.Path][]*bgprib.Destination,
-	[]*bgprib.Destination, *bgprib.Path, []*bgprib.Destination) {
+func (server *BGPServer) CheckForAggregation(updated map[*bgprib.Path][]*bgprib.Destination, withdrawn,
+	updatedAddPaths []*bgprib.Destination) (map[*bgprib.Path][]*bgprib.Destination, []*bgprib.Destination,
+	[]*bgprib.Destination) {
 	server.logger.Info(fmt.Sprintf("BGPServer:checkForAggregate - start, updated %v withdrawn %v", updated, withdrawn))
 
 	for _, dest := range withdrawn {
@@ -556,7 +554,7 @@ func (server *BGPServer) CheckForAggregation(updated map[*bgprib.Path][]*bgprib.
 
 	server.logger.Info(fmt.Sprintf("BGPServer:checkForAggregate - complete, updated %v withdrawn %v\n",
 		updated, withdrawn))
-	return updated, withdrawn, withdrawPath, updatedAddPaths
+	return updated, withdrawn, updatedAddPaths
 }
 
 func (server *BGPServer) UpdateRouteAndPolicyDB(policyDetails utilspolicy.PolicyDetails, params interface{}) {
@@ -609,7 +607,7 @@ func (server *BGPServer) TraverseAndApplyBGPRib(data interface{}, updateFunc uti
 	}
 	server.logger.Info(fmt.Sprintf("BGPServer:TraverseRibForPolicies - updated %v withdrawn %v",
 		updated, withdrawn))
-	server.SendUpdate(updated, withdrawn, nil, updatedAddPaths)
+	server.SendUpdate(updated, withdrawn, updatedAddPaths)
 }
 
 func (server *BGPServer) TraverseAndReverseBGPRib(policyData interface{}) {
@@ -663,14 +661,13 @@ func (server *BGPServer) ProcessUpdate(pktInfo *packet.BGPPktSrc) {
 
 	atomic.AddUint32(&peer.NeighborConf.Neighbor.State.Queues.Input, ^uint32(0))
 	peer.NeighborConf.Neighbor.State.Messages.Received.Update++
-	updated, withdrawn, withdrawPath, updatedAddPaths, addedAllPrefixes := server.LocRib.ProcessUpdate(
+	updated, withdrawn, updatedAddPaths, addedAllPrefixes := server.LocRib.ProcessUpdate(
 		peer.NeighborConf, pktInfo, server.AddPathCount)
 	if !addedAllPrefixes {
 		peer.MaxPrefixesExceeded()
 	}
-	updated, withdrawn, withdrawPath, updatedAddPaths = server.CheckForAggregation(updated, withdrawn, withdrawPath,
-		updatedAddPaths)
-	server.SendUpdate(updated, withdrawn, withdrawPath, updatedAddPaths)
+	updated, withdrawn, updatedAddPaths = server.CheckForAggregation(updated, withdrawn, updatedAddPaths)
+	server.SendUpdate(updated, withdrawn, updatedAddPaths)
 }
 
 func (server *BGPServer) convertDestIPToIPPrefix(routes []*config.RouteInfo) []packet.NLRI {
@@ -688,11 +685,10 @@ func (server *BGPServer) ProcessConnectedRoutes(installedRoutes []*config.RouteI
 	server.logger.Info(fmt.Sprintln("valid routes:", installedRoutes, "invalid routes:", withdrawnRoutes))
 	valid := server.convertDestIPToIPPrefix(installedRoutes)
 	invalid := server.convertDestIPToIPPrefix(withdrawnRoutes)
-	updated, withdrawn, withdrawPath, updatedAddPaths := server.LocRib.ProcessConnectedRoutes(
+	updated, withdrawn, updatedAddPaths := server.LocRib.ProcessConnectedRoutes(
 		server.BgpConfig.Global.Config.RouterId.String(), server.ConnRoutesPath, valid, invalid, server.AddPathCount)
-	updated, withdrawn, withdrawPath, updatedAddPaths = server.CheckForAggregation(updated, withdrawn, withdrawPath,
-		updatedAddPaths)
-	server.SendUpdate(updated, withdrawn, withdrawPath, updatedAddPaths)
+	updated, withdrawn, updatedAddPaths = server.CheckForAggregation(updated, withdrawn, updatedAddPaths)
+	server.SendUpdate(updated, withdrawn, updatedAddPaths)
 }
 
 func (server *BGPServer) ProcessIntfStates(intfs []*config.IntfStateInfo) {
@@ -706,21 +702,19 @@ func (server *BGPServer) ProcessIntfStates(intfs []*config.IntfStateInfo) {
 }
 
 func (server *BGPServer) ProcessRemoveNeighbor(peerIp string, peer *Peer) {
-	updated, withdrawn, withdrawPath, updatedAddPaths :=
-		server.LocRib.RemoveUpdatesFromNeighbor(peerIp,
-			peer.NeighborConf, server.AddPathCount)
+	updated, withdrawn, updatedAddPaths := server.LocRib.RemoveUpdatesFromNeighbor(peerIp, peer.NeighborConf,
+		server.AddPathCount)
 	server.logger.Info(fmt.Sprintf("ProcessRemoveNeighbor - Neighbor %s, send updated paths %v, withdrawn paths %v\n",
 		peerIp, updated, withdrawn))
-	updated, withdrawn, withdrawPath, updatedAddPaths = server.CheckForAggregation(updated, withdrawn, withdrawPath,
-		updatedAddPaths)
-	server.SendUpdate(updated, withdrawn, withdrawPath, updatedAddPaths)
+	updated, withdrawn, updatedAddPaths = server.CheckForAggregation(updated, withdrawn, updatedAddPaths)
+	server.SendUpdate(updated, withdrawn, updatedAddPaths)
 }
 
 func (server *BGPServer) SendAllRoutesToPeer(peer *Peer) {
 	withdrawn := make([]*bgprib.Destination, 0)
 	updatedAddPaths := make([]*bgprib.Destination, 0)
 	updated := server.LocRib.GetLocRib()
-	server.SendUpdate(updated, withdrawn, nil, updatedAddPaths)
+	server.SendUpdate(updated, withdrawn, updatedAddPaths)
 }
 
 func (server *BGPServer) RemoveRoutesFromAllNeighbor() {
