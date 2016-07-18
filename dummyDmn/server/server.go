@@ -13,26 +13,26 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 package server
 
 import (
-	"utils/dmnBase"
-	"fmt"
 	"asicdServices"
+	"fmt"
 	"l3/rib/ribdCommonDefs"
+	"utils/dmnBase"
 )
 
-type DummyServer struct{
-	Dmn dmnBase.L3Daemon
-	ServerStartedCh       chan bool
+type DummyServer struct {
+	Dmn             dmnBase.L3Daemon
+	ServerStartedCh chan bool
 }
 
 func (d *DummyServer) GetLogicalIntfInfo() {
@@ -66,36 +66,36 @@ func (d *DummyServer) GetLogicalIntfInfo() {
 func NewDummyServer(dmn dmnBase.L3Daemon) *DummyServer {
 	dummyServer := &DummyServer{}
 	dummyServer.Dmn = dmn
-    dummyServer.ServerStartedCh = make(chan bool)
+	dummyServer.ServerStartedCh = make(chan bool)
 	dummyServer.Dmn.NewServer()
 	return dummyServer
 }
 func (d *DummyServer) InitServer() {
-    err := d.Dmn.ConnectToServers()
+	err := d.Dmn.ConnectToServers()
 	if err != nil {
 		d.Dmn.Logger.Err("Error connecting to servers")
 		return
 	}
-	
+
 	//test code
-    if d.Dmn.Asicdclnt.IsConnected {
-        d.Dmn.Logger.Info("Connected to ASICD")
-        d.GetLogicalIntfInfo()		
+	if d.Dmn.Asicdclnt.IsConnected {
+		d.Dmn.Logger.Info("Connected to ASICD")
+		d.GetLogicalIntfInfo()
 	}
 	if d.Dmn.Ribdclnt.IsConnected {
 		d.Dmn.Logger.Info("Connected to RIBD")
-         nh,_ := d.Dmn.Ribdclnt.ClientHdl.GetRouteReachabilityInfo("40.1.1.2")	
+		nh, _ := d.Dmn.Ribdclnt.ClientHdl.GetRouteReachabilityInfo("40.1.1.2")
 		d.Dmn.Logger.Info(fmt.Sprintln("nh: ", nh))
 	}
-	
+
 	//read from DB
 	//initialize defaults
 }
-func (d *DummyServer)StartServer() {
+func (d *DummyServer) StartServer() {
 
-    d.InitServer()
+	d.InitServer()
 	ribdSubscriberList := []string{ribdCommonDefs.PUB_SOCKET_ADDR, ribdCommonDefs.PUB_SOCKET_POLICY_ADDR}
-    d.Dmn.InitSubscribers(ribdSubscriberList)	
+	d.Dmn.InitSubscribers(ribdSubscriberList)
 
 	d.ServerStartedCh <- true
 
@@ -104,10 +104,10 @@ func (d *DummyServer)StartServer() {
 		d.Dmn.Logger.Info("In for loop")
 		select {
 		case <-d.Dmn.AsicdSubSocketCh:
-		    d.Dmn.Logger.Info("Received message on AsicdSubSocketCh")
+			d.Dmn.Logger.Info("Received message on AsicdSubSocketCh")
 		case <-d.Dmn.AsicdSubSocketErrCh:
 		case <-d.Dmn.RibdSubSocketCh:
-		    d.Dmn.Logger.Info("Received message on RibdSubSocketCh")
+			d.Dmn.Logger.Info("Received message on RibdSubSocketCh")
 		case <-d.Dmn.RibdSubSocketErrCh:
 		}
 	}

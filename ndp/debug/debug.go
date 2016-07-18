@@ -20,36 +20,14 @@
 // |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
 // |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
 //
-
-package main
+package debug
 
 import (
-	"fmt"
-	"l3/dummyDmn/server"
-	"utils/dmnBase"
+	"utils/logging"
 )
 
-var DummyDmn dmnBase.L3Daemon
+var Logger *logging.Writer
 
-func main() {
-	status := DummyDmn.Init("dmnd", "DUMMY")
-	DummyDmn.Logger.Info(fmt.Sprintln("Init done with status", status))
-	if status == false {
-		fmt.Println("Init failed")
-		return
-	}
-	dummyServer := server.NewDummyServer(DummyDmn)
-
-	go dummyServer.StartServer()
-	<-dummyServer.ServerStartedCh
-
-	DummyDmn.Logger.Info("Dummy server started")
-
-	// Start keepalive routine
-	DummyDmn.Logger.Println("Starting KeepAlive")
-	DummyDmn.StartKeepAlive()
-
-	//simulate rpc.StartServer()
-	for {
-	}
+func NDPSetLogger(log *logging.Writer) {
+	Logger = log
 }

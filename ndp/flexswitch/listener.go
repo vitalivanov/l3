@@ -20,36 +20,20 @@
 // |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
 // |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
 //
-
-package main
+package flexswitch
 
 import (
-	"fmt"
-	"l3/dummyDmn/server"
-	"utils/dmnBase"
+	"ndpd"
 )
 
-var DummyDmn dmnBase.L3Daemon
+func (h *ConfigHandler) CreateNDGlobal(config *ndpd.NDGlobal) (bool, error) {
+	return true, nil
+}
 
-func main() {
-	status := DummyDmn.Init("dmnd", "DUMMY")
-	DummyDmn.Logger.Info(fmt.Sprintln("Init done with status", status))
-	if status == false {
-		fmt.Println("Init failed")
-		return
-	}
-	dummyServer := server.NewDummyServer(DummyDmn)
+func (h *ConfigHandler) UpdateNDGlobal(orgCfg *ndpd.NDGlobal, newCfg *ndpd.NDGlobal, attrset []bool, op []*ndpd.PatchOpInfo) (bool, error) {
+	return true, nil
+}
 
-	go dummyServer.StartServer()
-	<-dummyServer.ServerStartedCh
-
-	DummyDmn.Logger.Info("Dummy server started")
-
-	// Start keepalive routine
-	DummyDmn.Logger.Println("Starting KeepAlive")
-	DummyDmn.StartKeepAlive()
-
-	//simulate rpc.StartServer()
-	for {
-	}
+func (h *ConfigHandler) DeleteNDGlobal(config *ndpd.NDGlobal) (bool, error) {
+	return true, nil
 }

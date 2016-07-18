@@ -20,36 +20,20 @@
 // |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
 // |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
 //
+package flexswitch
 
-package main
+type ConfigPlugin struct {
+	handler  *ConfigHandler
+	fileName string
+}
 
-import (
-	"fmt"
-	"l3/dummyDmn/server"
-	"utils/dmnBase"
-)
+type ClientJson struct {
+	Name string `json:Name`
+	Port int    `json:Port`
+}
 
-var DummyDmn dmnBase.L3Daemon
+type ConfigHandler struct {
+}
 
-func main() {
-	status := DummyDmn.Init("dmnd", "DUMMY")
-	DummyDmn.Logger.Info(fmt.Sprintln("Init done with status", status))
-	if status == false {
-		fmt.Println("Init failed")
-		return
-	}
-	dummyServer := server.NewDummyServer(DummyDmn)
-
-	go dummyServer.StartServer()
-	<-dummyServer.ServerStartedCh
-
-	DummyDmn.Logger.Info("Dummy server started")
-
-	// Start keepalive routine
-	DummyDmn.Logger.Println("Starting KeepAlive")
-	DummyDmn.StartKeepAlive()
-
-	//simulate rpc.StartServer()
-	for {
-	}
+type AsicNotificationHdl struct {
 }
