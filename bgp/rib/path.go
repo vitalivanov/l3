@@ -153,11 +153,6 @@ func (p *Path) IsValid() bool {
 	return true
 }
 
-func (p *Path) UpdatePath(pa []packet.BGPPathAttr) {
-	p.PathAttrs = pa
-	p.Pref = p.calculatePref()
-}
-
 func (p *Path) GetNeighborConf() *base.NeighborConf {
 	return p.NeighborConf
 }
@@ -189,17 +184,11 @@ func (p *Path) GetAS4ByteList() []string {
 						}
 						asSetStr := strings.Join(asSetList, ", ")
 						asSetStr = "{ " + asSetStr + " }"
-						//asSetStr = append(asSetStr, "}")
 						asList = append(asList, asSetStr)
 					} else if seg.Type == packet.BGPASPathSegmentSequence {
-						//asSeqList := make([]string, 0, len(seg.AS))
 						for _, as := range seg.AS {
-							//asSeq := make([]int32, 1)
-							//asSeq[0] = int32(as)
-							//asSeqList = append(asSeqList, asSeq)
 							asList = append(asList, strconv.Itoa(int(as)))
 						}
-						//asList = append(asList, asSeqList...)
 					}
 				} else {
 					seg := asSegment.(*packet.BGPAS2PathSegment)
@@ -210,18 +199,11 @@ func (p *Path) GetAS4ByteList() []string {
 						}
 						asSetStr := strings.Join(asSetList, ", ")
 						asSetStr = "{ " + asSetStr + " }"
-						//asSetStr = append("{", asSetStr...)
-						//asSetStr = append(asSetStr, "}")
 						asList = append(asList, asSetStr)
 					} else if seg.Type == packet.BGPASPathSegmentSequence {
-						//asSeqList := make([][]int32, 0, len(seg.AS))
 						for _, as := range seg.AS {
-							//asSeq := make([]int32, 1)
-							//asSeq[0] = int32(as)
-							//asSeqList = append(asSeqList, asSeq)
 							asList = append(asList, strconv.Itoa(int(as)))
 						}
-						//asList = append(asList, asSeqList...)
 					}
 				}
 			}

@@ -270,7 +270,6 @@ func (d *Destination) RemovePath(peerIP string, pathId uint32, path *Path) *Path
 		for ecmpPath, _ := range d.ecmpPaths {
 			if ecmpPath == oldPath {
 				d.recalculate = true
-				//d.LocRibPath = path
 			}
 		}
 
@@ -624,47 +623,6 @@ func (d *Destination) SelectRouteForLocRib(addPathCount int) (RouteAction, bool,
 		}
 	}
 	return locRibAction, addPathsUpdated, addedRoutes, updatedRoutes, deletedRoutes
-}
-
-func (d *Destination) updateRoute(path *Path) {
-	d.logger.Info(fmt.Sprintf("Remove route for ip=%s, mask=%s\n", d.NLRI.GetPrefix().String(),
-		constructNetmaskFromLen(int(d.NLRI.GetLength()), 32).String()))
-	protocol := "IBGP"
-	if path.IsExternal() {
-		protocol = "EBGP"
-	}
-	cfg := config.RouteConfig{
-		DestinationNw:     d.NLRI.GetPrefix().String(),
-		Protocol:          protocol,
-		OutgoingInterface: strconv.Itoa(int(path.reachabilityInfo.NextHopIfIdx)),
-		Cost:              int32(path.reachabilityInfo.Metric),
-		NetworkMask:       constructNetmaskFromLen(int(d.NLRI.GetLength()), 32).String(),
-		NextHopIp:         path.reachabilityInfo.NextHop,
-	}
-	//d.rib.routeMgr.DeleteRoute(&cfg)
-	d.rib.routeMgr.UpdateRoute(&cfg, "remove")
-
-	if path.IsAggregate() || !path.IsLocal() {
-		var nextHop string
-		if path.IsAggregate() {
-			nextHop = "255.255.255.255"
-		} else {
-			nextHop = path.reachabilityInfo.NextHop
-		}
-
-		d.logger.Info(fmt.Sprintf("Add route for ip=%s, mask=%s, next hop=%s\n", d.NLRI.GetPrefix().String(),
-			constructNetmaskFromLen(int(d.NLRI.GetLength()), 32).String(), nextHop))
-		cfg := config.RouteConfig{
-			Cost:              int32(path.reachabilityInfo.Metric),
-			Protocol:          protocol,
-			IntfType:          int32(path.reachabilityInfo.NextHopIfType),
-			NextHopIp:         nextHop,
-			NetworkMask:       constructNetmaskFromLen(int(d.NLRI.GetLength()), 32).String(),
-			DestinationNw:     d.NLRI.GetPrefix().String(),
-			OutgoingInterface: strconv.Itoa(int(path.reachabilityInfo.NextHopIfIdx)),
-		}
-		d.rib.routeMgr.CreateRoute(&cfg)
-	}
 }
 
 func (d *Destination) getRoutesWithHighestPref(updatedPaths []*Path, prunedPaths []PathSortIface) ([]*Path,

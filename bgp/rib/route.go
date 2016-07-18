@@ -79,15 +79,6 @@ func NewRoute(dest *Destination, path *Path, action RouteAction, inPathId, outPa
 	}
 }
 
-/*
-func (r *Route) GetBGPRoute() *bgpd.BGPRouteState {
-	if r.BGPRouteState != nil {
-		r.BGPRouteState.UpdatedDuration = time.Now().Sub(r.time).String()
-	}
-	return r.BGPRouteState
-}
-*/
-
 func (r *Route) setAction(action RouteAction) {
 	r.action = action
 }
