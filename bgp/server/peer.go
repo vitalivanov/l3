@@ -233,7 +233,7 @@ func (p *Peer) ReceiveUpdate(msg *packet.BGPMessage) {
 	}
 
 	if len(update.NLRI) > 0 {
-		path := bgprib.NewPath(p.locRib, p.NeighborConf, update.PathAttributes, false, true, bgprib.RouteTypeEGP)
+		path := bgprib.NewPath(p.locRib, p.NeighborConf, update.PathAttributes, bgprib.RouteTypeEGP)
 		for _, nlri := range update.NLRI {
 			ip := nlri.GetPrefix().String()
 			if _, ok = p.ribIn[ip]; !ok {

@@ -317,8 +317,8 @@ func (l *LocRib) ProcessUpdate(neighborConf *base.NeighborConf, pktInfo *packet.
 	map[*Path][]*Destination, []*Destination, []*Destination, bool) {
 	body := pktInfo.Msg.Body.(*packet.BGPUpdate)
 
-	remPath := NewPath(l, neighborConf, body.PathAttributes, true, false, RouteTypeEGP)
-	addPath := NewPath(l, neighborConf, body.PathAttributes, false, true, RouteTypeEGP)
+	remPath := NewPath(l, neighborConf, body.PathAttributes, RouteTypeEGP)
+	addPath := NewPath(l, neighborConf, body.PathAttributes, RouteTypeEGP)
 
 	reachabilityInfo := l.GetReachabilityInfo(addPath)
 	addPath.SetReachabilityInfo(reachabilityInfo)
@@ -345,7 +345,6 @@ func (l *LocRib) ProcessUpdate(neighborConf *base.NeighborConf, pktInfo *packet.
 
 	updated, withdrawn, updatedAddPaths, addedAllPrefixes := l.ProcessRoutes(pktInfo.Src, body.NLRI, addPath,
 		body.WithdrawnRoutes, remPath, addPathCount)
-	addPath.updated = false
 
 	if reachabilityInfo != nil {
 		l.logger.Info(fmt.Sprintf("ProcessUpdate - next hop %s is reachable, so process previously unreachable routes",
@@ -360,11 +359,8 @@ func (l *LocRib) ProcessConnectedRoutes(src string, path *Path, add []packet.NLR
 	addPathCount int) (map[*Path][]*Destination, []*Destination, []*Destination) {
 	var removePath *Path
 	removePath = path.Clone()
-	removePath.withdrawn = true
-	path.updated = true
 	updated, withdrawn, updatedAddPaths, addedAllPrefixes := l.ProcessRoutes(src, add, path, remove, removePath,
 		addPathCount)
-	path.updated = false
 	if !addedAllPrefixes {
 		l.logger.Err(fmt.Sprintf("Failed to add connected routes... max prefixes exceeded for connected routes!"))
 	}
@@ -373,7 +369,7 @@ func (l *LocRib) ProcessConnectedRoutes(src string, path *Path, add []packet.NLR
 
 func (l *LocRib) RemoveUpdatesFromNeighbor(peerIP string, neighborConf *base.NeighborConf, addPathCount int) (
 	map[*Path][]*Destination, []*Destination, []*Destination) {
-	remPath := NewPath(l, neighborConf, nil, true, false, RouteTypeEGP)
+	remPath := NewPath(l, neighborConf, nil, RouteTypeEGP)
 	withdrawn := make([]*Destination, 0)
 	updated := make(map[*Path][]*Destination)
 	updatedAddPaths := make([]*Destination, 0)
@@ -456,7 +452,7 @@ func (l *LocRib) RemoveRouteFromAggregate(ip *packet.IPPrefix, aggIP *packet.IPP
 		dest.LocRibPathRoute.path))
 	op := l.stateDBMgr.UpdateObject
 	path = dest.LocRibPathRoute.path
-	remPath := NewPath(l, nil, path.PathAttrs, true, false, path.routeType)
+	remPath := NewPath(l, nil, path.PathAttrs, path.routeType)
 
 	if aggDest, ok = l.GetDest(aggIP, false); !ok {
 		l.logger.Info(fmt.Sprintf("LocRib:RemoveRouteFromAggregate - dest not found for aggIP %v", aggIP))
@@ -507,7 +503,7 @@ func (l *LocRib) AddRouteToAggregate(ip *packet.IPPrefix, aggIP *packet.IPPrefix
 		return updated, withdrawn, nil, nil
 	}
 	path = dest.LocRibPath
-	remPath := NewPath(l, nil, path.PathAttrs, true, false, path.routeType)
+	remPath := NewPath(l, nil, path.PathAttrs, path.routeType)
 
 	op := l.stateDBMgr.UpdateObject
 	if aggDest, ok = l.GetDest(aggIP, true); ok {
@@ -528,7 +524,7 @@ func (l *LocRib) AddRouteToAggregate(ip *packet.IPPrefix, aggIP *packet.IPPrefix
 			packet.SetNextHopPathAttrs(pathAttrs, ifaceIP)
 		}
 		packet.SetPathAttrAggregator(pathAttrs, l.gConf.AS, l.gConf.RouterId)
-		aggPath = NewPath(path.rib, nil, pathAttrs, false, true, RouteTypeAgg)
+		aggPath = NewPath(path.rib, nil, pathAttrs, RouteTypeAgg)
 		aggPath.setAggregatedPath(ip.Prefix.String(), path)
 		aggDest, _ := l.GetDest(aggIP, true)
 		aggDest.AddOrUpdatePath(srcIP, AggregatePathId, aggPath)
@@ -566,9 +562,6 @@ func (l *LocRib) AddRouteToAggregate(ip *packet.IPPrefix, aggIP *packet.IPPrefix
 	}
 
 	op(l.GetRouteStateConfigObj(dest.GetBGPRoute()))
-	if aggPath != nil {
-		aggPath.SetUpdate(false)
-	}
 	return updated, withdrawn, remPath, updatedAddPaths
 }
 

@@ -1275,8 +1275,7 @@ func (server *BGPServer) StartServer() {
 	server.BgpConfig.PeerGroups = make(map[string]*config.PeerGroup)
 
 	pathAttrs := packet.ConstructPathAttrForConnRoutes(gConf.RouterId, gConf.AS)
-	server.ConnRoutesPath = bgprib.NewPath(server.LocRib, nil, pathAttrs,
-		false, false, bgprib.RouteTypeConnected)
+	server.ConnRoutesPath = bgprib.NewPath(server.LocRib, nil, pathAttrs, bgprib.RouteTypeConnected)
 
 	server.logger.Info("Setting up Peer connections")
 	// channel for accepting connections

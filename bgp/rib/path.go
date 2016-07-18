@@ -72,8 +72,6 @@ type Path struct {
 	logger           *logging.Writer
 	NeighborConf     *base.NeighborConf
 	PathAttrs        []packet.BGPPathAttr
-	withdrawn        bool
-	updated          bool
 	Pref             uint32
 	reachabilityInfo *ReachabilityInfo
 	routeType        uint8
@@ -82,15 +80,12 @@ type Path struct {
 	AggregatedPaths  map[string]*Path
 }
 
-func NewPath(locRib *LocRib, peer *base.NeighborConf, pa []packet.BGPPathAttr, withdrawn bool, updated bool,
-	routeType uint8) *Path {
+func NewPath(locRib *LocRib, peer *base.NeighborConf, pa []packet.BGPPathAttr, routeType uint8) *Path {
 	path := &Path{
 		rib:             locRib,
 		logger:          locRib.logger,
 		NeighborConf:    peer,
 		PathAttrs:       pa,
-		withdrawn:       withdrawn,
-		updated:         updated,
 		routeType:       routeType,
 		AggregatedPaths: make(map[string]*Path),
 	}
@@ -106,8 +101,6 @@ func (p *Path) Clone() *Path {
 		logger:           p.rib.logger,
 		NeighborConf:     p.NeighborConf,
 		PathAttrs:        p.PathAttrs,
-		withdrawn:        p.withdrawn,
-		updated:          p.updated,
 		Pref:             p.Pref,
 		reachabilityInfo: p.reachabilityInfo,
 		routeType:        p.routeType,
@@ -160,26 +153,9 @@ func (p *Path) IsValid() bool {
 	return true
 }
 
-func (p *Path) SetWithdrawn(status bool) {
-	p.withdrawn = status
-}
-
-func (p *Path) IsWithdrawn() bool {
-	return p.withdrawn
-}
-
 func (p *Path) UpdatePath(pa []packet.BGPPathAttr) {
 	p.PathAttrs = pa
 	p.Pref = p.calculatePref()
-	p.updated = true
-}
-
-func (p *Path) SetUpdate(status bool) {
-	p.updated = status
-}
-
-func (p *Path) IsUpdated() bool {
-	return p.updated
 }
 
 func (p *Path) GetNeighborConf() *base.NeighborConf {
@@ -353,7 +329,6 @@ func (p *Path) addPathToAggregate(destIP string, path *Path, generateASSet bool)
 			p.AggregatedPaths[destIP] = path
 			p.aggregateAllPaths(generateASSet)
 		}
-		p.updated = true
 
 		return true
 	}
@@ -364,7 +339,6 @@ func (p *Path) addPathToAggregate(destIP string, path *Path, generateASSet bool)
 		return false
 	}
 
-	p.updated = true
 	idx, i := 0, 0
 	pathIdx := 0
 	for idx = 0; idx < len(p.PathAttrs); idx++ {
@@ -388,7 +362,6 @@ func (p *Path) addPathToAggregate(destIP string, path *Path, generateASSet bool)
 }
 
 func (p *Path) removePathFromAggregate(destIP string, generateASSet bool) {
-	p.updated = true
 	delete(p.AggregatedPaths, destIP)
 	p.aggregateAllPaths(generateASSet)
 }
