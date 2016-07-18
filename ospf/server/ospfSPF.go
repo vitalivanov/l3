@@ -853,7 +853,7 @@ func (server *OSPFServer) spfCalculation() {
 		server.GlobalRoutingTbl = nil
 		server.GlobalRoutingTbl = make(map[RoutingTblEntryKey]GlobalRoutingTblEntry)
 		server.GlobalRoutingTbl = server.TempGlobalRoutingTbl
-		server.dumpGlobalRoutingTbl()
+		//server.dumpGlobalRoutingTbl()
 		for key, _ := range server.AreaConfMap {
 			areaId := convertAreaOrRouterIdUint32(string(key.AreaId))
 			areaIdKey := AreaIdKey{

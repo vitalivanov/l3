@@ -93,15 +93,18 @@ func rTableTestLogic(tNum int) int {
 		go ospf.spfCalculation()
 		ospf.StartCalcSPFCh <- true
 
+                ospf.TempAreaRoutingTbl = make(map[AreaIdKey]AreaRoutingTbl)
+		ospf.TempAreaRoutingTbl[areaidkey] = areaRoutingTable
 		ospf.UpdateRoutingTbl(vKeyR, lsdbKey.AreaId)
 		ospf.UpdateRoutingTbl(vKeyN, lsdbKey.AreaId)
 		ospf.UpdateRoutingTbl(vKeyT, lsdbKey.AreaId)
 		fmt.Println(" Running routing table display.")
-		ospf.dumpGlobalRoutingTbl()
+		//ospf.dumpGlobalRoutingTbl()
 
 		fmt.Println("Running install routing table.")
 		ospf.InstallRoutingTbl()
 
+		ospf.TempGlobalRoutingTbl = make(map[RoutingTblEntryKey]GlobalRoutingTblEntry)
 		//init area config and install routes
 		ospf.initAreaConfDefault()
 		ospf.processAreaConfig(areaConf)
@@ -112,6 +115,23 @@ func rTableTestLogic(tNum int) int {
 		fmt.Println("Generated summary LSAs ", "lsaKey ", lsakey," lsa " ,lsa)
 		lsakey, slsa := ospf.GenerateType3SummaryLSA(rKey, rEntry, lsdbKey)
 		fmt.Println("Generated type 3 summary lsa ", "lsakey ", lsakey, " lsa ", slsa)
+		
+		/* install routing table */
+		ospf.InstallRoute(rKey)
+		ospf.UpdateRoute(rKey)
+		ospf.CompareRoutes(rKey)
+		ospf.DeleteRoute(rKey)
+		
+		ospf.AreaGraph[vKeyR] = vertexR
+		ospf.AreaGraph[vKeyN] = vertexN
+		ospf.AreaGraph[vKeyT] = vertexT
+
+		ospf.UpdateRoutingTblForTNetwork(areaidkey, vKeyR, treeVertex, vKeyN)
+		ospf.UpdateRoutingTblForTNetwork(areaidkey, vKeyR, treeVertex, vKeyT)
+
+		ospf.UpdateRoutingTblWithStub(lsdbKey.AreaId, vKeyN, treeVertex,treeVertex, vKeyT, vKeyT)
+		ospf.UpdateRoutingTblWithStub(lsdbKey.AreaId, vKeyT, treeVertex,treeVertex, vKeyT, vKeyN)
+
 	}
 	return SUCCESS
 }

@@ -31,6 +31,7 @@ import (
 	"net"
 	"sync"
 	"time"
+	"utils/commonDefs"
 	"utils/logging"
 )
 
@@ -68,6 +69,13 @@ var netmask uint32
 var lsid uint32
 var ospf *OSPFServer
 var eventMsg DbEventMsg
+
+/* Infra Structs */
+var portProperty PortProperty
+var vlanProperty VlanProperty
+var ipv4Msg IPv4IntfNotifyMsg
+var ipProperty IpProperty
+var ipIntfProperty IPIntfProperty
 
 /* Global conf */
 var gConf config.GlobalConf
@@ -367,12 +375,45 @@ func initAttr() {
 	}
 	eventMsg.eventInfo = "SeqNumberMismatch. Nbr should be master "
 
+	initInfra()
 	initLsdbData()
 	initRoutingTable()
 	//populateNbrLists()
 
 }
 
+func initInfra() {
+	portProperty = PortProperty{
+		Name:  "fpPort1",
+		Mtu:   int32(1500),
+		Speed: uint32(100),
+	}
+	vlanProperty = VlanProperty{
+		Name:       "fpPort1",
+		UntagPorts: []int32{12, 1, 2},
+	}
+
+	ipv4Msg = IPv4IntfNotifyMsg{
+		IpAddr: string("10.1.1.2/24"),
+		IfId:   uint16(0),
+		IfType: uint8(commonDefs.IfTypePort),
+	}
+
+	ipProperty = IpProperty{
+		IfId:   uint16(0),
+		IfType: uint8(commonDefs.IfTypePort),
+		IpAddr: "10.1.1.2",
+	}
+	ipIntfProperty = IPIntfProperty{
+		IfName:  "fpPort1",
+		IpAddr:  dstIP,
+		MacAddr: dstMAC,
+		NetMask: []byte{0x0a, 0x0, 0x0, 0x0},
+		Mtu:     1500,
+		Cost:    uint32(20),
+	}
+
+}
 func initLsdbData() {
 	areaid := convertAreaOrRouterIdUint32("10.0.0.0")
 	netmask = convertAreaOrRouterIdUint32("255.0.0.0")
@@ -571,36 +612,36 @@ func initRoutingTable() {
 	areaidkey = AreaIdKey{
 		AreaId: lsdbKey.AreaId,
 	}
+	ospf.TempAreaRoutingTbl = make(map[AreaIdKey]AreaRoutingTbl)
 	ospf.TempAreaRoutingTbl[areaidkey] = areaRoutingTable
-
-	sVertex1 = StubVertex {
-	NbrVertexKey:vKeyR,
-	NbrVertexCost:uint16(20),
-	LinkData:uint32(11),
-	LsaKey:routerKey,
-	AreaId:lsdbKey.AreaId,
-	LinkStateId:lsid,
-	}
-	
-	sVertex2 = StubVertex {
-	NbrVertexKey:vKeyN,
-	NbrVertexCost:uint16(20),
-	LinkData:uint32(11),
-	LsaKey:routerKey, 
-	AreaId:lsdbKey.AreaId,
-	LinkStateId:lsid, 
+	ospf.TempGlobalRoutingTbl[rKey] = rEntry
+	ospf.OldGlobalRoutingTbl[rKey] = rEntry
+	sVertex1 = StubVertex{
+		NbrVertexKey:  vKeyR,
+		NbrVertexCost: uint16(20),
+		LinkData:      uint32(11),
+		LsaKey:        routerKey,
+		AreaId:        lsdbKey.AreaId,
+		LinkStateId:   lsid,
 	}
 
-	sVertex3 = StubVertex {  
-	 NbrVertexKey:vKeyT,
-	NbrVertexCost:uint16(20),
-	LinkData:uint32(11),
-	LsaKey:routerKey,
-	AreaId:lsdbKey.AreaId, 
-	LinkStateId:lsid, 
+	sVertex2 = StubVertex{
+		NbrVertexKey:  vKeyN,
+		NbrVertexCost: uint16(20),
+		LinkData:      uint32(11),
+		LsaKey:        routerKey,
+		AreaId:        lsdbKey.AreaId,
+		LinkStateId:   lsid,
 	}
 
-	
+	sVertex3 = StubVertex{
+		NbrVertexKey:  vKeyT,
+		NbrVertexCost: uint16(20),
+		LinkData:      uint32(11),
+		LsaKey:        routerKey,
+		AreaId:        lsdbKey.AreaId,
+		LinkStateId:   lsid,
+	}
 
 }
 

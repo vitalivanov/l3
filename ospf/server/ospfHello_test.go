@@ -99,9 +99,26 @@ func helloTestLogic(tNum int) int {
 }
 
 func checkHeaderAPIs() {
-ospfHdr := &OSPFHeader{}
-decodeOspfHdr(header, ospfHdr)
 
-pkt := encodeOspfHdr(*ospfHdr)
-fmt.Println("Encoded header pkt : ", pkt)
+	ospf.IntfConfMap[key] = intf
+	intf.SendMutex = sync.Mutex{}
+
+	ospfHdr := &OSPFHeader{}
+	decodeOspfHdr(header, ospfHdr)
+
+	pkt := encodeOspfHdr(*ospfHdr)
+	fmt.Println("Encoded header pkt : ", pkt)
+
+	ospf.processOspfHeader(hello, key, &ospfHdrMd)
+	ospf.processOspfData(hello, &ethHdrMd, &ipHdrMd, &ospfHdrMd, key)
+	ospf.processOspfData(lsaupd, &ethHdrMd, &ipHdrMd, &ospfHdrMd, key)
+	ospf.processOspfData(lsaack, &ethHdrMd, &ipHdrMd, &ospfHdrMd, key)
+	ospf.processOspfData(lsareq, &ethHdrMd, &ipHdrMd, &ospfHdrMd, key)
+
+	ospf.processIPv4Layer(ip_layer, dstIP, &ipHdrMd)
+
+	ospf.StopSendHelloPkt(key)
+	ospf.StartSendHelloPkt(key)
+
+	ospf.SendOspfPkt(key, hello)
 }

@@ -819,6 +819,7 @@ func (server *OSPFServer) InstallRoutingTbl() {
 	}
 }
 
+/*
 func (server *OSPFServer) dumpGlobalRoutingTbl() {
 	server.logger.Info("=============Routing Table============")
 	server.logger.Info("DestId      AddrMask        DestType        OprCapabilities Area    PathType        Cost    Type2Cost       LSOrigin        NumOfPaths      NextHops")
@@ -858,14 +859,6 @@ func (server *OSPFServer) dumpGlobalRoutingTbl() {
 				LsaType = "RouterLSA"
 			} else if ent.RoutingTblEnt.LSOrigin.LSType == NetworkLSA {
 				LsaType = "NetworkLSA"
-				/*
-				   } else if ent.RoutingTblEnt.LSOrigin.LSType == Summary3LSA {
-				           LsaType = "Summary3LSA"
-				   } else if ent.RoutingTblEnt.LSOrigin.LSType == Summary4LSA {
-				           LsaType = "Summary4LSA"
-				   } else {
-				           LsaType = "ASExternalLSA"
-				*/
 			}
 			LsaLSId = convertUint32ToIPv4(ent.RoutingTblEnt.LSOrigin.LSId)
 			LsaAdvRouter = convertUint32ToIPv4(ent.RoutingTblEnt.LSOrigin.AdvRouter)
@@ -889,3 +882,4 @@ func (server *OSPFServer) dumpGlobalRoutingTbl() {
 	}
 	server.logger.Info("==============End of Routing Table================")
 }
+*/

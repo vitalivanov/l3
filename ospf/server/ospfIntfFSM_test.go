@@ -24,6 +24,7 @@
 package server
 
 import (
+	"asicd/asicdCommonDefs"
 	"fmt"
 	"l3/ospf/config"
 	"testing"
@@ -93,5 +94,22 @@ func intfFSMTestLogic() int {
 	tNum++
 	fmt.Println(tNum, ": Running StopOspfIntfFSM")
 	//	ospf.StopOspfIntfFSM(key)
+
+	/*Test infra APIS.*/
+	checkInfraAPIs()
 	return SUCCESS
+}
+
+func checkInfraAPIs() {
+	ospf.BuildOspfInfra()
+	mtu := ospf.computeMinMTU(ipv4Msg)
+	fmt.Println("Mtu size calculated as ", mtu)
+	ospf.updateIpPropertyMap(ipv4Msg, asicdCommonDefs.NOTIFY_IPV4INTF_CREATE)
+
+	ospf.getLinuxIntfName(ipProperty.IfId, ipProperty.IfType)
+	cost, _ := ospf.getIntfCost(ipProperty.IfId, ipProperty.IfType)
+	fmt.Println("Cost calculated as ", cost)
+	macadd, _ := getMacAddrIntfName(vlanProperty.Name)
+	fmt.Println("mac address ", macadd)
+	//ospf.updateVlanPropertyMap(
 }
