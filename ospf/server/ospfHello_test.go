@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"l3/ospf/config"
 	"testing"
+//	"sync"
 )
 
 func initHelloTestParams() {
@@ -101,7 +102,7 @@ func helloTestLogic(tNum int) int {
 func checkHeaderAPIs() {
 
 	ospf.IntfConfMap[key] = intf
-	intf.SendMutex = sync.Mutex{}
+	//intf.SendMutex = sync.Mutex{}
 
 	ospfHdr := &OSPFHeader{}
 	decodeOspfHdr(header, ospfHdr)
@@ -115,7 +116,7 @@ func checkHeaderAPIs() {
 	ospf.processOspfData(lsaack, &ethHdrMd, &ipHdrMd, &ospfHdrMd, key)
 	ospf.processOspfData(lsareq, &ethHdrMd, &ipHdrMd, &ospfHdrMd, key)
 
-	ospf.processIPv4Layer(ip_layer, dstIP, &ipHdrMd)
+//	ospf.processIPv4Layer(ip_layer, dstIP, &ipHdrMd)
 
 	ospf.StopSendHelloPkt(key)
 	ospf.StartSendHelloPkt(key)
