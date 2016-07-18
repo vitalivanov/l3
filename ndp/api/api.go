@@ -56,10 +56,11 @@ func SendL2PortNotification(ifIndex int32, state string) {
 	}
 }
 
-func SendL3PortNotification(ifIndex int32, state string) {
+func SendL3PortNotification(ifIndex int32, state, ipAddr string) {
 	ndpApi.server.IpStateCh <- &config.StateNotification{
 		IfIndex: ifIndex,
 		State:   state,
+		IpAddr:  ipAddr,
 	}
 }
 

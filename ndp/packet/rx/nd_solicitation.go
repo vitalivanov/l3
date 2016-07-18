@@ -23,16 +23,32 @@
 package rx
 
 import (
-	_ "encoding/binary"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"net"
 	_ "reflect"
 )
 
-type NDSolicitation struct {
+type NDOptionType byte
+
+const (
+	NDOptionTypeSourceLinkLayerAddress NDOptionType = 1
+	NDOptionTypeTargetLinkLayerAddress NDOptionType = 2
+	NDOptionTypePrefixInfo             NDOptionType = 3
+	NDOptionTypeRedirectHeader         NDOptionType = 4
+	NDOptionTypeMTU                    NDOptionType = 5
+)
+
+type NDOption struct {
+	Type   NDOptionType
+	Length byte
+	Value  []byte
+}
+
+type NDInfo struct {
 	TargetAddress net.IP
-	Options       []byte
+	Options       []*NDOption
 }
 
 const (
@@ -55,11 +71,25 @@ const (
  *   |   Options ...
  *   +-+-+-+-+-+-+-+-+-+-+-+-
  */
-func DecodeNDSolicitation(payload []byte, nds *NDSolicitation) error {
+
+func DecodeOptionLayer(payload []byte) *NDOption {
+	ndOpt := &NDOption{}
+	ndOpt.Type = NDOptionType(payload[0])
+	ndOpt.Length = payload[1]
+	ndOpt.Value = append(ndOpt.Value, payload[2:]...)
+	return ndOpt
+}
+
+func DecodeNDInfo(payload []byte, nds *NDInfo) error {
 	if nds.TargetAddress == nil {
 		nds.TargetAddress = make(net.IP, IPV6_ADDRESS_BYTES, IPV6_ADDRESS_BYTES)
 	}
-	copy(nds.TargetAddress, payload[:])
+	copy(nds.TargetAddress, payload[0:IPV6_ADDRESS_BYTES])
+	if len(payload) > IPV6_ADDRESS_BYTES {
+		//decode option layer also
+		ndOpt := DecodeOptionLayer(payload[IPV6_ADDRESS_BYTES:])
+		nds.Options = append(nds.Options, ndOpt)
+	}
 	return nil
 }
 
@@ -67,7 +97,7 @@ func DecodeNDSolicitation(payload []byte, nds *NDSolicitation) error {
  *  According to RFC 2375 https://tools.ietf.org/html/rfc2375 all ipv6 multicast address have first byte as
  *  FF or 0xff, so compare that with the Target address first byte.
  */
-func IsNDSolicitationMulticastAddr(in net.IP) bool {
+func IsTargetMulticast(in net.IP) bool {
 	if in.IsMulticast() {
 		return true
 	}
@@ -80,7 +110,7 @@ func IsNDSolicitationMulticastAddr(in net.IP) bool {
  *  if srcIp == "::", i.e Unspecified address then dstIP should be solicited-node address FF02:0:0:0:0:1:FFXX:XXXX
  *  if srcIP == "::", then there should not be any source link-layer option in message
  */
-func ValidateIpAddrs(srcIP net.IP, dstIP net.IP) error {
+func ValidateNDSIpAddrs(srcIP net.IP, dstIP net.IP) error {
 	if srcIP.IsUnspecified() {
 		if !(dstIP[0] == IPV6_MULTICAST_BYTE && dstIP[1]&0x0f == 0x02 &&
 			dstIP[11]&0x0f == 0x01 && dstIP[12] == IPV6_MULTICAST_BYTE) {
@@ -89,5 +119,22 @@ func ValidateIpAddrs(srcIP net.IP, dstIP net.IP) error {
 		}
 		// @TODO: need to add support for source link-layer address option
 	}
+	return nil
+}
+
+/*
+ * If the IP Destination Address is a multicast address the
+ *       Solicited flag is zero.
+ * All included options have a length that is greater than zero.
+ */
+func ValidateNDAInfo(icmpFlags []byte, dstIP net.IP) error {
+	if dstIP.IsMulticast() {
+		flags := binary.BigEndian.Uint16(icmpFlags[0:2])
+		if (flags & 0x4000) == 0x4000 {
+			return errors.New(fmt.Sprintln("Check for If Destination Address is a multicast address then",
+				"the Solicited flag is zero, Failed"))
+		}
+	}
+	// @TODO: need to add support for options length
 	return nil
 }

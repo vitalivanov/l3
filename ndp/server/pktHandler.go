@@ -29,6 +29,7 @@ import (
 	"l3/ndp/config"
 	"l3/ndp/debug"
 	"l3/ndp/packet"
+	_ "net"
 )
 
 /*
@@ -136,7 +137,6 @@ func (svr *NDPServer) ProcessRxPkt(ifIndex int32, pkt gopacket.Packet) {
 		return
 	}
 	nbrInfo := &config.NeighborInfo{}
-	debug.Logger.Info("Processing RX Pkt")
 	err := packet.ValidateAndParse(nbrInfo, pkt)
 	if err != nil {
 		debug.Logger.Err(fmt.Sprintln("Validating and parsing Pkt Failed:", err))
@@ -144,15 +144,16 @@ func (svr *NDPServer) ProcessRxPkt(ifIndex int32, pkt gopacket.Packet) {
 	}
 	switchMac := svr.CheckSrcMac(nbrInfo.MacAddr)
 	if switchMac {
-		debug.Logger.Info(fmt.Sprintln("Received Packet from same port and hence ignoring the packet:", nbrInfo))
+		debug.Logger.Info(fmt.Sprintln(
+			"Received Packet from same port and hence ignoring the packet:", nbrInfo))
 		return
 	}
 	svr.PopulateVlanInfo(nbrInfo, ifIndex)
-	debug.Logger.Info(fmt.Sprintln("Calling create ipv6 neighgor and nbrinfo is", nbrInfo))
-	// ipaddr, macAddr, vlanId, ifIndex
+	debug.Logger.Info(fmt.Sprintln("Calling create ipv6 neighgor for global nbrinfo is", nbrInfo))
+	// ipaddr, macAddr, vlanId, ifIndex --- Global IPv6 Address
 	_, err = svr.SwitchPlugin.CreateIPv6Neighbor(nbrInfo.IpAddr, nbrInfo.MacAddr, nbrInfo.VlanId, nbrInfo.IfIndex)
 	if err != nil {
-		debug.Logger.Err(fmt.Sprintln("create ipv6 neigbor failed for", nbrInfo, "error is", err))
+		debug.Logger.Err(fmt.Sprintln("create ipv6 global neigbor failed for", nbrInfo, "error is", err))
 	}
 	return
 }

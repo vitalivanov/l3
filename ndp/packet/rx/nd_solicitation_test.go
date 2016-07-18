@@ -53,20 +53,25 @@ func NDPTestNewLogger(name string, tag string, listenToConfig bool) (*logging.Wr
 	return srLogger, err
 }
 
+var OptionRawByteWithTarget = []byte{
+	0xfe, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xc0, 0x00, 0x54, 0xff, 0xfe, 0xf5, 0x00, 0x01,
+	0x02, 0x01, 0xc2, 0x00, 0x54, 0xf5, 0x00, 0x00,
+}
+
 // Test ND Solicitation message Decoder
-func TestNDSolicitationDecoder(t *testing.T) {
+func TestNDInfoDecoder(t *testing.T) {
 	var err error
 	logger, err := NDPTestNewLogger("ndpd", "NDPTEST", true)
 	if err != nil {
 		t.Error("creating logger failed")
 	}
 	debug.NDPSetLogger(logger)
-	nds := &NDSolicitation{}
-	err = DecodeNDSolicitation(testPkt, nds)
+	nds := &NDInfo{}
+	err = DecodeNDInfo(testPkt, nds)
 	if err != nil {
 		t.Error("Decoding ipv6 and icmpv6 header failed", err)
 	}
-	ndWant := &NDSolicitation{
+	ndWant := &NDInfo{
 		TargetAddress: net.IP{0xfe, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xc0, 0x00, 0x54, 0xff, 0xfe, 0xf5, 0x00, 0x01},
 	}
 	if !reflect.DeepEqual(nds, ndWant) {
@@ -74,18 +79,49 @@ func TestNDSolicitationDecoder(t *testing.T) {
 	}
 }
 
+// Test ND Options
+func TestNDOptionDecoder(t *testing.T) {
+	nds := &NDInfo{}
+	err := DecodeNDInfo(OptionRawByteWithTarget, nds)
+	if err != nil {
+		t.Error("Decoding ipv6 and icmpv6 header failed", err)
+	}
+	ndWant := &NDInfo{
+		TargetAddress: net.IP{0xfe, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xc0, 0x00, 0x54, 0xff, 0xfe, 0xf5, 0x00, 0x01},
+	}
+	if !reflect.DeepEqual(nds.TargetAddress, ndWant.TargetAddress) {
+		t.Error("Decoding NDInfo Target Address Failed")
+	}
+	optionWant := &NDOption{
+		Type:   2,
+		Length: 1,
+		Value:  []byte{0xc2, 0x00, 0x54, 0xf5, 0x00, 0x00},
+	}
+	ndWant.Options = append(ndWant.Options, optionWant)
+	if !reflect.DeepEqual(nds, ndWant) {
+		t.Error("NDInfo is not correct")
+	}
+	/*
+		option := nds.Options[0]
+		macAddr := option.Value
+		fmt.Printf("%02x:%02x:%02x:%02x:%02x:%02x\n",
+			macAddr[0], macAddr[1], macAddr[2],
+			macAddr[3], macAddr[4], macAddr[5])
+	*/
+}
+
 // Test ND Solicitation multicast Address Validation
 func TestNDSMulticast(t *testing.T) {
 	b := net.IP{0xfe, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xc0, 0x00, 0x54, 0xff, 0xfe, 0xf5, 0x00, 0x01}
 
 	// b is not multicast address, fail the test case if true is returned
-	if IsNDSolicitationMulticastAddr(b) {
+	if IsTargetMulticast(b) {
 		t.Error("byte is not ipv6 muticast address", b)
 	}
 
 	b[0] = 0xff
 	// b is multicast address, fail the test case if false is returned
-	if !IsNDSolicitationMulticastAddr(b) {
+	if !IsTargetMulticast(b) {
 		t.Error("byte is ipv6 muticast address", b)
 	}
 }
@@ -94,22 +130,42 @@ func TestNDSMulticast(t *testing.T) {
 func TestNDSIpAddress(t *testing.T) {
 	srcIP := net.IP{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
 	dstIP := net.IP{0xff, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0xff, 0x10, 0x78, 0x2e}
-	t.Log("SrcIP->", srcIP.String(), "DstIP->", dstIP.String())
-	err := ValidateIpAddrs(srcIP, dstIP)
+	//t.Log("SrcIP->", srcIP.String(), "DstIP->", dstIP.String())
+	err := ValidateNDSIpAddrs(srcIP, dstIP)
 	if err != nil {
 		t.Error("Validation of ip address failed with error", err)
 	}
 
 	srcIP = net.IP{0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
-	t.Log("SrcIP->", srcIP.String(), "DstIP->", dstIP.String())
-	err = ValidateIpAddrs(srcIP, dstIP)
+	//t.Log("SrcIP->", srcIP.String(), "DstIP->", dstIP.String())
+	err = ValidateNDSIpAddrs(srcIP, dstIP)
 	if err != nil {
 		t.Error("Validation of ip address", srcIP, "failed with error", err)
 	}
 	dstIP = net.IP{0xfe, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xc0, 0x00, 0x54, 0xff, 0xfe, 0xf5, 0x00, 0x01}
-	t.Log("SrcIP->", srcIP.String(), "DstIP->", dstIP.String())
-	err = ValidateIpAddrs(srcIP, dstIP)
+	//t.Log("SrcIP->", srcIP.String(), "DstIP->", dstIP.String())
+	err = ValidateNDSIpAddrs(srcIP, dstIP)
 	if err != nil {
 		t.Error("Validation of ip address", srcIP, "dst Ip", dstIP, "failed with error", err)
+	}
+}
+
+// Test ND Advertisement check
+func TestValidateNDAInfo(t *testing.T) {
+	dstIp := net.IP{0xff, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01}
+	flags := []byte{0xa0, 00, 00, 00}
+	err := ValidateNDAInfo(flags, dstIp)
+	if err != nil {
+		t.Error("Validation of nda failed, error:", err)
+	}
+	flags1 := []byte{0x40, 00, 00, 00, 00}
+	err = ValidateNDAInfo(flags1, dstIp)
+	if err == nil {
+		t.Error("Validation of nda didn't failed, error:", err)
+	}
+	dstIp = net.IP{0xfe, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xc0, 0x00, 0x54, 0xff, 0xfe, 0xf5, 0x00, 0x01}
+	err = ValidateNDAInfo(flags1, dstIp)
+	if err != nil {
+		t.Error("Validation of nda failed, error:", err)
 	}
 }

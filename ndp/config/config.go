@@ -58,11 +58,12 @@ type PortState struct {
 
 type IPv6IntfInfo struct {
 	PcapBase
-	IntfRef   string
-	IfIndex   int32
-	IpAddr    string
-	OperState string
-	MsgType   string
+	IntfRef     string
+	IfIndex     int32
+	IpAddr      string
+	MsgType     string
+	OperState   string
+	LinkLocalIp string
 }
 
 type IPIntfNotification struct {
@@ -74,13 +75,15 @@ type IPIntfNotification struct {
 type StateNotification struct {
 	IfIndex int32
 	State   string
+	IpAddr  string
 }
 
 type NeighborInfo struct {
-	IpAddr  string
-	MacAddr string
-	VlanId  int32
-	IfIndex int32
+	MacAddr     string
+	VlanId      int32
+	IfIndex     int32
+	IpAddr      string
+	LinkLocalIp string
 }
 
 type VlanInfo struct {

@@ -23,18 +23,29 @@
 package packet
 
 import (
+	"encoding/binary"
 	"fmt"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"infra/sysd/sysdCommonDefs"
 	"l3/ndp/config"
 	"l3/ndp/debug"
+	"l3/ndp/packet/rx"
 	"log/syslog"
 	"net"
 	"reflect"
 	"testing"
 	"utils/logging"
 )
+
+var ndaPkt = []byte{
+	0x33, 0x33, 0x00, 0x00, 0x00, 0x01, 0xc2, 0x00, 0x54, 0xf5, 0x00, 0x00, 0x86, 0xdd, 0x6e, 0x00,
+	0x00, 0x00, 0x00, 0x20, 0x3a, 0xff, 0xfe, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xc0, 0x00,
+	0x54, 0xff, 0xfe, 0xf5, 0x00, 0x00, 0xff, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x88, 0x00, 0x9a, 0xbb, 0xa0, 0x00, 0x00, 0x00, 0xfe, 0x80,
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xc0, 0x00, 0x54, 0xff, 0xfe, 0xf5, 0x00, 0x00, 0x02, 0x01,
+	0xc2, 0x00, 0x54, 0xf5, 0x00, 0x00,
+}
 
 var testPkt = []byte{
 	0x33, 0x33, 0xff, 0xf5, 0x00, 0x00, 0xc2, 0x00, 0x54, 0xf5, 0x00, 0x00, 0x86, 0xdd, 0x6e, 0x00,
@@ -82,7 +93,6 @@ func DeepCheckIPv6Hdr(ipv6Hdr, ipv6Want *layers.IPv6, t *testing.T) {
 	if !reflect.DeepEqual(ipv6Hdr.Length, ipv6Want.Length) {
 		t.Error("lenght mismatch")
 	}
-	t.Log("IPv6 Header Successfully Verified")
 }
 
 func DeepCheckNDHdr(icmpv6Hdr, ndWant *layers.ICMPv6, t *testing.T) {
@@ -92,7 +102,6 @@ func DeepCheckNDHdr(icmpv6Hdr, ndWant *layers.ICMPv6, t *testing.T) {
 	if !reflect.DeepEqual(icmpv6Hdr.Checksum, ndWant.Checksum) {
 		t.Error("Checksum MisMatch")
 	}
-	t.Log("ICMPv6 Header Successfully Verified")
 }
 
 func TestEthLayer(t *testing.T) {
@@ -164,7 +173,7 @@ func TestValidateIpv6hdr(t *testing.T) {
 	}
 }
 
-func TestValidateICMPv6Checksum(t *testing.T) {
+func TestValidateICMPv6NDSChecksum(t *testing.T) {
 	p := gopacket.NewPacket(testPkt, layers.LinkTypeEthernet, gopacket.Default)
 	if p.ErrorLayer() != nil {
 		t.Error("Failed to decode packet:", p.ErrorLayer().Error())
@@ -175,7 +184,7 @@ func TestValidateICMPv6Checksum(t *testing.T) {
 	if err != nil {
 		t.Error("Decoding ipv6 and icmpv6 header failed", err)
 	}
-	err = validateChecksum(ipv6Hdr, icmpv6Hdr)
+	err = validateChecksum(ipv6Hdr.SrcIP, ipv6Hdr.DstIP, icmpv6Hdr)
 	if err != nil {
 		t.Error("Validating Checksum failed", err)
 	}
@@ -192,21 +201,23 @@ func TestValidateICMPv6Hdr(t *testing.T) {
 	if err != nil {
 		t.Error("Decoding ipv6 and icmpv6 header failed", err)
 	}
-	t.Log("SrcIP->", ipv6Hdr.SrcIP.String(), "DstIP->", ipv6Hdr.DstIP.String())
-	/*
-		for idx, _ := range ipv6Hdr.DstIP {
-			t.Log(idx, "---->", ipv6Hdr.DstIP[idx])
-		}
-	*/
-	err = validateICMPv6Hdr(icmpv6Hdr, ipv6Hdr.SrcIP, ipv6Hdr.DstIP)
+	//t.Log("SrcIP->", ipv6Hdr.SrcIP.String(), "DstIP->", ipv6Hdr.DstIP.String())
+	var testPkt = net.IP{
+		0xfe, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xc0, 0x00, 0x54, 0xff, 0xfe, 0xf5, 0x00, 0x00,
+	}
+	nds, err := decodeICMPv6Hdr(icmpv6Hdr, ipv6Hdr.SrcIP, ipv6Hdr.DstIP)
 	if err != nil {
 		t.Error("Validating ICMPv6 Header failed:", err)
+	}
+	if !reflect.DeepEqual(nds.TargetAddress, testPkt) {
+		t.Error("Link Local Ip Mismatch:", err)
 	}
 }
 
 func TestPopulateNeighborInfo(t *testing.T) {
 	nbrInfo := &config.NeighborInfo{}
-	populateNeighborInfo(nbrInfo, nil, nil, nil)
+	nds := rx.NDInfo{}
+	populateNeighborInfo(nbrInfo, nil, nil, nil, &nds)
 	if nbrInfo.IpAddr != "" {
 		t.Error("nil error check failed")
 	}
@@ -225,19 +236,19 @@ func TestPopulateNeighborInfo(t *testing.T) {
 	if err != nil {
 		t.Error("failed to get ethener layer", err)
 	}
-	populateNeighborInfo(nbrInfo, eth, nil, nil)
+	populateNeighborInfo(nbrInfo, eth, nil, nil, &nds)
 	if nbrInfo.IpAddr != "" {
 		t.Error("nil error check failed")
 	}
-	populateNeighborInfo(nbrInfo, nil, ipv6Hdr, nil)
+	populateNeighborInfo(nbrInfo, nil, ipv6Hdr, nil, &nds)
 	if nbrInfo.IpAddr != "" {
 		t.Error("nil error check failed")
 	}
-	populateNeighborInfo(nbrInfo, nil, nil, icmpv6Hdr)
+	populateNeighborInfo(nbrInfo, nil, nil, icmpv6Hdr, &nds)
 	if nbrInfo.IpAddr != "" {
 		t.Error("nil error check failed")
 	}
-	populateNeighborInfo(nbrInfo, eth, ipv6Hdr, icmpv6Hdr)
+	populateNeighborInfo(nbrInfo, eth, ipv6Hdr, icmpv6Hdr, &nds)
 	if nbrInfo.MacAddr != "c2:00:54:f5:00:00" {
 		t.Error("Src Mac copy to NeighborInfo failed")
 	}
@@ -247,7 +258,7 @@ func TestPopulateNeighborInfo(t *testing.T) {
 	}
 }
 
-func TestValidatePkt(t *testing.T) {
+func TestValidateNDSPkt(t *testing.T) {
 	p := gopacket.NewPacket(testPkt, layers.LinkTypeEthernet, gopacket.Default)
 	if p.ErrorLayer() != nil {
 		t.Error("Failed to decode packet:", p.ErrorLayer().Error())
@@ -262,6 +273,143 @@ func TestValidatePkt(t *testing.T) {
 	}
 
 	if nbrInfo.IpAddr != "::" {
+		t.Error("src ip address copy failed")
+	}
+}
+
+var lotsOfZeros [1024]byte
+
+func TestDecodeNDA(t *testing.T) {
+	p := gopacket.NewPacket(ndaPkt, layers.LinkTypeEthernet, gopacket.Default)
+	if p.ErrorLayer() != nil {
+		t.Error("Failed to decode packet:", p.ErrorLayer().Error())
+	}
+	icmpv6Hdr := &layers.ICMPv6{}
+	ipv6Hdr := &layers.IPv6{}
+
+	err := getIpAndICMPv6Hdr(p, ipv6Hdr, icmpv6Hdr)
+	if err != nil {
+		t.Error("Decoding ipv6 and icmpv6 header failed", err)
+	}
+
+	nda, err := decodeICMPv6Hdr(icmpv6Hdr, ipv6Hdr.SrcIP, ipv6Hdr.DstIP)
+	if err != nil {
+		t.Error("Validating ICMPv6 Header failed:", err)
+	}
+
+	var testPkt = net.IP{
+		0xfe, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xc0, 0x00, 0x54, 0xff, 0xfe, 0xf5, 0x00, 0x00,
+	}
+	optionWant := &rx.NDOption{
+		Type:   2,
+		Length: 1,
+		Value:  []byte{0xc2, 0x00, 0x54, 0xf5, 0x00, 0x00},
+	}
+	want := &rx.NDInfo{
+		TargetAddress: testPkt,
+	}
+	want.Options = append(want.Options, optionWant)
+
+	if !reflect.DeepEqual(nda, want) {
+		t.Error("NDInfo is not correct")
+	}
+}
+
+func TestPseudoChecksumBuf(t *testing.T) {
+	p := gopacket.NewPacket(ndaPkt, layers.LinkTypeEthernet, gopacket.Default)
+	if p.ErrorLayer() != nil {
+		t.Error("Failed to decode packet:", p.ErrorLayer().Error())
+	}
+	icmpv6Hdr := &layers.ICMPv6{}
+	ipv6Hdr := &layers.IPv6{}
+
+	err := getIpAndICMPv6Hdr(p, ipv6Hdr, icmpv6Hdr)
+	if err != nil {
+		t.Error("Decoding ipv6 and icmpv6 header failed", err)
+	}
+	buf := createPseudoHeader(ipv6Hdr.SrcIP, ipv6Hdr.DstIP, icmpv6Hdr)
+	if buf[39] != ICMP_PSEUDO_NEXT_HEADER {
+		t.Error("creating pseudo header failed")
+	}
+	if len(buf) != 40 {
+		t.Error("invalid pseudo header for checksum calculation")
+	}
+}
+
+func TestNDAChecksum(t *testing.T) {
+	p := gopacket.NewPacket(ndaPkt, layers.LinkTypeEthernet, gopacket.Default)
+	if p.ErrorLayer() != nil {
+		t.Error("Failed to decode packet:", p.ErrorLayer().Error())
+	}
+	icmpv6Hdr := &layers.ICMPv6{}
+	ipv6Hdr := &layers.IPv6{}
+
+	err := getIpAndICMPv6Hdr(p, ipv6Hdr, icmpv6Hdr)
+	if err != nil {
+		t.Error("Decoding ipv6 and icmpv6 header failed", err)
+	}
+
+	nda, err := decodeICMPv6Hdr(icmpv6Hdr, ipv6Hdr.SrcIP, ipv6Hdr.DstIP)
+	if err != nil {
+		t.Error("Validating ICMPv6 Header failed:", err)
+	}
+
+	var testPkt = net.IP{
+		0xfe, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xc0, 0x00, 0x54, 0xff, 0xfe, 0xf5, 0x00, 0x00,
+	}
+	optionWant := &rx.NDOption{
+		Type:   2,
+		Length: 1,
+		Value:  []byte{0xc2, 0x00, 0x54, 0xf5, 0x00, 0x00},
+	}
+	want := &rx.NDInfo{
+		TargetAddress: testPkt,
+	}
+	want.Options = append(want.Options, optionWant)
+
+	if !reflect.DeepEqual(nda, want) {
+		t.Error("NDInfo is not correct")
+	}
+	err = validateChecksum(ipv6Hdr.SrcIP, ipv6Hdr.DstIP, icmpv6Hdr)
+	if err != nil {
+		t.Error("Validating Checksum failed:-", err)
+	}
+}
+
+func TestUnSupportedICMPv6(t *testing.T) {
+	icmpv6Hdr := &layers.ICMPv6{}
+	csum := []byte{0x9a, 0xbb}
+	flags := []byte{0xa0, 00, 00, 00}
+	icmpv6Hdr.TypeCode = layers.CreateICMPv6TypeCode(137, 0)
+	icmpv6Hdr.Checksum = binary.BigEndian.Uint16(csum[:])
+	icmpv6Hdr.TypeBytes = append(icmpv6Hdr.TypeBytes, flags...)
+	var ip net.IP
+	_, err := decodeICMPv6Hdr(icmpv6Hdr, ip, ip)
+	if err == nil {
+		t.Error("Validating ICMPv6 Header should have failed:", err)
+	}
+	icmpv6Hdr.TypeCode = layers.CreateICMPv6TypeCode(133, 0)
+	_, err = decodeICMPv6Hdr(icmpv6Hdr, ip, ip)
+	if err == nil {
+		t.Error("Validating ICMPv6 Header should have failed:", err)
+	}
+}
+
+func TestValidateNDAPkt(t *testing.T) {
+	p := gopacket.NewPacket(ndaPkt, layers.LinkTypeEthernet, gopacket.Default)
+	if p.ErrorLayer() != nil {
+		t.Error("Failed to decode packet:", p.ErrorLayer().Error())
+	}
+	nbrInfo := &config.NeighborInfo{}
+	err := ValidateAndParse(nbrInfo, p)
+	if err != nil {
+		t.Error("Failed to Validate Packet, Error:", err)
+	}
+	if nbrInfo.MacAddr != "c2:00:54:f5:00:00" {
+		t.Error("Src Mac copy to NeighborInfo failed")
+	}
+
+	if nbrInfo.IpAddr != "fe80::c000:54ff:fef5:0" {
 		t.Error("src ip address copy failed")
 	}
 }

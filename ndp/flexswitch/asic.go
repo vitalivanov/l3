@@ -82,9 +82,9 @@ func (notifyHdl *AsicNotificationHdl) ProcessNotification(msg commonDefs.AsicdNo
 	case commonDefs.L3IntfStateNotifyMsg:
 		l3Msg := msg.(commonDefs.L3IntfStateNotifyMsg)
 		if l3Msg.IfState == asicdCommonDefs.INTF_STATE_UP {
-			api.SendL3PortNotification(l3Msg.IfIndex, config.STATE_UP)
+			api.SendL3PortNotification(l3Msg.IfIndex, config.STATE_UP, l3Msg.IpAddr)
 		} else {
-			api.SendL3PortNotification(l3Msg.IfIndex, config.STATE_DOWN)
+			api.SendL3PortNotification(l3Msg.IfIndex, config.STATE_DOWN, l3Msg.IpAddr)
 		}
 	case commonDefs.VlanNotifyMsg:
 		/*

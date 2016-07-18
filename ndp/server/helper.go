@@ -28,6 +28,7 @@ import (
 	"github.com/google/gopacket/pcap"
 	"l3/ndp/config"
 	"l3/ndp/debug"
+	"net"
 )
 
 /*
@@ -179,6 +180,11 @@ func (svr *NDPServer) GetIntfRefName(ifIndex int32) string {
 	return INTF_REF_NOT_FOUND
 }
 
+func (svr *NDPServer) IsLinkLocal(ipAddr string) bool {
+	ip, _, _ := net.ParseCIDR(ipAddr)
+	return ip.IsLinkLocalUnicast()
+}
+
 /*  API: will handle IPv6 notifications received from switch/asicd
  *      Msg types
  *	    1) Create:
@@ -186,11 +192,17 @@ func (svr *NDPServer) GetIntfRefName(ifIndex int32) string {
  *	    2) Delete:
  *		    delete an entry from the map
  */
-func (svr *NDPServer) CreateIPIntf(obj *config.IPIntfNotification) {
+func (svr *NDPServer) HandleCreateIPIntf(obj *config.IPIntfNotification) {
 	ipInfo, exists := svr.L3Port[obj.IfIndex]
 	switch obj.Operation {
 	case config.CONFIG_CREATE:
 		if exists {
+			if svr.IsLinkLocal(obj.IpAddr) {
+				debug.Logger.Info(fmt.Sprintln("Updating link local Ip", obj.IpAddr, "for", obj.IfIndex))
+				ipInfo.LinkLocalIp = obj.IpAddr
+				svr.L3Port[obj.IfIndex] = ipInfo
+				return
+			}
 			debug.Logger.Err(fmt.Sprintln("Received create notification for ifIndex", obj.IfIndex,
 				"when entry already exist in the database. Dumping IpAddr for debugging info.",
 				"Received Ip:", obj.IpAddr, "stored Ip:", ipInfo.IpAddr))
@@ -229,10 +241,12 @@ func (svr *NDPServer) HandlePhyPortStateNotification(msg *config.StateNotificati
  *		     Stop Rx/Tx in this case
  */
 func (svr *NDPServer) HandleStateNotification(msg *config.StateNotification) {
-	debug.Logger.Info(fmt.Sprintln("Received State:", msg.State, "for ifIndex:", msg.IfIndex))
+	debug.Logger.Info(fmt.Sprintln("Received State:", msg.State, "for ifIndex:", msg.IfIndex, "ipAddr:", msg.IpAddr))
 	switch msg.State {
 	case config.STATE_UP:
-		svr.StartRxTx(msg.IfIndex)
+		if !svr.IsLinkLocal(msg.IpAddr) {
+			svr.StartRxTx(msg.IfIndex)
+		}
 	case config.STATE_DOWN:
 		svr.StopRxTx(msg.IfIndex)
 	}

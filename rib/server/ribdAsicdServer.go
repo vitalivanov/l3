@@ -36,27 +36,28 @@ var asicdRoute []asicdInt.IPv4Route
 
 func addAsicdRoute(routeInfoRecord RouteInfoRecord) {
 	logger.Info(fmt.Sprintln("addAsicdRoute, weight = ", routeInfoRecord.weight+1, " ipType:", routeInfoRecord.ipType))
-	/*	asicdRoute = make([]asicdInt.IPv4Route, asicdBulkCount)
-		if asicdRouteCount == 0 {
-			asicdRoutes = make([]*asicdInt.IPv4Route, 0)
-		}
-		asicdRoute[asicdRouteCount] = asicdInt.IPv4Route{
-			routeInfoRecord.destNetIp.String(),
-			routeInfoRecord.networkMask.String(),
-			[]*asicdInt.IPv4NextHop{
-				&asicdInt.IPv4NextHop{
-					NextHopIp: routeInfoRecord.resolvedNextHopIpIntf.NextHopIp,
-					Weight:    int32(routeInfoRecord.weight + 1),
+	if routeInfoRecord.ipType == ipv4 {
+		/*	asicdRoute = make([]asicdInt.IPv4Route, asicdBulkCount)
+			if asicdRouteCount == 0 {
+				asicdRoutes = make([]*asicdInt.IPv4Route, 0)
+			}
+			asicdRoute[asicdRouteCount] = asicdInt.IPv4Route{
+				routeInfoRecord.destNetIp.String(),
+				routeInfoRecord.networkMask.String(),
+				[]*asicdInt.IPv4NextHop{
+					&asicdInt.IPv4NextHop{
+						NextHopIp: routeInfoRecord.resolvedNextHopIpIntf.NextHopIp,
+						Weight:    int32(routeInfoRecord.weight + 1),
+					},
 				},
-			},
-		}
-		asicdRoutes = append(asicdRoutes, &asicdRoute[asicdRouteCount])
-		asicdRouteCount++
-		if asicdRouteCount == asicdBulkCount {
-			asicdclnt.ClientHdl.OnewayCreateIPv4Route(asicdRoutes)
-			asicdRoutes = nil
-			asicdRouteCount = 0
-		}*/
+			}
+			asicdRoutes = append(asicdRoutes, &asicdRoute[asicdRouteCount])
+			asicdRouteCount++
+			if asicdRouteCount == asicdBulkCount {
+				asicdclnt.ClientHdl.OnewayCreateIPv4Route(asicdRoutes)
+				asicdRoutes = nil
+				asicdRouteCount = 0
+			}*/
 		asicdclnt.ClientHdl.OnewayCreateIPv4Route([]*asicdInt.IPv4Route{
 			&asicdInt.IPv4Route{
 				routeInfoRecord.destNetIp.String(),
