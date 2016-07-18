@@ -30,17 +30,17 @@ import (
 	"models/objects"
 	"ospfd"
 	"strings"
-	"utils/dbutils"
 	"time"
+	"utils/dbutils"
 )
 
 type DbRouteMsg struct {
-	op bool
+	op    bool
 	entry RoutingTblEntryKey
 }
 
 type DbLsdbMsg struct {
-	op bool 
+	op    bool
 	entry LsdbSliceEnt
 }
 
@@ -76,32 +76,32 @@ func (server *OSPFServer) StartDBListener() {
 	}
 	for {
 		select {
-		     case start := <- server.DbReadConfig:
+		case start := <-server.DbReadConfig:
 			if start {
-			server.ReadOspfCfgFromDB()
+				server.ReadOspfCfgFromDB()
 			} else {
-			   return
+				return
 			}
 
-		     case msg := <- server.DbRouteOp:
+		case msg := <-server.DbRouteOp:
 			if msg.op {
-			  server.AddIPv4RoutesState(msg.entry)  
+				server.AddIPv4RoutesState(msg.entry)
 			} else {
-			   server.DelIPv4RoutesState(msg.entry)
+				server.DelIPv4RoutesState(msg.entry)
 			}
 
-		     case msg := <- server.DbLsdbOp:
+		case msg := <-server.DbLsdbOp:
 			if msg.op {
-			    server.AddLsdbEntry(msg.entry)
+				server.AddLsdbEntry(msg.entry)
 			} else {
-			    server.DelLsdbEntry(msg.entry)
+				server.DelLsdbEntry(msg.entry)
 			}
 
-		     case msg := <- server.DbEventOp:
+		case msg := <-server.DbEventOp:
 			server.AddOspfEventState(msg.eventType, msg.eventInfo)
 		}
 	}
-	
+
 }
 
 func (server *OSPFServer) ReadOspfCfgFromDB() {
@@ -435,7 +435,7 @@ func (server *OSPFServer) AddOspfEventState(eventType string, eventInfo string) 
 	var dbObj objects.OspfEventState
 	obj := ospfd.NewOspfEventState()
 
-        obj.Index = DBEventSeq
+	obj.Index = DBEventSeq
 	DBEventSeq++
 	obj.TimeStamp = time.Now().String()
 	obj.EventInfo = eventInfo
@@ -443,27 +443,27 @@ func (server *OSPFServer) AddOspfEventState(eventType string, eventInfo string) 
 
 	objects.ConvertThriftToospfdOspfEventStateObj(obj, &dbObj)
 	if server.dbHdl == nil {
-		 return errors.New(fmt.Sprintln("dbHdl is nil")) 
+		return errors.New(fmt.Sprintln("dbHdl is nil"))
 	}
 	err := dbObj.StoreObjectInDb(server.dbHdl)
-        if err != nil {
-                server.logger.Err(fmt.Sprintln("DB: Failed to add event object in db , err ", err))
-                return errors.New(fmt.Sprintln("Failed to add OspfEventState in db : ", eventInfo))
-        }
+	if err != nil {
+		server.logger.Err(fmt.Sprintln("DB: Failed to add event object in db , err ", err))
+		return errors.New(fmt.Sprintln("Failed to add OspfEventState in db : ", eventInfo))
+	}
 
-        return err
+	return err
 
 }
 
 func (server *OSPFServer) DelOspfEventState(entry config.OspfEventState) error {
 	server.logger.Info(fmt.Sprintln("DB: DEL ospf event ", entry))
 	var dbObj objects.OspfEventState
- 	obj := ospfd.NewOspfEventState()
-	
+	obj := ospfd.NewOspfEventState()
+
 	obj.TimeStamp = time.Now().String()
 	obj.EventInfo = entry.EventInfo
 	obj.EventType = entry.EventType
-	
+
 	objects.ConvertThriftToospfdOspfEventStateObj(obj, &dbObj)
 	err := dbObj.DeleteObjectFromDb(server.dbHdl)
 	if err != nil {

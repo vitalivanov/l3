@@ -24,16 +24,16 @@
 package server
 
 import (
-        "fmt"
-     //   "l3/ospf/config"
-        "testing"
+	"fmt"
+	//   "l3/ospf/config"
+	"testing"
 )
 
 func initDBTestParams() {
-        fmt.Println("\n Get Server object")
-        ospf = getServerObject()
-        initAttr()
-        go startDummyChannels(ospf)
+	fmt.Println("\n Get Server object")
+	ospf = getServerObject()
+	initAttr()
+	go startDummyChannels(ospf)
 	//fmt.Println(" Initialize db ")
 	//ospf.InitializeDB()
 	fmt.Println(" Init DB channels. ")
@@ -43,47 +43,46 @@ func initDBTestParams() {
 }
 
 func TestOspfDB(t *testing.T) {
-        fmt.Println("\n**************** STATE DB ************\n")
-        initDBTestParams()
-        for index := 1; index < 21; index++ {
-                err := dbTestLogic(index)
-                if err != SUCCESS {
-                        fmt.Println("Failed test case for state db")
-                }
-        }
+	fmt.Println("\n**************** STATE DB ************\n")
+	initDBTestParams()
+	for index := 1; index < 21; index++ {
+		err := dbTestLogic(index)
+		if err != SUCCESS {
+			fmt.Println("Failed test case for state db")
+		}
+	}
 }
 
 func dbTestLogic(tNum int) int {
 
 	switch tNum {
 	case 1:
-	fmt.Println(tNum, ": Running DbReadConfig ")
-	ospf.DbReadConfig <- true
+		fmt.Println(tNum, ": Running DbReadConfig ")
+		ospf.DbReadConfig <- true
 
 	case 2:
-	fmt.Println(tNum, ": Running DbRouteOp ")
-	msg := DbRouteMsg{ 
-		entry: rKey,
-		op: true,
-	}
+		fmt.Println(tNum, ": Running DbRouteOp ")
+		msg := DbRouteMsg{
+			entry: rKey,
+			op:    true,
+		}
 
-	ospf.DbRouteOp<-msg
-	
+		ospf.DbRouteOp <- msg
+
 	case 3:
-	ospf.DbLsdbOp <- lsdbMsg
-	
+		ospf.DbLsdbOp <- lsdbMsg
+
 	case 4:
-	ospf.DbEventOp <- eventMsg
+		ospf.DbEventOp <- eventMsg
 
 	case 5:
-	fmt.Println(tNum, ": Running ReadOspfCfgFromDB ")
-	ospf.ReadOspfCfgFromDB()
+		fmt.Println(tNum, ": Running ReadOspfCfgFromDB ")
+		ospf.ReadOspfCfgFromDB()
 
 	case 6:
-	fmt.Println(tNum, "applyOspfGlobalConf ")
-	//ospf.applyOspfGlobalConf(gConf)
+		fmt.Println(tNum, "applyOspfGlobalConf ")
+		//ospf.applyOspfGlobalConf(gConf)
 	}
-	
-return SUCCESS	
-}
 
+	return SUCCESS
+}
