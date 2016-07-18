@@ -84,8 +84,14 @@ func StartTestServer() {
 	InitTestServer()
 	server.AcceptConfig = true
 	go server.StartServer("/opt/flexswitch/params")
-	InitIpInfoList()
-	InitRouteList()
+	InitLogicalIntfList()
+	InitVlanList()
+	InitIPv4IntfList()
+	InitIPv6IntfList()
+	InitIpv4AddrInfoList()
+	InitIpv4RouteList()
+	InitIpv6AddrInfoList()
+	InitIpv6RouteList()
 	InitPatchOpList()
 
 	fmt.Println("server started")

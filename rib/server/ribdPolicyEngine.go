@@ -81,7 +81,7 @@ func policyEngineActionRejectRoute(params interface{}) {
 	}
 	cfg.NextHop = make([]*ribd.NextHopInfo, 0)
 	cfg.NextHop = append(cfg.NextHop, &nextHop)
-	_, err := RouteServiceHandler.ProcessRouteDeleteConfig(&cfg) //routeInfo.destNetIp, routeInfo.networkMask, ReverseRouteProtoTypeMapDB[int(routeInfo.routeType)], routeInfo.nextHopIp) // FIBAndRIB)//,ribdCommonDefs.RoutePolicyStateChangetoInValid)
+	_, err := RouteServiceHandler.ProcessV4RouteDeleteConfig(&cfg) //routeInfo.destNetIp, routeInfo.networkMask, ReverseRouteProtoTypeMapDB[int(routeInfo.routeType)], routeInfo.nextHopIp) // FIBAndRIB)//,ribdCommonDefs.RoutePolicyStateChangetoInValid)
 	if err != nil {
 		logger.Info(fmt.Sprintln("deleting v4 route failed with err ", err))
 		return
@@ -335,7 +335,7 @@ func policyEngineUpdateRoute(prefix patriciaDB.Prefix, item patriciaDB.Item, han
 		}
 		cfg.NextHop = make([]*ribd.NextHopInfo, 0)
 		cfg.NextHop = append(cfg.NextHop, &nextHop)
-		RouteServiceHandler.ProcessRouteUpdateConfig(&cfg, &cfg, nil)
+		RouteServiceHandler.Processv4RouteUpdateConfig(&cfg, &cfg, nil)
 	} else if selectedRouteInfoRecord.ipType == ipv6 {
 		cfg := ribd.IPv6Route{
 			DestinationNw: selectedRouteInfoRecord.destNetIp.String(),
