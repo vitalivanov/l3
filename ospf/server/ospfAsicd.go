@@ -111,7 +111,10 @@ func (server *OSPFServer) initAsicdForRxMulticastPkt() (err error) {
 		MacAddr:     ALLSPFROUTERMAC,
 		MacAddrMask: MASKMAC,
 	}
-
+	if server.asicdClient.ClientHdl == nil {
+		server.logger.Err("Null asicd client handle")
+		return nil
+	}
 	ret, err := server.asicdClient.ClientHdl.EnablePacketReception(&allSPFRtrMacConf)
 	if !ret {
 		server.logger.Info(fmt.Sprintln("Adding reserved mac failed", ALLSPFROUTERMAC))
