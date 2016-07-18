@@ -69,6 +69,7 @@ var netmask uint32
 var lsid uint32
 var ospf *OSPFServer
 var eventMsg DbEventMsg
+var conf config.IfMetricConf
 
 /* Infra Structs */
 var portProperty PortProperty
@@ -89,6 +90,7 @@ var msg NbrStateChangeMsg
 var msgNbrFull NbrFullStateMsg
 var intf IntfConf
 var hellodata OSPFHelloData
+var ifConf config.InterfaceConf
 
 /* Nbr FSM */
 var ospfNbrEntry OspfNeighborEntry
@@ -97,7 +99,7 @@ var nbrDbPkt ospfDatabaseDescriptionData
 var nbrIntfMsg IntfToNeighMsg
 var nbrDbdMsg ospfNeighborDBDMsg
 var nbrLsaReqMsg ospfNeighborLSAreqMsg
-
+var db_list []*ospfNeighborDBSummary
 var req ospfLSAReq
 var req1 ospfLSAReq
 
@@ -196,6 +198,21 @@ func initAttr() {
 	gConf.RestartInterval = 40
 	gConf.ReferenceBandwidth = 100
 
+	ifConf = config.InterfaceConf{
+		IfIpAddress:       config.IpAddress("10.1.1.2"),
+		AddressLessIf:     config.InterfaceIndexOrZero(0),
+		IfAreaId:          config.AreaId("10.0.0.0"),
+		IfType:            config.IfType(0),
+		IfAdminStat:       config.Status(0),
+		IfRtrPriority:     config.DesignatedRouterPriority(1),
+		IfTransitDelay:    config.UpToMaxAge(10),
+		IfRetransInterval: config.UpToMaxAge(40),
+		IfHelloInterval:   config.HelloRange(10),
+		IfRtrDeadInterval: config.PositiveInteger(10),
+		IfPollInterval:    config.PositiveInteger(10),
+		IfAuthKey:         string("10.1.10.1"),
+		IfAuthType:        config.AuthType(1),
+	}
 	hellodata = OSPFHelloData{
 		netmask:             []byte{10, 0, 0, 0},
 		helloInterval:       uint16(10),
@@ -383,6 +400,12 @@ func initAttr() {
 }
 
 func initInfra() {
+	conf = config.IfMetricConf{
+		IfMetricIpAddress:     config.IpAddress("10.1.1.10"),
+		IfMetricAddressLessIf: config.InterfaceIndexOrZero(0),
+		IfMetricTOS:           config.TosType(2),
+		IfMetricValue:         config.Metric(20),
+	}
 	portProperty = PortProperty{
 		Name:  "fpPort1",
 		Mtu:   int32(1500),
@@ -548,6 +571,20 @@ func initLsdbData() {
 		lsOp:    LSAFLOOD,
 		pkt:     lsa_router,
 	}
+	db_list = []*ospfNeighborDBSummary{}
+	db_summary1 := newospfNeighborDBSummary()
+	db_summary2 := newospfNeighborDBSummary()
+	db_summary1.valid = true
+	db_summary2.valid = true
+	lsaHeader := getLsaHeaderFromLsa(routerLsa.LsaMd.LSAge, routerLsa.LsaMd.Options, routerKey.LSType,
+		routerKey.LSId, routerKey.AdvRouter, uint32(routerLsa.LsaMd.LSSequenceNum),
+		routerLsa.LsaMd.LSChecksum, routerLsa.LsaMd.LSLen)
+
+	db_summary1.lsa_headers = lsaHeader
+	db_summary2.lsa_headers = lsaHeader
+	db_list = append(db_list, db_summary1)
+	db_list = append(db_list, db_summary2)
+
 }
 
 func initRoutingTable() {
@@ -781,6 +818,9 @@ func startDummyChannels(server *OSPFServer) {
 			fmt.Println("Received data on neighborLSAACKEventCh ", data)
 		case data := <-server.neighborLSAReqEventCh:
 			fmt.Println("Received data on neighborLSAReqEventCh ", data)
+		case data := <-server.IntfSliceRefreshCh:
+			fmt.Println("Received data on IntfSliceRefreshCh ", data)
+			server.IntfSliceRefreshDoneCh <- true
 		}
 	}
 
