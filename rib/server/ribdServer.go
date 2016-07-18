@@ -82,7 +82,7 @@ type NextHopInfo struct {
 	refCount int //number of routes using this as a next hop
 }
 type ApplyPolicyInfo struct {
-	Source     string
+	Source     string //source application/protocol
 	Policy     string
 	Action     string
 	Conditions []*ribdInt.ConditionInfo
@@ -412,13 +412,13 @@ func (ribdServiceHandler *RIBDServer) ConnectToClients(paramsFile string) {
 
 	bytes, err := ioutil.ReadFile(paramsFile)
 	if err != nil {
-		logger.Info("Error in reading configuration file")
+		logger.Err("Error in reading configuration file")
 		return
 	}
 
 	err = json.Unmarshal(bytes, &clientsList)
 	if err != nil {
-		logger.Info("Error in Unmarshalling Json")
+		logger.Err("Error in Unmarshalling Json")
 		return
 	}
 

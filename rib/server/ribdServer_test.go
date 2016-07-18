@@ -31,7 +31,7 @@ import (
 	"utils/logging"
 )
 
-var routeServer *RIBDServer
+var server *RIBDServer
 
 func RIBdNewLogger(name string, tag string) (*logging.Writer, error) {
 	var err error
@@ -60,11 +60,33 @@ func getServerObject() *RIBDServer {
 		logger.Err("Failed to dial out to Redis server")
 		return nil
 	}
-	server := NewRIBDServicesHandler(dbHdl, logger)
-	if server == nil {
+	testserver := NewRIBDServicesHandler(dbHdl, logger)
+	if testserver == nil {
 		fmt.Sprintln("ribd server object is null ")
 		return nil
 	}
-	routeServer = server
-	return server
+	return testserver
+}
+func InitTestServer() {
+	fmt.Println("Init server ")
+	rtserver := getServerObject()
+	if rtserver == nil {
+		logger.Println("server nil")
+		return
+	}
+	server = rtserver
+}
+func StartTestServer() {
+	if server != nil {
+		fmt.Println("server already initialized, return")
+		return
+	}
+	InitTestServer()
+	server.AcceptConfig = true
+	go server.StartServer("/opt/flexswitch/params")
+	InitIpInfoList()
+	InitRouteList()
+	InitPatchOpList()
+
+	fmt.Println("server started")
 }

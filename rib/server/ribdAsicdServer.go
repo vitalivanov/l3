@@ -35,6 +35,9 @@ var asicdRoutes []*asicdInt.IPv4Route
 var asicdRoute []asicdInt.IPv4Route
 
 func addAsicdRoute(routeInfoRecord RouteInfoRecord) {
+	if asicdclnt.IsConnected == false {
+		return
+	}
 	logger.Info(fmt.Sprintln("addAsicdRoute, weight = ", routeInfoRecord.weight+1))
 	/*	asicdRoute = make([]asicdInt.IPv4Route, asicdBulkCount)
 		if asicdRouteCount == 0 {
@@ -71,6 +74,9 @@ func addAsicdRoute(routeInfoRecord RouteInfoRecord) {
 	})
 }
 func delAsicdRoute(routeInfoRecord RouteInfoRecord) {
+	if asicdclnt.IsConnected == false {
+		return
+	}
 	logger.Info("delAsicdRoute")
 	asicdclnt.ClientHdl.OnewayDeleteIPv4Route([]*asicdInt.IPv4Route{
 		&asicdInt.IPv4Route{

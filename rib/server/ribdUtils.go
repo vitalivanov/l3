@@ -946,6 +946,10 @@ func getIPInt(ip net.IP) (ipInt int, err error) {
 		return ipInt, errors.New("Invalid destination network IP Address")
 	}
 	ip = ip.To4()
+	if ip == nil {
+		logger.Err("ip.To4 nil")
+		return ipInt, errors.New("ip.To4() nil")
+	}
 	parsedPrefixIP := int(ip[3]) | int(ip[2])<<8 | int(ip[1])<<16 | int(ip[0])<<24
 	ipInt = parsedPrefixIP
 	return ipInt, nil
@@ -957,6 +961,10 @@ func getIP(ipAddr string) (ip net.IP, err error) {
 		return ip, errors.New("Invalid destination network IP Address")
 	}
 	ip = ip.To4()
+	if ip == nil {
+		logger.Err("ip.To4 nil")
+		return ip, errors.New("ip.To4() nil")
+	}
 	return ip, nil
 }
 

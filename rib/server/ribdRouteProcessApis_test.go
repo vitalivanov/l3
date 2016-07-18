@@ -24,7 +24,6 @@
 package server
 
 import (
-	"asicd/asicdCommonDefs"
 	"encoding/json"
 	"fmt"
 	"ribd"
@@ -39,46 +38,11 @@ type testIpInfo struct {
 	mask   string
 }
 
-var server *RIBDServer
 var ipAddrList []testIpInfo
 var ipRouteList []*ribd.IPv4Route
 var patchOpList []*ribd.PatchOpInfo
-var logicalIntfList []asicdCommonDefs.LogicalIntfNotifyMsg
+var ipRouteListInit, patchOpListInit bool
 
-func InitTestServer() {
-	fmt.Println("Init server ")
-	routeServer = getServerObject()
-	if routeServer == nil {
-		logger.Println("routeServer nil")
-		return
-	}
-	server = routeServer
-	go server.StartServer("/opt/flexswitch/params/")
-	fmt.Println("route server started")
-}
-func InitLogicalIntfList() {
-	logicalIntfList = make([]asicdCommonDefs.LogicalIntfNotifyMsg, 0)
-	logicalIntfList = append(logicalIntfList, asicdCommonDefs.LogicalIntfNotifyMsg{
-		IfIndex:         1,
-		LogicalIntfName: "lo1",
-	})
-	logicalIntfList = append(logicalIntfList, asicdCommonDefs.LogicalIntfNotifyMsg{
-		IfIndex:         2,
-		LogicalIntfName: "lo2",
-	})
-	logicalIntfList = append(logicalIntfList, asicdCommonDefs.LogicalIntfNotifyMsg{
-		IfIndex:         3,
-		LogicalIntfName: "lo3",
-	})
-	logicalIntfList = append(logicalIntfList, asicdCommonDefs.LogicalIntfNotifyMsg{
-		IfIndex:         4,
-		LogicalIntfName: "lo4",
-	})
-	logicalIntfList = append(logicalIntfList, asicdCommonDefs.LogicalIntfNotifyMsg{
-		IfIndex:         5,
-		LogicalIntfName: "lo5",
-	})
-}
 func InitIpInfoList() {
 	ipAddrList = make([]testIpInfo, 0)
 	ipAddrList = append(ipAddrList, testIpInfo{"11.1.10.2", "255.255.255.0"})
@@ -92,7 +56,48 @@ func InitIpInfoList() {
 	ipAddrList = append(ipAddrList, testIpInfo{"50.1.10.2", "255.255.255.0"})
 
 }
+func InitRouteList() {
+	if ipRouteListInit == true {
+		return
+	}
+	ipRouteList = make([]*ribd.IPv4Route, 0)
+	ipRouteList = append(ipRouteList, &ribd.IPv4Route{
+		DestinationNw: "40.1.10.0",
+		NetworkMask:   "255.255.255.0",
+		NextHop:       []*ribd.NextHopInfo{&ribd.NextHopInfo{NextHopIp: "11.1.10.2", NextHopIntRef: "lo1"}},
+		Protocol:      "EBGP",
+	})
+	ipRouteList = append(ipRouteList, &ribd.IPv4Route{
+		DestinationNw: "50.1.10.0",
+		NetworkMask:   "255.255.255.0",
+		NextHop:       []*ribd.NextHopInfo{&ribd.NextHopInfo{NextHopIp: "12.1.10.20", NextHopIntRef: "lo2"}},
+		Protocol:      "STATIC",
+	})
+	ipRouteList = append(ipRouteList, &ribd.IPv4Route{
+		DestinationNw: "40.1.10.0",
+		NetworkMask:   "255.255.255.0",
+		NextHop:       []*ribd.NextHopInfo{&ribd.NextHopInfo{NextHopIp: "22.1.10.2", NextHopIntRef: "22"}},
+		Protocol:      "CONNECTED",
+	})
+	ipRouteList = append(ipRouteList, &ribd.IPv4Route{
+		DestinationNw: "60.1.10.0",
+		NetworkMask:   "255.255.255.0",
+		NextHop:       []*ribd.NextHopInfo{&ribd.NextHopInfo{NextHopIp: "12.1.10.20", NextHopIntRef: "lo2"}},
+		Protocol:      "STATIC",
+		Cost:          20,
+	})
+	ipRouteList = append(ipRouteList, &ribd.IPv4Route{
+		DestinationNw: "40.1.10.0",
+		NetworkMask:   "255.255.255.0",
+		NextHop:       []*ribd.NextHopInfo{&ribd.NextHopInfo{NextHopIp: "33.1.10.2", NextHopIntRef: "33"}},
+		Protocol:      "STATIC",
+	})
+	ipRouteListInit = true
+}
 func InitPatchOpList() {
+	if patchOpListInit == true {
+		return
+	}
 	patchOpList = make([]*ribd.PatchOpInfo, 0)
 	nhbytes, _ := json.Marshal([]*ribd.NextHopInfo{&ribd.NextHopInfo{NextHopIp: "13.1.10.2", NextHopIntRef: "lo3"}})
 	patchOpList = append(patchOpList, &ribd.PatchOpInfo{
@@ -127,57 +132,20 @@ func InitPatchOpList() {
 		Path:  "Cost",
 		Value: string(costbytes),
 	})
+	patchOpListInit = true
 }
-func InitRouteList() {
-	ipRouteList = make([]*ribd.IPv4Route, 0)
-	ipRouteList = append(ipRouteList, &ribd.IPv4Route{
-		DestinationNw: "40.1.10.0",
-		NetworkMask:   "255.255.255.0",
-		NextHop:       []*ribd.NextHopInfo{&ribd.NextHopInfo{NextHopIp: "11.1.10.2", NextHopIntRef: "lo1"}},
-		Protocol:      "EBGP",
-	})
-	ipRouteList = append(ipRouteList, &ribd.IPv4Route{
-		DestinationNw: "50.1.10.0",
-		NetworkMask:   "255.255.255.0",
-		NextHop:       []*ribd.NextHopInfo{&ribd.NextHopInfo{NextHopIp: "12.1.10.20", NextHopIntRef: "lo2"}},
-		Protocol:      "STATIC",
-	})
-	ipRouteList = append(ipRouteList, &ribd.IPv4Route{
-		DestinationNw: "40.1.10.0",
-		NetworkMask:   "255.255.255.0",
-		NextHop:       []*ribd.NextHopInfo{&ribd.NextHopInfo{NextHopIp: "22.1.10.2", NextHopIntRef: "22"}},
-		Protocol:      "CONNECTED",
-	})
-	ipRouteList = append(ipRouteList, &ribd.IPv4Route{
-		DestinationNw: "60.1.10.0",
-		NetworkMask:   "255.255.255.0",
-		NextHop:       []*ribd.NextHopInfo{&ribd.NextHopInfo{NextHopIp: "12.1.10.20", NextHopIntRef: "lo2"}},
-		Protocol:      "STATIC",
-		Cost:          20,
-	})
-	ipRouteList = append(ipRouteList, &ribd.IPv4Route{
-		DestinationNw: "40.1.10.0",
-		NetworkMask:   "255.255.255.0",
-		NextHop:       []*ribd.NextHopInfo{&ribd.NextHopInfo{NextHopIp: "33.1.10.2", NextHopIntRef: "33"}},
-		Protocol:      "STATIC",
-	})
-}
-func TestInitServer(t *testing.T) {
-	fmt.Println("Test InitServer")
-	InitTestServer()
-	InitLogicalIntfList()
-	InitIpInfoList()
-	InitRouteList()
-	InitPatchOpList()
+func TestInitRtProcessApiTestServer(t *testing.T) {
+	fmt.Println("InitRtProcessApiTestServer")
+	StartTestServer()
+	TestProcessLogicalIntfCreateEvent(t)
+	TestIPv4IntfCreateEvent(t)
+	TestPolicyConditionConfigCreate(t)
+	TestPolicyStmtConfigCreate(t)
+	TestPolicyDefinitionConfigCreate(t)
+	TestUpdateApplyPolicy(t)
 	fmt.Println("****************")
 }
-func TestProcessLogicalIntfCreateEvent(t *testing.T) {
-	fmt.Println("**** Test LogicalIntfCreate event ****")
-	for _, lo := range logicalIntfList {
-		server.ProcessLogicalIntfCreateEvent(lo)
-	}
-	fmt.Println("***************************************")
-}
+
 func TestGetRouteReachability(t *testing.T) {
 	fmt.Println("**** Test GetRouteReachability****")
 	for _, ipAddr := range ipAddrList {
@@ -214,6 +182,11 @@ func TestGetRoute(t *testing.T) {
 func TestProcessRouteCreateConfig(t *testing.T) {
 	fmt.Println("****TestProcessRouteCreateConfig****")
 	for _, v4route := range ipRouteList {
+		val_err := server.RouteConfigValidationCheck(ipRouteList[0], "add")
+		if val_err != nil {
+			fmt.Println("Validation failed for route:", ipRouteList[0], " with error:", val_err)
+			continue
+		}
 		val, err := server.ProcessRouteCreateConfig(v4route)
 		fmt.Println("val = ", val, " err: ", err, " for route:", v4route)
 	}
@@ -222,6 +195,7 @@ func TestProcessRouteCreateConfig(t *testing.T) {
 	TestGetRouteReachability(t)
 	TestResolveNextHop(t)
 	TestGetRoute(t)
+	TestProcessL3IntfStateChangeEvents(t)
 	fmt.Println("************************************")
 }
 func TestScaleRouteCreate(t *testing.T) {
@@ -345,6 +319,11 @@ func TestProcessRoutePatchUpdateConfig(t *testing.T) {
 		for _, op := range patchOpList {
 			fmt.Println("Applying patch:", op, " to route:", v4Route)
 			testRoute := *v4Route
+			val_err := server.RouteConfigValidationCheckForPatchUpdate(&testRoute, &testRoute, []*ribd.PatchOpInfo{op})
+			if val_err != nil {
+				fmt.Println("Validaion for Patch Update for route:", testRoute, "and patch op: ", op, " failed with err:", val_err)
+				continue
+			}
 			val, err := server.ProcessRoutePatchUpdateConfig(&testRoute, &testRoute, []*ribd.PatchOpInfo{op})
 			fmt.Println("val = ", val, " err: ", err, " for testRoute:", testRoute)
 			TestGetRoute(t)
@@ -366,6 +345,11 @@ func TestProcessRouteUpdateConfig(t *testing.T) {
 		attrSet[3] = true          //set cost attr to true
 		attrSet[4] = true          //NUll route attr to true
 		attrSet[5] = true          //set next hop ip attr to true
+		val_err := server.RouteConfigValidationCheckForUpdate(v4Route, &newRoute, attrSet)
+		if val_err != nil {
+			fmt.Println("val_err:", val_err, " for v4Route:", v4Route, " newRoute:", newRoute, " attrSet:", attrSet)
+			continue
+		}
 		val, err := server.ProcessRouteUpdateConfig(v4Route, &newRoute, attrSet)
 		fmt.Println("val = ", val, " err: ", err)
 	}
@@ -377,6 +361,11 @@ func TestProcessRouteUpdateConfig(t *testing.T) {
 func TestProcessRouteDeleteConfig(t *testing.T) {
 	fmt.Println("****TestProcessRouteDeleteConfig****")
 	for _, v4Route := range ipRouteList {
+		val_err := server.RouteConfigValidationCheck(v4Route, "del")
+		if val_err != nil {
+			fmt.Println("Validation failed for route:", v4Route, " with error:", val_err)
+			continue
+		}
 		val, err := server.ProcessRouteDeleteConfig(v4Route)
 		fmt.Println("val = ", val, " err: ", err)
 	}

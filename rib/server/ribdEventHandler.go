@@ -49,6 +49,19 @@ func (ribdServiceHandler *RIBDServer) ProcessLogicalIntfCreateEvent(logicalIntfN
 	IfNameToIfIndex[logicalIntfNotifyMsg.LogicalIntfName] = ifId
 
 }
+func (ribdServiceHandler *RIBDServer) ProcessVlanCreateEvent(vlanNotifyMsg asicdCommonDefs.VlanNotifyMsg) {
+	ifId := asicdCommonDefs.GetIfIndexFromIntfIdAndIntfType(int(vlanNotifyMsg.VlanId), commonDefs.IfTypeVlan)
+	ribdServiceHandler.Logger.Info(fmt.Sprintln("vlanId ", vlanNotifyMsg.VlanId, " ifId:", ifId))
+	if IntfIdNameMap == nil {
+		IntfIdNameMap = make(map[int32]IntfEntry)
+	}
+	intfEntry := IntfEntry{name: vlanNotifyMsg.VlanName}
+	IntfIdNameMap[int32(ifId)] = intfEntry
+	if IfNameToIfIndex == nil {
+		IfNameToIfIndex = make(map[string]int32)
+	}
+	IfNameToIfIndex[vlanNotifyMsg.VlanName] = ifId
+}
 func (ribdServiceHandler *RIBDServer) ProcessIPv4IntfCreateEvent(msg asicdCommonDefs.IPv4IntfNotifyMsg) {
 
 	var ipMask net.IP
@@ -146,17 +159,7 @@ func (ribdServiceHandler *RIBDServer) ProcessAsicdEvents(sub *nanomsg.SubSocket)
 				ribdServiceHandler.Logger.Info(fmt.Sprintln("Unable to unmashal vlanNotifyMsg:", Notif.Msg))
 				return
 			}
-			ifId := asicdCommonDefs.GetIfIndexFromIntfIdAndIntfType(int(vlanNotifyMsg.VlanId), commonDefs.IfTypeVlan)
-			ribdServiceHandler.Logger.Info(fmt.Sprintln("vlanId ", vlanNotifyMsg.VlanId, " ifId:", ifId))
-			if IntfIdNameMap == nil {
-				IntfIdNameMap = make(map[int32]IntfEntry)
-			}
-			intfEntry := IntfEntry{name: vlanNotifyMsg.VlanName}
-			IntfIdNameMap[int32(ifId)] = intfEntry
-			if IfNameToIfIndex == nil {
-				IfNameToIfIndex = make(map[string]int32)
-			}
-			IfNameToIfIndex[vlanNotifyMsg.VlanName] = ifId
+			ribdServiceHandler.ProcessVlanCreateEvent(vlanNotifyMsg)
 			break
 		case asicdCommonDefs.NOTIFY_L3INTF_STATE_CHANGE:
 			ribdServiceHandler.Logger.Info("NOTIFY_L3INTF_STATE_CHANGE event")

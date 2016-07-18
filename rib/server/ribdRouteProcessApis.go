@@ -1032,14 +1032,15 @@ func addNewRoute(destNetPrefix patriciaDB.Prefix,
 		logger.Debug(fmt.Sprintln("nhIntf:ipAddr:mask = ", nhIntf.Ipaddr, ":", nhIntf.Mask, " nexthop ip :", routeInfoRecord.nextHopIp.String()))
 		routeInfoRecord.resolvedNextHopIpIntf = resolvedNextHopIntf
 		//call asicd to add
-		if asicdclnt.IsConnected {
-			logger.Debug(fmt.Sprintln("New route selected, call asicd to install a new route - ip", routeInfoRecord.destNetIp.String(), " mask ", routeInfoRecord.networkMask.String(), " nextHopIP ", routeInfoRecord.resolvedNextHopIpIntf.NextHopIp))
-			RouteServiceHandler.AsicdRouteCh <- RIBdServerConfig{OrigConfigObject: routeInfoRecord, Op: "add"}
-		}
+		//	if asicdclnt.IsConnected {
+		logger.Debug(fmt.Sprintln("New route selected, call asicd to install a new route - ip", routeInfoRecord.destNetIp.String(), " mask ", routeInfoRecord.networkMask.String(), " nextHopIP ", routeInfoRecord.resolvedNextHopIpIntf.NextHopIp))
+		RouteServiceHandler.AsicdRouteCh <- RIBdServerConfig{OrigConfigObject: routeInfoRecord, Op: "add"}
+		//	}
 		/*
 		   Call Arp to resolve the next hop if this is not a connected route
 		*/
-		if arpdclnt.IsConnected && routeInfoRecord.protocol != ribdCommonDefs.CONNECTED {
+		//if arpdclnt.IsConnected &&
+		if routeInfoRecord.protocol != ribdCommonDefs.CONNECTED {
 			/*
 			   Call arp resolve only if it has not yet been called for this next hop
 			*/
@@ -1231,11 +1232,12 @@ func deleteRoute(destNetPrefix patriciaDB.Prefix, //route prefix of the route be
 	}
 	logger.Debug("This is the selected protocol")
 	//delete in asicd
-	if asicdclnt.IsConnected {
-		logger.Debug(fmt.Sprintln("Calling asicd to delete this route- ip", routeInfoRecord.destNetIp.String(), " mask ", routeInfoRecord.networkMask.String(), " nextHopIP ", routeInfoRecord.resolvedNextHopIpIntf.NextHopIp))
-		RouteServiceHandler.AsicdRouteCh <- RIBdServerConfig{OrigConfigObject: routeInfoRecord, Op: "del"}
-	}
-	if arpdclnt.IsConnected && routeInfoRecord.protocol != ribdCommonDefs.CONNECTED {
+	//if asicdclnt.IsConnected {
+	logger.Debug(fmt.Sprintln("Calling asicd to delete this route- ip", routeInfoRecord.destNetIp.String(), " mask ", routeInfoRecord.networkMask.String(), " nextHopIP ", routeInfoRecord.resolvedNextHopIpIntf.NextHopIp))
+	RouteServiceHandler.AsicdRouteCh <- RIBdServerConfig{OrigConfigObject: routeInfoRecord, Op: "del"}
+	//}
+	//if arpdclnt.IsConnected &&
+	if routeInfoRecord.protocol != ribdCommonDefs.CONNECTED {
 		if !arpResolveCalled(NextHopInfoKey{routeInfoRecord.resolvedNextHopIpIntf.NextHopIp}) {
 			logger.Debug(fmt.Sprintln("ARP resolve was never called for ", routeInfoRecord.nextHopIp.String()))
 		} else {
@@ -1408,11 +1410,12 @@ func createV4Route(destNetIp string,
 		}
 		destNetSlice = append(destNetSlice, localDBRecord)
 		//call asicd
-		if asicdclnt.IsConnected {
-			logger.Debug(fmt.Sprintln("New route selected, call asicd to install a new route - ip", routeInfoRecord.destNetIp.String(), " mask ", routeInfoRecord.networkMask.String(), " nextHopIP ", routeInfoRecord.resolvedNextHopIpIntf.NextHopIp))
-			RouteServiceHandler.AsicdRouteCh <- RIBdServerConfig{OrigConfigObject: routeInfoRecord, Op: "add"}
-		}
-		if arpdclnt.IsConnected && routeInfoRecord.protocol != ribdCommonDefs.CONNECTED {
+		//		if asicdclnt.IsConnected {
+		logger.Debug(fmt.Sprintln("New route selected, call asicd to install a new route - ip", routeInfoRecord.destNetIp.String(), " mask ", routeInfoRecord.networkMask.String(), " nextHopIP ", routeInfoRecord.resolvedNextHopIpIntf.NextHopIp))
+		RouteServiceHandler.AsicdRouteCh <- RIBdServerConfig{OrigConfigObject: routeInfoRecord, Op: "add"}
+		//		}
+		//if arpdclnt.IsConnected &&
+		if routeInfoRecord.protocol != ribdCommonDefs.CONNECTED {
 			if !arpResolveCalled(NextHopInfoKey{routeInfoRecord.resolvedNextHopIpIntf.NextHopIp}) {
 				//call arpd to resolve the ip
 				logger.Debug(fmt.Sprintln("Adding ", routeInfoRecord.resolvedNextHopIpIntf.NextHopIp, " to ArpdRouteCh"))
