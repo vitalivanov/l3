@@ -392,23 +392,23 @@ func (m RIBDServicesHandler) GetRouteDistanceState(protocol string) (*ribd.Route
 	state, err := m.server.GetRouteDistanceState(protocol)
 	return state, err
 }
-func (m RIBDServicesHandler) GetNextHopIfTypeStr(nextHopIfType ribdInt.Int) (nextHopIfTypeStr string, err error) {
-	nhStr, err := m.server.GetNextHopIfTypeStr(nextHopIfType)
-	return nhStr, err
+func (m RIBDServicesHandler) Getv4Route(destNetIp string) (route *ribdInt.IPv4RouteState, err error) {
+	ret, err := m.server.Getv4Route(destNetIp)
+	return ret, err
 }
-func (m RIBDServicesHandler) GetRoute(destNetIp string, networkMask string) (route *ribdInt.IPv4RouteState, err error) {
-	ret, err := m.server.GetRoute(destNetIp, networkMask)
+func (m RIBDServicesHandler) Getv6Route(destNetIp string) (route *ribdInt.IPv6RouteState, err error) {
+	ret, err := m.server.Getv6Route(destNetIp)
 	return ret, err
 }
 func (m RIBDServicesHandler) GetRouteReachabilityInfo(destNet string) (nextHopIntf *ribdInt.NextHopInfo, err error) {
 	nh, err := m.server.GetRouteReachabilityInfo(destNet)
 	return nh, err
 }
-func (m RIBDServicesHandler) GetTotalRouteCount() (number ribdInt.Int, err error) {
-	num, err := m.server.GetTotalRouteCount()
+func (m RIBDServicesHandler) GetTotalv4RouteCount() (number ribdInt.Int, err error) {
+	num, err := m.server.GetTotalv4RouteCount()
 	return ribdInt.Int(num), err
 }
-func (m RIBDServicesHandler) GetRouteCreatedTime(number ribdInt.Int) (time string, err error) {
-	time, err = m.server.GetRouteCreatedTime(int(number))
+func (m RIBDServicesHandler) Getv4RouteCreatedTime(number ribdInt.Int) (time string, err error) {
+	time, err = m.server.Getv4RouteCreatedTime(int(number))
 	return time, err
 }

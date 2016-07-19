@@ -33,8 +33,6 @@ func TestInitRtUtilsTestServer(t *testing.T) {
 	fmt.Println("****Init Route Utils Server****")
 	StartTestServer()
 	TestProcessLogicalIntfCreateEvent(t)
-	InitRouteList()
-	InitPatchOpList()
 	fmt.Println("****************")
 }
 func TestConvertIntfStrToIfIndexStr(t *testing.T) {
@@ -46,10 +44,6 @@ func TestConvertIntfStrToIfIndexStr(t *testing.T) {
 	ifIndex, err = server.ConvertIntfStrToIfIndexStr("lo10")
 	fmt.Println("ifIndex,err:", ifIndex, err, " for lo10")
 	fmt.Println("***************************************")
-}
-func TestRouteConfigValidationCheckForUpdate(t *testing.T) {
-	fmt.Println("****TestRouteConfigValidationCheckForUpdate****")
-	fmt.Println("***********************************************")
 }
 func TestGetNetworkPrefixFromStrings(t *testing.T) {
 	fmt.Println("****TestGetNetworkPrefixFromCIDR****")

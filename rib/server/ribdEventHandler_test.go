@@ -32,7 +32,7 @@ import (
 var logicalIntfList []asicdCommonDefs.LogicalIntfNotifyMsg
 var vlanList []asicdCommonDefs.VlanNotifyMsg
 var ipv4IntfList []asicdCommonDefs.IPv4IntfNotifyMsg
-var logicalIntfListInit, ipv4IntfListInit bool
+var ipv6IntfList []asicdCommonDefs.IPv6IntfNotifyMsg
 
 func InitLogicalIntfList() {
 	logicalIntfList = make([]asicdCommonDefs.LogicalIntfNotifyMsg, 0)
@@ -87,20 +87,32 @@ func InitIPv4IntfList() {
 		IfIndex: 35,
 	})
 }
+func InitIPv6IntfList() {
+	ipv6IntfList = make([]asicdCommonDefs.IPv6IntfNotifyMsg, 0)
+	ipv6IntfList = append(ipv6IntfList, asicdCommonDefs.IPv6IntfNotifyMsg{
+		IpAddr:  "2002::1/64",
+		IfIndex: 4,
+	})
+	ipv6IntfList = append(ipv6IntfList, asicdCommonDefs.IPv6IntfNotifyMsg{
+		IpAddr:  "2002::/64",
+		IfIndex: 3,
+	})
+	ipv6IntfList = append(ipv6IntfList, asicdCommonDefs.IPv6IntfNotifyMsg{
+		IpAddr:  "2003::1/64",
+		IfIndex: 40,
+	})
+	ipv6IntfList = append(ipv6IntfList, asicdCommonDefs.IPv6IntfNotifyMsg{
+		IpAddr:  "2003::1/64",
+		IfIndex: 5,
+	})
+}
 func TestInitRtEventHdlrTestServer(t *testing.T) {
 	fmt.Println("****Init Route event handler Server****")
 	StartTestServer()
-	InitLogicalIntfList()
-	InitVlanList()
-	InitIPv4IntfList()
 	fmt.Println("****************")
 }
 func TestProcessLogicalIntfCreateEvent(t *testing.T) {
 	fmt.Println("**** Test LogicalIntfCreate event ****")
-	if logicalIntfListInit == true {
-		fmt.Println("List already initialized")
-		return
-	}
 	fmt.Println("IntfIdNameMap before:")
 	fmt.Println(IntfIdNameMap)
 	fmt.Println("IfNameToIfIndex before:")
@@ -112,7 +124,6 @@ func TestProcessLogicalIntfCreateEvent(t *testing.T) {
 	fmt.Println(IntfIdNameMap)
 	fmt.Println("IfNameToIfIndex after:")
 	fmt.Println(IfNameToIfIndex)
-	logicalIntfListInit = true
 	fmt.Println("***************************************")
 }
 func TestVlanCreateEvent(t *testing.T) {
@@ -132,24 +143,26 @@ func TestVlanCreateEvent(t *testing.T) {
 }
 func TestIPv4IntfCreateEvent(t *testing.T) {
 	fmt.Println("**** TestIPv4IntfCreateEvent event ****")
-	if ipv4IntfListInit == true {
-		fmt.Println("List already initialized")
-		return
-	}
 	for _, v4Intf := range ipv4IntfList {
 		server.ProcessIPv4IntfCreateEvent(v4Intf)
 	}
-	ipv4IntfListInit = true
+	fmt.Println("***************************************")
+}
+func TestIPv6IntfCreateEvent(t *testing.T) {
+	fmt.Println("**** TestIPv6IntfCreateEvent event ****")
+	for _, v6Intf := range ipv6IntfList {
+		server.ProcessIPv6IntfCreateEvent(v6Intf)
+	}
 	fmt.Println("***************************************")
 }
 func TestProcessL3IntfStateChangeEvents(t *testing.T) {
 	fmt.Println("****TestProcessL3IntfStateChangeEvents()****")
 	TestGetRouteReachability(t)
-	for _, ipInfo := range ipAddrList {
+	for _, ipInfo := range ipv4AddrList {
 		server.ProcessL3IntfDownEvent(ipInfo.ipAddr)
 	}
 	TestGetRouteReachability(t)
-	for _, ipInfo := range ipAddrList {
+	for _, ipInfo := range ipv4AddrList {
 		server.ProcessL3IntfUpEvent(ipInfo.ipAddr)
 	}
 	TestGetRouteReachability(t)
@@ -167,5 +180,19 @@ func TestIPv4IntfDeleteEvent(t *testing.T) {
 		IfIndex: 6,
 	}
 	server.ProcessIPv4IntfDeleteEvent(v4Intf)
+	fmt.Println("***************************************")
+}
+func TestIPv6IntfDeleteEvent(t *testing.T) {
+	fmt.Println("**** TestIPv6IntfDeleteEvent event ****")
+	v6Intf := asicdCommonDefs.IPv6IntfNotifyMsg{
+		IpAddr:  "2002::1/64",
+		IfIndex: 4,
+	}
+	server.ProcessIPv6IntfDeleteEvent(v6Intf)
+	v6Intf = asicdCommonDefs.IPv6IntfNotifyMsg{
+		IpAddr:  "2006::1/64",
+		IfIndex: 6,
+	}
+	server.ProcessIPv6IntfDeleteEvent(v6Intf)
 	fmt.Println("***************************************")
 }
