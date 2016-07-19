@@ -123,6 +123,13 @@ func (svr *NDPServer) CheckSrcMac(macAddr string) bool {
 	return exists
 }
 
+func (svr *NDPServer) insertNeigborInfo(nbrInfo *config.NeighborInfo) {
+	svr.NeigborEntryLock.Lock()
+	svr.NeighborInfo[nbrInfo.IpAddr] = *nbrInfo
+	svr.neighborKey = append(svr.neighborKey, nbrInfo.IpAddr)
+	svr.NeigborEntryLock.Unlock()
+}
+
 /*
  *	CheckCallUpdateNeighborInfo
  *			a) It will first check whether a neighbor exists in the neighbor cache
@@ -140,7 +147,7 @@ func (svr *NDPServer) CheckCallUpdateNeighborInfo(nbrInfo *config.NeighborInfo) 
 	if err != nil {
 		debug.Logger.Err(fmt.Sprintln("create ipv6 global neigbor failed for", nbrInfo, "error is", err))
 	}
-	svr.NeighborInfo[nbrInfo.IpAddr] = *nbrInfo
+	svr.insertNeigborInfo(nbrInfo)
 }
 
 /*

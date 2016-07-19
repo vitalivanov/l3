@@ -29,9 +29,14 @@ import (
 	"l3/ndp/config"
 	"l3/ndp/debug"
 	"log/syslog"
+	"reflect"
 	"strconv"
 	"testing"
 	"utils/logging"
+)
+
+const (
+	TEST_NBR_ENTRIES = 5
 )
 
 func NDPTestNewLogger(name string, tag string, listenToConfig bool) (*logging.Writer, error) {
@@ -107,7 +112,7 @@ func TestCheckSrcMac(t *testing.T) {
 	svr := &NDPServer{}
 	svr.InitGlobalDS()
 	i := int(0)
-	for i = 0; i < 5; i++ {
+	for i = 0; i < TEST_NBR_ENTRIES; i++ {
 		macStr := "aa:bb:cc:dd:ee:0" + strconv.Itoa(i)
 		var temp struct{}
 		svr.SwitchMacMapEntries[macStr] = temp
@@ -158,4 +163,98 @@ func TestLinkLocalAddr(t *testing.T) {
 	if !svr.IsLinkLocal("fe80::c000:54ff:fef5:0/64") {
 		t.Error("ipv6 address is link local ip address")
 	}
+}
+
+var nbr []config.NeighborInfo
+
+func populateNbrInfoTest(svr *NDPServer) {
+	nbr1 := config.NeighborInfo{
+		IpAddr:      "2002::1/64",
+		VlanId:      100,
+		IfIndex:     1234,
+		LinkLocalIp: "fe80::1/64",
+		MacAddr:     "aa:bb:cc:dd:ee:01",
+	}
+	nbr2 := config.NeighborInfo{
+		IpAddr:      "2003::1/64",
+		VlanId:      100,
+		IfIndex:     1234,
+		LinkLocalIp: "fe80::2/64",
+		MacAddr:     "aa:bb:cc:dd:ee:02",
+	}
+	nbr3 := config.NeighborInfo{
+		IpAddr:      "2004::1/64",
+		VlanId:      100,
+		IfIndex:     1234,
+		LinkLocalIp: "fe80::3/64",
+		MacAddr:     "aa:bb:cc:dd:ee:03",
+	}
+	nbr4 := config.NeighborInfo{
+		IpAddr:      "2005::1/64",
+		VlanId:      100,
+		IfIndex:     1234,
+		LinkLocalIp: "fe80::4/64",
+		MacAddr:     "aa:bb:cc:dd:ee:04",
+	}
+	nbr5 := config.NeighborInfo{
+		IpAddr:      "2006::1/64",
+		VlanId:      100,
+		IfIndex:     1234,
+		LinkLocalIp: "fe80::5/64",
+		MacAddr:     "aa:bb:cc:dd:ee:05",
+	}
+	nbr = append(nbr, nbr1)
+	nbr = append(nbr, nbr2)
+	nbr = append(nbr, nbr3)
+	nbr = append(nbr, nbr4)
+	nbr = append(nbr, nbr5)
+	for i := 0; i < TEST_NBR_ENTRIES; i++ {
+		svr.insertNeigborInfo(&nbr[i])
+	}
+}
+
+func TestGetAllNbrEntries(t *testing.T) {
+	svr := &NDPServer{}
+	svr.InitGlobalDS()
+	populateNbrInfoTest(svr)
+	if len(svr.NeighborInfo) < TEST_NBR_ENTRIES || len(svr.neighborKey) < TEST_NBR_ENTRIES {
+		t.Error("Inserting neighbor entries failed")
+	}
+	nextIdx, count, runTimeEntries := svr.GetNeighborEntries(0, TEST_NBR_ENTRIES)
+	if nextIdx != 0 {
+		t.Error("Not All Entries are fetched, nextIdx is", nextIdx)
+	}
+	if count != TEST_NBR_ENTRIES {
+		t.Error("Not all entries are found from runtime, count is", count)
+	}
+	if !reflect.DeepEqual(nbr, runTimeEntries) {
+		t.Error("Get All Entries Failed, nbr Info Stored:", nbr, "Runtime Entries fetched:", runTimeEntries)
+	}
+	svr.DeInitGlobalDS()
+}
+
+func TestGet3NbrEntries(t *testing.T) {
+	svr := &NDPServer{}
+	svr.InitGlobalDS()
+	populateNbrInfoTest(svr)
+	if len(svr.NeighborInfo) < TEST_NBR_ENTRIES || len(svr.neighborKey) < TEST_NBR_ENTRIES {
+		t.Error("Inserting neighbor entries failed")
+	}
+	nextIdx, count, runTimeEntries := svr.GetNeighborEntries(2, TEST_NBR_ENTRIES)
+	if nextIdx != 0 {
+		t.Error("Not All Entries are fetched, nextIdx is", nextIdx)
+	}
+	if count != TEST_NBR_ENTRIES-2 {
+		t.Error("Not all entries are found from runtime, count is", count)
+	}
+
+	if len(runTimeEntries) == TEST_NBR_ENTRIES {
+		t.Error("Len of fetched entries should be", count, " but got", len(runTimeEntries))
+	}
+	for i := 2; i < count; i++ {
+		if !reflect.DeepEqual(nbr[i], runTimeEntries[i-2]) {
+			t.Error("Get All Entries Failed, nbr Info Stored:", nbr[i], "Runtime Entries fetched:", runTimeEntries[i-2])
+		}
+	}
+	svr.DeInitGlobalDS()
 }

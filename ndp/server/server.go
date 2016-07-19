@@ -29,6 +29,7 @@ import (
 	_ "models/objects"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 	"utils/asicdClient"
@@ -85,6 +86,7 @@ func (svr *NDPServer) InitGlobalDS() {
 	svr.SnapShotLen = 1024
 	svr.Promiscuous = false
 	svr.Timeout = 1 * time.Second
+	svr.NeigborEntryLock = &sync.RWMutex{}
 }
 
 func (svr *NDPServer) DeInitGlobalDS() {

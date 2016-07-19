@@ -24,24 +24,36 @@ package flexswitch
 
 import (
 	"ndpd"
+	"testing"
 )
 
-func (h *ConfigHandler) CreateNDPGlobal(config *ndpd.NDPGlobal) (bool, error) {
-	return true, nil
+func TestCreateNDPGlobal(t *testing.T) {
+	h := NewConfigHandler()
+	config := &ndpd.NDPGlobal{}
+	h.CreateNDPGlobal(config)
 }
 
-func (h *ConfigHandler) UpdateNDPGlobal(orgCfg *ndpd.NDPGlobal, newCfg *ndpd.NDPGlobal, attrset []bool, op []*ndpd.PatchOpInfo) (bool, error) {
-	return true, nil
+func TestDeleteNDPGlobal(t *testing.T) {
+	h := NewConfigHandler()
+	config := &ndpd.NDPGlobal{}
+	h.DeleteNDPGlobal(config)
 }
 
-func (h *ConfigHandler) DeleteNDPGlobal(config *ndpd.NDPGlobal) (bool, error) {
-	return true, nil
+func TestUpdateNDPGlobal(t *testing.T) {
+	h := NewConfigHandler()
+	config := &ndpd.NDPGlobal{}
+	newConfig := &ndpd.NDPGlobal{}
+	attrset := make([]bool, 0)
+	op := make([]*ndpd.PatchOpInfo, 0)
+	h.UpdateNDPGlobal(config, newConfig, attrset, op)
 }
 
-func (h *ConfigHandler) GetBulkNDPEntryState(fromIdx ndpd.Int, count ndpd.Int) (*ndpd.NDPEntryStateGetInfo, error) {
-	return nil, nil
+func TestGetBulkNDPEntry(t *testing.T) {
+	h := NewConfigHandler()
+	h.GetBulkNDPEntryState(0, 10)
 }
 
-func (h *ConfigHandler) GetNDPEntryState(ipAddr string) (*ndpd.NDPEntryState, error) {
-	return nil, nil
+func TestGetNDPEntry(t *testing.T) {
+	h := NewConfigHandler()
+	h.GetNDPEntryState("")
 }
