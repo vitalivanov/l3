@@ -79,11 +79,13 @@ type StateNotification struct {
 }
 
 type NeighborInfo struct {
-	MacAddr     string
-	VlanId      int32
-	IfIndex     int32
-	IpAddr      string
-	LinkLocalIp string
+	MacAddr        string
+	VlanId         int32
+	IfIndex        int32
+	Intf           string
+	IpAddr         string
+	LinkLocalIp    string
+	ExpiryTimeLeft string
 }
 
 type VlanInfo struct {

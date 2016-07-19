@@ -20,28 +20,32 @@
 // |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
 // |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
 //
-package flexswitch
+package server
 
 import (
-	"ndpd"
+	_ "fmt"
+	"l3/ndp/config"
+	_ "l3/ndp/debug"
 )
 
-func (h *ConfigHandler) CreateNDPGlobal(config *ndpd.NDPGlobal) (bool, error) {
-	return true, nil
-}
+func (svr *NDPServer) GetNeighborEntries(idx, cnt int) (int, int, []config.NeighborInfo) {
+	var nextIdx int
+	var count int
+	var i, j int
 
-func (h *ConfigHandler) UpdateNDPGlobal(orgCfg *ndpd.NDPGlobal, newCfg *ndpd.NDPGlobal, attrset []bool, op []*ndpd.PatchOpInfo) (bool, error) {
-	return true, nil
-}
+	length := len(svr.neighborKey)
+	var result []config.NeighborInfo
 
-func (h *ConfigHandler) DeleteNDPGlobal(config *ndpd.NDPGlobal) (bool, error) {
-	return true, nil
-}
-
-func (h *ConfigHandler) GetBulkNDPEntryState(fromIdx ndpd.Int, count ndpd.Int) (*ndpd.NDPEntryStateGetInfo, error) {
-	return nil, nil
-}
-
-func (h *ConfigHandler) GetNDPEntryState(ipAddr string) (*ndpd.NDPEntryState, error) {
-	return nil, nil
+	svr.NeigborEntryLock.RLock()
+	for i, j = 0, idx; i < cnt && j < length; j++ {
+		key := svr.neighborKey[j]
+		result = append(result, svr.NeighborInfo[key])
+		i++
+	}
+	svr.NeigborEntryLock.RUnlock()
+	if j == length {
+		nextIdx = 0
+	}
+	count = i
+	return nextIdx, count, result
 }

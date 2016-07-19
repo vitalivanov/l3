@@ -25,12 +25,9 @@ package server
 import (
 	"github.com/google/gopacket"
 	"l3/ndp/config"
+	"sync"
 	"time"
 	"utils/asicdClient" // this is switch plugin need to change the name
-)
-
-const (
-	INTF_REF_NOT_FOUND = "Not Found"
 )
 
 type RxPktInfo struct {
@@ -42,11 +39,18 @@ type NDPServer struct {
 	SwitchPlugin asicdClient.AsicdClientIntf
 
 	// System Ports information, key is IntfRef
-	PhyPort             map[int32]config.PortInfo     // key is l2 ifIndex
-	L3Port              map[int32]config.IPv6IntfInfo // key is l3 ifIndex
-	VlanInfo            map[int32]config.VlanInfo     // key is vlanId
-	VlanIfIdxVlanIdMap  map[int32]int32               //reverse map for ifIndex ----> vlanId, used during ipv6 neig create
-	SwitchMacMapEntries map[string]bool               // cache entry for all mac addresses on a switch
+	PhyPort             map[int32]config.PortInfo      // key is l2 ifIndex
+	L3Port              map[int32]config.IPv6IntfInfo  // key is l3 ifIndex
+	VlanInfo            map[int32]config.VlanInfo      // key is vlanId
+	VlanIfIdxVlanIdMap  map[int32]int32                //reverse map for ifIndex ----> vlanId, used during ipv6 neig create
+	SwitchMacMapEntries map[string]struct{}            // cache entry for all mac addresses on a switch
+	NeighborInfo        map[string]config.NeighborInfo // cache which neighbors are created by NDP
+
+	// Lock for reading/writing NeighorInfo
+	// We need this lock because getbulk/getentry is not requested on the main entry point channel, rather it's a
+	// direct call to server. So to avoid updating the Neighbor Runtime Info during read
+	// it's better to use lock
+	NeigborEntryLock *sync.RWMutex
 
 	// Physical Port/ L2 Port State Notification
 	PhyPortStateCh chan *config.StateNotification
@@ -68,8 +72,11 @@ type NDPServer struct {
 	SnapShotLen int32
 	Promiscuous bool
 	Timeout     time.Duration
+
+	neighborKey []string // keys for all neighbor entries is stored here for GET calls
 }
 
 const (
-	NDP_SYSTEM_PORT_MAP_CAPACITY = 50
+	NDP_SERVER_MAP_INITIAL_CAP = 50
+	INTF_REF_NOT_FOUND         = "Not Found"
 )
