@@ -21,6 +21,15 @@
 // |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
 //
 
+/* ospfLsdb_test
+   This test covers
+   1) LSA encode and decode APIs.
+   2) LSDB operations.
+   3) LSDB timer related APIs.
+   4) Area border router APIs.
+   5) SPF calculation APIs which are driven by LSDB.
+   6) Flooding operations that are driven by LSDB events.
+*/
 package server
 
 import (
@@ -309,7 +318,7 @@ func checkFloodAPIs() {
 	fmt.Println("Lsa from db(lsa, ret) ", alsa, ret)
 	lsDbEnt.ASExternalLsaMap[*lsaKey] = *asexternalLsa
 	selfOrigLsaEnt[*lsaKey] = true
-	ospf.regenerateLsa(lsdbKey, *lsaKey)	
+	ospf.regenerateLsa(lsdbKey, *lsaKey)
 	ospf.processAsExternalLSAFlood(*lsaKey)
 	ospf.floodASExternalLsa(lsa_asExt)
 
@@ -317,7 +326,9 @@ func checkFloodAPIs() {
 	ospf.AreaSelfOrigLsa[lsdbKey] = selfOrigLsaEnt
 
 	ospf.processMaxAgeLSA(lsdbKey, lsDbEnt)
-
+	ospf.AddLsdbEntry(val)
+	ospf.DelLsdbEntry(val)
+	ospf.AddOspfEventState("Del ls entry", "LSDB")
 	ospf.lsdbStateRefresh()
 	ospf.lsdbSelfLsaRefresh()
 	ospf.processLSDatabaseTicker()
@@ -328,7 +339,15 @@ func checkFloodAPIs() {
 	}
 	ospf.processMaxAgeLsaMsg(maxAgeMsg)
 
+	/* AS External LSAs */
+	ospf.HandleASExternalLsa(lsdbKey.AreaId)
+	ospf.CalcASBorderRoutes(lsdbKey.AreaId)
+	ospf.GenerateType4SummaryLSA(rKey, rEntry, lsdbKey)
 	/* Flooding */
+	ospf.generateDbsummary4LsaList(lsdbKey.AreaId)
+	ospf.generateDbsummary3LsaList(lsdbKey.AreaId)
+	ospf.generateDbasExternalList(lsdbKey.AreaId)
+	ospf.generateDbSummaryList(nbrKey)
 	ospf.SendSelfOrigLSA(lsdbKey.AreaId, key)
 	ospf.processFloodMsg(floodMsg)
 	floodMsg.lsOp = LSASELFLOOD
@@ -352,5 +371,54 @@ func checkFloodAPIs() {
 	ospf.floodSummaryLsa(lsa_summary, lsdbKey.AreaId)
 
 	ospf.CalcInterAreaRoutes(lsdbKey.AreaId)
-//	ospf.GenerateSummaryLsa()	
+
+	/* SPF */
+	checkSPFAPIs(selfOrigLsaEnt)
+	//	ospf.GenerateSummaryLsa()
+}
+
+func checkSPFAPIs(selfOrMap map[LsaKey]bool) {
+	lsaKey, err := findSelfOrigRouterLsaKey(selfOrMap)
+	fmt.Println("Found router Key ", lsaKey, " error ", err)
+
+	network := link1.LinkId & netmask
+	cons := ospf.checkRouterLsaConsistency(lsdbKey.AreaId, lsid, network, netmask)
+	if cons {
+		fmt.Println("Router LSA is not consitent with given lsid, network , netmask ",
+			lsid, ", ", network, " ,", netmask)
+	}
+
+	var vkey VertexKey
+	//start SPF calculation
+	//ospf.spfCalculation()
+	//fmt.Println(" Done initialising SPF tables.", done)
+	ospf.initialiseSPFStructs()
+	vkey, err = ospf.CreateAreaGraph(lsdbKey.AreaId)
+	fmt.Println("Area graph created with vertex kay ", vkey)
+	ospf.AreaStubs[vKeyR] = sVertex1
+	ospf.AreaStubs[vKeyN] = sVertex2
+	ospf.AreaStubs[vKeyT] = sVertex3
+
+	fmt.Println("Handle stub networks ")
+	ospf.HandleStubs(vKeyR, lsdbKey.AreaId)
+	err = ospf.UpdateAreaGraphNetworkLsa(networkLsa, networkKey, lsdbKey.AreaId)
+	fmt.Println("Area graph updated with error ", err)
+
+	lsaKey, err = ospf.findNetworkLsa(lsdbKey.AreaId, networkKey.LSId)
+	err = ospf.findRouterLsa(lsdbKey.AreaId, routerKey.LSId)
+
+	ospf.UpdateAreaGraphRouterLsa(routerLsa, routerKey, lsdbKey.AreaId)
+	ospf.UpdateRoutingTblForRouter(areaidkey, vKeyR, treeVertex, vKeyN)
+
+	ip, nhip, success := ospf.findP2PNextHopIP(vKeyR, vKeyN, areaidkey)
+	fmt.Println("Calculated P2P nexthop ip ", ip, nhip, success)
+}
+
+func initialiseSPFData() {
+	ospf.AreaGraph = make(map[VertexKey]Vertex)
+	ospf.SPFTree = make(map[VertexKey]TreeVertex)
+
+	ospf.AreaGraph[vKeyR] = vertexR
+	ospf.AreaGraph[vKeyN] = vertexN
+	ospf.AreaGraph[vKeyT] = vertexT
 }

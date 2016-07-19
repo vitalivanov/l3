@@ -84,6 +84,7 @@ func rTableTestLogic(tNum int) int {
 
 		fmt.Println("Running ExecuteDijkstra")
 		ospf.SPFTree[vKeyR] = treeVertex
+		ospf.SPFTree[vKeyN] = treeVertex
 		ospf.ExecuteDijkstra(vKeyR, lsdbKey.AreaId)
 		ospf.ExecuteDijkstra(vKeyN, lsdbKey.AreaId)
 		ospf.ExecuteDijkstra(vKeyT, lsdbKey.AreaId)
@@ -92,22 +93,58 @@ func rTableTestLogic(tNum int) int {
 		go ospf.spfCalculation()
 		ospf.StartCalcSPFCh <- true
 
+		ospf.TempAreaRoutingTbl = make(map[AreaIdKey]AreaRoutingTbl)
+		ospf.TempAreaRoutingTbl[areaidkey] = areaRoutingTable
+		ospf.UpdateRoutingTbl(vKeyR, lsdbKey.AreaId)
+		ospf.UpdateRoutingTbl(vKeyN, lsdbKey.AreaId)
+		ospf.UpdateRoutingTbl(vKeyT, lsdbKey.AreaId)
 		fmt.Println(" Running routing table display.")
-		ospf.dumpGlobalRoutingTbl()
+		//ospf.dumpGlobalRoutingTbl()
 
 		fmt.Println("Running install routing table.")
 		ospf.InstallRoutingTbl()
 
+		ospf.TempGlobalRoutingTbl = make(map[RoutingTblEntryKey]GlobalRoutingTblEntry)
 		//init area config and install routes
 		ospf.initAreaConfDefault()
 		ospf.processAreaConfig(areaConf)
 		ospf.ConsolidatingRoutingTbl()
-		
+
 		ospf.GenerateSummaryLsa()
 		lsakey, lsa := ospf.GenerateDefaultSummary3LSA(lsdbKey)
-		fmt.Println("Generated summary LSAs ", "lsaKey ", lsakey," lsa " ,lsa)
+		fmt.Println("Generated summary LSAs ", "lsaKey ", lsakey, " lsa ", lsa)
 		lsakey, slsa := ospf.GenerateType3SummaryLSA(rKey, rEntry, lsdbKey)
 		fmt.Println("Generated type 3 summary lsa ", "lsakey ", lsakey, " lsa ", slsa)
+
+		/* install routing table */
+		ospf.InstallRoute(rKey)
+		ospf.UpdateRoute(rKey)
+		ospf.CompareRoutes(rKey)
+		ospf.DeleteRoute(rKey)
+
+		ospf.AreaGraph[vKeyR] = vertexR
+		ospf.AreaGraph[vKeyN] = vertexN
+		ospf.AreaGraph[vKeyT] = vertexT
+
+		ospf.UpdateRoutingTblForTNetwork(areaidkey, vKeyR, treeVertex, vKeyN)
+		ospf.UpdateRoutingTblForTNetwork(areaidkey, vKeyR, treeVertex, vKeyT)
+
+		ospf.UpdateRoutingTblWithStub(lsdbKey.AreaId, vKeyN, treeVertex, treeVertex, vKeyT, vKeyT)
+		ospf.UpdateRoutingTblWithStub(lsdbKey.AreaId, vKeyT, treeVertex, treeVertex, vKeyT, vKeyN)
+		ospf.AddIPv4RoutesState(rKey)
+		ospf.DelIPv4RoutesState(rKey)
+
+		checkRibdAPIs()
 	}
 	return SUCCESS
+}
+
+func checkRibdAPIs() {
+	err := ospf.startRibdUpdates()
+	fmt.Println("started ribd updates with error code ", err)
+	ospf.verifyOspfRoute(1112, 122)
+	ospf.listenForRIBUpdates("ribd")
+	ospf.processRibdNotification(hello)
+	ospf.getRibdRoutes()
+	ospf.ProcessRibdRoutes(route, uint16(1))
 }

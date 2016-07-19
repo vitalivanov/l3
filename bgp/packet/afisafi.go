@@ -13,19 +13,20 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 // bgp.go
 package packet
 
 import (
 	"l3/bgp/config"
+	"net"
 )
 
 type AFI uint16
@@ -48,7 +49,7 @@ var ProtocolFamilyMap = map[string]uint32{
 	"ipv6-multicast": GetProtocolFamily(AfiIP6, SafiMulticast),
 }
 
-func GetProtocolFromConfig(afiSafis *[]config.AfiSafiConfig) (map[uint32]bool, bool) {
+func GetProtocolFromConfig(afiSafis *[]config.AfiSafiConfig, neighborAddress net.IP) (map[uint32]bool, bool) {
 	afiSafiMap := make(map[uint32]bool)
 	rv := true
 	for _, afiSafi := range *afiSafis {
@@ -61,7 +62,11 @@ func GetProtocolFromConfig(afiSafis *[]config.AfiSafiConfig) (map[uint32]bool, b
 	}
 
 	if len(afiSafiMap) == 0 {
-		afiSafiMap[ProtocolFamilyMap["ipv4-unicast"]] = true
+		if neighborAddress.To4() == nil {
+			afiSafiMap[ProtocolFamilyMap["ipv6-unicast"]] = true
+		} else {
+			afiSafiMap[ProtocolFamilyMap["ipv4-unicast"]] = true
+		}
 	}
 	return afiSafiMap, rv
 }

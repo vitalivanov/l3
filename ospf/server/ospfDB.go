@@ -319,6 +319,9 @@ func (server *OSPFServer) DelIPv4RoutesState(entry RoutingTblEntryKey) error {
 	obj.DestType = string(entry.DestType)
 
 	objects.ConvertThriftToospfdOspfIPv4RouteStateObj(obj, &dbObj)
+	if  server.dbHdl == nil {
+		return errors.New(fmt.Sprintln("Nil dbobj or db handle.", entry))
+	}
 	err := dbObj.DeleteObjectFromDb(server.dbHdl)
 	if err != nil {
 		server.logger.Err(fmt.Sprintln("DB: Failed to add object in db , err ", err))
@@ -398,6 +401,9 @@ func (server *OSPFServer) AddLsdbEntry(entry LsdbSliceEnt) error {
 
 	objects.ConvertThriftToospfdOspfLsdbEntryStateObj(obj, &dbObj)
 	server.logger.Info(fmt.Sprintln("DB: Db obj received ", dbObj))
+	if server.dbHdl == nil {
+		return errors.New(fmt.Sprintln("Nil db handle "))
+	}
 	err := dbObj.StoreObjectInDb(server.dbHdl)
 	if err != nil {
 		server.logger.Err(fmt.Sprintln("DB: lsdb Failed to add object in db , err ", err))
@@ -446,6 +452,9 @@ func (server *OSPFServer) AddOspfEventState(eventType string, eventInfo string) 
 		return errors.New(fmt.Sprintln("dbHdl is nil"))
 	}
 	err := dbObj.StoreObjectInDb(server.dbHdl)
+	if server.dbHdl == nil {
+	return errors.New(fmt.Sprintln("Nil db handle"))
+	}
 	if err != nil {
 		server.logger.Err(fmt.Sprintln("DB: Failed to add event object in db , err ", err))
 		return errors.New(fmt.Sprintln("Failed to add OspfEventState in db : ", eventInfo))
@@ -465,6 +474,9 @@ func (server *OSPFServer) DelOspfEventState(entry config.OspfEventState) error {
 	obj.EventType = entry.EventType
 
 	objects.ConvertThriftToospfdOspfEventStateObj(obj, &dbObj)
+	if server.dbHdl == nil {
+	 return errors.New(fmt.Sprintln("Nil db handle"))
+	}
 	err := dbObj.DeleteObjectFromDb(server.dbHdl)
 	if err != nil {
 		server.logger.Info(fmt.Sprintln("DB: Failed to log event ", entry))

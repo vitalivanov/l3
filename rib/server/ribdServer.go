@@ -57,11 +57,12 @@ type RouteConfigInfo struct {
 	Op        string //"add"/"del"/"update"
 }
 type RIBdServerConfig struct {
-	OrigConfigObject interface{}
-	NewConfigObject  interface{}
-	AttrSet          []bool
-	Op               string //"add"/"del"/"update/get"
-	PatchOp          []*ribd.PatchOpInfo
+	OrigConfigObject          interface{}
+	NewConfigObject           interface{}
+	OrigBulkRouteConfigObject []*ribdInt.IPv4RouteConfig
+	AttrSet                   []bool
+	Op                        string //"add"/"del"/"update/get"
+	PatchOp                   []*ribd.PatchOpInfo
 }
 
 /*type PatchUpdateRouteInfo struct {
@@ -179,6 +180,8 @@ var IfNameToIfIndex map[string]int32
 var GlobalPolicyEngineDB *policy.PolicyEngineDB
 var PolicyEngineDB *policy.PolicyEngineDB
 var PARAMSDIR string
+var rtCount int
+var routeCreatedTimeMap map[int]string
 
 /*
    Handle Interface down event
@@ -198,7 +201,7 @@ func (ribdServiceHandler *RIBDServer) ProcessL3IntfDownEvent(ipAddr string) {
 	for i := 0; i < len(ConnectedRoutes); i++ {
 		if ConnectedRoutes[i].Ipaddr == ipAddrStr && ConnectedRoutes[i].Mask == ipMaskStr {
 			logger.Info(fmt.Sprintln("Delete this route with destAddress = ", ConnectedRoutes[i].Ipaddr, " nwMask = ", ConnectedRoutes[i].Mask))
-			deleteV4Route(ConnectedRoutes[i].Ipaddr, ConnectedRoutes[i].Mask, "CONNECTED", ConnectedRoutes[i].NextHopIp, FIBOnly, ribdCommonDefs.RoutePolicyStateChangeNoChange)
+			deleteIPRoute(ConnectedRoutes[i].Ipaddr, ConnectedRoutes[i].Mask, "CONNECTED", ConnectedRoutes[i].NextHopIp, FIBOnly, ribdCommonDefs.RoutePolicyStateChangeNoChange)
 		}
 	}
 }
@@ -356,7 +359,7 @@ func (ribdServiceHandler *RIBDServer) AcceptConfigActions() {
 	//update dbRouteCh to fetch route data
 	ribdServiceHandler.DBRouteCh <- RIBdServerConfig{Op: "fetch"}
 	dbRead := <-ribdServiceHandler.DBReadDone
-	logger.Debug(fmt.Sprintln("Received dbread: ", dbRead))
+	logger.Debug(fmt.Sprintln("Received dbread: "))
 	if dbRead != true {
 		logger.Err("DB read failed")
 	}
@@ -503,6 +506,7 @@ func NewRIBDServicesHandler(dbHdl *dbutils.DBUtil, loggerC *logging.Writer) *RIB
 	localRouteEventsDB = make([]RouteEventInfo, 0)
 	RedistributeRouteMap = make(map[string][]RedistributeRouteInfo)
 	TrackReachabilityMap = make(map[string][]string)
+	routeCreatedTimeMap = make(map[int]string)
 	RouteProtocolTypeMapDB = make(map[string]int)
 	ReverseRouteProtoTypeMapDB = make(map[int]string)
 	ProtocolAdminDistanceMapDB = make(map[string]RouteDistanceConfig)
@@ -513,13 +517,13 @@ func NewRIBDServicesHandler(dbHdl *dbutils.DBUtil, loggerC *logging.Writer) *RIB
 	ribdServicesHandler.AsicdRouteCh = make(chan RIBdServerConfig, 5000)
 	ribdServicesHandler.ArpdRouteCh = make(chan RIBdServerConfig, 5000)
 	ribdServicesHandler.NotificationChannel = make(chan NotificationMsg, 5000)
-	ribdServicesHandler.PolicyConditionConfCh = make(chan RIBdServerConfig)
-	ribdServicesHandler.PolicyActionConfCh = make(chan RIBdServerConfig)
-	ribdServicesHandler.PolicyStmtConfCh = make(chan RIBdServerConfig)
-	ribdServicesHandler.PolicyDefinitionConfCh = make(chan RIBdServerConfig)
+	ribdServicesHandler.PolicyConditionConfCh = make(chan RIBdServerConfig, 5000)
+	ribdServicesHandler.PolicyActionConfCh = make(chan RIBdServerConfig, 5000)
+	ribdServicesHandler.PolicyStmtConfCh = make(chan RIBdServerConfig, 5000)
+	ribdServicesHandler.PolicyDefinitionConfCh = make(chan RIBdServerConfig, 5000)
 	ribdServicesHandler.PolicyApplyCh = make(chan ApplyPolicyInfo, 100)
 	ribdServicesHandler.PolicyUpdateApplyCh = make(chan ApplyPolicyInfo, 100)
-	ribdServicesHandler.DBRouteCh = make(chan RIBdServerConfig)
+	ribdServicesHandler.DBRouteCh = make(chan RIBdServerConfig, 5000)
 	ribdServicesHandler.ServerUpCh = make(chan bool)
 	ribdServicesHandler.DBReadDone = make(chan bool)
 	ribdServicesHandler.DbHdl = dbHdl

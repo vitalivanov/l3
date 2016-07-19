@@ -29,8 +29,11 @@ import (
 	"l3/ospf/config"
 	"log/syslog"
 	"net"
+	"ospfd"
+	"ribdInt"
 	"sync"
 	"time"
+	"utils/commonDefs"
 	"utils/logging"
 )
 
@@ -64,8 +67,18 @@ var nbrKey NeighborConfKey
 var intConf IntfConf
 var dstMAC net.HardwareAddr
 var dstIP net.IP
+var netmask uint32
+var lsid uint32
 var ospf *OSPFServer
 var eventMsg DbEventMsg
+var conf config.IfMetricConf
+
+/* Infra Structs */
+var portProperty PortProperty
+var vlanProperty VlanProperty
+var ipv4Msg IPv4IntfNotifyMsg
+var ipProperty IpProperty
+var ipIntfProperty IPIntfProperty
 
 /* Global conf */
 var gConf config.GlobalConf
@@ -73,12 +86,15 @@ var gConf config.GlobalConf
 /* Area conf */
 var areaConf config.AreaConf
 var areaConfKey AreaConfKey
+var ospfArea *ospfd.OspfAreaEntry
 
 /* Intf FSM */
 var msg NbrStateChangeMsg
 var msgNbrFull NbrFullStateMsg
 var intf IntfConf
 var hellodata OSPFHelloData
+var ifConf config.InterfaceConf
+var ospfIf *ospfd.OspfIfEntry
 
 /* Nbr FSM */
 var ospfNbrEntry OspfNeighborEntry
@@ -87,7 +103,7 @@ var nbrDbPkt ospfDatabaseDescriptionData
 var nbrIntfMsg IntfToNeighMsg
 var nbrDbdMsg ospfNeighborDBDMsg
 var nbrLsaReqMsg ospfNeighborLSAreqMsg
-
+var db_list []*ospfNeighborDBSummary
 var req ospfLSAReq
 var req1 ospfLSAReq
 
@@ -105,9 +121,15 @@ var summaryLsa SummaryLsa
 
 var routerKey LsaKey
 var routerLsa RouterLsa
+var link1 LinkDetail
 var lin []LinkDetail
 var networkKey LsaKey
 var networkLsa NetworkLsa
+var val1 LsdbSliceEnt
+var val2 LsdbSliceEnt
+var val3 LsdbSliceEnt
+var val4 LsdbSliceEnt
+var val5 LsdbSliceEnt
 
 var lsa_reqs []ospfLSAReq
 var val LsdbSliceEnt
@@ -134,6 +156,11 @@ var vertexR Vertex
 var vertexN Vertex
 var vertexT Vertex
 var treeVertex TreeVertex
+var sVertex1 StubVertex
+var sVertex2 StubVertex
+var sVertex3 StubVertex
+
+var route ribdInt.Routes
 
 func OSPFNewLogger(name string, tag string, listenToConfig bool) (*logging.Writer, error) {
 	var err error
@@ -174,6 +201,13 @@ func initAttr() {
 		AreaNssaTranslatorRole: config.NssaTranslatorRole(1),
 	}
 
+	ospfArea = &ospfd.OspfAreaEntry{
+		AuthType:               int32(areaConf.AuthType),
+		ImportAsExtern:         int32(areaConf.ImportAsExtern),
+		AreaSummary:            int32(areaConf.AreaSummary),
+		AreaNssaTranslatorRole: int32(areaConf.AreaNssaTranslatorRole),
+	}
+
 	gConf.RouterId = "20.0.1.1"
 	gConf.AdminStat = config.Disabled
 	gConf.ASBdrRtrStatus = true
@@ -181,6 +215,36 @@ func initAttr() {
 	gConf.RestartSupport = config.None
 	gConf.RestartInterval = 40
 	gConf.ReferenceBandwidth = 100
+
+	ifConf = config.InterfaceConf{
+		IfIpAddress:       config.IpAddress("10.1.1.2"),
+		AddressLessIf:     config.InterfaceIndexOrZero(0),
+		IfAreaId:          config.AreaId("10.0.0.0"),
+		IfType:            config.IfType(0),
+		IfAdminStat:       config.Status(0),
+		IfRtrPriority:     config.DesignatedRouterPriority(1),
+		IfTransitDelay:    config.UpToMaxAge(10),
+		IfRetransInterval: config.UpToMaxAge(40),
+		IfHelloInterval:   config.HelloRange(10),
+		IfRtrDeadInterval: config.PositiveInteger(10),
+		IfPollInterval:    config.PositiveInteger(10),
+		IfAuthKey:         string("10.1.10.1"),
+		IfAuthType:        config.AuthType(1),
+	}
+
+	ospfIf = &ospfd.OspfIfEntry{
+		IfIpAddress:       string(ifConf.IfIpAddress),
+		AddressLessIf:     int32(ifConf.AddressLessIf),
+		IfAreaId:          string(ifConf.IfAreaId),
+		IfRtrPriority:     int32(ifConf.IfRtrPriority),
+		IfTransitDelay:    int32(ifConf.IfTransitDelay),
+		IfRetransInterval: int32(ifConf.IfRetransInterval),
+		IfHelloInterval:   int32(ifConf.IfHelloInterval),
+		IfRtrDeadInterval: int32(ifConf.IfRtrDeadInterval),
+		IfPollInterval:    int32(ifConf.IfPollInterval),
+		IfAuthKey:         ifConf.IfAuthKey,
+		IfAuthType:        int32(ifConf.IfAuthType),
+	}
 
 	hellodata = OSPFHelloData{
 		netmask:             []byte{10, 0, 0, 0},
@@ -361,16 +425,55 @@ func initAttr() {
 	}
 	eventMsg.eventInfo = "SeqNumberMismatch. Nbr should be master "
 
+	initInfra()
 	initLsdbData()
 	initRoutingTable()
 	//populateNbrLists()
 
 }
 
+func initInfra() {
+	conf = config.IfMetricConf{
+		IfMetricIpAddress:     config.IpAddress("10.1.1.10"),
+		IfMetricAddressLessIf: config.InterfaceIndexOrZero(0),
+		IfMetricTOS:           config.TosType(2),
+		IfMetricValue:         config.Metric(20),
+	}
+	portProperty = PortProperty{
+		Name:  "fpPort1",
+		Mtu:   int32(1500),
+		Speed: uint32(100),
+	}
+	vlanProperty = VlanProperty{
+		Name:       "fpPort1",
+		UntagPorts: []int32{12, 1, 2},
+	}
+
+	ipv4Msg = IPv4IntfNotifyMsg{
+		IpAddr: string("10.1.1.2/24"),
+		IfId:   uint16(0),
+		IfType: uint8(commonDefs.IfTypePort),
+	}
+
+	ipProperty = IpProperty{
+		IfId:   uint16(0),
+		IfType: uint8(commonDefs.IfTypePort),
+		IpAddr: "10.1.1.2",
+	}
+	ipIntfProperty = IPIntfProperty{
+		IfName:  "fpPort1",
+		IpAddr:  dstIP,
+		MacAddr: dstMAC,
+		NetMask: []byte{0x0a, 0x0, 0x0, 0x0},
+		Mtu:     1500,
+		Cost:    uint32(20),
+	}
+
+}
 func initLsdbData() {
 	areaid := convertAreaOrRouterIdUint32("10.0.0.0")
-	netmask := convertAreaOrRouterIdUint32("255.0.0.0")
-	lsid := convertAreaOrRouterIdUint32("10.1.1.1")
+	netmask = convertAreaOrRouterIdUint32("255.0.0.0")
+	lsid = convertAreaOrRouterIdUint32("10.1.1.1")
 	lsdbKey = LsdbKey{
 		AreaId: areaid,
 	}
@@ -394,6 +497,30 @@ func initLsdbData() {
 		Netmask: netmask,
 		Metric:  uint32(20),
 	}
+	val1.AreaId = lsdbKey.AreaId
+	val1.LSType = RouterLSA
+	val1.LSId = lsid
+	val1.AdvRtr = lsid
+
+	val2.AreaId = lsdbKey.AreaId
+	val2.LSType = NetworkLSA
+	val2.LSId = lsid
+	val2.AdvRtr = lsid
+
+	val3.AreaId = lsdbKey.AreaId
+	val3.LSType = Summary3LSA
+	val3.LSId = lsid
+	val3.AdvRtr = lsid
+
+	val4.AreaId = lsdbKey.AreaId
+	val4.LSType = Summary4LSA
+	val4.LSId = lsid
+	val4.AdvRtr = lsid
+
+	val5.AreaId = lsdbKey.AreaId
+	val5.LSType = ASExternalLSA
+	val5.LSId = lsid
+	val5.AdvRtr = lsid
 
 	routerKey = LsaKey{
 		LSType:    uint8(RouterLSA),
@@ -403,7 +530,7 @@ func initLsdbData() {
 
 	link := make([]LinkDetail, 2)
 
-	link1 := LinkDetail{
+	link1 = LinkDetail{
 		LinkId:     uint32(1234), /* Link ID */
 		LinkData:   uint32(1),    /* Link Data */
 		LinkType:   TransitLink,  /* Link Type */
@@ -501,6 +628,20 @@ func initLsdbData() {
 		lsOp:    LSAFLOOD,
 		pkt:     lsa_router,
 	}
+	db_list = []*ospfNeighborDBSummary{}
+	db_summary1 := newospfNeighborDBSummary()
+	db_summary2 := newospfNeighborDBSummary()
+	db_summary1.valid = true
+	db_summary2.valid = true
+	lsaHeader := getLsaHeaderFromLsa(routerLsa.LsaMd.LSAge, routerLsa.LsaMd.Options, routerKey.LSType,
+		routerKey.LSId, routerKey.AdvRouter, uint32(routerLsa.LsaMd.LSSequenceNum),
+		routerLsa.LsaMd.LSChecksum, routerLsa.LsaMd.LSLen)
+
+	db_summary1.lsa_headers = lsaHeader
+	db_summary2.lsa_headers = lsaHeader
+	db_list = append(db_list, db_summary1)
+	db_list = append(db_list, db_summary2)
+
 }
 
 func initRoutingTable() {
@@ -565,7 +706,42 @@ func initRoutingTable() {
 	areaidkey = AreaIdKey{
 		AreaId: lsdbKey.AreaId,
 	}
+	ospf.TempAreaRoutingTbl = make(map[AreaIdKey]AreaRoutingTbl)
 	ospf.TempAreaRoutingTbl[areaidkey] = areaRoutingTable
+	ospf.TempGlobalRoutingTbl[rKey] = rEntry
+	ospf.OldGlobalRoutingTbl[rKey] = rEntry
+	sVertex1 = StubVertex{
+		NbrVertexKey:  vKeyR,
+		NbrVertexCost: uint16(20),
+		LinkData:      uint32(11),
+		LsaKey:        routerKey,
+		AreaId:        lsdbKey.AreaId,
+		LinkStateId:   lsid,
+	}
+
+	sVertex2 = StubVertex{
+		NbrVertexKey:  vKeyN,
+		NbrVertexCost: uint16(20),
+		LinkData:      uint32(11),
+		LsaKey:        routerKey,
+		AreaId:        lsdbKey.AreaId,
+		LinkStateId:   lsid,
+	}
+
+	sVertex3 = StubVertex{
+		NbrVertexKey:  vKeyT,
+		NbrVertexCost: uint16(20),
+		LinkData:      uint32(11),
+		LsaKey:        routerKey,
+		AreaId:        lsdbKey.AreaId,
+		LinkStateId:   lsid,
+	}
+
+	route = ribdInt.Routes{
+		Ipaddr: "10.1.1.2",
+		Mask:   "10.0.0.0",
+		Metric: 10,
+	}
 
 }
 
@@ -705,6 +881,13 @@ func startDummyChannels(server *OSPFServer) {
 			fmt.Println("Received data on neighborLSAACKEventCh ", data)
 		case data := <-server.neighborLSAReqEventCh:
 			fmt.Println("Received data on neighborLSAReqEventCh ", data)
+		case data := <-server.IntfSliceRefreshCh:
+			fmt.Println("Received data on IntfSliceRefreshCh ", data)
+			server.IntfSliceRefreshDoneCh <- true
+		case data := <-server.neighborSliceStartCh:
+			fmt.Println("Received data on neighborSliceStartCh ", data)
+		case data := <-server.ExternalRouteNotif:
+			fmt.Println("Received data on ExternalRouteNotif ", data)
 		}
 	}
 

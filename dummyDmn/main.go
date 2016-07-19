@@ -13,21 +13,22 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 package main
 
 import (
-	"utils/dmnBase"
-	"l3/dummyDmn/server"
 	"fmt"
+	"l3/dummyDmn/server"
+	"utils/dmnBase"
 )
+
 var DummyDmn dmnBase.L3Daemon
 
 func main() {
@@ -40,14 +41,14 @@ func main() {
 	dummyServer := server.NewDummyServer(DummyDmn)
 
 	go dummyServer.StartServer()
-    <-dummyServer.ServerStartedCh
-	
+	<-dummyServer.ServerStartedCh
+
 	DummyDmn.Logger.Info("Dummy server started")
-	
+
 	// Start keepalive routine
 	DummyDmn.Logger.Println("Starting KeepAlive")
 	DummyDmn.StartKeepAlive()
-	
+
 	//simulate rpc.StartServer()
 	for {
 	}

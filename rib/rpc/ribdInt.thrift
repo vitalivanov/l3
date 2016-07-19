@@ -46,11 +46,12 @@ struct Routes {
     12: 	bool IsPolicyBasedStateValid,
 	13: string RouteCreated,
 	14: string RouteUpdated,
-	15: string RoutePrototypeString
-	16: string DestNetIp
-	17: bool NetworkStatement
-	18: string RouteOrigin
-	19: int Weight
+	15: string RoutePrototypeString,
+	16: string DestNetIp,
+	17: bool NetworkStatement,
+	18: string RouteOrigin,
+	19: int Weight,
+	20: int IPAddrType
 }
 struct RoutesGetInfo {
 	1: int StartIdx,
@@ -88,6 +89,14 @@ struct PolicyDstIpMatchPrefixSetCondition{
 	1 : string 	PrefixSet
 	2 : PolicyPrefix Prefix
 }
+struct IPv4RouteConfig {
+	1 : string DestinationNw
+	2 : string NetworkMask
+	3 : string Protocol
+	4 : i32 Cost
+	5 : bool NullRoute
+	6 : list<RouteNextHopInfo> NextHop
+}
 struct IPv4Route {
 	1 : string DestinationNw
 	2 : string NetworkMask
@@ -109,6 +118,20 @@ struct PatchOpInfo {
     2 : string Path
     3 : list<map<string,string>> Value
 }
+struct RouteNextHopInfo {
+	1 : string NextHopIp
+	2 : string NextHopIntRef
+	3 : i32 Weight
+}
+struct IPv4RouteState {
+	1 : string DestinationNw
+	2 : string Protocol
+	3 : bool IsNetworkReachable
+	4 : string RouteCreatedTime
+	5 : string RouteUpdatedTime
+	6 : list<RouteNextHopInfo> NextHopList
+	7 : list<string> PolicyList
+}
 
 service RIBDINTServices 
 {
@@ -119,8 +142,10 @@ service RIBDINTServices
 	RoutesGetInfo getBulkRoutesForProtocol(1: string srcProtocol, 2: int fromIndex ,3: int rcount)
     void TrackReachabilityStatus(1: string ipAddr, 2: string protocol, 3:string op) //op:"add"/"del"
 	//RoutesGetInfo getBulkRoutes(1: int fromIndex, 2: int count);
-	Routes getRoute(1: string destNetIp, 2:string networkMask);
-	oneway void OnewayCreateBulkIPv4Route(1: list<IPv4Route> config);
+	IPv4RouteState getRoute(1: string destNetIp, 2:string networkMask);
+	int GetTotalRouteCount();
+	string GetRouteCreatedTime(1:int number);
+	oneway void OnewayCreateBulkIPv4Route(1: list<IPv4RouteConfig> config);
 	bool CreatePolicyAction(1: PolicyAction config);
 	bool UpdatePolicyAction(1: PolicyAction origconfig, 2: PolicyAction newconfig, 3: list<bool> attrset, 4: list<PatchOpInfo> op);
 	bool DeletePolicyAction(1: PolicyAction config);
