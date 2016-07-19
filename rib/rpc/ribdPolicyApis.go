@@ -13,13 +13,13 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 // policyApis.go
 package rpc
@@ -35,9 +35,11 @@ import (
 func (m RIBDServicesHandler) CreatePolicyStmt(cfg *ribd.PolicyStmt) (val bool, err error) {
 	logger.Debug(fmt.Sprintln("CreatePolicyStatement"))
 	newPolicyStmt := policy.PolicyStmtConfig{Name: cfg.Name, MatchConditions: cfg.MatchConditions}
-	newPolicyStmt.Conditions = make([]string, 0)
-	for i := 0; i < len(cfg.Conditions); i++ {
-		newPolicyStmt.Conditions = append(newPolicyStmt.Conditions, cfg.Conditions[i])
+	if len(cfg.Conditions) != 0 {
+		newPolicyStmt.Conditions = make([]string, 0)
+		for i := 0; i < len(cfg.Conditions); i++ {
+			newPolicyStmt.Conditions = append(newPolicyStmt.Conditions, cfg.Conditions[i])
+		}
 	}
 	newPolicyStmt.Actions = make([]string, 0)
 	newPolicyStmt.Actions = append(newPolicyStmt.Actions, cfg.Action)
@@ -47,9 +49,9 @@ func (m RIBDServicesHandler) CreatePolicyStmt(cfg *ribd.PolicyStmt) (val bool, e
 		return false, err
 	}
 	m.server.PolicyStmtConfCh <- server.RIBdServerConfig{
-	                                   OrigConfigObject:cfg,
-	                                   Op : "add",
-	                              }
+		OrigConfigObject: cfg,
+		Op:               "add",
+	}
 	return true, err
 }
 
@@ -61,9 +63,9 @@ func (m RIBDServicesHandler) DeletePolicyStmt(cfg *ribd.PolicyStmt) (val bool, e
 		return false, err
 	}
 	m.server.PolicyStmtConfCh <- server.RIBdServerConfig{
-	                                   OrigConfigObject:cfg,
-	                                   Op : "del",
-	                              }
+		OrigConfigObject: cfg,
+		Op:               "del",
+	}
 	return true, err
 }
 
@@ -98,9 +100,9 @@ func (m RIBDServicesHandler) CreatePolicyDefinition(cfg *ribd.PolicyDefinition) 
 		return false, err
 	}
 	m.server.PolicyDefinitionConfCh <- server.RIBdServerConfig{
-	                                   OrigConfigObject:cfg,
-	                                   Op : "add",
-	                              }
+		OrigConfigObject: cfg,
+		Op:               "add",
+	}
 	return true, err
 }
 
@@ -113,9 +115,9 @@ func (m RIBDServicesHandler) DeletePolicyDefinition(cfg *ribd.PolicyDefinition) 
 		return false, err
 	}
 	m.server.PolicyDefinitionConfCh <- server.RIBdServerConfig{
-	                                   OrigConfigObject:cfg,
-	                                   Op : "del",
-	                              }
+		OrigConfigObject: cfg,
+		Op:               "del",
+	}
 	return true, err
 }
 

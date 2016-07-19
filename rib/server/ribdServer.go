@@ -82,7 +82,7 @@ type NextHopInfo struct {
 	refCount int //number of routes using this as a next hop
 }
 type ApplyPolicyInfo struct {
-	Source     string
+	Source     string //source application/protocol
 	Policy     string
 	Action     string
 	Conditions []*ribdInt.ConditionInfo
@@ -180,8 +180,10 @@ var IfNameToIfIndex map[string]int32
 var GlobalPolicyEngineDB *policy.PolicyEngineDB
 var PolicyEngineDB *policy.PolicyEngineDB
 var PARAMSDIR string
-var rtCount int
-var routeCreatedTimeMap map[int]string
+var v4rtCount int
+var v4routeCreatedTimeMap map[int]string
+var v6rtCount int
+var v6routeCreatedTimeMap map[int]string
 
 /*
    Handle Interface down event
@@ -412,13 +414,13 @@ func (ribdServiceHandler *RIBDServer) ConnectToClients(paramsFile string) {
 
 	bytes, err := ioutil.ReadFile(paramsFile)
 	if err != nil {
-		logger.Info("Error in reading configuration file")
+		logger.Err("Error in reading configuration file")
 		return
 	}
 
 	err = json.Unmarshal(bytes, &clientsList)
 	if err != nil {
-		logger.Info("Error in Unmarshalling Json")
+		logger.Err("Error in Unmarshalling Json")
 		return
 	}
 
@@ -506,7 +508,8 @@ func NewRIBDServicesHandler(dbHdl *dbutils.DBUtil, loggerC *logging.Writer) *RIB
 	localRouteEventsDB = make([]RouteEventInfo, 0)
 	RedistributeRouteMap = make(map[string][]RedistributeRouteInfo)
 	TrackReachabilityMap = make(map[string][]string)
-	routeCreatedTimeMap = make(map[int]string)
+	v4routeCreatedTimeMap = make(map[int]string)
+	v6routeCreatedTimeMap = make(map[int]string)
 	RouteProtocolTypeMapDB = make(map[string]int)
 	ReverseRouteProtoTypeMapDB = make(map[int]string)
 	ProtocolAdminDistanceMapDB = make(map[string]RouteDistanceConfig)

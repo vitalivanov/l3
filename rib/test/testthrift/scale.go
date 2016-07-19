@@ -41,7 +41,7 @@ func handleClient(client *ribd.RIBDServicesClient, maxCount int) (err error) {
 	byte4 := "0"
 	start := time.Now()
 	var route ribd.IPv4Route
-	routeCount, _ := client.GetTotalRouteCount()
+	routeCount, _ := client.GetTotalv4RouteCount()
 	fmt.Println("Route count before scale test start:", routeCount)
 	for {
 		if intByt3 > 254 {
@@ -105,7 +105,7 @@ func handleBulkClient(client *ribd.RIBDServicesClient, maxCount int) (err error)
 	var routes []*ribdInt.IPv4RouteConfig
 	routes = make([]*ribdInt.IPv4RouteConfig, 0)
 	route = make([]ribdInt.IPv4RouteConfig, maxCount)
-	routeCount, _ := client.GetTotalRouteCount()
+	routeCount, _ := client.GetTotalv4RouteCount()
 	fmt.Println("Route count before scale test start:", routeCount)
 	for {
 		if intByt3 > 254 {
@@ -178,6 +178,6 @@ func Scale(ribdClient *ribd.RIBDServicesClient, number int) {
 		fmt.Println("RIBd client nil")
 		return
 	}*/
-	handleClient(ribdClient, number) //ribd.NewRIBDServicesClientFactory(transport, protocolFactory))
-	//handleBulkClient(ribdClient, number) //(ribd.NewRIBDServicesClientFactory(transport, protocolFactory))
+	//handleClient(ribdClient, number) //ribd.NewRIBDServicesClientFactory(transport, protocolFactory))
+	handleBulkClient(ribdClient, number) //(ribd.NewRIBDServicesClientFactory(transport, protocolFactory))
 }
