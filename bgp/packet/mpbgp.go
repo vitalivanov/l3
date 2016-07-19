@@ -35,7 +35,7 @@ import (
 
 var BGPAFIToStructMap = map[AFI]MPNextHop{
 	AfiIP:  &MPNextHopIP{},
-	AfiIP6: &MPNextHopIP{},
+	AfiIP6: &MPNextHopIP6{},
 }
 
 type MPNextHop interface {
@@ -61,17 +61,32 @@ func (i *MPNextHopIP) Clone() MPNextHop {
 
 func (i *MPNextHopIP) Encode(pkt []byte) error {
 	pkt[0] = i.Length
-	copy(pkt[1:], i.Value[cap(i.Value)-int(i.Length):])
+	if i.Length != 4 && i.Length != 16 || i.Length != 32 {
+		return errors.New(fmt.Sprintf("Wrong Next hop len %d", i.Length))
+	}
+	ipLen := net.IPv4len
+	if i.Length == 16 || i.Length == 32 {
+		ipLen = net.IPv6len
+	}
+	copy(pkt[1:], i.Value[cap(i.Value)-ipLen:])
 	return nil
 }
 
 func (i *MPNextHopIP) Decode(pkt []byte) error {
 	i.Length = pkt[0]
-	i.Value = make(net.IP, i.Length)
-	if i.Length == 4 {
+	if i.Length != 4 && i.Length != 16 || i.Length != 32 {
+		return errors.New(fmt.Sprintf("Wrong Next hop len %d", i.Length))
+	}
+	ipLen := net.IPv4len
+	if i.Length == 16 || i.Length == 32 {
+		ipLen = net.IPv6len
+	}
+
+	i.Value = make(net.IP, ipLen)
+	if ipLen == 4 {
 		i.Value = net.IPv4(pkt[1], pkt[2], pkt[3], pkt[4])
 	} else {
-		copy(i.Value, pkt[1:1+i.Length])
+		copy(i.Value, pkt[1:])
 	}
 	return nil
 }
@@ -102,6 +117,91 @@ func NewMPNextHopIP() *MPNextHopIP {
 	return &MPNextHopIP{
 		Length: 0,
 		Value:  net.IP{},
+	}
+}
+
+type MPNextHopIP6 struct {
+	*MPNextHopIP
+	LinkLocal net.IP
+}
+
+func (i *MPNextHopIP6) Clone() MPNextHop {
+	x := *i
+	nextHopIP := i.MPNextHopIP.Clone()
+	x.MPNextHopIP = nextHopIP.(*MPNextHopIP)
+	x.Value = make(net.IP, len(i.Value), cap(i.Value))
+	copy(x.Value, i.Value)
+	return &x
+}
+
+func (i *MPNextHopIP6) Encode(pkt []byte) error {
+	err := i.MPNextHopIP.Encode(pkt)
+	if err != nil {
+		return err
+	}
+	if i.LinkLocal != nil {
+		ipLen := net.IPv6len
+		copy(pkt[ipLen+1:], i.LinkLocal[cap(i.LinkLocal)-ipLen:])
+	}
+	return nil
+}
+
+func (i *MPNextHopIP6) Decode(pkt []byte) error {
+	err := i.MPNextHopIP.Decode(pkt)
+	if err != nil {
+		return err
+	}
+
+	if i.Length == 16 || i.Length == 32 {
+		ipLen := net.IPv6len
+		i.LinkLocal = make(net.IP, ipLen)
+		copy(i.LinkLocal, pkt[ipLen+1:])
+	}
+	return nil
+}
+
+func (i *MPNextHopIP6) New() MPNextHop {
+	return &MPNextHopIP{}
+}
+
+func (i *MPNextHopIP6) String() string {
+	return fmt.Sprintf("{NEXTHOP %v}", i.Value)
+}
+
+func (i *MPNextHopIP6) SetGlobalNextHop(ip net.IP) error {
+	if len(ip) != 16 {
+		return errors.New(fmt.Sprintf("IPv6 next hop address is not 16 bytes, length =%d", len(ip)))
+	}
+
+	i.Value = ip
+	if i.LinkLocal != nil {
+		i.Length = uint8(len(ip)) * 2
+	} else {
+		i.Length = uint8(len(ip))
+	}
+	return nil
+}
+
+func (i *MPNextHopIP6) SetLinkLocalNextHop(ip net.IP) error {
+	if len(ip) != 16 {
+		return errors.New(fmt.Sprintf("IPv6 next hop address is not 16 bytes, length =%d", len(ip)))
+	}
+
+	i.LinkLocal = ip
+	if i.LinkLocal != nil {
+		i.Length = uint8(len(ip)) * 2
+	} else {
+		i.Length = uint8(len(ip))
+	}
+	return nil
+}
+
+func NewMPNextHopIP6() *MPNextHopIP6 {
+	return &MPNextHopIP6{
+		MPNextHopIP: &MPNextHopIP{
+			Length: 0,
+			Value:  net.IP{},
+		},
 	}
 }
 
@@ -246,7 +346,7 @@ func (r *BGPPathAttrMPReachNLRI) Decode(pkt []byte, data interface{}) error {
 
 	r.NLRI = make([]NLRI, 0)
 	length := uint32(r.BGPPathAttrBase.Length) - 5 - uint32(r.NextHop.Len())
-	_, err = decodeNLRI(pkt[idx:], &r.NLRI, length, data)
+	_, err = decodeNLRI(pkt[idx:], &r.NLRI, length, r.AFI, data)
 	return err
 }
 
@@ -330,7 +430,7 @@ func (u *BGPPathAttrMPUnreachNLRI) Decode(pkt []byte, data interface{}) error {
 
 	u.NLRI = make([]NLRI, 0)
 	length := uint32(u.BGPPathAttrBase.Length) - 3
-	_, err = decodeNLRI(pkt[idx:], &u.NLRI, length, data)
+	_, err = decodeNLRI(pkt[idx:], &u.NLRI, length, u.AFI, data)
 	return err
 }
 
