@@ -45,10 +45,6 @@ func (m RIBDServer) WriteIPv4RouteStateEntryToDB(dbInfo RouteDBInfo) error {
 	var dbObj objects.IPv4RouteState
 	obj := ribd.NewIPv4RouteState()
 	obj.DestinationNw = entry.networkAddr
-	/*	obj.NextHopIp = entry.nextHopIp.String()
-		nextHopIfTypeStr, _ := m.GetNextHopIfTypeStr(ribdInt.Int(entry.nextHopIfType))
-		obj.OutgoingIntfType = nextHopIfTypeStr
-		obj.OutgoingInterface = strconv.Itoa(int(entry.nextHopIfIndex))*/
 	obj.Protocol = routeList.selectedRouteProtocol //ReverseRouteProtoTypeMapDB[int(entry.protocol)]
 	obj.NextHopList = make([]*ribd.NextHopInfo, 0)
 	routeInfoList := routeList.routeInfoProtocolMap[routeList.selectedRouteProtocol]
@@ -118,10 +114,6 @@ func (m RIBDServer) WriteIPv6RouteStateEntryToDB(dbInfo RouteDBInfo) error {
 	var dbObj objects.IPv6RouteState
 	obj := ribd.NewIPv6RouteState()
 	obj.DestinationNw = entry.networkAddr
-	/*	obj.NextHopIp = entry.nextHopIp.String()
-		nextHopIfTypeStr, _ := m.GetNextHopIfTypeStr(ribdInt.Int(entry.nextHopIfType))
-		obj.OutgoingIntfType = nextHopIfTypeStr
-		obj.OutgoingInterface = strconv.Itoa(int(entry.nextHopIfIndex))*/
 	obj.Protocol = routeList.selectedRouteProtocol //ReverseRouteProtoTypeMapDB[int(entry.protocol)]
 	obj.NextHopList = make([]*ribd.NextHopInfo, 0)
 	routeInfoList := routeList.routeInfoProtocolMap[routeList.selectedRouteProtocol]

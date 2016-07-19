@@ -30,6 +30,9 @@ import (
 )
 
 func arpdResolveRoute(routeInfoRecord RouteInfoRecord) {
+	if arpdclnt.IsConnected == false {
+		return
+	}
 	logger.Debug(fmt.Sprintln(" arpdResolveRoute: Sending ARP Resolve for ", routeInfoRecord.nextHopIp.String(), " routeInfoRecord.nextHopIfIndex ", routeInfoRecord.nextHopIfIndex, " routeInfoRecord.resolvedNextHopIpIntf.NextHopIfIndex ", routeInfoRecord.resolvedNextHopIpIntf.NextHopIfIndex))
 	if routeInfoRecord.ipType == ipv6 {
 		return
@@ -38,6 +41,9 @@ func arpdResolveRoute(routeInfoRecord RouteInfoRecord) {
 	logger.Debug(fmt.Sprintln("ARP resolve for ", routeInfoRecord.resolvedNextHopIpIntf.NextHopIp, arpdInt.Int(routeInfoRecord.nextHopIfIndex), " returned "))
 }
 func arpdRemoveRoute(routeInfoRecord RouteInfoRecord) {
+	if arpdclnt.IsConnected == false {
+		return
+	}
 	logger.Debug(fmt.Sprintln("arpdRemoveRoute: for ", routeInfoRecord.nextHopIp.String()))
 	if routeInfoRecord.ipType == ipv6 {
 		return
