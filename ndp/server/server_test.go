@@ -109,7 +109,8 @@ func TestCheckSrcMac(t *testing.T) {
 	i := int(0)
 	for i = 0; i < 5; i++ {
 		macStr := "aa:bb:cc:dd:ee:0" + strconv.Itoa(i)
-		svr.SwitchMacMapEntries[macStr] = true
+		var temp struct{}
+		svr.SwitchMacMapEntries[macStr] = temp
 	}
 	if !svr.CheckSrcMac("aa:bb:cc:dd:ee:01") {
 		t.Error("failed checking src mac 01")
@@ -134,4 +135,27 @@ func TestPopulateVlanIfIndexInfo(t *testing.T) {
 		t.Error("IfIndex is not copied properly need 1 but got", nbrInfo.IfIndex)
 	}
 	svr.DeInitGlobalDS()
+}
+
+func TestIpV6Addr(t *testing.T) {
+	svr := &NDPServer{}
+	if svr.IsIPv6Addr("192.168.1.1/31") {
+		t.Error("Failed check for ipv6 adddress when ipv4 is passed as arg")
+	}
+	if !svr.IsIPv6Addr("2002::1/64") {
+		t.Error("failed check for ipv6 addr when ipv6 is passed as arg")
+	}
+}
+
+func TestLinkLocalAddr(t *testing.T) {
+	svr := &NDPServer{}
+	if svr.IsLinkLocal("192.168.1.1/31") {
+		t.Error("ipv6 adddress is not link local ip address")
+	}
+	if svr.IsLinkLocal("2002::1/64") {
+		t.Error("ipv6 adddress is not link local ip address")
+	}
+	if !svr.IsLinkLocal("fe80::c000:54ff:fef5:0/64") {
+		t.Error("ipv6 address is link local ip address")
+	}
 }

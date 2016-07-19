@@ -124,6 +124,26 @@ func (svr *NDPServer) CheckSrcMac(macAddr string) bool {
 }
 
 /*
+ *	CheckCallUpdateNeighborInfo
+ *			a) It will first check whether a neighbor exists in the neighbor cache
+ *			b) If it doesn't exists then we create neighbor in the platform
+ *		        a) It will update ndp server neighbor info cache with the latest information
+ */
+func (svr *NDPServer) CheckCallUpdateNeighborInfo(nbrInfo *config.NeighborInfo) {
+	_, exists := svr.NeighborInfo[nbrInfo.IpAddr]
+	if exists {
+		return
+	}
+	debug.Logger.Info(fmt.Sprintln("Calling create ipv6 neighgor for global nbrinfo is", nbrInfo))
+	// ipaddr, macAddr, vlanId, ifIndex --- Global IPv6 Address
+	_, err := svr.SwitchPlugin.CreateIPv6Neighbor(nbrInfo.IpAddr, nbrInfo.MacAddr, nbrInfo.VlanId, nbrInfo.IfIndex)
+	if err != nil {
+		debug.Logger.Err(fmt.Sprintln("create ipv6 global neigbor failed for", nbrInfo, "error is", err))
+	}
+	svr.NeighborInfo[nbrInfo.IpAddr] = *nbrInfo
+}
+
+/*
  *	ProcessRxPkt
  *		        a) Check for runtime information
  *			b) Validate & Parse Pkt, which gives ipAddr, MacAddr
@@ -149,11 +169,6 @@ func (svr *NDPServer) ProcessRxPkt(ifIndex int32, pkt gopacket.Packet) {
 		return
 	}
 	svr.PopulateVlanInfo(nbrInfo, ifIndex)
-	debug.Logger.Info(fmt.Sprintln("Calling create ipv6 neighgor for global nbrinfo is", nbrInfo))
-	// ipaddr, macAddr, vlanId, ifIndex --- Global IPv6 Address
-	_, err = svr.SwitchPlugin.CreateIPv6Neighbor(nbrInfo.IpAddr, nbrInfo.MacAddr, nbrInfo.VlanId, nbrInfo.IfIndex)
-	if err != nil {
-		debug.Logger.Err(fmt.Sprintln("create ipv6 global neigbor failed for", nbrInfo, "error is", err))
-	}
+	svr.CheckCallUpdateNeighborInfo(nbrInfo)
 	return
 }
