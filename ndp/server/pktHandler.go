@@ -70,7 +70,7 @@ func (svr *NDPServer) StartRxTx(ifIndex int32) {
 	if !exists {
 		// This will copy msg (intRef, ifIndex, ipAddr) into ipPort
 		// And also create an entry into the ndpL3IntfStateSlice
-		debug.Logger.Err(fmt.Sprintln("Starting RX/TX for interface which was not created, ifIndex:",
+		debug.Logger.Err(fmt.Sprintln("Failed starting RX/TX for interface which was not created, ifIndex:",
 			ifIndex, "is not allowed"))
 		return
 	}
