@@ -27,7 +27,7 @@ import (
 	"fmt"
 	"infra/sysd/sysdCommonDefs"
 	"log/syslog"
-	"testing"
+	//"testing"
 	"utils/logging"
 )
 
@@ -50,7 +50,4 @@ func initTestServer() {
 	bfdTestServer = NewBFDServer(logger)
 	bfdTestServer.InitServer(paramFile)
 	return
-}
-
-func initTestSession() {
 }
