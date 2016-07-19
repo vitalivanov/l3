@@ -256,4 +256,5 @@ type RouteConfig struct {
 	NetworkMask       string
 	DestinationNw     string
 	OutgoingInterface string
+	IsIPv6            bool
 }

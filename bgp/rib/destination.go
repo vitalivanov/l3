@@ -48,6 +48,7 @@ type Destination struct {
 	logger            *logging.Writer
 	gConf             *config.GlobalConfig
 	NLRI              packet.NLRI
+	ipLength          int
 	peerPathMap       map[string]map[uint32]*Path
 	LocRibPath        *Path
 	LocRibPathRoute   *Route
@@ -70,6 +71,7 @@ func NewDestination(rib *LocRib, nlri packet.NLRI, gConf *config.GlobalConfig) *
 		logger:            rib.logger,
 		gConf:             gConf,
 		NLRI:              nlri,
+		ipLength:          4,
 		peerPathMap:       make(map[string]map[uint32]*Path),
 		ecmpPaths:         make(map[*Path]*Route),
 		aggregatedDestMap: make(map[string]*Destination),
@@ -394,6 +396,10 @@ func (d *Destination) SelectRouteForLocRib(addPathCount int) (RouteAction, bool,
 	routeSrc := RouteSrcUnknown
 	locRibAction := RouteActionNone
 	addPathsUpdated := false
+	isIPv6 := false
+	if d.ipLength == 16 {
+		isIPv6 = true
+	}
 
 	d.logger.Info(fmt.Sprintf("Destination - selecting best path for prefix %s", d.NLRI.GetPrefix()))
 	if !d.recalculate {
@@ -556,6 +562,7 @@ func (d *Destination) SelectRouteForLocRib(addPathCount int) (RouteAction, bool,
 						NetworkMask:       constructNetmaskFromLen(int(d.NLRI.GetLength()), 32).String(),
 						DestinationNw:     d.NLRI.GetPrefix().String(),
 						OutgoingInterface: strconv.Itoa(int(path.reachabilityInfo.NextHopIfIdx)),
+						IsIPv6:            isIPv6,
 					}
 					//d.rib.routeMgr.DeleteRoute(&cfg)
 					d.rib.routeMgr.UpdateRoute(&cfg, "remove")
@@ -584,6 +591,7 @@ func (d *Destination) SelectRouteForLocRib(addPathCount int) (RouteAction, bool,
 					NetworkMask:       constructNetmaskFromLen(int(d.NLRI.GetLength()), 32).String(),
 					DestinationNw:     d.NLRI.GetPrefix().String(),
 					OutgoingInterface: strconv.Itoa(int(path.reachabilityInfo.NextHopIfIdx)),
+					IsIPv6:            isIPv6,
 				}
 				//d.rib.routeMgr.DeleteRoute(&cfg)
 				d.rib.routeMgr.UpdateRoute(&cfg, "remove")
@@ -614,6 +622,7 @@ func (d *Destination) SelectRouteForLocRib(addPathCount int) (RouteAction, bool,
 			NetworkMask:       constructNetmaskFromLen(int(d.NLRI.GetLength()), 32).String(),
 			DestinationNw:     d.NLRI.GetPrefix().String(),
 			OutgoingInterface: strconv.Itoa(int(path.reachabilityInfo.NextHopIfIdx)),
+			IsIPv6:            isIPv6,
 		}
 		if firstRoute {
 			d.rib.routeMgr.CreateRoute(&cfg)
