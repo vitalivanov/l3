@@ -61,7 +61,7 @@ func (i *MPNextHopIP) Clone() MPNextHop {
 
 func (i *MPNextHopIP) Encode(pkt []byte) error {
 	pkt[0] = i.Length
-	if i.Length != 4 && i.Length != 16 || i.Length != 32 {
+	if i.Length != 4 && i.Length != 16 && i.Length != 32 {
 		return errors.New(fmt.Sprintf("Wrong Next hop len %d", i.Length))
 	}
 	ipLen := net.IPv4len
@@ -74,7 +74,7 @@ func (i *MPNextHopIP) Encode(pkt []byte) error {
 
 func (i *MPNextHopIP) Decode(pkt []byte) error {
 	i.Length = pkt[0]
-	if i.Length != 4 && i.Length != 16 || i.Length != 32 {
+	if i.Length != 4 && i.Length != 16 && i.Length != 32 {
 		return errors.New(fmt.Sprintf("Wrong Next hop len %d", i.Length))
 	}
 	ipLen := net.IPv4len
