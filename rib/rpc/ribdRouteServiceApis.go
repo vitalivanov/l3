@@ -81,7 +81,7 @@ func (m RIBDServicesHandler) CreateIPv6Route(cfg *ribd.IPv6Route) (val bool, err
    OnewayCreate API for route
 */
 func (m RIBDServicesHandler) OnewayCreateIPv6Route(cfg *ribd.IPv6Route) (err error) {
-	logger.Info(fmt.Sprintln("OnewayCreateIPv4Route - Received create route request for ip", cfg.DestinationNw, " mask ", cfg.NetworkMask, "cfg.NextHopIntRef: ", cfg.NextHop[0].NextHopIntRef))
+	logger.Info(fmt.Sprintln("OnewayCreateIPv6Route - Received create route request for ip", cfg.DestinationNw, " mask ", cfg.NetworkMask, "cfg.NextHopIntRef: ", cfg.NextHop[0].NextHopIntRef))
 	m.CreateIPv6Route(cfg)
 	return err
 }
@@ -177,7 +177,7 @@ func (m RIBDServicesHandler) OnewayDeleteIPv6Route(cfg *ribd.IPv6Route) (err err
    Update route
 */
 func (m RIBDServicesHandler) UpdateIPv4Route(origconfig *ribd.IPv4Route, newconfig *ribd.IPv4Route, attrset []bool, op []*ribd.PatchOpInfo) (val bool, err error) { //[]*ribd.PatchOpInfo) (val bool, err error) {
-	logger.Println("UpdateIPv4Route: Received update route request")
+	logger.Info("UpdateIPv4Route: Received update route request")
 	/*
 	   validate route config parameters for update operation
 	*/
@@ -209,7 +209,7 @@ func (m RIBDServicesHandler) UpdateIPv4Route(origconfig *ribd.IPv4Route, newconf
    one way update route function
 */
 func (m RIBDServicesHandler) OnewayUpdateIPv4Route(origconfig *ribd.IPv4Route, newconfig *ribd.IPv4Route, attrset []bool) (err error) {
-	logger.Println("OneWayUpdateIPv4Route: Received update route request")
+	logger.Info("OneWayUpdateIPv4Route: Received update route request")
 	m.UpdateIPv4Route(origconfig, newconfig, attrset, nil)
 	return err
 }
@@ -218,7 +218,7 @@ func (m RIBDServicesHandler) OnewayUpdateIPv4Route(origconfig *ribd.IPv4Route, n
    Update route
 */
 func (m RIBDServicesHandler) UpdateIPv6Route(origconfig *ribd.IPv6Route, newconfig *ribd.IPv6Route, attrset []bool, op []*ribd.PatchOpInfo) (val bool, err error) { //[]*ribd.PatchOpInfo) (val bool, err error) {
-	logger.Println("UpdateIPv6Route: Received update route request")
+	logger.Info("UpdateIPv6Route: Received update route request")
 	/*
 	   validate route config parameters for update operation
 	*/
@@ -253,7 +253,7 @@ func (m RIBDServicesHandler) UpdateIPv6Route(origconfig *ribd.IPv6Route, newconf
    one way update route function
 */
 func (m RIBDServicesHandler) OnewayUpdateIPv6Route(origconfig *ribd.IPv6Route, newconfig *ribd.IPv6Route, attrset []bool) (err error) {
-	logger.Println("OneWayUpdateIPv6Route: Received update route request")
+	logger.Info("OneWayUpdateIPv6Route: Received update route request")
 	m.UpdateIPv6Route(origconfig, newconfig, attrset, nil)
 	return err
 }

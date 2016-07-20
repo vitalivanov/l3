@@ -572,8 +572,26 @@ func (m RIBDServer) ProcessV4RouteCreateConfig(cfg *ribd.IPv4Route) (val bool, e
 		newCfg.NextHop = append(newCfg.NextHop, &nh)
 		policyRoute := BuildPolicyRouteFromribdIPv4Route(&newCfg)
 		params := BuildRouteParamsFromribdIPv4Route(&newCfg, FIBAndRIB, Invalid, len(destNetSlice))
-		logger.Debug(fmt.Sprintln("createType = ", params.createType, "deleteType = ", params.deleteType))
 		PolicyEngineFilter(policyRoute, policyCommonDefs.PolicyPath_Import, params)
+		//policyEngineActionAcceptRoute(params)
+		/*		nextHopIp := newCfg.NextHop[0].NextHopIp
+				if cfg.NullRoute == true { //commonDefs.IfTypeNull {
+					logger.Info("null route create request")
+					nextHopIp = "255.255.255.255"
+				}
+				nextHopIntRef, _ := strconv.Atoi(newCfg.NextHop[0].NextHopIntRef)
+				_, err = createRoute(ipv4,
+					newCfg.DestinationNw,
+					newCfg.NetworkMask,
+					ribd.Int(cfg.Cost),
+					ribd.Int(newCfg.NextHop[0].Weight),
+					nextHopIp,
+					ribd.Int(nextHopIntRef),
+					ribd.Int(RouteProtocolTypeMapDB[newCfg.Protocol]),
+					FIBAndRIB,
+					ribdCommonDefs.RoutePolicyStateChangetoValid,
+					ribd.Int(len(destNetSlice)))*/
+
 	}
 
 	return true, err
