@@ -34,6 +34,9 @@ func (svr *NDPServer) GetNeighborEntries(idx, cnt int) (int, int, []config.Neigh
 	var i, j int
 
 	length := len(svr.neighborKey)
+	if length == 0 {
+		return 0, 0, nil
+	}
 	var result []config.NeighborInfo
 
 	svr.NeigborEntryLock.RLock()
@@ -48,4 +51,15 @@ func (svr *NDPServer) GetNeighborEntries(idx, cnt int) (int, int, []config.Neigh
 	}
 	count = i
 	return nextIdx, count, result
+}
+
+func (svr *NDPServer) GetNeighborEntry(ipAddr string) *config.NeighborInfo {
+	svr.NeigborEntryLock.RLock()
+	defer svr.NeigborEntryLock.RUnlock()
+
+	nbrEntry, exists := svr.NeighborInfo[ipAddr]
+	if exists {
+		return &nbrEntry
+	}
+	return nil
 }
