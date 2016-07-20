@@ -37,8 +37,6 @@ import (
 	"utils/logging"
 )
 
-type BGPFSMState int
-
 const BGPConnectRetryTime uint16 = 120  // seconds
 const BGPHoldTimeDefault uint16 = 9     // 240 seconds
 const BGPIdleHoldTimeDefault uint16 = 5 // 240 seconds
@@ -53,16 +51,6 @@ var IdleHoldTimeInterval = map[uint16]uint16{
 	300: 500,
 	500: 0,
 }
-
-const (
-	BGPFSMNone BGPFSMState = iota
-	BGPFSMIdle
-	BGPFSMConnect
-	BGPFSMActive
-	BGPFSMOpensent
-	BGPFSMOpenconfirm
-	BGPFSMEstablished
-)
 
 type BGPFSMEvent int
 
@@ -133,7 +121,7 @@ type BaseStateIface interface {
 	processEvent(BGPFSMEvent, interface{})
 	enter()
 	leave()
-	state() BGPFSMState
+	state() config.BGPFSMState
 	String() string
 }
 
@@ -164,8 +152,8 @@ func (baseState *BaseState) leave() {
 	baseState.logger.Info(fmt.Sprintln("BaseState: leave"))
 }
 
-func (baseState *BaseState) state() BGPFSMState {
-	return BGPFSMNone
+func (baseState *BaseState) state() config.BGPFSMState {
+	return config.BGPFSMNone
 }
 
 type IdleState struct {
@@ -229,8 +217,8 @@ func (st *IdleState) leave() {
 	st.fsm.StopIdleHoldTimer()
 }
 
-func (st *IdleState) state() BGPFSMState {
-	return BGPFSMIdle
+func (st *IdleState) state() config.BGPFSMState {
+	return config.BGPFSMIdle
 }
 
 func (st *IdleState) String() string {
@@ -328,8 +316,8 @@ func (st *ConnectState) leave() {
 		"State: Connect - leave"))
 }
 
-func (st *ConnectState) state() BGPFSMState {
-	return BGPFSMConnect
+func (st *ConnectState) state() config.BGPFSMState {
+	return config.BGPFSMConnect
 }
 
 func (st *ConnectState) String() string {
@@ -422,8 +410,8 @@ func (st *ActiveState) leave() {
 		"State: Active - leave"))
 }
 
-func (st *ActiveState) state() BGPFSMState {
-	return BGPFSMActive
+func (st *ActiveState) state() config.BGPFSMState {
+	return config.BGPFSMActive
 }
 
 func (st *ActiveState) String() string {
@@ -536,8 +524,8 @@ func (st *OpenSentState) leave() {
 		"State: OpenSent - leave"))
 }
 
-func (st *OpenSentState) state() BGPFSMState {
-	return BGPFSMOpensent
+func (st *OpenSentState) state() config.BGPFSMState {
+	return config.BGPFSMOpensent
 }
 
 func (st *OpenSentState) String() string {
@@ -651,8 +639,8 @@ func (st *OpenConfirmState) leave() {
 		st.fsm.neighborConf.RunningConf.KeepaliveTime)
 }
 
-func (st *OpenConfirmState) state() BGPFSMState {
-	return BGPFSMOpenconfirm
+func (st *OpenConfirmState) state() config.BGPFSMState {
+	return config.BGPFSMOpenconfirm
 }
 
 func (st *OpenConfirmState) String() string {
@@ -769,8 +757,8 @@ func (st *EstablishedState) leave() {
 		st.fsm.neighborConf.RunningConf.KeepaliveTime)
 }
 
-func (st *EstablishedState) state() BGPFSMState {
-	return BGPFSMEstablished
+func (st *EstablishedState) state() config.BGPFSMState {
+	return config.BGPFSMEstablished
 }
 
 func (st *EstablishedState) String() string {
@@ -954,7 +942,7 @@ func (fsm *FSM) StartFSM() {
 			fsm.SetPassiveTcpEstablishment(val)
 
 		case bgpMsg := <-fsm.pktTxCh:
-			if fsm.State.state() != BGPFSMEstablished {
+			if fsm.State.state() != config.BGPFSMEstablished {
 				fsm.logger.Info(fmt.Sprintln("Neighbor:", fsm.pConf.NeighborAddress, "FSM", fsm.id,
 					"is not in Established state, can't send the UPDATE message"))
 				continue
@@ -1052,9 +1040,9 @@ func (fsm *FSM) ChangeState(newState BaseStateIface) {
 	fsm.State = newState
 	fsm.State.enter()
 	fsm.Manager.fsmStateChange(fsm.id, fsm.State.state())
-	if oldState == BGPFSMEstablished && fsm.State.state() != BGPFSMEstablished {
+	if oldState == config.BGPFSMEstablished && fsm.State.state() != config.BGPFSMEstablished {
 		fsm.ConnBroken()
-	} else if oldState != BGPFSMEstablished && fsm.State.state() == BGPFSMEstablished {
+	} else if oldState != config.BGPFSMEstablished && fsm.State.state() == config.BGPFSMEstablished {
 		fsm.ConnEstablished()
 	}
 }
