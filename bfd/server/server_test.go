@@ -27,13 +27,14 @@ import (
 	"fmt"
 	"infra/sysd/sysdCommonDefs"
 	"log/syslog"
-	//"testing"
+	"testing"
 	"utils/logging"
 )
 
 var bfdTestServer *BFDServer
 var bfdTestSession *BfdSession
 var bfdTestSessionParam *BfdSessionParam
+var bfdTestControlPacket *BfdControlPacket
 
 func BfdTestNewLogger() *logging.Writer {
 	logger := new(logging.Writer)
@@ -49,5 +50,136 @@ func initTestServer() {
 	logger := BfdTestNewLogger()
 	bfdTestServer = NewBFDServer(logger)
 	bfdTestServer.InitServer(paramFile)
+	initSessionHandlingChans()
 	return
+}
+
+func initSessionHandlingChans() {
+	bfdTestServer.CreateSessionCh = make(chan BfdSessionMgmt)
+	bfdTestServer.DeleteSessionCh = make(chan BfdSessionMgmt)
+	bfdTestServer.AdminUpSessionCh = make(chan BfdSessionMgmt)
+	bfdTestServer.AdminDownSessionCh = make(chan BfdSessionMgmt)
+	bfdTestServer.CreatedSessionCh = make(chan int32, MAX_NUM_SESSIONS)
+	bfdTestServer.FailedSessionClientCh = make(chan int32, MAX_NUM_SESSIONS)
+	bfdTestServer.tobeCreatedSessions = make(map[string]BfdSessionMgmt)
+}
+
+func startTestServerChans() {
+	for {
+		select {
+		case <-bfdTestServer.ServerStartedCh:
+		case <-bfdTestServer.GlobalConfigCh:
+		case <-bfdTestServer.asicdSubSocketCh:
+		case <-bfdTestServer.asicdSubSocketErrCh:
+		case <-bfdTestServer.ribdSubSocketCh:
+		case <-bfdTestServer.ribdSubSocketErrCh:
+		case <-bfdTestServer.CreateSessionCh:
+		case <-bfdTestServer.DeleteSessionCh:
+		case <-bfdTestServer.AdminUpSessionCh:
+		case <-bfdTestServer.AdminDownSessionCh:
+		case <-bfdTestServer.SessionConfigCh:
+		case <-bfdTestServer.CreatedSessionCh:
+		case <-bfdTestServer.notificationCh:
+		case <-bfdTestServer.FailedSessionClientCh:
+		case <-bfdTestServer.BfdPacketRecvCh:
+		case <-bfdTestServer.SessionParamConfigCh:
+		case <-bfdTestServer.SessionParamDeleteCh:
+		}
+	}
+}
+
+func TestCreateBfdServer(t *testing.T) {
+	initTestServer()
+	go startTestServerChans()
+}
+
+func TestBuildPortPropertyMap(t *testing.T) {
+	bfdTestServer.BuildPortPropertyMap()
+}
+
+func TestCreateASICdSubscriber(t *testing.T) {
+	go bfdTestServer.CreateASICdSubscriber()
+}
+
+func TestCreateRIBdSubscriber(t *testing.T) {
+	go bfdTestServer.CreateRIBdSubscriber()
+}
+
+func TestNewNormalBfdSession(t *testing.T) {
+	bfdTestServer.createDefaultSessionParam()
+	fmt.Println("Creating BFD session to 10.1.1.1")
+	bfdTestSession = bfdTestServer.NewNormalBfdSession(0, "10.1.1.1", "default", false, 2)
+}
+
+func TestStartSessionServer(t *testing.T) {
+	go bfdTestSession.StartSessionServer()
+}
+
+func TestStartSessionClient(t *testing.T) {
+	go bfdTestSession.StartSessionClient(bfdTestServer)
+}
+
+func TestFindBfdSession(t *testing.T) {
+	sessionId, found := bfdTestServer.FindBfdSession("10.1.1.1")
+	if found {
+		fmt.Println("Found session: ", sessionId)
+	}
+}
+
+func TestEventHandler(t *testing.T) {
+	bfdTestSession.EventHandler(REMOTE_DOWN)
+	bfdTestSession.EventHandler(REMOTE_INIT)
+	bfdTestSession.EventHandler(TIMEOUT)
+	bfdTestSession.EventHandler(REMOTE_ADMIN_DOWN)
+	bfdTestSession.EventHandler(ADMIN_UP)
+	bfdTestSession.EventHandler(REMOTE_UP)
+}
+
+func TestUpdateBfdSessionControlPacket(t *testing.T) {
+	bfdTestSession.UpdateBfdSessionControlPacket()
+}
+
+func TestCheckIfAnyProtocolRegistered(t *testing.T) {
+	bfdTestSession.CheckIfAnyProtocolRegistered()
+}
+
+func TestAdminDownBfdSession(t *testing.T) {
+	sessionMgmt := BfdSessionMgmt{
+		DestIp:   "10.1.1.1",
+		Protocol: 2,
+	}
+	bfdTestServer.AdminDownBfdSession(sessionMgmt)
+}
+
+func TestAdminUpBfdSession(t *testing.T) {
+	sessionMgmt := BfdSessionMgmt{
+		DestIp:   "10.1.1.1",
+		Protocol: 2,
+	}
+	bfdTestServer.AdminUpBfdSession(sessionMgmt)
+}
+
+func TestSendBfdNotification(t *testing.T) {
+	bfdTestSession.SendBfdNotification()
+}
+
+func TestSendPeriodicControlPackets(t *testing.T) {
+	bfdTestSession.SendPeriodicControlPackets()
+}
+
+func TestHandleSessionTimeout(t *testing.T) {
+	bfdTestSession.HandleSessionTimeout()
+}
+
+func TestProcessBfdPacket(t *testing.T) {
+	bfdTestSession.ProcessBfdPacket(bfdTestSession.bfdPacket)
+}
+
+func TestInitiatePollSequence(t *testing.T) {
+	bfdTestSession.InitiatePollSequence()
+}
+
+func TestDecodeBfdControlPacket(t *testing.T) {
+	bfdPacketBuf, _ := bfdTestSession.bfdPacket.CreateBfdControlPacket()
+	DecodeBfdControlPacket(bfdPacketBuf)
 }
