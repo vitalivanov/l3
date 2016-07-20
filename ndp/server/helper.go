@@ -255,7 +255,8 @@ func (svr *NDPServer) HandleStateNotification(msg *config.StateNotification) {
 	switch msg.State {
 	case config.STATE_UP:
 		if svr.IsIPv6Addr(msg.IpAddr) {
-			if svr.IsLinkLocal(msg.IpAddr) {
+			if !svr.IsLinkLocal(msg.IpAddr) {
+				debug.Logger.Info(fmt.Sprintln("Create pkt handler for", msg.IfIndex, "IpAddr:", msg.IpAddr))
 				svr.StartRxTx(msg.IfIndex)
 			}
 		}

@@ -127,24 +127,46 @@ func TestNDSMulticast(t *testing.T) {
 }
 
 // Test ND Solicitation src ip Address Validation
-func TestNDSIpAddress(t *testing.T) {
+func TestNDSInformation(t *testing.T) {
 	srcIP := net.IP{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
 	dstIP := net.IP{0xff, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0xff, 0x10, 0x78, 0x2e}
 	//t.Log("SrcIP->", srcIP.String(), "DstIP->", dstIP.String())
-	err := ValidateNDSIpAddrs(srcIP, dstIP)
+	err := ValidateNDSInfo(srcIP, dstIP, nil)
 	if err != nil {
 		t.Error("Validation of ip address failed with error", err)
 	}
+	optionWant := &NDOption{
+		Type:   2,
+		Length: 1,
+		Value:  []byte{0xc2, 0x00, 0x54, 0xf5, 0x00, 0x00},
+	}
+	ndInfo := &NDInfo{}
+	ndInfo.Options = append(ndInfo.Options, optionWant)
 
+	err = ValidateNDSInfo(srcIP, dstIP, ndInfo.Options)
+	if err != nil {
+		t.Error("Neigbor solicitation should fail for any option other than Source Link Layer Address", err)
+	}
+	optionWant1 := &NDOption{
+		Type:   1,
+		Length: 1,
+		Value:  []byte{0xc2, 0x00, 0x54, 0xf5, 0x00, 0x00},
+	}
+	ndInfo1 := &NDInfo{}
+	ndInfo1.Options = append(ndInfo1.Options, optionWant1)
+	err = ValidateNDSInfo(srcIP, dstIP, ndInfo1.Options)
+	if err == nil {
+		t.Error("Neigbor solicitation should fail for any option other than Source Link Layer Address")
+	}
 	srcIP = net.IP{0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
 	//t.Log("SrcIP->", srcIP.String(), "DstIP->", dstIP.String())
-	err = ValidateNDSIpAddrs(srcIP, dstIP)
+	err = ValidateNDSInfo(srcIP, dstIP, nil)
 	if err != nil {
 		t.Error("Validation of ip address", srcIP, "failed with error", err)
 	}
 	dstIP = net.IP{0xfe, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xc0, 0x00, 0x54, 0xff, 0xfe, 0xf5, 0x00, 0x01}
 	//t.Log("SrcIP->", srcIP.String(), "DstIP->", dstIP.String())
-	err = ValidateNDSIpAddrs(srcIP, dstIP)
+	err = ValidateNDSInfo(srcIP, dstIP, nil)
 	if err != nil {
 		t.Error("Validation of ip address", srcIP, "dst Ip", dstIP, "failed with error", err)
 	}
