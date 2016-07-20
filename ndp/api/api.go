@@ -80,3 +80,8 @@ func SendIPIntfNotfication(ifIndex int32, ipaddr, msgType string) {
 		Operation: msgType,
 	}
 }
+
+func GetAllNeigborEntries(from, count int) (int, int, []config.NeighborInfo) {
+	n, c, result := ndpApi.server.GetNeighborEntries(from, count)
+	return n, c, result
+}

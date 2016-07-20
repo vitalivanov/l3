@@ -20,28 +20,32 @@
 // |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
 // |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
 //
-package flexswitch
 
-import (
-	"ndpd"
+// fsmState.go
+package config
+
+type BGPFSMState int
+
+const (
+	BGPFSMNone BGPFSMState = iota
+	BGPFSMIdle
+	BGPFSMConnect
+	BGPFSMActive
+	BGPFSMOpensent
+	BGPFSMOpenconfirm
+	BGPFSMEstablished
 )
 
-func (h *ConfigHandler) CreateNDPGlobal(config *ndpd.NDPGlobal) (bool, error) {
-	return true, nil
+var BGPStateToStr = map[BGPFSMState]string{
+	BGPFSMNone:        "INIT",
+	BGPFSMIdle:        "IDLE",
+	BGPFSMConnect:     "CONNECT",
+	BGPFSMActive:      "ACTIVE",
+	BGPFSMOpensent:    "OPENSENT",
+	BGPFSMOpenconfirm: "OPENCONFIRM",
+	BGPFSMEstablished: "ESTABLISHED",
 }
 
-func (h *ConfigHandler) UpdateNDPGlobal(orgCfg *ndpd.NDPGlobal, newCfg *ndpd.NDPGlobal, attrset []bool, op []*ndpd.PatchOpInfo) (bool, error) {
-	return true, nil
-}
-
-func (h *ConfigHandler) DeleteNDPGlobal(config *ndpd.NDPGlobal) (bool, error) {
-	return true, nil
-}
-
-func (h *ConfigHandler) GetBulkNDPEntryState(fromIdx ndpd.Int, count ndpd.Int) (*ndpd.NDPEntryStateGetInfo, error) {
-	return nil, nil
-}
-
-func (h *ConfigHandler) GetNDPEntryState(ipAddr string) (*ndpd.NDPEntryState, error) {
-	return nil, nil
+func GetBGPStateToStr(stateId BGPFSMState) string {
+	return BGPStateToStr[stateId]
 }

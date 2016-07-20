@@ -39,6 +39,8 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"utils/dbutils"
+	"utils/eventUtils"
 	"utils/logging"
 	"utils/netUtils"
 	"utils/patriciaDB"
@@ -123,6 +125,7 @@ type BGPServer struct {
 	routeMgr   config.RouteMgrIntf
 	bfdMgr     config.BfdMgrIntf
 	stateDBMgr statedbclient.StateDBClient
+	eventDbHdl *dbutils.DBUtil
 }
 
 func NewBGPServer(logger *logging.Writer, policyManager *bgppolicy.BGPPolicyManager, iMgr config.IntfStateMgrIntf,
@@ -1271,7 +1274,24 @@ func (server *BGPServer) listenChannelUpdates() {
 
 }
 
+func (server *BGPServer) InitBGPEvent() {
+	// Start DB Util
+	server.eventDbHdl = dbutils.NewDBUtil(server.logger)
+	err := server.eventDbHdl.Connect()
+	if err != nil {
+		server.logger.Err(fmt.Sprintf("DB connect failed with error %s. Exiting!!", err))
+		return
+	}
+	err = eventUtils.InitEvents("BGPD", server.eventDbHdl, server.logger)
+	if err != nil {
+		server.logger.Err(fmt.Sprintln("Unable to initialize events", err))
+	}
+}
+
 func (server *BGPServer) StartServer() {
+	// Initialize Event Handler
+	server.InitBGPEvent()
+
 	globalUpdate := <-server.GlobalConfigCh
 	gConf := globalUpdate.NewConfig
 	server.GlobalCfgDone = true

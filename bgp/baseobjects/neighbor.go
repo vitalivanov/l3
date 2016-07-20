@@ -28,8 +28,10 @@ import (
 	"fmt"
 	"l3/bgp/config"
 	"l3/bgp/packet"
+	"models/events"
 	"net"
 	"time"
+	"utils/eventUtils"
 	"utils/logging"
 )
 
@@ -279,8 +281,23 @@ func (n *NeighborConf) CanAcceptNewPrefix() bool {
 	return true
 }
 
+func (n *NeighborConf) PublishEvents(stateId uint32) {
+	oldState := config.GetBGPStateToStr(config.BGPFSMState(n.Neighbor.State.SessionState))
+	newState := config.GetBGPStateToStr(config.BGPFSMState(stateId))
+	evtKey := events.BGPNeighborKey{
+		NeighborAddress: n.Neighbor.NeighborAddress.String(),
+		IfIndex:         n.Neighbor.Config.IfIndex,
+	}
+	additionalInfo := fmt.Sprintf("State change from %s to %s", oldState, newState)
+	err := eventUtils.PublishEvents(events.BGPNeighborStateChange, evtKey, additionalInfo)
+	if err != nil {
+		n.logger.Err(fmt.Sprintln("Error publish new events for BGPNeighborStateChange"))
+	}
+}
+
 func (n *NeighborConf) FSMStateChange(state uint32) {
 	n.logger.Info(fmt.Sprintf("Neighbor %s: FSMStateChange %d", n.Neighbor.NeighborAddress, state))
+	n.PublishEvents(state)
 	n.Neighbor.State.SessionState = uint32(state)
 }
 
