@@ -54,13 +54,13 @@ type Route struct {
 func NewRoute(dest *Destination, path *Path, action RouteAction, inPathId, outPathId uint32) *Route {
 	currTime := time.Now()
 	pathInfo := &bgpd.PathInfo{
-		NextHop:        path.GetNextHop().String(),
+		NextHop:        path.GetNextHop(dest.protoFamily).String(),
 		Metric:         int32(path.MED),
 		LocalPref:      int32(path.LocalPref),
 		Path:           path.GetAS4ByteList(),
 		PathId:         int32(inPathId),
 		UpdatedTime:    currTime.String(),
-		ValidPath:      path.IsReachable(),
+		ValidPath:      path.IsReachable(dest.protoFamily),
 		BestPath:       false,
 		MultiPath:      false,
 		AdditionalPath: false,

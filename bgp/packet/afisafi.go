@@ -84,6 +84,14 @@ func GetAfiSafi(protocolFamily uint32) (AFI, SAFI) {
 	return AFI(protocolFamily >> 8), SAFI(protocolFamily & 0xFF)
 }
 
+func GetAddressLengthForFamily(protoFamily uint32) int {
+	afi, _ := GetAfiSafi(protoFamily)
+	if addrLen, ok := AFINextHopLenMap[afi]; ok {
+		return addrLen
+	}
+	return -1
+}
+
 func GetProtocolFromOpenMsg(openMsg *BGPOpen) map[uint32]bool {
 	afiSafiMap := make(map[uint32]bool)
 	for _, optParam := range openMsg.OptParams {

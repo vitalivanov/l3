@@ -45,6 +45,7 @@ type MPNextHop interface {
 	Len() uint8
 	New() MPNextHop
 	String() string
+	GetNextHop() net.IP
 }
 
 type MPNextHopIP struct {
@@ -101,6 +102,10 @@ func (i *MPNextHopIP) New() MPNextHop {
 
 func (i *MPNextHopIP) String() string {
 	return fmt.Sprintf("{NEXTHOP %v}", i.Value)
+}
+
+func (i *MPNextHopIP) GetNextHop() net.IP {
+	return i.Value
 }
 
 func (i *MPNextHopIP) SetNextHop(ip net.IP) error {
@@ -242,6 +247,10 @@ func (u *MPNextHopUnknown) String() string {
 	return fmt.Sprintf("{NEXTHOP %v}", u.Value)
 }
 
+func (u *MPNextHopUnknown) GetNextHop() net.IP {
+	return u.Value
+}
+
 func (u *MPNextHopUnknown) SetNextHop(nextHop []byte) error {
 	u.Length = uint8(len(nextHop))
 	u.Value = make([]byte, u.Length)
@@ -364,6 +373,13 @@ func (r *BGPPathAttrMPReachNLRI) AddNLRI(nlri NLRI) {
 	r.BGPPathAttrBase.Length += uint16(nlri.Len())
 }
 
+func (r *BGPPathAttrMPReachNLRI) SetNLRIList(nlriList []NLRI) {
+	r.NLRI = nlriList
+	for _, nlri := range nlriList {
+		r.BGPPathAttrBase.Length += uint16(nlri.Len())
+	}
+}
+
 func NewBGPPathAttrMPReachNLRI() *BGPPathAttrMPReachNLRI {
 	return &BGPPathAttrMPReachNLRI{
 		BGPPathAttrBase: BGPPathAttrBase{
@@ -441,6 +457,13 @@ func (u *BGPPathAttrMPUnreachNLRI) New() BGPPathAttr {
 func (u *BGPPathAttrMPUnreachNLRI) AddNLRI(nlri NLRI) {
 	u.NLRI = append(u.NLRI, nlri)
 	u.BGPPathAttrBase.Length += uint16(nlri.Len())
+}
+
+func (u *BGPPathAttrMPUnreachNLRI) AddNLRIList(nlriList []NLRI) {
+	for _, nlri := range nlriList {
+		u.NLRI = append(u.NLRI, nlri)
+		u.BGPPathAttrBase.Length += uint16(nlri.Len())
+	}
 }
 
 func NewBGPPathAttrMPUnreachNLRI() *BGPPathAttrMPUnreachNLRI {

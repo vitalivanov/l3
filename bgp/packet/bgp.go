@@ -899,7 +899,7 @@ func (ip *IPPrefix) Decode(pkt []byte, afi AFI) error {
 	}
 
 	ip.Length = pkt[0]
-	if ip.Length > 32 {
+	if ip.Length > (uint8(AFINextHopLenMap[afi]) * 8) {
 		return BGPMessageError{BGPUpdateMsgError, BGPInvalidNetworkField, nil, fmt.Sprintf("Prefix length is greater than 32, lenght:%d", ip.Length)}
 	}
 

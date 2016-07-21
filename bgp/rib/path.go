@@ -67,45 +67,53 @@ func getRouteSource(routeType uint8) uint8 {
 	return RouteSrcUnknown
 }
 
-type Path struct {
-	rib              *LocRib
-	logger           *logging.Writer
-	NeighborConf     *base.NeighborConf
-	PathAttrs        []packet.BGPPathAttr
-	Pref             uint32
+type NHReachabilityInfo struct {
+	nextHop          net.IP
 	reachabilityInfo *ReachabilityInfo
-	routeType        uint8
-	MED              uint32
-	LocalPref        uint32
-	AggregatedPaths  map[string]*Path
 }
 
-func NewPath(locRib *LocRib, peer *base.NeighborConf, pa []packet.BGPPathAttr, routeType uint8) *Path {
+type Path struct {
+	rib                *LocRib
+	logger             *logging.Writer
+	NeighborConf       *base.NeighborConf
+	PathAttrs          []packet.BGPPathAttr
+	Pref               uint32
+	nhReachabilityInfo map[uint32]*NHReachabilityInfo
+	routeType          uint8
+	MED                uint32
+	LocalPref          uint32
+	AggregatedPaths    map[string]*Path
+}
+
+func NewPath(locRib *LocRib, peer *base.NeighborConf, pa []packet.BGPPathAttr,
+	mpReach *packet.BGPPathAttrMPReachNLRI, routeType uint8) *Path {
 	path := &Path{
-		rib:             locRib,
-		logger:          locRib.logger,
-		NeighborConf:    peer,
-		PathAttrs:       pa,
-		routeType:       routeType,
-		AggregatedPaths: make(map[string]*Path),
+		rib:                locRib,
+		logger:             locRib.logger,
+		NeighborConf:       peer,
+		PathAttrs:          pa,
+		nhReachabilityInfo: make(map[uint32]*NHReachabilityInfo),
+		routeType:          routeType,
+		AggregatedPaths:    make(map[string]*Path),
 	}
 
 	path.logger.Info(fmt.Sprintln("Path:NewPath - path attr =", pa, "path.path attrs =", path.PathAttrs))
 	path.Pref = path.calculatePref()
+	path.constructNHReachabilityInfo(mpReach)
 	return path
 }
 
 func (p *Path) Clone() *Path {
 	path := &Path{
-		rib:              p.rib,
-		logger:           p.rib.logger,
-		NeighborConf:     p.NeighborConf,
-		PathAttrs:        p.PathAttrs,
-		Pref:             p.Pref,
-		reachabilityInfo: p.reachabilityInfo,
-		routeType:        p.routeType,
-		MED:              p.MED,
-		LocalPref:        p.LocalPref,
+		rib:                p.rib,
+		logger:             p.rib.logger,
+		NeighborConf:       p.NeighborConf,
+		PathAttrs:          p.PathAttrs,
+		Pref:               p.Pref,
+		nhReachabilityInfo: p.nhReachabilityInfo,
+		routeType:          p.routeType,
+		MED:                p.MED,
+		LocalPref:          p.LocalPref,
 	}
 
 	return path
@@ -130,6 +138,27 @@ func (p *Path) calculatePref() uint32 {
 	}
 
 	return pref
+}
+
+func (p *Path) constructNHReachabilityInfo(mpReach *packet.BGPPathAttrMPReachNLRI) {
+	for _, attr := range p.PathAttrs {
+		if attr.GetCode() == packet.BGPPathAttrTypeNextHop {
+			nextHop := attr.(*packet.BGPPathAttrNextHop)
+			protoFamily := packet.GetProtocolFamily(packet.AfiIP, packet.SafiUnicast)
+			if _, ok := p.nhReachabilityInfo[protoFamily]; !ok {
+				p.nhReachabilityInfo[protoFamily] = &NHReachabilityInfo{}
+			}
+			p.nhReachabilityInfo[protoFamily].nextHop = nextHop.Value
+		}
+	}
+
+	if mpReach != nil {
+		protoFamily := packet.GetProtocolFamily(mpReach.AFI, mpReach.SAFI)
+		if _, ok := p.nhReachabilityInfo[protoFamily]; !ok {
+			p.nhReachabilityInfo[protoFamily] = &NHReachabilityInfo{}
+		}
+		p.nhReachabilityInfo[protoFamily].nextHop = mpReach.NextHop.GetNextHop()
+	}
 }
 
 func (p *Path) IsValid() bool {
@@ -250,8 +279,11 @@ func (p *Path) GetOrigin() uint8 {
 	return packet.GetOrigin(p.PathAttrs)
 }
 
-func (p *Path) GetNextHop() net.IP {
-	return packet.GetNextHop(p.PathAttrs)
+func (p *Path) GetNextHop(protoFamily uint32) net.IP {
+	if nhReachInfo, ok := p.nhReachabilityInfo[protoFamily]; ok {
+		return nhReachInfo.nextHop
+	}
+	return nil
 }
 
 func (p *Path) GetBGPId() uint32 {
@@ -268,14 +300,36 @@ func (p *Path) GetNumClusters() uint16 {
 	return packet.GetNumClusters(p.PathAttrs)
 }
 
-func (p *Path) SetReachabilityInfo(reachabilityInfo *ReachabilityInfo) {
-	p.reachabilityInfo = reachabilityInfo
+func (p *Path) SetReachabilityForFamily(protoFamily uint32, reachabilityInfo *ReachabilityInfo) {
+	if nhReachInfo, ok := p.nhReachabilityInfo[protoFamily]; ok {
+		nhReachInfo.reachabilityInfo = reachabilityInfo
+	}
 }
 
-func (p *Path) IsReachable() bool {
-	if p.routeType == RouteTypeStatic || p.routeType == RouteTypeConnected || p.routeType == RouteTypeIGP ||
-		(p.reachabilityInfo != nil && p.reachabilityInfo.NextHop != "") {
+func (p *Path) SetReachabilityForNextHop(nextHop string, reachabilityInfo *ReachabilityInfo) {
+	for _, nhReachInfo := range p.nhReachabilityInfo {
+		if nhReachInfo.nextHop.String() == nextHop {
+			nhReachInfo.reachabilityInfo = reachabilityInfo
+		}
+	}
+}
+
+func (p *Path) GetReachability(protoFamily uint32) *ReachabilityInfo {
+	if nhReachInfo, ok := p.nhReachabilityInfo[protoFamily]; ok {
+		return nhReachInfo.reachabilityInfo
+	}
+	return nil
+}
+
+func (p *Path) IsReachable(protoFamily uint32) bool {
+	if p.routeType == RouteTypeStatic || p.routeType == RouteTypeConnected || p.routeType == RouteTypeIGP {
 		return true
+	}
+
+	if nhReachInfo, ok := p.nhReachabilityInfo[protoFamily]; ok {
+		if nhReachInfo.reachabilityInfo != nil {
+			return true
+		}
 	}
 	return false
 }
@@ -327,7 +381,8 @@ func (p *Path) addPathToAggregate(destIP string, path *Path, generateASSet bool)
 		for i = pathIdx; i < len(path.PathAttrs) && path.PathAttrs[i].GetCode() < p.PathAttrs[idx].GetCode(); i++ {
 			if path.PathAttrs[i].GetCode() == packet.BGPPathAttrTypeAtomicAggregate {
 				atomicAggregate := packet.NewBGPPathAttrAtomicAggregate()
-				packet.AddPathAttrToPathAttrs(p.PathAttrs, packet.BGPPathAttrTypeAtomicAggregate, atomicAggregate)
+				p.PathAttrs = packet.AddPathAttrToPathAttrs(p.PathAttrs, packet.BGPPathAttrTypeAtomicAggregate,
+					atomicAggregate)
 			}
 		}
 
