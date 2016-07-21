@@ -20,34 +20,44 @@
 // |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
 // |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
 //
-
-package server
+package flexswitch
 
 import (
-	"fmt"
-	"infra/sysd/sysdCommonDefs"
-	"log/syslog"
-	//"testing"
-	"utils/logging"
+	"ndpd"
+	"testing"
 )
 
-var bfdTestServer *BFDServer
-var bfdTestSession *BfdSession
-var bfdTestSessionParam *BfdSessionParam
-
-func BfdTestNewLogger() *logging.Writer {
-	logger := new(logging.Writer)
-	logger.SysLogger, _ = syslog.New(syslog.LOG_DEBUG|syslog.LOG_DAEMON, "BFDTEST")
-	logger.GlobalLogging = true
-	logger.MyLogLevel = sysdCommonDefs.DEBUG
-	return logger
+func TestCreateNDPGlobal(t *testing.T) {
+	h := NewConfigHandler()
+	config := &ndpd.NDPGlobal{}
+	h.CreateNDPGlobal(config)
 }
 
-func initTestServer() {
-	var paramFile string
-	fmt.Println("Initializing BFD UT params")
-	logger := BfdTestNewLogger()
-	bfdTestServer = NewBFDServer(logger)
-	bfdTestServer.InitServer(paramFile)
-	return
+func TestDeleteNDPGlobal(t *testing.T) {
+	h := NewConfigHandler()
+	config := &ndpd.NDPGlobal{}
+	h.DeleteNDPGlobal(config)
+}
+
+func TestUpdateNDPGlobal(t *testing.T) {
+	h := NewConfigHandler()
+	config := &ndpd.NDPGlobal{}
+	newConfig := &ndpd.NDPGlobal{}
+	attrset := make([]bool, 0)
+	op := make([]*ndpd.PatchOpInfo, 0)
+	h.UpdateNDPGlobal(config, newConfig, attrset, op)
+}
+
+func TestGetBulkNDPEntry(t *testing.T) {
+	/*
+		h := NewConfigHandler()
+		h.GetBulkNDPEntryState(0, 10)
+	*/
+}
+
+func TestGetNDPEntry(t *testing.T) {
+	/*
+		h := NewConfigHandler()
+		h.GetNDPEntryState("")
+	*/
 }

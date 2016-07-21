@@ -8,3 +8,4 @@ ospf/rpc/ospfd.thrift
 rib/rpc/ribd.thrift
 tunnel/vxlan/rpc/vxland.thrift
 vrrp/rpc/vrrpd.thrift
+ndp/flexswitch/ndpd.thrift

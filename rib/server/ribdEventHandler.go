@@ -49,6 +49,19 @@ func (ribdServiceHandler *RIBDServer) ProcessLogicalIntfCreateEvent(logicalIntfN
 	IfNameToIfIndex[logicalIntfNotifyMsg.LogicalIntfName] = ifId
 
 }
+func (ribdServiceHandler *RIBDServer) ProcessVlanCreateEvent(vlanNotifyMsg asicdCommonDefs.VlanNotifyMsg) {
+	ifId := asicdCommonDefs.GetIfIndexFromIntfIdAndIntfType(int(vlanNotifyMsg.VlanId), commonDefs.IfTypeVlan)
+	ribdServiceHandler.Logger.Info(fmt.Sprintln("vlanId ", vlanNotifyMsg.VlanId, " ifId:", ifId))
+	if IntfIdNameMap == nil {
+		IntfIdNameMap = make(map[int32]IntfEntry)
+	}
+	intfEntry := IntfEntry{name: vlanNotifyMsg.VlanName}
+	IntfIdNameMap[int32(ifId)] = intfEntry
+	if IfNameToIfIndex == nil {
+		IfNameToIfIndex = make(map[string]int32)
+	}
+	IfNameToIfIndex[vlanNotifyMsg.VlanName] = ifId
+}
 func (ribdServiceHandler *RIBDServer) ProcessIPv4IntfCreateEvent(msg asicdCommonDefs.IPv4IntfNotifyMsg) {
 
 	var ipMask net.IP
@@ -79,6 +92,35 @@ func (ribdServiceHandler *RIBDServer) ProcessIPv4IntfCreateEvent(msg asicdCommon
 		Op:               "add",
 	}
 }
+func (ribdServiceHandler *RIBDServer) ProcessIPv6IntfCreateEvent(msg asicdCommonDefs.IPv6IntfNotifyMsg) {
+	var ipMask net.IP
+	ip, ipNet, err := net.ParseCIDR(msg.IpAddr)
+	if err != nil {
+		return
+	}
+	ipMask = make(net.IP, 16)
+	copy(ipMask, ipNet.Mask)
+	ipAddrStr := ip.String()
+	ipMaskStr := net.IP(ipMask).String()
+	ribdServiceHandler.Logger.Info(fmt.Sprintln("Calling createRoute with ipaddr ", ipAddrStr, " mask ", ipMaskStr, " nextHopIntRef: ", strconv.Itoa(int(msg.IfIndex))))
+	cfg := ribd.IPv6Route{
+		DestinationNw: ipAddrStr,
+		Protocol:      "CONNECTED",
+		Cost:          0,
+		NetworkMask:   ipMaskStr,
+	}
+	nextHop := ribd.NextHopInfo{
+		NextHopIp:     "0.0.0.0",
+		NextHopIntRef: strconv.Itoa(int(msg.IfIndex)),
+	}
+	cfg.NextHop = make([]*ribd.NextHopInfo, 0)
+	cfg.NextHop = append(cfg.NextHop, &nextHop)
+
+	ribdServiceHandler.RouteConfCh <- RIBdServerConfig{
+		OrigConfigObject: &cfg,
+		Op:               "addv6",
+	}
+}
 func (ribdServiceHandler *RIBDServer) ProcessIPv4IntfDeleteEvent(msg asicdCommonDefs.IPv4IntfNotifyMsg) {
 	var ipMask net.IP
 	ip, ipNet, err := net.ParseCIDR(msg.IpAddr)
@@ -107,6 +149,34 @@ func (ribdServiceHandler *RIBDServer) ProcessIPv4IntfDeleteEvent(msg asicdCommon
 		Op:               "del",
 	}
 
+}
+func (ribdServiceHandler *RIBDServer) ProcessIPv6IntfDeleteEvent(msg asicdCommonDefs.IPv6IntfNotifyMsg) {
+	var ipMask net.IP
+	ip, ipNet, err := net.ParseCIDR(msg.IpAddr)
+	if err != nil {
+		return
+	}
+	ipMask = make(net.IP, 16)
+	copy(ipMask, ipNet.Mask)
+	ipAddrStr := ip.String()
+	ipMaskStr := net.IP(ipMask).String()
+	ribdServiceHandler.Logger.Info(fmt.Sprintln("Calling deleteRoute with ipaddr ", ipAddrStr, " mask ", ipMaskStr))
+	cfg := ribd.IPv6Route{
+		DestinationNw: ipAddrStr,
+		Protocol:      "CONNECTED",
+		Cost:          0,
+		NetworkMask:   ipMaskStr,
+	}
+	nextHop := ribd.NextHopInfo{
+		NextHopIp:     "0.0.0.0",
+		NextHopIntRef: strconv.Itoa(int(msg.IfIndex)),
+	}
+	cfg.NextHop = make([]*ribd.NextHopInfo, 0)
+	cfg.NextHop = append(cfg.NextHop, &nextHop)
+	ribdServiceHandler.RouteConfCh <- RIBdServerConfig{
+		OrigConfigObject: &cfg,
+		Op:               "delv6",
+	}
 }
 func (ribdServiceHandler *RIBDServer) ProcessAsicdEvents(sub *nanomsg.SubSocket) {
 
@@ -146,17 +216,7 @@ func (ribdServiceHandler *RIBDServer) ProcessAsicdEvents(sub *nanomsg.SubSocket)
 				ribdServiceHandler.Logger.Info(fmt.Sprintln("Unable to unmashal vlanNotifyMsg:", Notif.Msg))
 				return
 			}
-			ifId := asicdCommonDefs.GetIfIndexFromIntfIdAndIntfType(int(vlanNotifyMsg.VlanId), commonDefs.IfTypeVlan)
-			ribdServiceHandler.Logger.Info(fmt.Sprintln("vlanId ", vlanNotifyMsg.VlanId, " ifId:", ifId))
-			if IntfIdNameMap == nil {
-				IntfIdNameMap = make(map[int32]IntfEntry)
-			}
-			intfEntry := IntfEntry{name: vlanNotifyMsg.VlanName}
-			IntfIdNameMap[int32(ifId)] = intfEntry
-			if IfNameToIfIndex == nil {
-				IfNameToIfIndex = make(map[string]int32)
-			}
-			IfNameToIfIndex[vlanNotifyMsg.VlanName] = ifId
+			ribdServiceHandler.ProcessVlanCreateEvent(vlanNotifyMsg)
 			break
 		case asicdCommonDefs.NOTIFY_L3INTF_STATE_CHANGE:
 			ribdServiceHandler.Logger.Info("NOTIFY_L3INTF_STATE_CHANGE event")
@@ -195,33 +255,7 @@ func (ribdServiceHandler *RIBDServer) ProcessAsicdEvents(sub *nanomsg.SubSocket)
 				return
 			}
 			ribdServiceHandler.Logger.Info(fmt.Sprintln("Received NOTIFY_IPV6INTF_CREATE ipAddr ", msg.IpAddr, " ifIndex = ", msg.IfIndex, " ifType ", asicdCommonDefs.GetIntfTypeFromIfIndex(msg.IfIndex), " ifId ", asicdCommonDefs.GetIntfIdFromIfIndex(msg.IfIndex)))
-			var ipMask net.IP
-			ip, ipNet, err := net.ParseCIDR(msg.IpAddr)
-			if err != nil {
-				return
-			}
-			ipMask = make(net.IP, 16)
-			copy(ipMask, ipNet.Mask)
-			ipAddrStr := ip.String()
-			ipMaskStr := net.IP(ipMask).String()
-			ribdServiceHandler.Logger.Info(fmt.Sprintln("Calling createRoute with ipaddr ", ipAddrStr, " mask ", ipMaskStr, " nextHopIntRef: ", strconv.Itoa(int(msg.IfIndex))))
-			cfg := ribd.IPv6Route{
-				DestinationNw: ipAddrStr,
-				Protocol:      "CONNECTED",
-				Cost:          0,
-				NetworkMask:   ipMaskStr,
-			}
-			nextHop := ribd.NextHopInfo{
-				NextHopIp:     "0.0.0.0",
-				NextHopIntRef: strconv.Itoa(int(msg.IfIndex)),
-			}
-			cfg.NextHop = make([]*ribd.NextHopInfo, 0)
-			cfg.NextHop = append(cfg.NextHop, &nextHop)
-
-			ribdServiceHandler.RouteConfCh <- RIBdServerConfig{
-				OrigConfigObject: &cfg,
-				Op:               "addv6",
-			}
+			ribdServiceHandler.ProcessIPv6IntfCreateEvent(msg)
 			break
 		case asicdCommonDefs.NOTIFY_IPV4INTF_DELETE:
 			ribdServiceHandler.Logger.Info("NOTIFY_IPV4INTF_DELETE  event")
@@ -243,32 +277,7 @@ func (ribdServiceHandler *RIBDServer) ProcessAsicdEvents(sub *nanomsg.SubSocket)
 				return
 			}
 			ribdServiceHandler.Logger.Info(fmt.Sprintln("Received ipv6 intf delete with ipAddr ", msg.IpAddr, " ifIndex = ", msg.IfIndex, " ifType ", asicdCommonDefs.GetIntfTypeFromIfIndex(msg.IfIndex), " ifId ", asicdCommonDefs.GetIntfIdFromIfIndex(msg.IfIndex)))
-			var ipMask net.IP
-			ip, ipNet, err := net.ParseCIDR(msg.IpAddr)
-			if err != nil {
-				return
-			}
-			ipMask = make(net.IP, 16)
-			copy(ipMask, ipNet.Mask)
-			ipAddrStr := ip.String()
-			ipMaskStr := net.IP(ipMask).String()
-			ribdServiceHandler.Logger.Info(fmt.Sprintln("Calling deleteRoute with ipaddr ", ipAddrStr, " mask ", ipMaskStr))
-			cfg := ribd.IPv6Route{
-				DestinationNw: ipAddrStr,
-				Protocol:      "CONNECTED",
-				Cost:          0,
-				NetworkMask:   ipMaskStr,
-			}
-			nextHop := ribd.NextHopInfo{
-				NextHopIp:     "0.0.0.0",
-				NextHopIntRef: strconv.Itoa(int(msg.IfIndex)),
-			}
-			cfg.NextHop = make([]*ribd.NextHopInfo, 0)
-			cfg.NextHop = append(cfg.NextHop, &nextHop)
-			ribdServiceHandler.RouteConfCh <- RIBdServerConfig{
-				OrigConfigObject: &cfg,
-				Op:               "delv6",
-			}
+			ribdServiceHandler.ProcessIPv6IntfDeleteEvent(msg)
 			break
 		default:
 			logger.Debug("Received unknown event ")

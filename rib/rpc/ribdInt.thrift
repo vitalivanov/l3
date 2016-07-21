@@ -132,19 +132,28 @@ struct IPv4RouteState {
 	6 : list<RouteNextHopInfo> NextHopList
 	7 : list<string> PolicyList
 }
+struct IPv6RouteState {
+	1 : string DestinationNw
+	2 : string Protocol
+	3 : bool IsNetworkReachable
+	4 : string RouteCreatedTime
+	5 : string RouteUpdatedTime
+	6 : list<RouteNextHopInfo> NextHopList
+	7 : list<string> PolicyList
+}
 
 service RIBDINTServices 
 {
     NextHopInfo getRouteReachabilityInfo(1: string desIPv4MasktNet);
-	string GetNextHopIfTypeStr(1: int nextHopIfType);
 	//list<Routes> getConnectedRoutesInfo();
     //void printV4Routes();
 	RoutesGetInfo getBulkRoutesForProtocol(1: string srcProtocol, 2: int fromIndex ,3: int rcount)
     void TrackReachabilityStatus(1: string ipAddr, 2: string protocol, 3:string op) //op:"add"/"del"
 	//RoutesGetInfo getBulkRoutes(1: int fromIndex, 2: int count);
-	IPv4RouteState getRoute(1: string destNetIp, 2:string networkMask);
-	int GetTotalRouteCount();
-	string GetRouteCreatedTime(1:int number);
+	IPv4RouteState getv4Route(1: string destNetIp);
+	IPv6RouteState getv6Route(1: string destNetIp);
+	int GetTotalv4RouteCount();
+	string Getv4RouteCreatedTime(1:int number);
 	oneway void OnewayCreateBulkIPv4Route(1: list<IPv4RouteConfig> config);
 	bool CreatePolicyAction(1: PolicyAction config);
 	bool UpdatePolicyAction(1: PolicyAction origconfig, 2: PolicyAction newconfig, 3: list<bool> attrset, 4: list<PatchOpInfo> op);

@@ -21,33 +21,31 @@
 // |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
 //
 
-package server
+// fsmState.go
+package config
 
-import (
-	"fmt"
-	"infra/sysd/sysdCommonDefs"
-	"log/syslog"
-	//"testing"
-	"utils/logging"
+type BGPFSMState int
+
+const (
+	BGPFSMNone BGPFSMState = iota
+	BGPFSMIdle
+	BGPFSMConnect
+	BGPFSMActive
+	BGPFSMOpensent
+	BGPFSMOpenconfirm
+	BGPFSMEstablished
 )
 
-var bfdTestServer *BFDServer
-var bfdTestSession *BfdSession
-var bfdTestSessionParam *BfdSessionParam
-
-func BfdTestNewLogger() *logging.Writer {
-	logger := new(logging.Writer)
-	logger.SysLogger, _ = syslog.New(syslog.LOG_DEBUG|syslog.LOG_DAEMON, "BFDTEST")
-	logger.GlobalLogging = true
-	logger.MyLogLevel = sysdCommonDefs.DEBUG
-	return logger
+var BGPStateToStr = map[BGPFSMState]string{
+	BGPFSMNone:        "INIT",
+	BGPFSMIdle:        "IDLE",
+	BGPFSMConnect:     "CONNECT",
+	BGPFSMActive:      "ACTIVE",
+	BGPFSMOpensent:    "OPENSENT",
+	BGPFSMOpenconfirm: "OPENCONFIRM",
+	BGPFSMEstablished: "ESTABLISHED",
 }
 
-func initTestServer() {
-	var paramFile string
-	fmt.Println("Initializing BFD UT params")
-	logger := BfdTestNewLogger()
-	bfdTestServer = NewBFDServer(logger)
-	bfdTestServer.InitServer(paramFile)
-	return
+func GetBGPStateToStr(stateId BGPFSMState) string {
+	return BGPStateToStr[stateId]
 }

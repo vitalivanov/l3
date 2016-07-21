@@ -20,34 +20,46 @@
 // |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
 // |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
 //
-
 package server
 
 import (
-	"fmt"
-	"infra/sysd/sysdCommonDefs"
-	"log/syslog"
-	//"testing"
-	"utils/logging"
+	_ "fmt"
+	"l3/ndp/config"
+	_ "l3/ndp/debug"
 )
 
-var bfdTestServer *BFDServer
-var bfdTestSession *BfdSession
-var bfdTestSessionParam *BfdSessionParam
+func (svr *NDPServer) GetNeighborEntries(idx, cnt int) (int, int, []config.NeighborInfo) {
+	var nextIdx int
+	var count int
+	var i, j int
 
-func BfdTestNewLogger() *logging.Writer {
-	logger := new(logging.Writer)
-	logger.SysLogger, _ = syslog.New(syslog.LOG_DEBUG|syslog.LOG_DAEMON, "BFDTEST")
-	logger.GlobalLogging = true
-	logger.MyLogLevel = sysdCommonDefs.DEBUG
-	return logger
+	length := len(svr.neighborKey)
+	if length == 0 {
+		return 0, 0, nil
+	}
+	var result []config.NeighborInfo
+
+	svr.NeigborEntryLock.RLock()
+	for i, j = 0, idx; i < cnt && j < length; j++ {
+		key := svr.neighborKey[j]
+		result = append(result, svr.NeighborInfo[key])
+		i++
+	}
+	svr.NeigborEntryLock.RUnlock()
+	if j == length {
+		nextIdx = 0
+	}
+	count = i
+	return nextIdx, count, result
 }
 
-func initTestServer() {
-	var paramFile string
-	fmt.Println("Initializing BFD UT params")
-	logger := BfdTestNewLogger()
-	bfdTestServer = NewBFDServer(logger)
-	bfdTestServer.InitServer(paramFile)
-	return
+func (svr *NDPServer) GetNeighborEntry(ipAddr string) *config.NeighborInfo {
+	svr.NeigborEntryLock.RLock()
+	defer svr.NeigborEntryLock.RUnlock()
+
+	nbrEntry, exists := svr.NeighborInfo[ipAddr]
+	if exists {
+		return &nbrEntry
+	}
+	return nil
 }
