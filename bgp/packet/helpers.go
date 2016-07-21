@@ -86,7 +86,7 @@ func AppendASToAS4PathSeg(asPath *BGPPathAttrASPath, pathSeg BGPASPathSegment, a
 	return pathSeg
 }
 
-func AddPathAttrToPathAttrs(pathAttrs []BGPPathAttr, code BGPPathAttrType, attr BGPPathAttr) {
+func AddPathAttrToPathAttrs(pathAttrs []BGPPathAttr, code BGPPathAttrType, attr BGPPathAttr) []BGPPathAttr {
 	addIdx := -1
 	for idx, pa := range pathAttrs {
 		if pa.GetCode() > code {
@@ -101,32 +101,53 @@ func AddPathAttrToPathAttrs(pathAttrs []BGPPathAttr, code BGPPathAttrType, attr 
 	pathAttrs = append(pathAttrs, attr)
 	copy(pathAttrs[addIdx+1:], pathAttrs[addIdx:])
 	pathAttrs[addIdx] = attr
-	return
+	return pathAttrs
+}
+
+func AddMPReachNLRIToPathAttrs(pathAttrs []BGPPathAttr, mpReach *BGPPathAttrMPReachNLRI) []BGPPathAttr {
+	return AddPathAttrToPathAttrs(pathAttrs, BGPPathAttrTypeMPReachNLRI, mpReach)
 }
 
 func addPathAttr(updateMsg *BGPMessage, code BGPPathAttrType, attr BGPPathAttr) {
 	body := updateMsg.Body.(*BGPUpdate)
-	AddPathAttrToPathAttrs(body.PathAttributes, code, attr)
+	body.PathAttributes = AddPathAttrToPathAttrs(body.PathAttributes, code, attr)
 	return
 }
 
-func removePathAttr(updateMsg *BGPMessage, code BGPPathAttrType) {
+func removePathAttr(updateMsg *BGPMessage, code BGPPathAttrType) BGPPathAttr {
 	body := updateMsg.Body.(*BGPUpdate)
+	return removeTypeFromPathAttrs(&body.PathAttributes, code)
+}
 
-	for idx, pa := range body.PathAttributes {
+func removeTypeFromPathAttrs(pathAttrs *[]BGPPathAttr, code BGPPathAttrType) BGPPathAttr {
+	for idx, pa := range *pathAttrs {
 		if pa.GetCode() == code {
-			body.PathAttributes = append(body.PathAttributes[:idx], body.PathAttributes[idx+1:]...)
-			return
+			(*pathAttrs) = append((*pathAttrs)[:idx], (*pathAttrs)[idx+1:]...)
+			return pa
 		}
 	}
+	return nil
 }
 
-func RemoveMultiExitDisc(updateMsg *BGPMessage) {
-	removePathAttr(updateMsg, BGPPathAttrTypeMultiExitDisc)
+func RemoveMultiExitDisc(updateMsg *BGPMessage) BGPPathAttr {
+	return removePathAttr(updateMsg, BGPPathAttrTypeMultiExitDisc)
 }
 
-func RemoveLocalPref(updateMsg *BGPMessage) {
-	removePathAttr(updateMsg, BGPPathAttrTypeLocalPref)
+func RemoveLocalPref(updateMsg *BGPMessage) BGPPathAttr {
+	return removePathAttr(updateMsg, BGPPathAttrTypeLocalPref)
+}
+
+func RemoveMPAttrs(pathAttrs *[]BGPPathAttr) (mpReach *BGPPathAttrMPReachNLRI, mpUnreach *BGPPathAttrMPUnreachNLRI) {
+	reach := removeTypeFromPathAttrs(pathAttrs, BGPPathAttrTypeMPReachNLRI)
+	if reach != nil {
+		mpReach = reach.(*BGPPathAttrMPReachNLRI)
+	}
+
+	unreach := removeTypeFromPathAttrs(pathAttrs, BGPPathAttrTypeMPUnreachNLRI)
+	if unreach != nil {
+		mpUnreach = unreach.(*BGPPathAttrMPUnreachNLRI)
+	}
+	return mpReach, mpUnreach
 }
 
 func SetLocalPref(updateMsg *BGPMessage, pref uint32) {
@@ -427,6 +448,12 @@ func ConstructPathAttrForConnRoutes(ip net.IP, as uint32) []BGPPathAttr {
 	pathAttrs = append(pathAttrs, nextHop)
 
 	return pathAttrs
+}
+
+func CopyPathAttrs(pathAttrs []BGPPathAttr) []BGPPathAttr {
+	newPathAttrs := make([]BGPPathAttr, len(pathAttrs))
+	copy(newPathAttrs, pathAttrs)
+	return newPathAttrs
 }
 
 func ConstructIPPrefix(ipStr string, maskStr string) *IPPrefix {

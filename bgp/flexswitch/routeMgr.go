@@ -13,13 +13,13 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 package FSMgr
 
@@ -187,58 +187,103 @@ func (mgr *FSRouteMgr) GetNextHopInfo(ipAddr string) (*config.NextHopInfo, error
 	return reachInfo, err
 }
 
-func (mgr *FSRouteMgr) createRibdIPv4RouteCfg(cfg *config.RouteConfig,
-	create bool) *ribd.IPv4Route {
+func (mgr *FSRouteMgr) createRibdIPv4RouteCfg(cfg *config.RouteConfig, create bool) *ribd.IPv4Route {
 	rCfg := ribd.IPv4Route{
-		Cost:              cfg.Cost,
-		Protocol:          cfg.Protocol,
-		NetworkMask:       cfg.NetworkMask,
-		DestinationNw:     cfg.DestinationNw,
+		Cost:          cfg.Cost,
+		Protocol:      cfg.Protocol,
+		NetworkMask:   cfg.NetworkMask,
+		DestinationNw: cfg.DestinationNw,
 	}
-	nextHop := ribd.NextHopInfo { 
-		NextHopIp : cfg.NextHopIp,
-		NextHopIntRef:cfg.OutgoingInterface,
+	nextHop := ribd.NextHopInfo{
+		NextHopIp:     cfg.NextHopIp,
+		NextHopIntRef: cfg.OutgoingInterface,
 	}
-	rCfg.NextHop = make([]*ribd.NextHopInfo,0)
-	rCfg.NextHop = append(rCfg.NextHop,&nextHop)
+	rCfg.NextHop = make([]*ribd.NextHopInfo, 0)
+	rCfg.NextHop = append(rCfg.NextHop, &nextHop)
+	return &rCfg
+}
+
+func (mgr *FSRouteMgr) createRibdIPv6RouteCfg(cfg *config.RouteConfig, create bool) *ribd.IPv6Route {
+	rCfg := ribd.IPv6Route{
+		Cost:          cfg.Cost,
+		Protocol:      cfg.Protocol,
+		NetworkMask:   cfg.NetworkMask,
+		DestinationNw: cfg.DestinationNw,
+	}
+	nextHop := ribd.NextHopInfo{
+		NextHopIp:     cfg.NextHopIp,
+		NextHopIntRef: cfg.OutgoingInterface,
+	}
+	rCfg.NextHop = make([]*ribd.NextHopInfo, 0)
+	rCfg.NextHop = append(rCfg.NextHop, &nextHop)
 	return &rCfg
 }
 
 func (mgr *FSRouteMgr) CreateRoute(cfg *config.RouteConfig) {
-	mgr.ribdClient.OnewayCreateIPv4Route(mgr.createRibdIPv4RouteCfg(cfg,
-		true /*create*/))
+	if cfg.IsIPv6 {
+		mgr.ribdClient.OnewayCreateIPv6Route(mgr.createRibdIPv6RouteCfg(cfg, true /*create*/))
+	} else {
+		mgr.ribdClient.OnewayCreateIPv4Route(mgr.createRibdIPv4RouteCfg(cfg, true /*create*/))
+	}
 }
 
 func (mgr *FSRouteMgr) DeleteRoute(cfg *config.RouteConfig) {
-	mgr.ribdClient.OnewayDeleteIPv4Route(mgr.createRibdIPv4RouteCfg(cfg,
-		false /*delete*/))
+	if cfg.IsIPv6 {
+		mgr.ribdClient.OnewayDeleteIPv6Route(mgr.createRibdIPv6RouteCfg(cfg, false /*delete*/))
+	} else {
+		mgr.ribdClient.OnewayDeleteIPv4Route(mgr.createRibdIPv4RouteCfg(cfg, false /*delete*/))
+	}
 }
-func (mgr *FSRouteMgr) UpdateRoute(cfg *config.RouteConfig, op string) {
+
+func (mgr *FSRouteMgr) UpdateV4Route(cfg *config.RouteConfig, nhInfo []*ribd.NextHopInfo, patch []*ribd.PatchOpInfo) {
 	rCfg := ribd.IPv4Route{
-		Cost:              cfg.Cost,
-		Protocol:          cfg.Protocol,
-		NetworkMask:       cfg.NetworkMask,
-		DestinationNw:     cfg.DestinationNw,
+		Cost:          cfg.Cost,
+		Protocol:      cfg.Protocol,
+		NetworkMask:   cfg.NetworkMask,
+		DestinationNw: cfg.DestinationNw,
 	}
-	nextHop := ribd.NextHopInfo { 
-		NextHopIp : cfg.NextHopIp,
-		NextHopIntRef:cfg.OutgoingInterface,
+	rCfg.NextHop = nhInfo
+	mgr.ribdClient.UpdateIPv4Route(&rCfg, &rCfg, nil, patch)
+}
+
+func (mgr *FSRouteMgr) UpdateV6Route(cfg *config.RouteConfig, nhInfo []*ribd.NextHopInfo, patch []*ribd.PatchOpInfo) {
+	rCfg := ribd.IPv6Route{
+		Cost:          cfg.Cost,
+		Protocol:      cfg.Protocol,
+		NetworkMask:   cfg.NetworkMask,
+		DestinationNw: cfg.DestinationNw,
 	}
-    rCfg.NextHop = make([]*ribd.NextHopInfo,0)
-    rCfg.NextHop = append(rCfg.NextHop,&nextHop)
-    value,err := json.Marshal(rCfg.NextHop)
+	rCfg.NextHop = nhInfo
+	mgr.ribdClient.UpdateIPv6Route(&rCfg, &rCfg, nil, patch)
+}
+
+func (mgr *FSRouteMgr) UpdateRoute(cfg *config.RouteConfig, op string) {
+	nextHop := ribd.NextHopInfo{
+		NextHopIp:     cfg.NextHopIp,
+		NextHopIntRef: cfg.OutgoingInterface,
+	}
+
+	nextHopInfo := make([]*ribd.NextHopInfo, 0)
+	nextHopInfo = append(nextHopInfo, &nextHop)
+	value, err := json.Marshal(nextHopInfo)
 	if err != nil {
-		mgr.logger.Err(fmt.Sprintln("Err:", err, " while marshalling nexthop : ", rCfg.NextHop))
+		mgr.logger.Err(fmt.Sprintln("Err:", err, " while marshalling nexthop : ", nextHopInfo))
 		return
 	}
-    patchOp := make([]*ribd.PatchOpInfo,0)
-    patchOp = append(patchOp,&ribd.PatchOpInfo {
-			        Op: op,
-                     Path:"NextHop",
-                     Value : string(value),
-                     })
-	mgr.ribdClient.UpdateIPv4Route(&rCfg, &rCfg, nil,patchOp)
+	patchOp := make([]*ribd.PatchOpInfo, 0)
+	patchOp = append(patchOp, &ribd.PatchOpInfo{
+		Op:    op,
+		Path:  "NextHop",
+		Value: string(value),
+	})
+
+	if cfg.IsIPv6 {
+		mgr.UpdateV6Route(cfg, nextHopInfo, patchOp)
+	} else {
+		mgr.UpdateV4Route(cfg, nextHopInfo, patchOp)
+	}
 }
+
 func (mgr *FSRouteMgr) ApplyPolicy(protocol string, policy string, action string, conditions []*config.ConditionInfo) {
 	temp := make([]ribdInt.ConditionInfo, len(conditions))
 	ribdConditions := make([]*ribdInt.ConditionInfo, 0)

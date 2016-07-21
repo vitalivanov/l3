@@ -49,6 +49,11 @@ var ProtocolFamilyMap = map[string]uint32{
 	"ipv6-multicast": GetProtocolFamily(AfiIP6, SafiMulticast),
 }
 
+var AFINextHopLenMap = map[AFI]int{
+	AfiIP:  4,
+	AfiIP6: 16,
+}
+
 func GetProtocolFromConfig(afiSafis *[]config.AfiSafiConfig, neighborAddress net.IP) (map[uint32]bool, bool) {
 	afiSafiMap := make(map[uint32]bool)
 	rv := true
@@ -77,6 +82,14 @@ func GetProtocolFamily(afi AFI, safi SAFI) uint32 {
 
 func GetAfiSafi(protocolFamily uint32) (AFI, SAFI) {
 	return AFI(protocolFamily >> 8), SAFI(protocolFamily & 0xFF)
+}
+
+func GetAddressLengthForFamily(protoFamily uint32) int {
+	afi, _ := GetAfiSafi(protoFamily)
+	if addrLen, ok := AFINextHopLenMap[afi]; ok {
+		return addrLen
+	}
+	return -1
 }
 
 func GetProtocolFromOpenMsg(openMsg *BGPOpen) map[uint32]bool {

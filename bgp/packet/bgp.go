@@ -864,7 +864,7 @@ func NewBGPNotificationMessage(errorCode uint8, errorSubCode uint8, data []byte)
 type NLRI interface {
 	Clone() NLRI
 	Encode() ([]byte, error)
-	Decode([]byte) error
+	Decode([]byte, AFI) error
 	Len() uint32
 	GetIPPrefix() *IPPrefix
 	GetPrefix() net.IP
@@ -893,13 +893,13 @@ func (ip *IPPrefix) Encode() ([]byte, error) {
 	return pkt, nil
 }
 
-func (ip *IPPrefix) Decode(pkt []byte) error {
+func (ip *IPPrefix) Decode(pkt []byte, afi AFI) error {
 	if len(pkt) < 1 {
 		return BGPMessageError{BGPUpdateMsgError, BGPInvalidNetworkField, nil, "NLRI does not contain prefix lenght"}
 	}
 
 	ip.Length = pkt[0]
-	if ip.Length > 32 {
+	if ip.Length > (uint8(AFINextHopLenMap[afi]) * 8) {
 		return BGPMessageError{BGPUpdateMsgError, BGPInvalidNetworkField, nil, fmt.Sprintf("Prefix length is greater than 32, lenght:%d", ip.Length)}
 	}
 
@@ -907,7 +907,12 @@ func (ip *IPPrefix) Decode(pkt []byte) error {
 	if len(pkt) < (int(bytes) + 1) {
 		return BGPMessageError{BGPUpdateMsgError, BGPInvalidNetworkField, nil, "Prefix length invalid"}
 	}
-	ip.Prefix = make(net.IP, 4)
+
+	ipLen := net.IPv4len
+	if afi == AfiIP6 {
+		ipLen = net.IPv6len
+	}
+	ip.Prefix = make(net.IP, ipLen)
 	copy(ip.Prefix, pkt[1:bytes+1])
 	return nil
 }
@@ -970,14 +975,14 @@ func (n *ExtNLRI) Encode() ([]byte, error) {
 	return pkt, nil
 }
 
-func (n *ExtNLRI) Decode(pkt []byte) error {
+func (n *ExtNLRI) Decode(pkt []byte, afi AFI) error {
 	if len(pkt) < 5 {
 		return BGPMessageError{BGPUpdateMsgError, BGPInvalidNetworkField, nil, "NLRI does not contain path id or prefix lenght"}
 	}
 	n.PathId = binary.BigEndian.Uint32(pkt[:4])
 
 	n.IPPrefix = &IPPrefix{}
-	err := n.IPPrefix.Decode(pkt[4:])
+	err := n.IPPrefix.Decode(pkt[4:], afi)
 	return err
 }
 
@@ -2275,7 +2280,7 @@ func (msg *BGPUpdate) Encode() ([]byte, error) {
 	return pkt, nil
 }
 
-func decodeNLRI(pkt []byte, ipPrefix *[]NLRI, length uint32, data interface{}) (uint32, error) {
+func decodeNLRI(pkt []byte, ipPrefix *[]NLRI, length uint32, afi AFI, data interface{}) (uint32, error) {
 	ptr := uint32(0)
 
 	if length > uint32(len(pkt)) {
@@ -2292,7 +2297,7 @@ func decodeNLRI(pkt []byte, ipPrefix *[]NLRI, length uint32, data interface{}) (
 			ip = &IPPrefix{}
 		}
 
-		err := ip.Decode(pkt[ptr:])
+		err := ip.Decode(pkt[ptr:], afi)
 		if err != nil {
 			return ptr, err
 		}
@@ -2340,7 +2345,7 @@ func (msg *BGPUpdate) Decode(header *BGPHeader, pkt []byte, data interface{}) er
 	}
 
 	msg.WithdrawnRoutes = make([]NLRI, 0)
-	ipLen, err = decodeNLRI(pkt[ptr:], &msg.WithdrawnRoutes, uint32(length), data)
+	ipLen, err = decodeNLRI(pkt[ptr:], &msg.WithdrawnRoutes, uint32(length), AfiIP, data)
 	if err != nil {
 		return BGPMessageError{BGPUpdateMsgError, BGPMalformedAttrList, nil, "Malformed Attributes"}
 	}
@@ -2372,7 +2377,7 @@ func (msg *BGPUpdate) Decode(header *BGPHeader, pkt []byte, data interface{}) er
 
 	msg.NLRI = make([]NLRI, 0)
 	length = int(header.Len()) - 23 - int(msg.WithdrawnRoutesLen) - int(msg.TotalPathAttrLen)
-	ipLen, err = decodeNLRI(pkt[ptr:], &msg.NLRI, uint32(length), data)
+	ipLen, err = decodeNLRI(pkt[ptr:], &msg.NLRI, uint32(length), AfiIP, data)
 	if err != nil {
 		return err
 	}
