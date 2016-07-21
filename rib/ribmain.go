@@ -26,7 +26,7 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/davecheney/profile"
+	//	"github.com/davecheney/profile"
 	"l3/rib/rpc"
 	"l3/rib/server"
 	"utils/dbutils"
@@ -35,7 +35,7 @@ import (
 )
 
 func main() {
-	defer profile.Start(profile.CPUProfile).Stop()
+	//	defer profile.Start(profile.CPUProfile).Stop()
 	var err error
 	paramsDir := flag.String("params", "./params", "Params directory")
 	flag.Parse()
