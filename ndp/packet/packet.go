@@ -224,6 +224,8 @@ func (p *Packet) decodeICMPv6Hdr(hdr *layers.ICMPv6, srcIP net.IP, dstIP net.IP)
 				for _, option := range ndInfo.Options {
 					if option.Type == rx.NDOptionTypeSourceLinkLayerAddress {
 						cache.State = REACHABLE
+						mac := net.HardwareAddr(option.Value)
+						cache.LinkLayerAddress = mac.String()
 					}
 				}
 			} else {
@@ -246,6 +248,14 @@ func (p *Packet) decodeICMPv6Hdr(hdr *layers.ICMPv6, srcIP net.IP, dstIP net.IP)
 			//@TODO: need to drop advertisement packet??
 		}
 		cache.State = REACHABLE
+		if len(ndInfo.Options) > 0 {
+			for _, option := range ndInfo.Options {
+				if option.Type == rx.NDOptionTypeTargetLinkLayerAddress {
+					mac := net.HardwareAddr(option.Value)
+					cache.LinkLayerAddress = mac.String()
+				}
+			}
+		}
 		p.NbrCache[ndInfo.TargetAddress.String()] = cache
 
 	case layers.ICMPv6TypeRouterSolicitation:
