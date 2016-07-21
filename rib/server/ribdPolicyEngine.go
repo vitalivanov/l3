@@ -359,7 +359,7 @@ func policyEngineTraverseAndUpdate() {
 }
 func policyEngineActionAcceptRoute(params interface{}) {
 	routeInfo := params.(RouteParams)
-	logger.Info(fmt.Sprintln("policyEngineActionAcceptRoute for ip ", routeInfo.destNetIp, " and mask ", routeInfo.networkMask))
+	//logger.Info(fmt.Sprintln("policyEngineActionAcceptRoute for ip ", routeInfo.destNetIp, " and mask ", routeInfo.networkMask))
 	_, err := createRoute(routeInfo.ipType, routeInfo.destNetIp, routeInfo.networkMask, routeInfo.metric, routeInfo.weight, routeInfo.nextHopIp, routeInfo.nextHopIfIndex, routeInfo.routeType, routeInfo.createType, ribdCommonDefs.RoutePolicyStateChangetoValid, routeInfo.sliceIdx)
 	//_, err := routeServiceHandler.InstallRoute(routeInfo)
 	if err != nil {
@@ -571,7 +571,7 @@ func DoesRouteExist(params interface{}) (exists bool) {
 	return exists
 }
 func PolicyEngineFilter(route ribdInt.Routes, policyPath int, params interface{}) {
-	logger.Info(fmt.Sprintln("PolicyEngineFilter"))
+	//logger.Info(fmt.Sprintln("PolicyEngineFilter"))
 	var policyPath_Str string
 	if policyPath == policyCommonDefs.PolicyPath_Import {
 		policyPath_Str = "Import"
@@ -579,11 +579,11 @@ func PolicyEngineFilter(route ribdInt.Routes, policyPath int, params interface{}
 		policyPath_Str = "Export"
 	} else if policyPath == policyCommonDefs.PolicyPath_All {
 		policyPath_Str = "ALL"
-		logger.Info(fmt.Sprintln("policy path ", policyPath_Str, " unexpected in this function"))
+		logger.Err(fmt.Sprintln("policy path ", policyPath_Str, " unexpected in this function"))
 		return
 	}
 	routeInfo := params.(RouteParams)
-	logger.Info(fmt.Sprintln("PolicyEngineFilter for policypath ", policyPath_Str, "createType = ", routeInfo.createType, " deleteType = ", routeInfo.deleteType, " route: ", route.Ipaddr, ":", route.Mask, " protocol type: ", route.Prototype))
+	//logger.Info(fmt.Sprintln("PolicyEngineFilter for policypath ", policyPath_Str, "createType = ", routeInfo.createType, " deleteType = ", routeInfo.deleteType, " route: ", route.Ipaddr, ":", route.Mask, " protocol type: ", route.Prototype))
 	entity, err := buildPolicyEntityFromRoute(route, params)
 	if err != nil {
 		logger.Info(fmt.Sprintln("Error building policy params"))

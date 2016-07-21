@@ -86,6 +86,8 @@ type NeighborInfo struct {
 	IpAddr         string
 	LinkLocalIp    string
 	ExpiryTimeLeft string
+	State          int
+	PktOperation   byte
 }
 
 type VlanInfo struct {

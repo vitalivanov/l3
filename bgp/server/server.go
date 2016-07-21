@@ -633,7 +633,7 @@ func (server *BGPServer) TraverseAndReverseBGPRib(policyData interface{}) {
 		policy.Name))
 	policyExtensions := policy.Extensions.(bgppolicy.PolicyExtensions)
 	if len(policyExtensions.RouteList) == 0 {
-		fmt.Println("No route affected by this policy, so nothing to do")
+		server.logger.Info("No route affected by this policy, so nothing to do")
 		return
 	}
 
