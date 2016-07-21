@@ -176,7 +176,7 @@ func getConnectedRoutes() {
 			return
 		}
 		if IPIntfBulk.Count == 0 {
-			logger.Println("0 objects returned from GetBulkIPv4IntfState")
+			logger.Info("0 objects returned from GetBulkIPv4IntfState")
 			return
 		}
 		logger.Debug(fmt.Sprintf("len(IPIntfBulk.IPv4IntfStateList)  = %d, num objects returned = %d\n", len(IPIntfBulk.IPv4IntfStateList), IPIntfBulk.Count))
@@ -384,24 +384,22 @@ func (m RIBDServer) TrackReachabilityStatus(ipAddr string, protocol string, op s
    Returns the longest prefix match route to reach the destination network destNet
 */
 func (m RIBDServer) GetRouteReachabilityInfo(destNet string) (nextHopIntf *ribdInt.NextHopInfo, err error) {
-	logger.Debug(fmt.Sprintln("GetRouteReachabilityInfo of ", destNet))
-	t1 := time.Now()
+	//	logger.Debug(fmt.Sprintln("GetRouteReachabilityInfo of ", destNet))
+	//t1 := time.Now()
 	var retnextHopIntf ribdInt.NextHopInfo
 	nextHopIntf = &retnextHopIntf
 	var found bool
 	destNetIp, err := getIP(destNet)
 	if err != nil {
-		logger.Debug(fmt.Sprintln("getIP returned Invalid dest ip address for ", destNet))
+		logger.Err(fmt.Sprintln("getIP returned Invalid dest ip address for ", destNet))
 		return nextHopIntf, errors.New("Invalid dest ip address")
 	}
-	logger.Debug(fmt.Sprintln("destNetIP after getIP:", destNetIp))
 	lookupIp := destNetIp
 	lookupIp = destNetIp.To4()
 	if lookupIp == nil {
 		lookupIp = destNetIp.To16()
 	}
 	destNetIp = lookupIp
-	logger.Debug(fmt.Sprintln("destNetIP after net.To func:", destNetIp))
 	rmapInfoListItem := RouteInfoMap.GetLongestPrefixNode(patriciaDB.Prefix(destNetIp))
 	if rmapInfoListItem != nil {
 		rmapInfoList := rmapInfoListItem.(RouteInfoRecordList)
@@ -409,7 +407,7 @@ func (m RIBDServer) GetRouteReachabilityInfo(destNet string) (nextHopIntf *ribdI
 			found = true
 			routeInfoList, ok := rmapInfoList.routeInfoProtocolMap[rmapInfoList.selectedRouteProtocol]
 			if !ok || len(routeInfoList) == 0 {
-				logger.Debug("Selected route not found")
+				logger.Err("Selected route not found")
 				return nil, errors.New("dest ip address not reachable")
 			}
 			v := routeInfoList[0]
@@ -423,12 +421,12 @@ func (m RIBDServer) GetRouteReachabilityInfo(destNet string) (nextHopIntf *ribdI
 	}
 
 	if found == false {
-		logger.Debug(fmt.Sprintln("dest IP", destNetIp, " not reachable "))
+		logger.Err(fmt.Sprintln("dest IP", destNetIp, " not reachable "))
 		err = errors.New("dest ip address not reachable")
 		return nextHopIntf, err
 	}
-	duration := time.Since(t1)
-	logger.Debug(fmt.Sprintln("time to get longestPrefixLen = ", duration.Nanoseconds(), " ipAddr of the route: ", nextHopIntf.Ipaddr, " next hop ip of the route = ", nextHopIntf.NextHopIp, " ifIndex: ", nextHopIntf.NextHopIfIndex))
+	//	duration := time.Since(t1)
+	//logger.Debug(fmt.Sprintln("time to get longestPrefixLen = ", duration.Nanoseconds(), " ipAddr of the route: ", nextHopIntf.Ipaddr, " next hop ip of the route = ", nextHopIntf.NextHopIp, " ifIndex: ", nextHopIntf.NextHopIfIndex))
 	return nextHopIntf, err
 }
 
@@ -1134,17 +1132,12 @@ func createRoute(ipType IPType, destNetIp string,
 		logger.Debug("nextHopIpAddr invalid")
 		return 0, err
 	}
-	prefixLen, err := getPrefixLen(networkMaskAddr)
-	if err != nil {
-		return -1, err
-	}
-	destNet, err := getNetworkPrefix(destNetIpAddr, networkMaskAddr)
+	destNet, nwAddr, err := getNetworkPrefix(destNetIpAddr, networkMaskAddr)
 	if err != nil {
 		return -1, err
 	}
 	routePrototype := int8(routeType)
-	nwAddr := (destNetIpAddr.Mask(net.IPMask(networkMaskAddr))).String() + "/" + strconv.Itoa(prefixLen)
-	logger.Debug(fmt.Sprintln("nwAddr:", nwAddr))
+	//nwAddr := (destNetIpAddr.Mask(net.IPMask(networkMaskAddr))).String() + "/" + strconv.Itoa(prefixLen)
 	routeInfoRecord := RouteInfoRecord{
 		ipType:         ipType,
 		destNetIp:      destNetIpAddr,
@@ -1197,7 +1190,8 @@ func createRoute(ipType IPType, destNetIp string,
 			newRouteInfoRecordList.isPolicyBasedStateValid = true
 		}
 		if ok := RouteInfoMap.Insert(destNet, newRouteInfoRecordList); ok != true {
-			logger.Debug(" return value not ok")
+			logger.Err("Route map insert return value not ok")
+			return 0, err
 		}
 		localDBRecord := localDB{prefix: destNet, isValid: true, nextHopIp: nextHopIp}
 		if destNetSlice == nil {
@@ -1330,7 +1324,7 @@ func deleteIPRoute(destNetIp string,
 	if err != nil {
 		return 0, err
 	}
-	destNet, err := getNetworkPrefix(destNetIpAddr, networkMaskAddr)
+	destNet, _, err := getNetworkPrefix(destNetIpAddr, networkMaskAddr)
 	if err != nil {
 		return -1, err
 	}

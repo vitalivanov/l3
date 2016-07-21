@@ -38,8 +38,15 @@ func addAsicdRoute(routeInfoRecord RouteInfoRecord) {
 	if asicdclnt.IsConnected == false {
 		return
 	}
-	logger.Info(fmt.Sprintln("addAsicdRoute, weight = ", routeInfoRecord.weight+1, " ipType:", routeInfoRecord.ipType))
+	ipType := ""
 	if routeInfoRecord.ipType == ipv4 {
+		ipType = "IPv4"
+	} else if routeInfoRecord.ipType == ipv6 {
+		ipType = "IPv6"
+	}
+	logger.Info(fmt.Sprintln("addAsicdRoute, weight = ", routeInfoRecord.weight+1, " ipType:", ipType))
+	if routeInfoRecord.ipType == ipv4 {
+		logger.Info("ipv4 route, calling onewaycreateipv4 route")
 		/*	asicdRoute = make([]asicdInt.IPv4Route, asicdBulkCount)
 			if asicdRouteCount == 0 {
 				asicdRoutes = make([]*asicdInt.IPv4Route, 0)

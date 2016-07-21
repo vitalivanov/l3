@@ -37,7 +37,7 @@ import (
    Function to send PolicyCondition Notification
 */
 func (ribdServiceHandler *RIBDServer) PolicyConditionNotificationSend(PUB *nanomsg.PubSocket, cfg ribd.PolicyCondition, evt int) {
-	logger.Println("PolicyConditionNotificationSend")
+	logger.Info("PolicyConditionNotificationSend")
 	msgBuf := objects.PolicyCondition{}
 	objects.ConvertThriftToribdPolicyConditionObj(&cfg, &msgBuf)
 	/*	msgBuf := objects.PolicyConditionConfig{
@@ -51,7 +51,7 @@ func (ribdServiceHandler *RIBDServer) PolicyConditionNotificationSend(PUB *nanom
 	msg := ribdCommonDefs.RibdNotifyMsg{MsgType: uint16(evt), MsgBuf: msgbufbytes}
 	buf, err := json.Marshal(msg)
 	if err != nil {
-		logger.Println("Error in marshalling Json")
+		logger.Err("Error in marshalling Json")
 		return
 	}
 	var evtStr string
@@ -69,7 +69,7 @@ func (ribdServiceHandler *RIBDServer) PolicyConditionNotificationSend(PUB *nanom
    Function to send PolicyStmt Notification
 */
 func (ribdServiceHandler *RIBDServer) PolicyStmtNotificationSend(PUB *nanomsg.PubSocket, cfg ribd.PolicyStmt, evt int) {
-	logger.Println("PolicyStmtNotificationSend")
+	logger.Info("PolicyStmtNotificationSend")
 	msgBuf := objects.PolicyStmt{}
 	objects.ConvertThriftToribdPolicyStmtObj(&cfg, &msgBuf)
 	/*	msgBuf := objects.PolicyStmtConfig{
@@ -85,7 +85,7 @@ func (ribdServiceHandler *RIBDServer) PolicyStmtNotificationSend(PUB *nanomsg.Pu
 	msg := ribdCommonDefs.RibdNotifyMsg{MsgType: uint16(evt), MsgBuf: msgbufbytes}
 	buf, err := json.Marshal(msg)
 	if err != nil {
-		logger.Println("Error in marshalling Json")
+		logger.Err("Error in marshalling Json")
 		return
 	}
 	var evtStr string
@@ -103,7 +103,7 @@ func (ribdServiceHandler *RIBDServer) PolicyStmtNotificationSend(PUB *nanomsg.Pu
    Function to send PolicyDefinition Notification
 */
 func (ribdServiceHandler *RIBDServer) PolicyDefinitionNotificationSend(PUB *nanomsg.PubSocket, cfg ribd.PolicyDefinition, evt int) {
-	logger.Println("PolicyDefinitionNotificationSend")
+	logger.Info("PolicyDefinitionNotificationSend")
 	msgBuf := objects.PolicyDefinition{}
 	objects.ConvertThriftToribdPolicyDefinitionObj(&cfg, &msgBuf)
 	/*	msgBuf := objects.PolicyDefinitionConfig{
@@ -123,7 +123,7 @@ func (ribdServiceHandler *RIBDServer) PolicyDefinitionNotificationSend(PUB *nano
 	msg := ribdCommonDefs.RibdNotifyMsg{MsgType: uint16(evt), MsgBuf: msgbufbytes}
 	buf, err := json.Marshal(msg)
 	if err != nil {
-		logger.Println("Error in marshalling Json")
+		logger.Err("Error in marshalling Json")
 		return
 	}
 	var evtStr string
