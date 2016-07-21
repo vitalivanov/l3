@@ -39,7 +39,7 @@ import (
 type Peer struct {
 	server       *BGPServer
 	logger       *logging.Writer
-	adjRib       *bgprib.AdjRib
+	locRib       *bgprib.LocRib
 	NeighborConf *base.NeighborConf
 	fsmManager   *fsm.FSMManager
 	ifIdx        int32
@@ -47,12 +47,12 @@ type Peer struct {
 	ribOut       map[string]map[uint32]*bgprib.AdjRIBRoute
 }
 
-func NewPeer(server *BGPServer, adjRib *bgprib.AdjRib, globalConf *config.GlobalConfig,
+func NewPeer(server *BGPServer, locRib *bgprib.LocRib, globalConf *config.GlobalConfig,
 	peerGroup *config.PeerGroupConfig, peerConf config.NeighborConfig) *Peer {
 	peer := Peer{
 		server: server,
 		logger: server.logger,
-		adjRib: adjRib,
+		locRib: locRib,
 		ifIdx:  -1,
 		ribIn:  make(map[string]map[uint32]*bgprib.AdjRIBRoute),
 		ribOut: make(map[string]map[uint32]*bgprib.AdjRIBRoute),
@@ -233,7 +233,7 @@ func (p *Peer) ReceiveUpdate(msg *packet.BGPMessage) {
 	}
 
 	if len(update.NLRI) > 0 {
-		path := bgprib.NewPath(p.adjRib, p.NeighborConf, update.PathAttributes, false, true, bgprib.RouteTypeEGP)
+		path := bgprib.NewPath(p.locRib, p.NeighborConf, update.PathAttributes, false, true, bgprib.RouteTypeEGP)
 		for _, nlri := range update.NLRI {
 			ip := nlri.GetPrefix().String()
 			if _, ok = p.ribIn[ip]; !ok {
@@ -265,13 +265,14 @@ func (p *Peer) updatePathAttrs(bgpMsg *packet.BGPMessage, path *bgprib.Path) boo
 		packet.Convert4ByteTo2ByteASPath(bgpMsg)
 	}
 
+	removeRRPathAttrs := true
 	if p.NeighborConf.IsInternal() {
 		if path.NeighborConf != nil && (path.NeighborConf.IsRouteReflectorClient() ||
 			p.NeighborConf.IsRouteReflectorClient()) {
+			removeRRPathAttrs = false
 			packet.AddOriginatorId(bgpMsg, path.NeighborConf.BGPId)
 			packet.AddClusterId(bgpMsg, path.NeighborConf.RunningConf.RouteReflectorClusterId)
 		} else {
-			packet.SetNextHop(bgpMsg, p.NeighborConf.Neighbor.Transport.Config.LocalAddress)
 			packet.SetLocalPref(bgpMsg, path.GetPreference())
 		}
 	} else {
@@ -282,6 +283,11 @@ func (p *Peer) updatePathAttrs(bgpMsg *packet.BGPMessage, path *bgprib.Path) boo
 		packet.PrependAS(bgpMsg, p.NeighborConf.RunningConf.LocalAS, p.NeighborConf.ASSize)
 		packet.SetNextHop(bgpMsg, p.NeighborConf.Neighbor.Transport.Config.LocalAddress)
 		packet.RemoveLocalPref(bgpMsg)
+	}
+
+	if removeRRPathAttrs {
+		packet.RemoveOriginatorId(bgpMsg)
+		packet.RemoveClusterList(bgpMsg)
 	}
 
 	return true

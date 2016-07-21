@@ -94,6 +94,7 @@ type GlobalRoutingTblEntry struct {
 	RoutingTblEnt RoutingTblEntry
 }
 
+/*
 func (server *OSPFServer) dumpRoutingTbl() {
 	server.logger.Info("=============Routing Table============")
 	server.logger.Info("DestId      AddrMask        DestType        OprCapabilities Area    PathType        Cost    Type2Cost       LSOrigin        NumOfPaths      NextHops")
@@ -135,14 +136,6 @@ func (server *OSPFServer) dumpRoutingTbl() {
 					LsaType = "RouterLSA"
 				} else if ent.LSOrigin.LSType == NetworkLSA {
 					LsaType = "NetworkLSA"
-					/*
-					   } else if ent.LSOrigin.LSType == Summary3LSA {
-					           LsaType = "Summary3LSA"
-					   } else if ent.LSOrigin.LSType == Summary4LSA {
-					           LsaType = "Summary4LSA"
-					   } else {
-					           LsaType = "ASExternalLSA"
-					*/
 				}
 				LsaLSId = convertUint32ToIPv4(ent.LSOrigin.LSId)
 				LsaAdvRouter = convertUint32ToIPv4(ent.LSOrigin.AdvRouter)
@@ -167,6 +160,7 @@ func (server *OSPFServer) dumpRoutingTbl() {
 	}
 	server.logger.Info("==============End of Routing Table================")
 }
+*/
 
 func (server *OSPFServer) findP2PNextHopIP(vFirst VertexKey, vSecond VertexKey, areaIdKey AreaIdKey) (ifIPAddr uint32, nextHopIP uint32, err error) {
 	// Our link is P2P
@@ -668,6 +662,11 @@ func (server *OSPFServer) DeleteRoute(rKey RoutingTblEntryKey) {
 		}
 		cfg.NextHop = make([]*ribd.NextHopInfo, 0)
 		cfg.NextHop = append(cfg.NextHop, &nextHopInfo)
+		if server.ribdClient.ClientHdl == nil {
+			server.logger.Err("Nil ribd handle. Can not delete route. ")
+			return
+		}
+
 		ret, err := server.ribdClient.ClientHdl.DeleteIPv4Route(&cfg)
 		//destNetIp, networkMask, routeType, nextHopIp)
 		if err != nil {
@@ -820,6 +819,7 @@ func (server *OSPFServer) InstallRoutingTbl() {
 	}
 }
 
+/*
 func (server *OSPFServer) dumpGlobalRoutingTbl() {
 	server.logger.Info("=============Routing Table============")
 	server.logger.Info("DestId      AddrMask        DestType        OprCapabilities Area    PathType        Cost    Type2Cost       LSOrigin        NumOfPaths      NextHops")
@@ -859,14 +859,6 @@ func (server *OSPFServer) dumpGlobalRoutingTbl() {
 				LsaType = "RouterLSA"
 			} else if ent.RoutingTblEnt.LSOrigin.LSType == NetworkLSA {
 				LsaType = "NetworkLSA"
-				/*
-				   } else if ent.RoutingTblEnt.LSOrigin.LSType == Summary3LSA {
-				           LsaType = "Summary3LSA"
-				   } else if ent.RoutingTblEnt.LSOrigin.LSType == Summary4LSA {
-				           LsaType = "Summary4LSA"
-				   } else {
-				           LsaType = "ASExternalLSA"
-				*/
 			}
 			LsaLSId = convertUint32ToIPv4(ent.RoutingTblEnt.LSOrigin.LSId)
 			LsaAdvRouter = convertUint32ToIPv4(ent.RoutingTblEnt.LSOrigin.AdvRouter)
@@ -890,3 +882,4 @@ func (server *OSPFServer) dumpGlobalRoutingTbl() {
 	}
 	server.logger.Info("==============End of Routing Table================")
 }
+*/

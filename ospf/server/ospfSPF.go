@@ -682,6 +682,7 @@ func dumpLsaKey(key LsaKey) string {
 	return fmt.Sprintln("LSA Type:", Type, "LSId:", LSId, "AdvRtr:", AdvRtr)
 }
 
+/*
 func (server *OSPFServer) dumpAreaStubs() {
 	server.logger.Info("=======================Dump Area Stubs======================")
 	for key, ent := range server.AreaStubs {
@@ -698,6 +699,7 @@ func (server *OSPFServer) dumpAreaStubs() {
 	server.logger.Info("==================================================")
 
 }
+
 
 func (server *OSPFServer) dumpAreaGraph() {
 	server.logger.Info("=======================Dump Area Graph======================")
@@ -742,6 +744,7 @@ func (server *OSPFServer) dumpSPFTree() {
 
 	}
 }
+*/
 
 func (server *OSPFServer) UpdateRoutingTbl(vKey VertexKey, areaId uint32) {
 	areaIdKey := AreaIdKey{
@@ -770,6 +773,13 @@ func (server *OSPFServer) initRoutingTbl(areaId uint32) {
 	server.GlobalRoutingTbl = make(map[RoutingTblEntryKey]GlobalRoutingTblEntry)
 }
 
+func (server *OSPFServer) initialiseSPFStructs() {
+	server.AreaGraph = make(map[VertexKey]Vertex)
+	server.AreaStubs = make(map[VertexKey]StubVertex)
+	server.SPFTree = make(map[VertexKey]TreeVertex)
+
+}
+
 func (server *OSPFServer) spfCalculation() {
 	for {
 		msg := <-server.StartCalcSPFCh
@@ -793,9 +803,7 @@ func (server *OSPFServer) spfCalculation() {
 			}
 			aEnt.TransitCapability = false
 			areaId := convertAreaOrRouterIdUint32(string(key.AreaId))
-			server.AreaGraph = make(map[VertexKey]Vertex)
-			server.AreaStubs = make(map[VertexKey]StubVertex)
-			server.SPFTree = make(map[VertexKey]TreeVertex)
+			server.initialiseSPFStructs()
 			areaIdKey := AreaIdKey{
 				AreaId: areaId,
 			}
@@ -822,9 +830,9 @@ func (server *OSPFServer) spfCalculation() {
 				continue
 			}
 			server.logger.Info("=========================Start after Dijkstra=================")
-			server.dumpAreaGraph()
-			server.dumpAreaStubs()
-			server.dumpSPFTree()
+			//	server.dumpAreaGraph()
+			//	server.dumpAreaStubs()
+			//	server.dumpSPFTree()
 			server.logger.Info("=========================End after Dijkstra=================")
 			server.UpdateRoutingTbl(vKey, areaId)
 			server.logger.Info("==============Handling Stub links...====================")
@@ -834,7 +842,9 @@ func (server *OSPFServer) spfCalculation() {
 			server.AreaStubs = nil
 			server.SPFTree = nil
 		}
-		server.dumpRoutingTbl() // Per area
+		/*
+			server.dumpRoutingTbl()
+		*/
 		server.TempGlobalRoutingTbl = nil
 		server.TempGlobalRoutingTbl = make(map[RoutingTblEntryKey]GlobalRoutingTblEntry)
 		/* Summarize and Install/Delete Routes In Routing Table */
@@ -843,7 +853,7 @@ func (server *OSPFServer) spfCalculation() {
 		server.GlobalRoutingTbl = nil
 		server.GlobalRoutingTbl = make(map[RoutingTblEntryKey]GlobalRoutingTblEntry)
 		server.GlobalRoutingTbl = server.TempGlobalRoutingTbl
-		server.dumpGlobalRoutingTbl()
+		//server.dumpGlobalRoutingTbl()
 		for key, _ := range server.AreaConfMap {
 			areaId := convertAreaOrRouterIdUint32(string(key.AreaId))
 			areaIdKey := AreaIdKey{

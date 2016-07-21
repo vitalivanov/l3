@@ -177,7 +177,9 @@ func SetNextHopPathAttrs(pathAttrs []BGPPathAttr, nextHopIP net.IP) {
 func SetPathAttrAggregator(pathAttrs []BGPPathAttr, as uint32, ip net.IP) {
 	for idx, pa := range pathAttrs {
 		if pa.GetCode() == BGPPathAttrTypeAggregator {
-			pathAttrs[idx].(*BGPPathAttrAggregator).AS = uint16(as)
+			aggAS := NewBGPAggregator4ByteAS()
+			aggAS.AS = as
+			pathAttrs[idx].(*BGPPathAttrAggregator).SetBGPAggregatorAS(aggAS)
 			pathAttrs[idx].(*BGPPathAttrAggregator).IP = ip
 		}
 	}
@@ -474,6 +476,10 @@ func AddOriginatorId(updateMsg *BGPMessage, id net.IP) bool {
 	return true
 }
 
+func RemoveOriginatorId(updateMsg *BGPMessage) {
+	removePathAttr(updateMsg, BGPPathAttrTypeOriginatorId)
+}
+
 func AddClusterId(updateMsg *BGPMessage, id uint32) bool {
 	body := updateMsg.Body.(*BGPUpdate)
 	var pa BGPPathAttr
@@ -508,6 +514,10 @@ func AddClusterId(updateMsg *BGPMessage, id uint32) bool {
 	}
 
 	return false
+}
+
+func RemoveClusterList(updateMsg *BGPMessage) {
+	removePathAttr(updateMsg, BGPPathAttrTypeClusterList)
 }
 
 func ConvertIPBytesToUint(bytes []byte) uint32 {
@@ -638,6 +648,7 @@ func ConvertAS2ToAS4(updateMsg *BGPMessage) {
 				as4Seg.Type = as2Seg.Type
 				as4Seg.Length = as2Seg.GetLen()
 				as4Seg.BGPASPathSegmentLen += (uint16(as2Seg.GetLen()) * 4)
+				as4Seg.AS = make([]uint32, as4Seg.Length)
 				for i, as := range as2Seg.AS {
 					as4Seg.AS[i] = uint32(as)
 				}
@@ -740,7 +751,7 @@ func NormalizeASPath(updateMsg *BGPMessage, data interface{}) {
 	}
 
 	if asPath.ASSize == 2 {
-		if asAggregator != nil && as4Aggregator != nil && asAggregator.AS != BGPASTrans {
+		if asAggregator != nil && as4Aggregator != nil && uint16(asAggregator.AS.GetAS()) != BGPASTrans {
 			removePathAttr(updateMsg, BGPPathAttrTypeAS4Aggregator)
 			removePathAttr(updateMsg, BGPPathAttrTypeAS4Path)
 		} else {

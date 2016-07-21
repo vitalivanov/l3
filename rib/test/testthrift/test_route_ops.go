@@ -27,12 +27,23 @@ package routeThriftTest
 import (
 	"fmt"
 	"ribd"
+	"ribdInt"
 )
 
 var route ribd.IPv4Route
 var ipv4RouteList []ribd.IPv4Route
 var reachabilityTestList []string
 
+func GetTotalRouteCount(client *ribd.RIBDServicesClient) {
+	fmt.Println("GetTotalRouteCount")
+	number, _ := client.GetTotalv4RouteCount()
+	fmt.Println("Number of routes:", number)
+}
+func GetRouteCreatedTime(client *ribd.RIBDServicesClient, number int) {
+	fmt.Println("GetRouteCreatedTime")
+	time, err := client.Getv4RouteCreatedTime(ribdInt.Int(number))
+	fmt.Println("err: ", err, " time:", time)
+}
 func Createv4Routes(client *ribd.RIBDServicesClient) {
 	fmt.Println("CreateRoutes")
 	for _, route := range ipv4RouteList {
@@ -53,17 +64,17 @@ func CheckRouteReachability(client *ribd.RIBDServicesClient) {
 	}
 }
 func Createv4RouteList() {
-	ipv4RouteList = make([]ribd.IPv4Route,0)
-	ipv4RouteList = append(ipv4RouteList,ribd.IPv4Route{
+	ipv4RouteList = make([]ribd.IPv4Route, 0)
+	ipv4RouteList = append(ipv4RouteList, ribd.IPv4Route{
 		DestinationNw: "40.1.10.0",
 		NetworkMask:   "255.255.255.0",
-		NextHop:       []*ribd.NextHopInfo{&ribd.NextHopInfo{NextHopIp: "40.1.1.2", NextHopIntRef: "lo1"}},
+		NextHop:       []*ribd.NextHopInfo{&ribd.NextHopInfo{NextHopIp: "11.1.10.2"}},
 		Protocol:      "STATIC",
 	})
 
 	//reachability test list
-	reachabilityTestList = make([]string,0)
-	reachabilityTestList = append(reachabilityTestList,"40.0.1.2")
-	reachabilityTestList = append(reachabilityTestList,"40.1.1.2")
-	reachabilityTestList = append(reachabilityTestList,"40.1.10.2")
+	reachabilityTestList = make([]string, 0)
+	reachabilityTestList = append(reachabilityTestList, "40.0.1.2")
+	reachabilityTestList = append(reachabilityTestList, "40.1.1.2")
+	reachabilityTestList = append(reachabilityTestList, "40.1.10.2")
 }

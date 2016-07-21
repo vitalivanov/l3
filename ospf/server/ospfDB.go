@@ -30,17 +30,17 @@ import (
 	"models/objects"
 	"ospfd"
 	"strings"
-	"utils/dbutils"
 	"time"
+	"utils/dbutils"
 )
 
 type DbRouteMsg struct {
-	op bool
+	op    bool
 	entry RoutingTblEntryKey
 }
 
 type DbLsdbMsg struct {
-	op bool 
+	op    bool
 	entry LsdbSliceEnt
 }
 
@@ -76,32 +76,32 @@ func (server *OSPFServer) StartDBListener() {
 	}
 	for {
 		select {
-		     case start := <- server.DbReadConfig:
+		case start := <-server.DbReadConfig:
 			if start {
-			server.ReadOspfCfgFromDB()
+				server.ReadOspfCfgFromDB()
 			} else {
-			   return
+				return
 			}
 
-		     case msg := <- server.DbRouteOp:
+		case msg := <-server.DbRouteOp:
 			if msg.op {
-			  server.AddIPv4RoutesState(msg.entry)  
+				server.AddIPv4RoutesState(msg.entry)
 			} else {
-			   server.DelIPv4RoutesState(msg.entry)
+				server.DelIPv4RoutesState(msg.entry)
 			}
 
-		     case msg := <- server.DbLsdbOp:
+		case msg := <-server.DbLsdbOp:
 			if msg.op {
-			    server.AddLsdbEntry(msg.entry)
+				server.AddLsdbEntry(msg.entry)
 			} else {
-			    server.DelLsdbEntry(msg.entry)
+				server.DelLsdbEntry(msg.entry)
 			}
 
-		     case msg := <- server.DbEventOp:
+		case msg := <-server.DbEventOp:
 			server.AddOspfEventState(msg.eventType, msg.eventInfo)
 		}
 	}
-	
+
 }
 
 func (server *OSPFServer) ReadOspfCfgFromDB() {
@@ -113,7 +113,10 @@ func (server *OSPFServer) ReadOspfCfgFromDB() {
 func (server *OSPFServer) readGlobalConfFromDB() {
 	server.logger.Info("Reading global object from DB")
 	var dbObj objects.OspfGlobal
-
+	if server.dbHdl == nil {
+		server.logger.Err("Null db handle . No global config read from db.")
+		return
+	}
 	objList, err := server.dbHdl.GetAllObjFromDb(dbObj)
 	if err != nil {
 		server.logger.Err("DB query failed for OspfGlobal")
@@ -151,6 +154,10 @@ func (server *OSPFServer) applyOspfGlobalConf(conf *ospfd.OspfGlobal) error {
 func (server *OSPFServer) readAreaConfFromDB() {
 	server.logger.Info("Reading area object from DB")
 	var dbObj objects.OspfAreaEntry
+	if server.dbHdl == nil {
+		server.logger.Err("Null db handle. No Area conf read from db.")
+		return
+	}
 
 	objList, err := server.dbHdl.GetAllObjFromDb(dbObj)
 	if err != nil {
@@ -188,6 +195,10 @@ func (server *OSPFServer) applyOspfAreaConf(conf *ospfd.OspfAreaEntry) error {
 func (server *OSPFServer) readIntfConfFromDB() {
 	server.logger.Info("Reading interface object from DB")
 	var dbObj objects.OspfIfEntry
+	if server.dbHdl == nil {
+		server.logger.Err("Null db handle. No Intf conf to be read from db.")
+		return
+	}
 
 	objList, err := server.dbHdl.GetAllObjFromDb(dbObj)
 	if err != nil {
@@ -282,6 +293,11 @@ func (server *OSPFServer) AddIPv4RoutesState(entry RoutingTblEntryKey) error {
 	obj.LSOrigin.AdvRouter = int32(rEntry.RoutingTblEnt.LSOrigin.AdvRouter)
 
 	objects.ConvertThriftToospfdOspfIPv4RouteStateObj(obj, &dbObj)
+
+	if server.dbHdl == nil {
+		return errors.New(fmt.Sprintln("Null db object or db handle"))
+	}
+
 	err := dbObj.StoreObjectInDb(server.dbHdl)
 	if err != nil {
 		server.logger.Err(fmt.Sprintln("DB: Failed to add object in db , err ", err))
@@ -303,6 +319,9 @@ func (server *OSPFServer) DelIPv4RoutesState(entry RoutingTblEntryKey) error {
 	obj.DestType = string(entry.DestType)
 
 	objects.ConvertThriftToospfdOspfIPv4RouteStateObj(obj, &dbObj)
+	if  server.dbHdl == nil {
+		return errors.New(fmt.Sprintln("Nil dbobj or db handle.", entry))
+	}
 	err := dbObj.DeleteObjectFromDb(server.dbHdl)
 	if err != nil {
 		server.logger.Err(fmt.Sprintln("DB: Failed to add object in db , err ", err))
@@ -382,6 +401,9 @@ func (server *OSPFServer) AddLsdbEntry(entry LsdbSliceEnt) error {
 
 	objects.ConvertThriftToospfdOspfLsdbEntryStateObj(obj, &dbObj)
 	server.logger.Info(fmt.Sprintln("DB: Db obj received ", dbObj))
+	if server.dbHdl == nil {
+		return errors.New(fmt.Sprintln("Nil db handle "))
+	}
 	err := dbObj.StoreObjectInDb(server.dbHdl)
 	if err != nil {
 		server.logger.Err(fmt.Sprintln("DB: lsdb Failed to add object in db , err ", err))
@@ -403,6 +425,9 @@ func (server *OSPFServer) DelLsdbEntry(entry LsdbSliceEnt) error {
 	obj.LsdbRouterId = convertUint32ToIPv4(entry.AdvRtr)
 
 	objects.ConvertThriftToospfdOspfLsdbEntryStateObj(obj, &dbObj)
+	if server.dbHdl == nil {
+		return errors.New(fmt.Sprintln("dbHdl is nil"))
+	}
 	err := dbObj.DeleteObjectFromDb(server.dbHdl)
 	if err != nil {
 		server.logger.Err(fmt.Sprintln("DB: LSDB Failed to delete object in db , err ", err))
@@ -416,33 +441,42 @@ func (server *OSPFServer) AddOspfEventState(eventType string, eventInfo string) 
 	var dbObj objects.OspfEventState
 	obj := ospfd.NewOspfEventState()
 
-        obj.Index = DBEventSeq
+	obj.Index = DBEventSeq
 	DBEventSeq++
 	obj.TimeStamp = time.Now().String()
 	obj.EventInfo = eventInfo
 	obj.EventType = eventType
 
 	objects.ConvertThriftToospfdOspfEventStateObj(obj, &dbObj)
+	if server.dbHdl == nil {
+		return errors.New(fmt.Sprintln("dbHdl is nil"))
+	}
 	err := dbObj.StoreObjectInDb(server.dbHdl)
-        if err != nil {
-                server.logger.Err(fmt.Sprintln("DB: Failed to add event object in db , err ", err))
-                return errors.New(fmt.Sprintln("Failed to add OspfEventState in db : ", eventInfo))
-        }
+	if server.dbHdl == nil {
+	return errors.New(fmt.Sprintln("Nil db handle"))
+	}
+	if err != nil {
+		server.logger.Err(fmt.Sprintln("DB: Failed to add event object in db , err ", err))
+		return errors.New(fmt.Sprintln("Failed to add OspfEventState in db : ", eventInfo))
+	}
 
-        return err
+	return err
 
 }
 
 func (server *OSPFServer) DelOspfEventState(entry config.OspfEventState) error {
 	server.logger.Info(fmt.Sprintln("DB: DEL ospf event ", entry))
 	var dbObj objects.OspfEventState
- 	obj := ospfd.NewOspfEventState()
-	
+	obj := ospfd.NewOspfEventState()
+
 	obj.TimeStamp = time.Now().String()
 	obj.EventInfo = entry.EventInfo
 	obj.EventType = entry.EventType
-	
+
 	objects.ConvertThriftToospfdOspfEventStateObj(obj, &dbObj)
+	if server.dbHdl == nil {
+	 return errors.New(fmt.Sprintln("Nil db handle"))
+	}
 	err := dbObj.DeleteObjectFromDb(server.dbHdl)
 	if err != nil {
 		server.logger.Info(fmt.Sprintln("DB: Failed to log event ", entry))

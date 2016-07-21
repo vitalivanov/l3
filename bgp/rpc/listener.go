@@ -822,7 +822,7 @@ func (h *BGPHandler) DeleteBGPPeerGroup(peerGroup *bgpd.BGPPeerGroup) (bool, err
 }
 
 func (h *BGPHandler) GetBGPRouteState(network string, cidrLen int16) (*bgpd.BGPRouteState, error) {
-	bgpRoute := h.server.AdjRib.GetBGPRoute(network)
+	bgpRoute := h.server.LocRib.GetBGPRoute(network)
 	var err error = nil
 	if bgpRoute == nil {
 		err = errors.New(fmt.Sprintf("Route not found for destination %s", network))
@@ -832,7 +832,7 @@ func (h *BGPHandler) GetBGPRouteState(network string, cidrLen int16) (*bgpd.BGPR
 
 func (h *BGPHandler) GetBulkBGPRouteState(index bgpd.Int,
 	count bgpd.Int) (*bgpd.BGPRouteStateGetInfo, error) {
-	nextIdx, currCount, bgpRoutes := h.server.AdjRib.BulkGetBGPRoutes(int(index), int(count))
+	nextIdx, currCount, bgpRoutes := h.server.LocRib.BulkGetBGPRoutes(int(index), int(count))
 
 	bgpRoutesBulk := bgpd.NewBGPRouteStateGetInfo()
 	bgpRoutesBulk.EndIdx = bgpd.Int(nextIdx)

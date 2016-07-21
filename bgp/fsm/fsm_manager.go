@@ -42,7 +42,7 @@ type PeerFSMConn struct {
 
 type PeerFSMState struct {
 	PeerIP string
-	State  BGPFSMState
+	State  config.BGPFSMState
 }
 
 type PeerAttrs struct {
@@ -236,7 +236,7 @@ func (mgr *FSMManager) fsmBroken(id uint8, fsmDelete bool) {
 	}
 }
 
-func (mgr *FSMManager) fsmStateChange(id uint8, state BGPFSMState) {
+func (mgr *FSMManager) fsmStateChange(id uint8, state config.BGPFSMState) {
 	if mgr.activeFSM == id || mgr.activeFSM == uint8(config.ConnDirInvalid) {
 		mgr.neighborConf.FSMStateChange(uint32(state))
 	}
@@ -340,8 +340,8 @@ func (mgr *FSMManager) receivedBGPOpenMessage(id uint8, connDir config.ConnDir, 
 	localBGPId := packet.ConvertIPBytesToUint(mgr.gConf.RouterId.To4())
 	bgpIdInt := packet.ConvertIPBytesToUint(openMsg.BGPId.To4())
 	for fsmId, fsm := range mgr.fsms {
-		if fsmId != id && fsm != nil && fsm.State.state() >= BGPFSMOpensent {
-			if fsm.State.state() == BGPFSMEstablished {
+		if fsmId != id && fsm != nil && fsm.State.state() >= config.BGPFSMOpensent {
+			if fsm.State.state() == config.BGPFSMEstablished {
 				closeConnDir = connDir
 			} else if localBGPId > bgpIdInt {
 				closeConnDir = config.ConnDirIn
