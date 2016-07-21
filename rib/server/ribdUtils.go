@@ -845,8 +845,8 @@ func getNetworkPrefixFromCIDR(ipAddr string) (ipPrefix patriciaDB.Prefix, err er
 	ipMask = make(net.IP, 16)
 	copy(ipMask, ipNet.Mask)
 	ipAddrStr := ip.String()
-	ipMaskStr := net.IP(ipMask).String()
-	ipPrefix, err = getNetowrkPrefixFromStrings(ipAddrStr, ipMaskStr)
+	//ipMaskStr := net.IP(ipMask).String()
+	ipPrefix, err = getNetowrkPrefixFromStrings(ipAddrStr, (net.IP(ipMask)).String()) //ipMaskStr)
 	return ipPrefix, err
 }
 func getCIDR(ipAddr string, mask string) (addr string, err error) {

@@ -46,7 +46,7 @@ func TestConvertIntfStrToIfIndexStr(t *testing.T) {
 	fmt.Println("***************************************")
 }
 func TestGetNetworkPrefixFromStrings(t *testing.T) {
-	fmt.Println("****TestGetNetworkPrefixFromCIDR****")
+	fmt.Println("****TestGetNetworkPrefixFromStrings****")
 	ipAddr := "11.1.10.2"
 	mask := "255.255.255.0"
 	ipPrefix, err := getNetowrkPrefixFromStrings(ipAddr, mask)
