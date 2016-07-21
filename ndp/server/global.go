@@ -25,6 +25,7 @@ package server
 import (
 	"github.com/google/gopacket"
 	"l3/ndp/config"
+	"l3/ndp/packet"
 	"sync"
 	"time"
 	"utils/asicdClient" // this is switch plugin need to change the name
@@ -45,6 +46,7 @@ type NDPServer struct {
 	VlanIfIdxVlanIdMap  map[int32]int32                //reverse map for ifIndex ----> vlanId, used during ipv6 neig create
 	SwitchMacMapEntries map[string]struct{}            // cache entry for all mac addresses on a switch
 	NeighborInfo        map[string]config.NeighborInfo // cache which neighbors are created by NDP
+	neighborKey         []string                       // keys for all neighbor entries is stored here for GET calls
 
 	// Lock for reading/writing NeighorInfo
 	// We need this lock because getbulk/getentry is not requested on the main entry point channel, rather it's a
@@ -73,7 +75,8 @@ type NDPServer struct {
 	Promiscuous bool
 	Timeout     time.Duration
 
-	neighborKey []string // keys for all neighbor entries is stored here for GET calls
+	// Neighbor Cache Information
+	Packet *packet.Packet
 }
 
 const (
