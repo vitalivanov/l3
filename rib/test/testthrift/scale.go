@@ -125,8 +125,7 @@ func handleBulkClient(client *ribd.RIBDServicesClient, maxCount int) (err error)
 		route[count].NetworkMask = "255.255.255.0"
 		route[count].NextHop = make([]*ribdInt.RouteNextHopInfo, 0)
 		nh := ribdInt.RouteNextHopInfo{
-			NextHopIp:     "11.1.10.2",
-			NextHopIntRef: "lo1",
+			NextHopIp: "11.1.10.2",
 		}
 		route[count].NextHop = append(route[count].NextHop, &nh)
 		route[count].Protocol = "STATIC"
@@ -180,6 +179,6 @@ func Scale(ribdClient *ribd.RIBDServicesClient, number int) {
 		fmt.Println("RIBd client nil")
 		return
 	}*/
-	handleClient(ribdClient, number) //ribd.NewRIBDServicesClientFactory(transport, protocolFactory))
-	//handleBulkClient(ribdClient, number) //(ribd.NewRIBDServicesClientFactory(transport, protocolFactory))
+	//handleClient(ribdClient, number) //ribd.NewRIBDServicesClientFactory(transport, protocolFactory))
+	handleBulkClient(ribdClient, number) //(ribd.NewRIBDServicesClientFactory(transport, protocolFactory))
 }
