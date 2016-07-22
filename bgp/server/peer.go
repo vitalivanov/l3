@@ -291,7 +291,11 @@ func (p *Peer) updatePathAttrs(bgpMsg *packet.BGPMessage, path *bgprib.Path) boo
 			packet.RemoveMultiExitDisc(bgpMsg)
 		}
 		packet.PrependAS(bgpMsg, p.NeighborConf.RunningConf.LocalAS, p.NeighborConf.ASSize)
-		packet.SetNextHop(bgpMsg, p.NeighborConf.Neighbor.Transport.Config.LocalAddress)
+		if updateMsg.NLRI != nil && len(updateMsg.NLRI) > 0 {
+			packet.SetNextHop(bgpMsg, p.NeighborConf.Neighbor.Transport.Config.LocalAddress)
+		} else if len(updateMsg.PathAttributes) > 0 {
+			packet.RemoveNextHop(&(updateMsg.PathAttributes))
+		}
 		packet.RemoveLocalPref(bgpMsg)
 	}
 
