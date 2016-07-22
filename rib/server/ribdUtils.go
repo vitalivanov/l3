@@ -29,7 +29,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/op/go-nanomsg"
 	"l3/rib/ribdCommonDefs"
 	"net"
 	"ribd"
@@ -39,13 +38,8 @@ import (
 	"strings"
 	"utils/patriciaDB"
 	"utils/policy"
-)
 
-type IPType int
-
-const (
-	ipv4 IPType = iota
-	ipv6
+	"github.com/op/go-nanomsg"
 )
 
 type RouteDistanceConfig struct {
@@ -275,7 +269,7 @@ func BuildRouteParamsFromribdIPv4Route(cfg *ribd.IPv4Route, createType int, dele
 	}
 	nextHopIntRef, _ := strconv.Atoi(cfg.NextHop[0].NextHopIntRef)
 	params := RouteParams{destNetIp: cfg.DestinationNw,
-		ipType:         ipv4,
+		ipType:         ribdCommonDefs.IPv4,
 		networkMask:    cfg.NetworkMask,
 		nextHopIp:      nextHopIp,
 		nextHopIfIndex: ribd.Int(nextHopIntRef),
@@ -296,7 +290,7 @@ func BuildRouteParamsFromribdIPv6Route(cfg *ribd.IPv6Route, createType int, dele
 	}
 	nextHopIntRef, _ := strconv.Atoi(cfg.NextHop[0].NextHopIntRef)
 	params := RouteParams{destNetIp: cfg.DestinationNw,
-		ipType:         ipv6,
+		ipType:         ribdCommonDefs.IPv6,
 		networkMask:    cfg.NetworkMask,
 		nextHopIp:      nextHopIp,
 		nextHopIfIndex: ribd.Int(nextHopIntRef),
@@ -317,7 +311,7 @@ func BuildPolicyRouteFromribdIPv4Route(cfg *ribd.IPv4Route) (policyRoute ribdInt
 	}
 	nextHopIntRef, _ := strconv.Atoi(cfg.NextHop[0].NextHopIntRef)
 	policyRoute = ribdInt.Routes{Ipaddr: cfg.DestinationNw,
-		IPAddrType: ribdInt.Int(ipv4),
+		IPAddrType: ribdInt.Int(ribdCommonDefs.IPv4),
 		Mask:       cfg.NetworkMask,
 		NextHopIp:  nextHopIp,
 		IfIndex:    ribdInt.Int(nextHopIntRef), //cfg.NextHopInfp[0].NextHopIntRef,
@@ -335,7 +329,7 @@ func BuildPolicyRouteFromribdIPv6Route(cfg *ribd.IPv6Route) (policyRoute ribdInt
 	}
 	nextHopIntRef, _ := strconv.Atoi(cfg.NextHop[0].NextHopIntRef)
 	policyRoute = ribdInt.Routes{Ipaddr: cfg.DestinationNw,
-		IPAddrType: ribdInt.Int(ipv6),
+		IPAddrType: ribdInt.Int(ribdCommonDefs.IPv6),
 		Mask:       cfg.NetworkMask,
 		NextHopIp:  nextHopIp,
 		IfIndex:    ribdInt.Int(nextHopIntRef), //cfg.NextHopInfp[0].NextHopIntRef,

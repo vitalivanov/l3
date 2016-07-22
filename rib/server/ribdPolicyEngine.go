@@ -48,7 +48,7 @@ type PolicyRouteIndex struct {
    data-structure used to communicate with policy engine
 */
 type RouteParams struct {
-	ipType         IPType
+	ipType         ribdCommonDefs.IPType
 	destNetIp      string
 	networkMask    string
 	nextHopIp      string
@@ -265,7 +265,7 @@ func policyEngineActionUndoNetworkStatemenAdvertiseAction(actionItem interface{}
 	switch RouteProtocolTypeMapDB[networkStatementTargetProtocol] {
 	case ribdCommonDefs.BGP:
 		logger.Info(fmt.Sprintln("Undo network statement advertise to BGP"))
-		route = ribdInt.Routes{Ipaddr: RouteInfo.destNetIp, Mask: RouteInfo.networkMask, NextHopIp: RouteInfo.nextHopIp, IfIndex: ribdInt.Int(RouteInfo.nextHopIfIndex), Metric: ribdInt.Int(RouteInfo.metric), Prototype: ribdInt.Int(RouteInfo.routeType)}
+		route = ribdInt.Routes{Ipaddr: RouteInfo.destNetIp, Mask: RouteInfo.networkMask, NextHopIp: RouteInfo.nextHopIp, IPAddrType: ribdInt.Int(RouteInfo.ipType), IfIndex: ribdInt.Int(RouteInfo.nextHopIfIndex), Metric: ribdInt.Int(RouteInfo.metric), Prototype: ribdInt.Int(RouteInfo.routeType)}
 		route.NetworkStatement = true
 		publisherInfo, ok := PublisherInfoMap["BGP"]
 		if ok {
@@ -292,7 +292,7 @@ func policyEngineActionUndoRedistribute(actionItem interface{}, conditionsList [
 		logger.Info(fmt.Sprintln("evt = NOTIFY_ROUTE_CREATED"))
 		evt = ribdCommonDefs.NOTIFY_ROUTE_CREATED
 	}
-	route = ribdInt.Routes{Ipaddr: RouteInfo.destNetIp, Mask: RouteInfo.networkMask, NextHopIp: RouteInfo.nextHopIp, IfIndex: ribdInt.Int(RouteInfo.nextHopIfIndex), Metric: ribdInt.Int(RouteInfo.metric), Prototype: ribdInt.Int(RouteInfo.routeType)}
+	route = ribdInt.Routes{Ipaddr: RouteInfo.destNetIp, Mask: RouteInfo.networkMask, NextHopIp: RouteInfo.nextHopIp, IPAddrType: ribdInt.Int(RouteInfo.ipType), IfIndex: ribdInt.Int(RouteInfo.nextHopIfIndex), Metric: ribdInt.Int(RouteInfo.metric), Prototype: ribdInt.Int(RouteInfo.routeType)}
 	route.RouteOrigin = ReverseRouteProtoTypeMapDB[int(RouteInfo.routeType)]
 	publisherInfo, ok := PublisherInfoMap[redistributeActionInfo.RedistributeTargetProtocol]
 	if ok {
@@ -322,7 +322,7 @@ func policyEngineUpdateRoute(prefix patriciaDB.Prefix, item patriciaDB.Item, han
 	nextHopIf := strconv.Itoa(int(selectedRouteInfoRecord.nextHopIfIndex))
 	//Even though we could potentially have multiple selected routes, calling update once for this prefix should suffice
 	//routeServiceHandler.UpdateIPv4Route(&cfg, nil, nil)
-	if selectedRouteInfoRecord.ipType == ipv4 {
+	if selectedRouteInfoRecord.ipType == ribdCommonDefs.IPv4 {
 		cfg := ribd.IPv4Route{
 			DestinationNw: selectedRouteInfoRecord.destNetIp.String(),
 			Protocol:      ReverseRouteProtoTypeMapDB[int(selectedRouteInfoRecord.protocol)],
@@ -336,7 +336,7 @@ func policyEngineUpdateRoute(prefix patriciaDB.Prefix, item patriciaDB.Item, han
 		cfg.NextHop = make([]*ribd.NextHopInfo, 0)
 		cfg.NextHop = append(cfg.NextHop, &nextHop)
 		RouteServiceHandler.Processv4RouteUpdateConfig(&cfg, &cfg, nil)
-	} else if selectedRouteInfoRecord.ipType == ipv6 {
+	} else if selectedRouteInfoRecord.ipType == ribdCommonDefs.IPv6 {
 		cfg := ribd.IPv6Route{
 			DestinationNw: selectedRouteInfoRecord.destNetIp.String(),
 			Protocol:      ReverseRouteProtoTypeMapDB[int(selectedRouteInfoRecord.protocol)],
@@ -456,7 +456,7 @@ func policyEngineActionNetworkStatementAdvertise(actionInfo interface{}, conditi
 	switch RouteProtocolTypeMapDB[networkStatementAdvertiseTargetProtocol] {
 	case ribdCommonDefs.BGP:
 		logger.Info(fmt.Sprintln("NetworkStatemtnAdvertise to BGP"))
-		route = ribdInt.Routes{Ipaddr: RouteInfo.destNetIp, Mask: RouteInfo.networkMask, NextHopIp: RouteInfo.nextHopIp, IfIndex: ribdInt.Int(RouteInfo.nextHopIfIndex), Metric: ribdInt.Int(RouteInfo.metric), Prototype: ribdInt.Int(RouteInfo.routeType)}
+		route = ribdInt.Routes{Ipaddr: RouteInfo.destNetIp, Mask: RouteInfo.networkMask, NextHopIp: RouteInfo.nextHopIp, IPAddrType: ribdInt.Int(RouteInfo.ipType), IfIndex: ribdInt.Int(RouteInfo.nextHopIfIndex), Metric: ribdInt.Int(RouteInfo.metric), Prototype: ribdInt.Int(RouteInfo.routeType)}
 		route.NetworkStatement = true
 		publisherInfo, ok := PublisherInfoMap["BGP"]
 		if ok {
@@ -499,7 +499,7 @@ func policyEngineActionRedistribute(actionInfo interface{}, conditionInfo []inte
 		logger.Info("Redistribute target protocol same as route source, do nothing more here")
 		return
 	}
-	route = ribdInt.Routes{Ipaddr: RouteInfo.destNetIp, Mask: RouteInfo.networkMask, NextHopIp: RouteInfo.nextHopIp, IfIndex: ribdInt.Int(RouteInfo.nextHopIfIndex), Metric: ribdInt.Int(RouteInfo.metric), Prototype: ribdInt.Int(RouteInfo.routeType)}
+	route = ribdInt.Routes{Ipaddr: RouteInfo.destNetIp, Mask: RouteInfo.networkMask, NextHopIp: RouteInfo.nextHopIp, IPAddrType: ribdInt.Int(RouteInfo.ipType), IfIndex: ribdInt.Int(RouteInfo.nextHopIfIndex), Metric: ribdInt.Int(RouteInfo.metric), Prototype: ribdInt.Int(RouteInfo.routeType)}
 	route.RouteOrigin = ReverseRouteProtoTypeMapDB[int(RouteInfo.routeType)]
 	publisherInfo, ok := PublisherInfoMap[redistributeActionInfo.RedistributeTargetProtocol]
 	if ok {

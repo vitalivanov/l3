@@ -266,7 +266,8 @@ func (p *Peer) updatePathAttrs(bgpMsg *packet.BGPMessage, path *bgprib.Path) boo
 		return false
 	}
 
-	if len(bgpMsg.Body.(*packet.BGPUpdate).NLRI) == 0 {
+	updateMsg := bgpMsg.Body.(*packet.BGPUpdate)
+	if len(updateMsg.NLRI) == 0 && !packet.HasMPReachNLRI(updateMsg.PathAttributes) {
 		return true
 	}
 
@@ -481,51 +482,53 @@ func (p *Peer) SendUpdate(updated map[uint32]map[*bgprib.Path][]*bgprib.Destinat
 	}
 
 	for protoFamily, pathDestMap := range updated {
-		if p.NeighborConf.AfiSafiMap[protoFamily] {
-			if _, ok := p.ribOut[protoFamily]; !ok {
-				p.ribOut[protoFamily] = make(map[string]map[uint32]*bgprib.AdjRIBRoute)
-			}
-			if _, ok := withdrawList[protoFamily]; !ok {
-				withdrawList[protoFamily] = make([]packet.NLRI, 0)
-			}
-			for path, destinations := range pathDestMap {
-				for _, dest := range destinations {
-					if dest != nil {
-						ip := dest.NLRI.GetPrefix().String()
-						if addPathsTx > 0 {
-							newUpdated, withdrawList = p.calculateAddPathsAdvertisements(dest, path, newUpdated,
-								withdrawList, addPathsTx)
-						} else {
-							if !p.isAdvertisable(path) {
-								if p.ribOut[protoFamily][ip] != nil {
-									withdrawList[protoFamily] = append(withdrawList[protoFamily], dest.NLRI)
-									delete(p.ribOut[protoFamily], ip)
-								}
-							} else {
-								route := dest.LocRibPathRoute
-								pathId := route.OutPathId
-								if _, ok := p.ribOut[protoFamily][ip]; !ok {
-									p.ribOut[protoFamily][ip] = make(map[uint32]*bgprib.AdjRIBRoute)
-								}
-								for ribPathId, _ := range p.ribOut[protoFamily][ip] {
-									if pathId != ribPathId {
-										delete(p.ribOut[protoFamily][ip], ribPathId)
-									}
-								}
-								if ribRoute, ok := p.ribOut[protoFamily][ip][pathId]; !ok ||
-									ribRoute.Path != path {
-									if _, ok := newUpdated[path]; !ok {
-										newUpdated[path] = make(map[uint32][]packet.NLRI)
-									}
-									if _, ok := newUpdated[path][protoFamily]; !ok {
-										newUpdated[path][protoFamily] = make([]packet.NLRI, 0)
-									}
-									newUpdated[path][protoFamily] = append(newUpdated[path][protoFamily], dest.NLRI)
-								}
-								p.ribOut[protoFamily][ip][pathId] = bgprib.NewAdjRIBRoute(dest.NLRI.GetIPPrefix(),
-									path, pathId)
+		if !p.NeighborConf.AfiSafiMap[protoFamily] {
+			continue
+		}
+		if _, ok := p.ribOut[protoFamily]; !ok {
+			p.ribOut[protoFamily] = make(map[string]map[uint32]*bgprib.AdjRIBRoute)
+		}
+		if _, ok := withdrawList[protoFamily]; !ok {
+			withdrawList[protoFamily] = make([]packet.NLRI, 0)
+		}
+		for path, destinations := range pathDestMap {
+			for _, dest := range destinations {
+				if dest == nil {
+					continue
+				}
+				ip := dest.NLRI.GetPrefix().String()
+				if addPathsTx > 0 {
+					newUpdated, withdrawList = p.calculateAddPathsAdvertisements(dest, path, newUpdated,
+						withdrawList, addPathsTx)
+				} else {
+					if !p.isAdvertisable(path) {
+						if p.ribOut[protoFamily][ip] != nil {
+							withdrawList[protoFamily] = append(withdrawList[protoFamily], dest.NLRI)
+							delete(p.ribOut[protoFamily], ip)
+						}
+					} else {
+						route := dest.LocRibPathRoute
+						pathId := route.OutPathId
+						if _, ok := p.ribOut[protoFamily][ip]; !ok {
+							p.ribOut[protoFamily][ip] = make(map[uint32]*bgprib.AdjRIBRoute)
+						}
+						for ribPathId, _ := range p.ribOut[protoFamily][ip] {
+							if pathId != ribPathId {
+								delete(p.ribOut[protoFamily][ip], ribPathId)
 							}
 						}
+						if ribRoute, ok := p.ribOut[protoFamily][ip][pathId]; !ok ||
+							ribRoute.Path != path {
+							if _, ok := newUpdated[path]; !ok {
+								newUpdated[path] = make(map[uint32][]packet.NLRI)
+							}
+							if _, ok := newUpdated[path][protoFamily]; !ok {
+								newUpdated[path][protoFamily] = make([]packet.NLRI, 0)
+							}
+							newUpdated[path][protoFamily] = append(newUpdated[path][protoFamily], dest.NLRI)
+						}
+						p.ribOut[protoFamily][ip][pathId] = bgprib.NewAdjRIBRoute(dest.NLRI.GetIPPrefix(),
+							path, pathId)
 					}
 				}
 			}
@@ -569,6 +572,8 @@ func (p *Peer) SendUpdate(updated map[uint32]map[*bgprib.Path][]*bgprib.Destinat
 		}
 	}
 
+	p.logger.Info(fmt.Sprintf("Neighbor %s: new updated routes:%+v",
+		p.NeighborConf.Neighbor.NeighborAddress, newUpdated))
 	for path, pfNLRIMap := range newUpdated {
 		var updateMsg *packet.BGPMessage
 		var ipv4List []packet.NLRI

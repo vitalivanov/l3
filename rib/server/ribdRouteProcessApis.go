@@ -42,7 +42,7 @@ import (
    Data type of each route stored in the DB
 */
 type RouteInfoRecord struct {
-	ipType                  IPType
+	ipType                  ribdCommonDefs.IPType
 	destNetIp               net.IP
 	networkMask             net.IP
 	nextHopIp               net.IP
@@ -1105,7 +1105,7 @@ func updateBestRoute(destNetPrefix patriciaDB.Prefix, routeInfoRecordList RouteI
  - a user/routing protocol installs a new route. In that case, addType will be RIBAndFIB
  - when a operationally down link comes up. In this case, the addType will be FIBOnly because on a link down, the route is still preserved in the RIB database and only deleted from FIB (Asic)
 **/
-func createRoute(ipType IPType, destNetIp string,
+func createRoute(ipType ribdCommonDefs.IPType, destNetIp string,
 	networkMask string,
 	metric ribd.Int,
 	weight ribd.Int,
@@ -1161,10 +1161,10 @@ func createRoute(ipType IPType, destNetIp string,
 	logger.Info(fmt.Sprintln("nhIntf ipaddr/mask: ", nhIntf.Ipaddr, ":", nhIntf.Mask, " resolvedNex ", resolvedNextHopIntf.NextHopIp, " nexthop ", nextHopIp, " reachable:", resolvedNextHopIntf.IsReachable))
 
 	routeInfoRecord.routeCreatedTime = time.Now().String()
-	if ipType == ipv4 {
+	if ipType == ribdCommonDefs.IPv4 {
 		v4rtCount++
 		v4routeCreatedTimeMap[v4rtCount] = routeInfoRecord.routeCreatedTime
-	} else if ipType == ipv6 {
+	} else if ipType == ribdCommonDefs.IPv6 {
 		v6rtCount++
 		v6routeCreatedTimeMap[v6rtCount] = routeInfoRecord.routeCreatedTime
 	}
