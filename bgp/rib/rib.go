@@ -409,8 +409,8 @@ func (l *LocRib) ProcessUpdate(neighborConf *base.NeighborConf, pktInfo *packet.
 	return updated, withdrawn, updatedAddPaths, addedAllPrefixes
 }
 
-func (l *LocRib) ProcessConnectedRoutes(src string, path *Path, add []packet.NLRI, remove []packet.NLRI,
-	addPathCount int, protoFamily uint32) (map[uint32]map[*Path][]*Destination, []*Destination, []*Destination) {
+func (l *LocRib) ProcessConnectedRoutes(src string, path *Path, add, remove map[uint32][]packet.NLRI,
+	addPathCount int) (map[uint32]map[*Path][]*Destination, []*Destination, []*Destination) {
 	var removePath *Path
 	var addedAllPrefixes bool
 	removePath = path.Clone()
@@ -418,10 +418,21 @@ func (l *LocRib) ProcessConnectedRoutes(src string, path *Path, add []packet.NLR
 	withdrawn := make([]*Destination, 0)
 	updatedAddPaths := make([]*Destination, 0)
 
-	updated, withdrawn, updatedAddPaths, addedAllPrefixes = l.ProcessRoutes(src, add, remove, path, removePath,
-		addPathCount, protoFamily, updated, withdrawn, updatedAddPaths)
-	if !addedAllPrefixes {
-		l.logger.Err(fmt.Sprintf("Failed to add connected routes... max prefixes exceeded for connected routes!"))
+	for protoFamily, withdrawnNLRI := range remove {
+		updated, withdrawn, updatedAddPaths, addedAllPrefixes = l.ProcessRoutes(src, add[protoFamily], withdrawnNLRI,
+			path, removePath, addPathCount, protoFamily, updated, withdrawn, updatedAddPaths)
+		delete(add, protoFamily)
+		if !addedAllPrefixes {
+			l.logger.Err(fmt.Sprintf("Failed to add connected routes... max prefixes exceeded for connected routes!"))
+		}
+	}
+
+	for protoFamily, updatedNLRI := range add {
+		updated, withdrawn, updatedAddPaths, addedAllPrefixes = l.ProcessRoutes(src, updatedNLRI, nil, path,
+			removePath, addPathCount, protoFamily, updated, withdrawn, updatedAddPaths)
+		if !addedAllPrefixes {
+			l.logger.Err(fmt.Sprintf("Failed to add connected routes... max prefixes exceeded for connected routes!"))
+		}
 	}
 	return updated, withdrawn, updatedAddPaths
 }

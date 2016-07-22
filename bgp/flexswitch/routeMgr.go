@@ -125,6 +125,7 @@ func (mgr *FSRouteMgr) populateConfigRoute(route *ribdInt.Routes) *config.RouteI
 		Prototype:        int(route.Prototype),
 		NetworkStatement: route.NetworkStatement,
 		RouteOrigin:      route.RouteOrigin,
+		AddressType:      ribdCommonDefs.IPType(route.IPAddrType),
 	}
 	return rv
 }

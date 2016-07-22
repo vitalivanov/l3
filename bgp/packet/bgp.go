@@ -863,7 +863,7 @@ func NewBGPNotificationMessage(errorCode uint8, errorSubCode uint8, data []byte)
 
 type NLRI interface {
 	Clone() NLRI
-	Encode() ([]byte, error)
+	Encode(AFI) ([]byte, error)
 	Decode([]byte, AFI) error
 	Len() uint32
 	GetIPPrefix() *IPPrefix
@@ -885,10 +885,17 @@ func (ip *IPPrefix) Clone() NLRI {
 	return &x
 }
 
-func (ip *IPPrefix) Encode() ([]byte, error) {
+func (ip *IPPrefix) Encode(afi AFI) ([]byte, error) {
+	utils.Logger.Info(fmt.Sprintf("IPPrefix:Encode - Length %d Prefix %+v Prefix_len %d Prefix_cap %d ip.Len %d", ip.Length, ip.Prefix, len(ip.Prefix), cap(ip.Prefix), ip.Len()))
 	pkt := make([]byte, ip.Len())
 	pkt[0] = ip.Length
-	ipBytesStart := uint8(cap(ip.Prefix) - 4)
+
+	ipLen := net.IPv4len
+	if afi == AfiIP6 {
+		ipLen = net.IPv6len
+	}
+	ipBytesStart := uint8(cap(ip.Prefix) - ipLen)
+	utils.Logger.Info(fmt.Sprintf("IPPrefix:Encode - ipBytesStart %d", ipBytesStart))
 	copy(pkt[1:], ip.Prefix[ipBytesStart:ipBytesStart+((ip.Length+7)/8)])
 	return pkt, nil
 }
@@ -964,10 +971,10 @@ func (n *ExtNLRI) Len() uint32 {
 	return n.IPPrefix.Len() + 4
 }
 
-func (n *ExtNLRI) Encode() ([]byte, error) {
+func (n *ExtNLRI) Encode(afi AFI) ([]byte, error) {
 	pkt := make([]byte, 4)
 	binary.BigEndian.PutUint32(pkt, n.PathId)
-	ipBytes, err := n.IPPrefix.Encode()
+	ipBytes, err := n.IPPrefix.Encode(afi)
 	if err != nil {
 		return nil, err
 	}
@@ -2246,7 +2253,7 @@ func (msg *BGPUpdate) Encode() ([]byte, error) {
 	pkt := make([]byte, 2)
 
 	for _, route := range msg.WithdrawnRoutes {
-		bytes, err := route.Encode()
+		bytes, err := route.Encode(AfiIP)
 		if err != nil {
 			return pkt, err
 		}
@@ -2269,7 +2276,7 @@ func (msg *BGPUpdate) Encode() ([]byte, error) {
 	binary.BigEndian.PutUint16(pkt[wdLen:], uint16(paLen-2))
 
 	for _, nlri := range msg.NLRI {
-		bytes, err := nlri.Encode()
+		bytes, err := nlri.Encode(AfiIP)
 		if err != nil {
 			return pkt, err
 		}

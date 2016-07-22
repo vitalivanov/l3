@@ -93,7 +93,7 @@ func (i *MPNextHopIP) Decode(pkt []byte) error {
 }
 
 func (i *MPNextHopIP) Len() uint8 {
-	return i.Length
+	return i.Length + 1
 }
 
 func (i *MPNextHopIP) New() MPNextHop {
@@ -236,7 +236,7 @@ func (u *MPNextHopUnknown) Decode(pkt []byte) error {
 }
 
 func (i *MPNextHopUnknown) Len() uint8 {
-	return i.Length
+	return i.Length + 1
 }
 
 func (u *MPNextHopUnknown) New() MPNextHop {
@@ -321,7 +321,7 @@ func (r *BGPPathAttrMPReachNLRI) Encode() ([]byte, error) {
 	idx++
 
 	for i := 0; i < len(r.NLRI); i++ {
-		bytes, err := r.NLRI[i].Encode()
+		bytes, err := r.NLRI[i].Encode(r.AFI)
 		if err != nil {
 			return pkt, err
 		}
@@ -383,7 +383,7 @@ func (r *BGPPathAttrMPReachNLRI) SetNLRIList(nlriList []NLRI) {
 func NewBGPPathAttrMPReachNLRI() *BGPPathAttrMPReachNLRI {
 	return &BGPPathAttrMPReachNLRI{
 		BGPPathAttrBase: BGPPathAttrBase{
-			Flags:          BGPPathAttrFlagOptional & BGPPathAttrFlagExtendedLen,
+			Flags:          BGPPathAttrFlagOptional | BGPPathAttrFlagExtendedLen,
 			Code:           BGPPathAttrTypeMPReachNLRI,
 			Length:         5,
 			BGPPathAttrLen: 4,
@@ -423,7 +423,7 @@ func (u *BGPPathAttrMPUnreachNLRI) Encode() ([]byte, error) {
 	idx++
 
 	for i := 0; i < len(u.NLRI); i++ {
-		bytes, err := u.NLRI[i].Encode()
+		bytes, err := u.NLRI[i].Encode(u.AFI)
 		if err != nil {
 			return pkt, err
 		}
@@ -469,7 +469,7 @@ func (u *BGPPathAttrMPUnreachNLRI) AddNLRIList(nlriList []NLRI) {
 func NewBGPPathAttrMPUnreachNLRI() *BGPPathAttrMPUnreachNLRI {
 	return &BGPPathAttrMPUnreachNLRI{
 		BGPPathAttrBase: BGPPathAttrBase{
-			Flags:          BGPPathAttrFlagOptional & BGPPathAttrFlagExtendedLen,
+			Flags:          BGPPathAttrFlagOptional | BGPPathAttrFlagExtendedLen,
 			Code:           BGPPathAttrTypeMPUnreachNLRI,
 			Length:         3,
 			BGPPathAttrLen: 4,
