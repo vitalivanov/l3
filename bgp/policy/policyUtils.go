@@ -288,7 +288,7 @@ func (eng *LocRibPolicyEngine) addPolicyRouteMap(route *bgprib.Route, policy str
 }
 
 func deletePolicyRouteMap(route *bgprib.Route, policy string) {
-	fmt.Println("deletePolicyRouteMap")
+	//fmt.Println("deletePolicyRouteMap")
 }
 
 func (eng *LocRibPolicyEngine) UpdatePolicyRouteMap(route *bgprib.Route, policy string, op int) {

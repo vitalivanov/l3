@@ -98,71 +98,6 @@ func (server *BFDServer) DispatchReceivedBfdPacket(ipAddr string, bfdPacket *Bfd
 	return nil
 }
 
-/*
- * TODO: PCAP
-func (server *BFDServer) StartBfdSesionServer(ifIndex unit32) error {
-	var err error
-	var myMacAddr net.HardwareAddr
-	var ifName string
-	ifName, err = server.getLinuxIntfName(ifindex)
-	if err != nil {
-		server.logger.Info(fmt.Sprintln("Failed to get ifname for ", session.state.InterfaceId))
-		return err
-	}
-	server.logger.Info(fmt.Sprintln("Starting session server on ", ifName))
-	myMacAddr, err = server.getMacAddrFromIntfName(ifName)
-	if err != nil {
-		server.logger.Info(fmt.Sprintln("Unable to get the MAC addr of ", ifName, err))
-		return err
-	}
-	server.logger.Info(fmt.Sprintln("MAC is  ", myMacAddr, " on ", ifName))
-	recvPcapHandle, err := pcap.OpenLive(ifName, bfdSnapshotLen, bfdPromiscuous, 0)
-	if recvPcapHandle == nil {
-		server.logger.Info(fmt.Sprintln("Failed to open recvPcapHandle for ", ifName, err))
-		return err
-	} else {
-		bfdPcapFilter += fmt.Sprintf("not ether src %s", myMacAddr)
-		err = recvPcapHandle.SetBPFFilter(bfdPcapFilter)
-		if err != nil {
-			server.logger.Info(fmt.Sprintln("Unable to set filter on", ifName, err))
-			return err
-		}
-	}
-	bfdPacketSrc := gopacket.NewPacketSource(recvPcapHandle, layers.LayerTypeEthernet)
-	defer recvPcapHandle.Close()
-	packetRecvCh := bfdPacketSrc.Packets()
-	for {
-		select {
-		case packet := <-packetRecvCh:
-
-			nwLayer := receivedPacket.Layer(layers.LayerTypeIPv4)
-			ipPacket, _ := nwLayer.(*layers.IPv4)
-			bfdServer.logger.Info(fmt.Sprintln("Network ", ipPacket.SrcIP, ipPacket.DstIP))
-			transLayer := receivedPacket.Layer(layers.LayerTypeUDP)
-			udpPacket, _ := transLayer.(*layers.UDP)
-			bfdServer.logger.Info(fmt.Sprintln("Transport ", udpPacket.SrcPort, udpPacket.DstPort))
-			buf := transLayer.LayerPayload()
-
-			server.logger.Info(fmt.Sprintln("Received packet from ", ipPacket.SrcIp, " : ", udpPacket.DstPort))
-			session, exist := server.bfdGlobal.SessionsByIp[ipPacket.SrcIp]
-			if exist {
-				if session.rxInterval != 0 {
-					session.sessionTimer.Reset(time.Duration(session.rxInterval) * time.Millisecond)
-					server.logger.Info(fmt.Sprintln("Reset rxtimer for session ", session.state.SessionId, " to ", session.rxInterval))
-				}
-				packet := RecvedBfdPacket{
-					IpAddr:    ipAddr,
-					Len:       int32(length),
-					PacketBuf: buf[0:length],
-				}
-				server.BfdPacketRecvCh <- packet
-			}
-		}
-	}
-	return nil
-}
-*/
-
 func (server *BFDServer) StartBfdSesionServer() error {
 	destAddr := ":" + strconv.Itoa(DEST_PORT)
 	ServerAddr, err := net.ResolveUDPAddr("udp", destAddr)
@@ -186,7 +121,7 @@ func (server *BFDServer) StartBfdSesionServer() error {
 			ipAddr := udpAddr.IP.String()
 			session, exist := server.bfdGlobal.SessionsByIp[ipAddr]
 			if exist {
-				if session.rxInterval != 0 {
+				if session.IsSessionActive() && session.rxInterval != 0 {
 					session.sessionTimer.Reset(time.Duration(session.rxInterval) * time.Millisecond)
 				}
 				if length >= DEFAULT_CONTROL_PACKET_LEN {

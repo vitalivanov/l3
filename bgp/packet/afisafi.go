@@ -13,19 +13,23 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 // bgp.go
 package packet
 
 import (
+	"errors"
+	"fmt"
 	"l3/bgp/config"
+	"l3/rib/ribdCommonDefs"
+	"net"
 )
 
 type AFI uint16
@@ -48,7 +52,17 @@ var ProtocolFamilyMap = map[string]uint32{
 	"ipv6-multicast": GetProtocolFamily(AfiIP6, SafiMulticast),
 }
 
-func GetProtocolFromConfig(afiSafis *[]config.AfiSafiConfig) (map[uint32]bool, bool) {
+var AFINextHopLenMap = map[AFI]int{
+	AfiIP:  4,
+	AfiIP6: 16,
+}
+
+var RIBdAddressTypeToAFI = map[ribdCommonDefs.IPType]AFI{
+	ribdCommonDefs.IPv4: AfiIP,
+	ribdCommonDefs.IPv6: AfiIP6,
+}
+
+func GetProtocolFromConfig(afiSafis *[]config.AfiSafiConfig, neighborAddress net.IP) (map[uint32]bool, bool) {
 	afiSafiMap := make(map[uint32]bool)
 	rv := true
 	for _, afiSafi := range *afiSafis {
@@ -61,7 +75,11 @@ func GetProtocolFromConfig(afiSafis *[]config.AfiSafiConfig) (map[uint32]bool, b
 	}
 
 	if len(afiSafiMap) == 0 {
-		afiSafiMap[ProtocolFamilyMap["ipv4-unicast"]] = true
+		if neighborAddress.To4() == nil {
+			afiSafiMap[ProtocolFamilyMap["ipv6-unicast"]] = true
+		} else {
+			afiSafiMap[ProtocolFamilyMap["ipv4-unicast"]] = true
+		}
 	}
 	return afiSafiMap, rv
 }
@@ -72,6 +90,14 @@ func GetProtocolFamily(afi AFI, safi SAFI) uint32 {
 
 func GetAfiSafi(protocolFamily uint32) (AFI, SAFI) {
 	return AFI(protocolFamily >> 8), SAFI(protocolFamily & 0xFF)
+}
+
+func GetAddressLengthForFamily(protoFamily uint32) int {
+	afi, _ := GetAfiSafi(protoFamily)
+	if addrLen, ok := AFINextHopLenMap[afi]; ok {
+		return addrLen
+	}
+	return -1
 }
 
 func GetProtocolFromOpenMsg(openMsg *BGPOpen) map[uint32]bool {
@@ -87,4 +113,12 @@ func GetProtocolFromOpenMsg(openMsg *BGPOpen) map[uint32]bool {
 	}
 
 	return afiSafiMap
+}
+
+func GetProtocolFamilyFromAddrType(addrType ribdCommonDefs.IPType) (uint32, error) {
+	if afi, ok := RIBdAddressTypeToAFI[addrType]; ok {
+		return GetProtocolFamily(afi, SafiUnicast), nil
+	}
+
+	return 0, errors.New(fmt.Sprintf("Address family not found for address type %d", addrType))
 }
