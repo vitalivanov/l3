@@ -13,13 +13,13 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 // ribdPolicyEngine.go
 package server
@@ -35,8 +35,9 @@ import (
 	"utils/policy"
 	"utils/policy/policyCommonDefs"
 )
+
 /*
-    Index of policy entity
+   Index of policy entity
 */
 type PolicyRouteIndex struct {
 	destNetIP string //CIDR format
@@ -44,9 +45,10 @@ type PolicyRouteIndex struct {
 }
 
 /*
-    data-structure used to communicate with policy engine
+   data-structure used to communicate with policy engine
 */
 type RouteParams struct {
+	ipType         IPType
 	destNetIp      string
 	networkMask    string
 	nextHopIp      string
@@ -79,7 +81,7 @@ func policyEngineActionRejectRoute(params interface{}) {
 	}
 	cfg.NextHop = make([]*ribd.NextHopInfo, 0)
 	cfg.NextHop = append(cfg.NextHop, &nextHop)
-	_, err := RouteServiceHandler.ProcessRouteDeleteConfig(&cfg) //routeInfo.destNetIp, routeInfo.networkMask, ReverseRouteProtoTypeMapDB[int(routeInfo.routeType)], routeInfo.nextHopIp) // FIBAndRIB)//,ribdCommonDefs.RoutePolicyStateChangetoInValid)
+	_, err := RouteServiceHandler.ProcessV4RouteDeleteConfig(&cfg) //routeInfo.destNetIp, routeInfo.networkMask, ReverseRouteProtoTypeMapDB[int(routeInfo.routeType)], routeInfo.nextHopIp) // FIBAndRIB)//,ribdCommonDefs.RoutePolicyStateChangetoInValid)
 	if err != nil {
 		logger.Info(fmt.Sprintln("deleting v4 route failed with err ", err))
 		return
@@ -318,21 +320,37 @@ func policyEngineUpdateRoute(prefix patriciaDB.Prefix, item patriciaDB.Item, han
 	selectedRouteInfoRecord := routeInfoList[0]
 	//route := ribdInt.Routes{Ipaddr:selectedRouteInfoRecord.destNetIp.String() , Mask: selectedRouteInfoRecord.networkMask.String(), NextHopIp: selectedRouteInfoRecord.nextHopIp.String(), NextHopIfType: ribdInt.Int(selectedRouteInfoRecord.nextHopIfType), IfIndex: ribdInt.Int(selectedRouteInfoRecord.nextHopIfIndex), Metric: ribdInt.Int(selectedRouteInfoRecord.metric), Prototype: ribdInt.Int(selectedRouteInfoRecord.protocol), IsPolicyBasedStateValid: rmapInfoRecordList.isPolicyBasedStateValid}
 	nextHopIf := strconv.Itoa(int(selectedRouteInfoRecord.nextHopIfIndex))
-	cfg := ribd.IPv4Route{
-		DestinationNw: selectedRouteInfoRecord.destNetIp.String(),
-		Protocol:      ReverseRouteProtoTypeMapDB[int(selectedRouteInfoRecord.protocol)],
-		Cost:          int32(selectedRouteInfoRecord.metric),
-		NetworkMask:   selectedRouteInfoRecord.networkMask.String(),
-	}
-	nextHop := ribd.NextHopInfo{
-		NextHopIp:     selectedRouteInfoRecord.nextHopIp.String(),
-		NextHopIntRef: nextHopIf,
-	}
-	cfg.NextHop = make([]*ribd.NextHopInfo, 0)
-	cfg.NextHop = append(cfg.NextHop, &nextHop)
 	//Even though we could potentially have multiple selected routes, calling update once for this prefix should suffice
 	//routeServiceHandler.UpdateIPv4Route(&cfg, nil, nil)
-	RouteServiceHandler.ProcessRouteUpdateConfig(&cfg, &cfg, nil)
+	if selectedRouteInfoRecord.ipType == ipv4 {
+		cfg := ribd.IPv4Route{
+			DestinationNw: selectedRouteInfoRecord.destNetIp.String(),
+			Protocol:      ReverseRouteProtoTypeMapDB[int(selectedRouteInfoRecord.protocol)],
+			Cost:          int32(selectedRouteInfoRecord.metric),
+			NetworkMask:   selectedRouteInfoRecord.networkMask.String(),
+		}
+		nextHop := ribd.NextHopInfo{
+			NextHopIp:     selectedRouteInfoRecord.nextHopIp.String(),
+			NextHopIntRef: nextHopIf,
+		}
+		cfg.NextHop = make([]*ribd.NextHopInfo, 0)
+		cfg.NextHop = append(cfg.NextHop, &nextHop)
+		RouteServiceHandler.Processv4RouteUpdateConfig(&cfg, &cfg, nil)
+	} else if selectedRouteInfoRecord.ipType == ipv6 {
+		cfg := ribd.IPv6Route{
+			DestinationNw: selectedRouteInfoRecord.destNetIp.String(),
+			Protocol:      ReverseRouteProtoTypeMapDB[int(selectedRouteInfoRecord.protocol)],
+			Cost:          int32(selectedRouteInfoRecord.metric),
+			NetworkMask:   selectedRouteInfoRecord.networkMask.String(),
+		}
+		nextHop := ribd.NextHopInfo{
+			NextHopIp:     selectedRouteInfoRecord.nextHopIp.String(),
+			NextHopIntRef: nextHopIf,
+		}
+		cfg.NextHop = make([]*ribd.NextHopInfo, 0)
+		cfg.NextHop = append(cfg.NextHop, &nextHop)
+		RouteServiceHandler.Processv6RouteUpdateConfig(&cfg, &cfg, nil)
+	}
 	return err
 }
 func policyEngineTraverseAndUpdate() {
@@ -341,8 +359,8 @@ func policyEngineTraverseAndUpdate() {
 }
 func policyEngineActionAcceptRoute(params interface{}) {
 	routeInfo := params.(RouteParams)
-	logger.Info(fmt.Sprintln("policyEngineActionAcceptRoute for ip ", routeInfo.destNetIp, " and mask ", routeInfo.networkMask))
-	_, err := createV4Route(routeInfo.destNetIp, routeInfo.networkMask, routeInfo.metric, routeInfo.weight, routeInfo.nextHopIp, routeInfo.nextHopIfIndex, routeInfo.routeType, routeInfo.createType, ribdCommonDefs.RoutePolicyStateChangetoValid, routeInfo.sliceIdx)
+	//logger.Info(fmt.Sprintln("policyEngineActionAcceptRoute for ip ", routeInfo.destNetIp, " and mask ", routeInfo.networkMask))
+	_, err := createRoute(routeInfo.ipType, routeInfo.destNetIp, routeInfo.networkMask, routeInfo.metric, routeInfo.weight, routeInfo.nextHopIp, routeInfo.nextHopIfIndex, routeInfo.routeType, routeInfo.createType, ribdCommonDefs.RoutePolicyStateChangetoValid, routeInfo.sliceIdx)
 	//_, err := routeServiceHandler.InstallRoute(routeInfo)
 	if err != nil {
 		logger.Info(fmt.Sprintln("creating v4 route failed with err ", err))
@@ -553,7 +571,7 @@ func DoesRouteExist(params interface{}) (exists bool) {
 	return exists
 }
 func PolicyEngineFilter(route ribdInt.Routes, policyPath int, params interface{}) {
-	logger.Info(fmt.Sprintln("PolicyEngineFilter"))
+	//logger.Info(fmt.Sprintln("PolicyEngineFilter"))
 	var policyPath_Str string
 	if policyPath == policyCommonDefs.PolicyPath_Import {
 		policyPath_Str = "Import"
@@ -561,11 +579,11 @@ func PolicyEngineFilter(route ribdInt.Routes, policyPath int, params interface{}
 		policyPath_Str = "Export"
 	} else if policyPath == policyCommonDefs.PolicyPath_All {
 		policyPath_Str = "ALL"
-		logger.Info(fmt.Sprintln("policy path ", policyPath_Str, " unexpected in this function"))
+		logger.Err(fmt.Sprintln("policy path ", policyPath_Str, " unexpected in this function"))
 		return
 	}
 	routeInfo := params.(RouteParams)
-	logger.Info(fmt.Sprintln("PolicyEngineFilter for policypath ", policyPath_Str, "createType = ", routeInfo.createType, " deleteType = ", routeInfo.deleteType, " route: ", route.Ipaddr, ":", route.Mask, " protocol type: ", route.Prototype))
+	//logger.Info(fmt.Sprintln("PolicyEngineFilter for policypath ", policyPath_Str, "createType = ", routeInfo.createType, " deleteType = ", routeInfo.deleteType, " route: ", route.Ipaddr, ":", route.Mask, " protocol type: ", route.Prototype))
 	entity, err := buildPolicyEntityFromRoute(route, params)
 	if err != nil {
 		logger.Info(fmt.Sprintln("Error building policy params"))

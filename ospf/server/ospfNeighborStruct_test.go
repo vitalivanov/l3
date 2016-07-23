@@ -170,6 +170,9 @@ func nbrFSMTestLogic(tNum int) int {
 		ospfNbrEntry.OspfNbrState = config.NbrFull
 		ospf.NeighborConfigMap[nbrKey] = ospfNbrEntry
 		ospf.neighborLSAReqEventCh <- nbrLsaReqMsg
+		ospf.neighborBulkSlice = append(ospf.neighborBulkSlice, nbrKey)
+		nextid, cnt, res := ospf.GetBulkOspfNbrEntryState(0, 10)
+		fmt.Println("Getbulk nextid, cnt, res", nextid, " ", cnt, " ", res)
 	}
 	return SUCCESS
 }

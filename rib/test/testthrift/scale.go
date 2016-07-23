@@ -31,16 +31,18 @@ import (
 	"time"
 )
 
-func handleClient(client *ribd.RIBDServicesClient) (err error) {
+func handleClient(client *ribd.RIBDServicesClient, maxCount int) (err error) {
 	fmt.Println("handleClient")
-	var count int = 1
-	var maxCount int = 50000
+	var count int = 0
+	//var maxCount int = 30000
 	intByt2 := 1
 	intByt3 := 1
 	byte1 := "22"
 	byte4 := "0"
 	start := time.Now()
 	var route ribd.IPv4Route
+	routeCount, _ := client.GetTotalv4RouteCount()
+	fmt.Println("Route count before scale test start:", routeCount)
 	for {
 		if intByt3 > 254 {
 			intByt3 = 1
@@ -63,6 +65,7 @@ func handleClient(client *ribd.RIBDServicesClient) (err error) {
 		route.NextHop = make([]*ribd.NextHopInfo, 0)
 		nh := ribd.NextHopInfo{
 			NextHopIp: "11.1.10.2",
+			//			NextHopIntRef: "lo1",
 		}
 		route.NextHop = append(route.NextHop, &nh)
 		route.Protocol = "STATIC"
@@ -86,19 +89,25 @@ func handleClient(client *ribd.RIBDServicesClient) (err error) {
 	fmt.Println(" ## Elapsed time is ", elapsed)
 	return nil
 }
-func handleBulkClient(client *ribd.RIBDServicesClient) (err error) {
-	var count int = 1
-	var maxCount int = 30000
+func handleBulkClient(client *ribd.RIBDServicesClient, maxCount int) (err error) {
+	var count int = 0
+	//timeFmt := "2006-01-02 15:04:05.999999999 +0000 UTC"
+	//	var maxCount int = 30000
 	intByt2 := 1
 	intByt3 := 1
 	byte1 := "42"
 	byte4 := "0"
 	start := time.Now()
-	var route ribdInt.IPv4Route
-	var routeList []*ribdInt.IPv4Route
-	routeList = make([]*ribdInt.IPv4Route, 5000)
-	var temprouteList [5000]ribdInt.IPv4Route
-	curr := 0
+	//	var scaleTestStartTime string
+	//	var scaleTestEndTime string
+	//	var startTime time.Time
+	//	var endTime time.Time
+	var route []ribdInt.IPv4RouteConfig
+	var routes []*ribdInt.IPv4RouteConfig
+	routes = make([]*ribdInt.IPv4RouteConfig, 0)
+	route = make([]ribdInt.IPv4RouteConfig, maxCount)
+	routeCount, _ := client.GetTotalv4RouteCount()
+	fmt.Println("Route count before scale test start:", routeCount)
 	for {
 		if intByt3 > 254 {
 			intByt3 = 1
@@ -108,55 +117,68 @@ func handleBulkClient(client *ribd.RIBDServicesClient) (err error) {
 		}
 		if intByt2 > 254 {
 			intByt2 = 1
-		} //else {
-		//intByt2++
-		//}
-
-		route = ribdInt.IPv4Route{}
+		}
 		byte2 := strconv.Itoa(intByt2)
 		byte3 := strconv.Itoa(intByt3)
 		rtNet := byte1 + "." + byte2 + "." + byte3 + "." + byte4
-		route.DestinationNw = rtNet
-		route.NetworkMask = "255.255.255.0"
-		//route.NextHopIp = "40.0.1.2"
-		//route.OutgoingInterface = "4"
-		//route.OutgoingIntfType = "VLAN"
-		route.Protocol = "STATIC"
-		//fmt.Println("Creating Route ", route)
-		temprouteList[curr] = route
-		routeList[curr] = &temprouteList[curr]
-		curr++
-		if curr == 5000 {
-			fmt.Println("calling count ", count, "routes")
-			rv := client.OnewayCreateBulkIPv4Route(routeList)
-			if rv == nil {
-				count += 5000
-			} else {
-				fmt.Println("Call failed", rv, "count: ", count)
-				elapsed := time.Since(start)
-				fmt.Println(" ## Elapsed time is ", elapsed)
-				return nil
-			}
-			if maxCount <= count {
-				fmt.Println("Done. Total calls executed", count)
-				break
-			}
-			curr = 0
+		route[count].DestinationNw = rtNet
+		route[count].NetworkMask = "255.255.255.0"
+		route[count].NextHop = make([]*ribdInt.RouteNextHopInfo, 0)
+		nh := ribdInt.RouteNextHopInfo{
+			NextHopIp: "11.1.10.2",
+		}
+		route[count].NextHop = append(route[count].NextHop, &nh)
+		route[count].Protocol = "STATIC"
+		routes = append(routes, &route[count])
+		count++
+		if maxCount == count {
+			fmt.Println("Done. Total route configs added ", count)
+			break
 		}
 
 	}
 	elapsed := time.Since(start)
 	fmt.Println(" ## Elapsed time is ", elapsed)
+	client.OnewayCreateBulkIPv4Route(routes)
+	/*	scaleTestEndTime, err = client.GetRouteCreatedTime(ribdInt.Int(int(routeCount) + maxCount))
+		if err != nil {
+			fmt.Println("err ", err, " getting routecreated time for route #", int(routeCount)+maxCount)
+			for {
+				scaleTestEndTime, err = client.GetRouteCreatedTime(ribdInt.Int(int(routeCount) + maxCount))
+				if err == nil {
+					scaleTestStartTime, err = client.GetRouteCreatedTime(routeCount + 1)
+					if err != nil {
+						fmt.Println("err ", err, " getting routecreated time for route #", routeCount+1)
+						return
+					}
+					fmt.Println("startTime:", scaleTestStartTime, " for the ", routeCount+1, " route")
+					startTime, err = time.Parse(timeFmt, scaleTestStartTime)
+					if err != nil {
+						fmt.Println("err parsing obj time:", scaleTestStartTime, " into timeFmt:", timeFmt, " err:", err)
+						return
+					}
+					break
+				}
+			}
+			//return
+		}
+		fmt.Println("endTime:", scaleTestEndTime, " after the ", int(routeCount)+maxCount, " route")
+		endTime, err = time.Parse(timeFmt, scaleTestEndTime)
+		if err != nil {
+			fmt.Println("err parsing obj time:", scaleTestEndTime, " into timeFmt:", timeFmt, " err:", err)
+			return
+		}
+		fmt.Println("GetRouteCreatedTime() method Time to install ", maxCount, " number of routes is:", "duration:", endTime.Sub(startTime))*/
 	return nil
 }
 
 //func main() {
-func Scale(ribdClient *ribd.RIBDServicesClient) {
+func Scale(ribdClient *ribd.RIBDServicesClient, number int) {
 	/*ribdClient := testutils.GetRIBdClient()
 	if ribdClient == nil {
 		fmt.Println("RIBd client nil")
 		return
 	}*/
-	handleClient(ribdClient) //ribd.NewRIBDServicesClientFactory(transport, protocolFactory))
-	//handleBulkClient(ribd.NewRIBDServicesClientFactory(transport, protocolFactory))
+	//handleClient(ribdClient, number) //ribd.NewRIBDServicesClientFactory(transport, protocolFactory))
+	handleBulkClient(ribdClient, number) //(ribd.NewRIBDServicesClientFactory(transport, protocolFactory))
 }

@@ -86,7 +86,7 @@ func AppendASToAS4PathSeg(asPath *BGPPathAttrASPath, pathSeg BGPASPathSegment, a
 	return pathSeg
 }
 
-func AddPathAttrToPathAttrs(pathAttrs []BGPPathAttr, code BGPPathAttrType, attr BGPPathAttr) {
+func AddPathAttrToPathAttrs(pathAttrs []BGPPathAttr, code BGPPathAttrType, attr BGPPathAttr) []BGPPathAttr {
 	addIdx := -1
 	for idx, pa := range pathAttrs {
 		if pa.GetCode() > code {
@@ -101,32 +101,53 @@ func AddPathAttrToPathAttrs(pathAttrs []BGPPathAttr, code BGPPathAttrType, attr 
 	pathAttrs = append(pathAttrs, attr)
 	copy(pathAttrs[addIdx+1:], pathAttrs[addIdx:])
 	pathAttrs[addIdx] = attr
-	return
+	return pathAttrs
+}
+
+func AddMPReachNLRIToPathAttrs(pathAttrs []BGPPathAttr, mpReach *BGPPathAttrMPReachNLRI) []BGPPathAttr {
+	return AddPathAttrToPathAttrs(pathAttrs, BGPPathAttrTypeMPReachNLRI, mpReach)
 }
 
 func addPathAttr(updateMsg *BGPMessage, code BGPPathAttrType, attr BGPPathAttr) {
 	body := updateMsg.Body.(*BGPUpdate)
-	AddPathAttrToPathAttrs(body.PathAttributes, code, attr)
+	body.PathAttributes = AddPathAttrToPathAttrs(body.PathAttributes, code, attr)
 	return
 }
 
-func removePathAttr(updateMsg *BGPMessage, code BGPPathAttrType) {
+func removePathAttr(updateMsg *BGPMessage, code BGPPathAttrType) BGPPathAttr {
 	body := updateMsg.Body.(*BGPUpdate)
+	return removeTypeFromPathAttrs(&body.PathAttributes, code)
+}
 
-	for idx, pa := range body.PathAttributes {
+func removeTypeFromPathAttrs(pathAttrs *[]BGPPathAttr, code BGPPathAttrType) BGPPathAttr {
+	for idx, pa := range *pathAttrs {
 		if pa.GetCode() == code {
-			body.PathAttributes = append(body.PathAttributes[:idx], body.PathAttributes[idx+1:]...)
-			return
+			(*pathAttrs) = append((*pathAttrs)[:idx], (*pathAttrs)[idx+1:]...)
+			return pa
 		}
 	}
+	return nil
 }
 
-func RemoveMultiExitDisc(updateMsg *BGPMessage) {
-	removePathAttr(updateMsg, BGPPathAttrTypeMultiExitDisc)
+func RemoveMultiExitDisc(updateMsg *BGPMessage) BGPPathAttr {
+	return removePathAttr(updateMsg, BGPPathAttrTypeMultiExitDisc)
 }
 
-func RemoveLocalPref(updateMsg *BGPMessage) {
-	removePathAttr(updateMsg, BGPPathAttrTypeLocalPref)
+func RemoveLocalPref(updateMsg *BGPMessage) BGPPathAttr {
+	return removePathAttr(updateMsg, BGPPathAttrTypeLocalPref)
+}
+
+func RemoveMPAttrs(pathAttrs *[]BGPPathAttr) (mpReach *BGPPathAttrMPReachNLRI, mpUnreach *BGPPathAttrMPUnreachNLRI) {
+	reach := removeTypeFromPathAttrs(pathAttrs, BGPPathAttrTypeMPReachNLRI)
+	if reach != nil {
+		mpReach = reach.(*BGPPathAttrMPReachNLRI)
+	}
+
+	unreach := removeTypeFromPathAttrs(pathAttrs, BGPPathAttrTypeMPUnreachNLRI)
+	if unreach != nil {
+		mpUnreach = unreach.(*BGPPathAttrMPUnreachNLRI)
+	}
+	return mpReach, mpUnreach
 }
 
 func SetLocalPref(updateMsg *BGPMessage, pref uint32) {
@@ -177,7 +198,9 @@ func SetNextHopPathAttrs(pathAttrs []BGPPathAttr, nextHopIP net.IP) {
 func SetPathAttrAggregator(pathAttrs []BGPPathAttr, as uint32, ip net.IP) {
 	for idx, pa := range pathAttrs {
 		if pa.GetCode() == BGPPathAttrTypeAggregator {
-			pathAttrs[idx].(*BGPPathAttrAggregator).AS = uint16(as)
+			aggAS := NewBGPAggregator4ByteAS()
+			aggAS.AS = as
+			pathAttrs[idx].(*BGPPathAttrAggregator).SetBGPAggregatorAS(aggAS)
 			pathAttrs[idx].(*BGPPathAttrAggregator).IP = ip
 		}
 	}
@@ -427,6 +450,12 @@ func ConstructPathAttrForConnRoutes(ip net.IP, as uint32) []BGPPathAttr {
 	return pathAttrs
 }
 
+func CopyPathAttrs(pathAttrs []BGPPathAttr) []BGPPathAttr {
+	newPathAttrs := make([]BGPPathAttr, len(pathAttrs))
+	copy(newPathAttrs, pathAttrs)
+	return newPathAttrs
+}
+
 func ConstructIPPrefix(ipStr string, maskStr string) *IPPrefix {
 	ip := net.ParseIP(ipStr)
 	mask := net.IPMask(net.ParseIP(maskStr).To4())
@@ -646,6 +675,7 @@ func ConvertAS2ToAS4(updateMsg *BGPMessage) {
 				as4Seg.Type = as2Seg.Type
 				as4Seg.Length = as2Seg.GetLen()
 				as4Seg.BGPASPathSegmentLen += (uint16(as2Seg.GetLen()) * 4)
+				as4Seg.AS = make([]uint32, as4Seg.Length)
 				for i, as := range as2Seg.AS {
 					as4Seg.AS[i] = uint32(as)
 				}
@@ -748,7 +778,7 @@ func NormalizeASPath(updateMsg *BGPMessage, data interface{}) {
 	}
 
 	if asPath.ASSize == 2 {
-		if asAggregator != nil && as4Aggregator != nil && asAggregator.AS != BGPASTrans {
+		if asAggregator != nil && as4Aggregator != nil && uint16(asAggregator.AS.GetAS()) != BGPASTrans {
 			removePathAttr(updateMsg, BGPPathAttrTypeAS4Aggregator)
 			removePathAttr(updateMsg, BGPPathAttrTypeAS4Path)
 		} else {
