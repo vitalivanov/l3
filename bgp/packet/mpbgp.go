@@ -302,20 +302,17 @@ func (r *BGPPathAttrMPReachNLRI) Encode() ([]byte, error) {
 		return pkt, nil
 	}
 	idx := int(r.BGPPathAttrBase.BGPPathAttrLen)
-	fmt.Printf("BGPPathAttrMPReachNLRI - path attr base encode done, pkt len=%d, idx =%d\n", len(pkt), idx)
 
 	binary.BigEndian.PutUint16(pkt[idx:idx+2], uint16(r.AFI))
 	idx += 2
 	pkt[idx] = uint8(r.SAFI)
 	idx++
-	fmt.Printf("BGPPathAttrMPReachNLRI - afi safi encode done, pkt len=%d, idx =%d\n", len(pkt), idx)
 
 	err = r.NextHop.Encode(pkt[idx:])
 	if err != nil {
 		return pkt, err
 	}
 	idx += int(r.NextHop.Len())
-	fmt.Printf("BGPPathAttrMPReachNLRI - next hop encode done, pkt len=%d, idx =%d\n", len(pkt), idx)
 
 	pkt[idx] = 0
 	idx++
@@ -325,10 +322,8 @@ func (r *BGPPathAttrMPReachNLRI) Encode() ([]byte, error) {
 		if err != nil {
 			return pkt, err
 		}
-		fmt.Printf("BGPPathAttrMPReachNLRI - nlri bytes=%d\n", len(bytes))
 		copy(pkt[idx:], bytes)
 		idx += len(bytes)
-		fmt.Printf("BGPPathAttrMPReachNLRI - nlri bytes, pkt len=%d, idx =%d\n", len(pkt), idx)
 	}
 	return pkt, nil
 }
@@ -340,7 +335,6 @@ func (r *BGPPathAttrMPReachNLRI) Decode(pkt []byte, data interface{}) error {
 	}
 
 	idx := int(r.BGPPathAttrBase.BGPPathAttrLen)
-	fmt.Printf("BGPPathAttrMPReachNLRI - path attr base decode done, pkt len=%d, base len=%d, path attr len=%d\n", len(pkt), idx, r.BGPPathAttrBase.Length)
 	r.AFI = AFI(binary.BigEndian.Uint16(pkt[idx : idx+2]))
 	r.SAFI = SAFI(pkt[idx+2])
 	idx += 3
@@ -348,13 +342,13 @@ func (r *BGPPathAttrMPReachNLRI) Decode(pkt []byte, data interface{}) error {
 	nextHop := BGPGetMPNextHop(r.AFI)
 	nextHop.Decode(pkt[idx:])
 	r.NextHop = nextHop
-	idx += int(nextHop.Len() + 1)
+	idx += int(nextHop.Len())
 
 	r.Reserved = pkt[idx]
 	idx++
 
 	r.NLRI = make([]NLRI, 0)
-	length := uint32(r.BGPPathAttrBase.Length) - 5 - uint32(r.NextHop.Len())
+	length := uint32(r.BGPPathAttrBase.Length) - 4 - uint32(r.NextHop.Len())
 	_, err = decodeNLRI(pkt[idx:], &r.NLRI, length, r.AFI, data)
 	return err
 }
@@ -385,7 +379,7 @@ func NewBGPPathAttrMPReachNLRI() *BGPPathAttrMPReachNLRI {
 		BGPPathAttrBase: BGPPathAttrBase{
 			Flags:          BGPPathAttrFlagOptional | BGPPathAttrFlagExtendedLen,
 			Code:           BGPPathAttrTypeMPReachNLRI,
-			Length:         5,
+			Length:         4,
 			BGPPathAttrLen: 4,
 		},
 		Reserved: 0,
