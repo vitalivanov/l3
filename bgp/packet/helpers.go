@@ -129,6 +129,10 @@ func removeTypeFromPathAttrs(pathAttrs *[]BGPPathAttr, code BGPPathAttrType) BGP
 	return nil
 }
 
+func RemoveNextHop(pathAttrs *[]BGPPathAttr) {
+	removeTypeFromPathAttrs(pathAttrs, BGPPathAttrTypeNextHop)
+}
+
 func RemoveMultiExitDisc(updateMsg *BGPMessage) BGPPathAttr {
 	return removePathAttr(updateMsg, BGPPathAttrTypeMultiExitDisc)
 }
