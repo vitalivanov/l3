@@ -13,13 +13,13 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 package server
 
@@ -38,7 +38,7 @@ func (server *OSPFServer) StartOspfIntfFSM(key IntfConfKey) {
 	}
 	areaId := convertIPv4ToUint32(ent.IfAreaId)
 	msg := NetworkLSAChangeMsg{
-		areaId: areaId,
+		areaId:  areaId,
 		intfKey: key,
 	}
 
@@ -130,7 +130,7 @@ func (server *OSPFServer) StartOspfBroadcastIntfFSM(key IntfConfKey) {
 			server.StartSendHelloPkt(key)
 		case <-ent.WaitTimer.C:
 			server.logger.Info("Wait timer expired")
-			eventInfo := "Wait time expired for " 
+			eventInfo := "Wait time expired for "
 			server.AddOspfEventState(config.INTF, eventInfo)
 			//server.IntfConfMap[key] = ent
 			// Elect BDR And DR
@@ -224,8 +224,8 @@ func (server *OSPFServer) StartOspfBroadcastIntfFSM(key IntfConfKey) {
 func (server *OSPFServer) processNbrDownEvent(msg NbrStateChangeMsg,
 	key IntfConfKey, p2p bool) {
 	ent, _ := server.IntfConfMap[key]
-	
-        neighborEntry, exist := ent.NeighborMap[msg.nbrKey]
+
+	neighborEntry, exist := ent.NeighborMap[msg.nbrKey]
 	if exist {
 		oldTwoWayStatus := neighborEntry.TwoWayStatus
 		delete(ent.NeighborMap, msg.nbrKey)

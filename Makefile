@@ -6,7 +6,8 @@ COMPS=arp\
 		dhcp_relay\
 		bfd \
 		vrrp\
-		tunnel/vxlan
+		tunnel/vxlan\
+		ndp
 
 IPCS=arp\
      rib\
@@ -16,7 +17,8 @@ IPCS=arp\
 	  dhcp_relay\
 	  bfd\
 	  vrrp\
-	tunnel/vxlan
+	tunnel/vxlan\
+	ndp
 
 define timedMake
 @echo -n "Building component $(1) started at :`date`\n"

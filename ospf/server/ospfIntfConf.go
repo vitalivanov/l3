@@ -346,8 +346,8 @@ func (server *OSPFServer) deleteIPIntfConfMap(msg IPv4IntfNotifyMsg, ifIndex int
 	delete(server.IntfConfMap, intfConfKey)
 	if flag == true {
 		msg := NetworkLSAChangeMsg{
-			areaId: areaId,
-                        intfKey: intfConfKey,
+			areaId:  areaId,
+			intfKey: intfConfKey,
 		}
 		server.IntfStateChangeCh <- msg
 	}

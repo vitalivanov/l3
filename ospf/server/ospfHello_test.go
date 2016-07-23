@@ -1,3 +1,26 @@
+//
+//Copyright [2016] [SnapRoute Inc]
+//
+//Licensed under the Apache License, Version 2.0 (the "License");
+//you may not use this file except in compliance with the License.
+//You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+//       Unless required by applicable law or agreed to in writing, software
+//       distributed under the License is distributed on an "AS IS" BASIS,
+//       WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//       See the License for the specific language governing permissions and
+//       limitations under the License.
+//
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
+
 /*
 OspfHello_test.go
 hello packet testing routines.
@@ -9,6 +32,7 @@ import (
 	"fmt"
 	"l3/ospf/config"
 	"testing"
+	//	"sync"
 )
 
 func initHelloTestParams() {
@@ -28,7 +52,7 @@ func printHelloData(pkt OSPFHelloData) {
 }
 
 func TestOspfHelloDecode(t *testing.T) {
-	fmt.Println("\n**************** HELLO PROTOCOL ************\n")
+	fmt.Println("\n\n**************** HELLO PROTOCOL ************\n")
 	initHelloTestParams()
 	for index := 1; index < 21; index++ {
 		err := helloTestLogic(index)
@@ -91,6 +115,39 @@ func helloTestLogic(tNum int) int {
 	case 8:
 		fmt.Println(tNum, ": Running CreateAndSendHelloRecvdMsg ")
 		ospf.CreateAndSendHelloRecvdMsg(12, &ipHdrMd, &ospfHdrMd, 40, config.Broadcast, false, 1, key)
+	case 9:
+		fmt.Println(tNum, ": Running header APIs.")
+		checkHeaderAPIs()
 	}
 	return SUCCESS
+}
+
+func checkHeaderAPIs() {
+
+	ospf.IntfConfMap[key] = intf
+	//intf.SendMutex = sync.Mutex{}
+
+	ospfHdr := &OSPFHeader{}
+	decodeOspfHdr(header, ospfHdr)
+
+	pkt := encodeOspfHdr(*ospfHdr)
+	fmt.Println("Encoded header pkt : ", pkt)
+
+	ospf.processOspfHeader(hello, key, &ospfHdrMd)
+	ospf.processOspfData(hello, &ethHdrMd, &ipHdrMd, &ospfHdrMd, key)
+	ospf.processOspfData(lsaupd, &ethHdrMd, &ipHdrMd, &ospfHdrMd, key)
+	ospf.processOspfData(lsaack, &ethHdrMd, &ipHdrMd, &ospfHdrMd, key)
+	ospf.processOspfData(lsareq, &ethHdrMd, &ipHdrMd, &ospfHdrMd, key)
+
+	/*
+	   ip_layer := layers.IPv4{
+	          SrcIP:    dstIP,
+	          DstIP:    dstIP,
+	      } */
+	//ospf.processIPv4Layer(ip_layer, dstIP, &ipHdrMd)
+
+	ospf.StopSendHelloPkt(key)
+	ospf.StartSendHelloPkt(key)
+
+	ospf.SendOspfPkt(key, hello)
 }
