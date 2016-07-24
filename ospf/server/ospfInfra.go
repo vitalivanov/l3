@@ -123,6 +123,10 @@ func (server *OSPFServer) constructVlanInfra() {
 	server.logger.Info("Calling Asicd for getting Vlan Property")
 	count := 100
 	for {
+		if server.asicdClient.ClientHdl == nil {
+		server.logger.Err("Infra: Null client handle for asicd ")
+			return
+		}
 		bulkVlanInfo, _ := server.asicdClient.ClientHdl.GetBulkVlan(asicdInt.Int(curMark), asicdInt.Int(count))
 		// Get bulk on vlan state can re-use curMark and count used
 		// by get bulk vlan, as there is a 1:1 mapping in terms of cfg/state objs
@@ -153,6 +157,10 @@ func (server *OSPFServer) constructL3Infra() {
 	server.logger.Info("Calling Asicd for getting L3 Interfaces")
 	count := 100
 	for {
+		if server.asicdClient.ClientHdl == nil {
+		    server.logger.Err("Infra: Null asicd client handle")
+		    return
+		}
 		bulkInfo, _ := server.asicdClient.ClientHdl.GetBulkIPv4IntfState(asicdServices.Int(curMark), asicdServices.Int(count))
 		if bulkInfo == nil {
 			break

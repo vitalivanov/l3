@@ -290,43 +290,49 @@ func (intf VXLANSnapClient) updateIpv4Intf(msg asicdCommonDefs.IPv4IntfNotifyMsg
 		for exitnotfound && !foundIntf {
 			bulkIntf, _ := asicdclnt.ClientHdl.GetBulkIntf(asicdInt.Int(nextindex), asicdInt.Int(count))
 			logger.Info(fmt.Sprintln("Return from GetBulkIntf", bulkIntf))
-			for _, intf := range bulkIntf.IntfList {
-				if intf.IfName == IfName {
-					IfIndex = intf.IfIndex
-					foundIntf = true
-					logger.Info(fmt.Sprintln("Found IfName", IfName, bulkIntf))
-					break
+			if bulkIntf == nil {
+				exitnotfound = false
+			} else {
+				for _, intf := range bulkIntf.IntfList {
+					if intf.IfName == IfName {
+						IfIndex = intf.IfIndex
+						foundIntf = true
+						logger.Info(fmt.Sprintln("Found IfName", IfName, bulkIntf))
+						break
+					}
 				}
-			}
 
-			if !foundIntf {
-				if bulkIntf.More == true {
-					nextindex += count
+				if !foundIntf {
+					if bulkIntf.More == true {
+						nextindex += count
+					} else {
+						exitnotfound = false
+					}
 				} else {
 					exitnotfound = false
 				}
-			} else {
-				exitnotfound = false
 			}
 		}
 		if foundIntf {
 			logicalIntfState, _ := asicdclnt.ClientHdl.GetLogicalIntfState(IfName)
-			mac, _ := net.ParseMAC(logicalIntfState.SrcMac)
-			config := vxlan.VxlanIntfInfo{
-				Command:  vxlan.VxlanCommandCreate,
-				Ip:       ipAddr,
-				Mac:      mac,
-				IfIndex:  IfIndex,
-				IntfName: IfName,
-			}
+			if logicalIntfState != nil {
+				mac, _ := net.ParseMAC(logicalIntfState.SrcMac)
+				config := vxlan.VxlanIntfInfo{
+					Command:  vxlan.VxlanCommandCreate,
+					Ip:       ipAddr,
+					Mac:      mac,
+					IfIndex:  IfIndex,
+					IntfName: IfName,
+				}
 
-			if msgType == asicdCommonDefs.NOTIFY_VLAN_CREATE {
-				config.Command = vxlan.VxlanCommandCreate
-				serverchannels.Vxlanintfinfo <- config
+				if msgType == asicdCommonDefs.NOTIFY_VLAN_CREATE {
+					config.Command = vxlan.VxlanCommandCreate
+					serverchannels.Vxlanintfinfo <- config
 
-			} else if msgType == asicdCommonDefs.NOTIFY_VLAN_DELETE {
-				config.Command = vxlan.VxlanCommandDelete
-				serverchannels.Vxlanintfinfo <- config
+				} else if msgType == asicdCommonDefs.NOTIFY_VLAN_DELETE {
+					config.Command = vxlan.VxlanCommandDelete
+					serverchannels.Vxlanintfinfo <- config
+				}
 			}
 		}
 	}
@@ -505,23 +511,27 @@ func (intf VXLANSnapClient) GetIntfInfo(IfName string, intfchan chan<- vxlan.Mac
 		// TODO when api is available should just call GetIntf...
 		for exitnotfound && !foundIntf {
 			bulkIntf, _ := asicdclnt.ClientHdl.GetBulkIntf(asicdInt.Int(nextindex), asicdInt.Int(count))
-			//logger.Info(fmt.Sprintln("Return from GetBulkIntf"))
-			for _, intf := range bulkIntf.IntfList {
-				if intf.IfName == IfName && IfIndex == 0 {
-					IfIndex = intf.IfIndex
-					foundIntf = true
-					logger.Info(fmt.Sprintln("Found IfName", IfName))
+			if bulkIntf == nil {
+				exitnotfound = false
+			} else {
+				//logger.Info(fmt.Sprintln("Return from GetBulkIntf"))
+				for _, intf := range bulkIntf.IntfList {
+					if intf.IfName == IfName && IfIndex == 0 {
+						IfIndex = intf.IfIndex
+						foundIntf = true
+						logger.Info(fmt.Sprintln("Found IfName", IfName))
+					}
 				}
-			}
 
-			if !foundIntf {
-				if bulkIntf.More == true {
-					nextindex += count
+				if !foundIntf {
+					if bulkIntf.More == true {
+						nextindex += count
+					} else {
+						exitnotfound = false
+					}
 				} else {
 					exitnotfound = false
 				}
-			} else {
-				exitnotfound = false
 			}
 		}
 		// if we found the interface all other objects at least the logical interface should exist
@@ -534,7 +544,12 @@ func (intf VXLANSnapClient) GetIntfInfo(IfName string, intfchan chan<- vxlan.Mac
 				portNum := asicdCommonDefs.GetIntfIdFromIfIndex(int32(IfIndex))
 				phyIntfState, _ := asicdclnt.ClientHdl.GetPort(fmt.Sprintf("%d", portNum))
 				logger.Info(fmt.Sprintln("Return from GetPort", phyIntfState))
-				mac, _ = net.ParseMAC(phyIntfState.MacAddr)
+				if phyIntfState != nil {
+					mac, _ = net.ParseMAC(phyIntfState.MacAddr)
+				} else {
+					// did not find src mac exiting
+					return
+				}
 			//case IfTypeLag:
 			//case IfTypeVlan:
 			//case IfTypeP2P:
@@ -542,7 +557,12 @@ func (intf VXLANSnapClient) GetIntfInfo(IfName string, intfchan chan<- vxlan.Mac
 			case commonDefs.IfTypeLoopback:
 				logicalIntfState, _ := asicdclnt.ClientHdl.GetLogicalIntfState(IfName)
 				logger.Info(fmt.Sprintln("Return from GetLogicalIntfState", logicalIntfState))
-				mac, _ = net.ParseMAC(logicalIntfState.SrcMac)
+				if logicalIntfState != nil {
+					mac, _ = net.ParseMAC(logicalIntfState.SrcMac)
+				} else {
+					// did not find src mac exiting
+					return
+				}
 
 				//case IfTypeSecondary:
 				//case IfTypeVirtual:

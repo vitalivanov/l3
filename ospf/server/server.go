@@ -103,35 +103,35 @@ type OSPFServer struct {
 	ribSubSocketCh    chan []byte
 	ribSubSocketErrCh chan error
 
-	asicdSubSocket          *nanomsg.SubSocket
-	asicdSubSocketCh        chan []byte
-	asicdSubSocketErrCh     chan error
-	AreaConfMap             map[AreaConfKey]AreaConf
-	IntfConfMap             map[IntfConfKey]IntfConf
-	IntfTxMap               map[IntfConfKey]IntfTxHandle
-	IntfRxMap               map[IntfConfKey]IntfRxHandle
-	NeighborConfigMap       map[NeighborConfKey]OspfNeighborEntry
-	NeighborListMap         map[IntfConfKey]list.List
-	neighborConfMutex       sync.Mutex
-	neighborHelloEventCh    chan IntfToNeighMsg
-	neighborFSMCtrlCh       chan bool
-	neighborConfCh          chan ospfNeighborConfMsg
-	neighborConfStopCh      chan bool
-	nbrFSMCtrlCh            chan bool
-	neighborSliceRefCh      *time.Ticker
-	neighborSliceStartCh    chan bool
-	neighborBulkSlice       []NeighborConfKey
-	neighborDBDEventCh      chan ospfNeighborDBDMsg
-	neighborIntfEventCh     chan IntfConfKey
-	neighborLSAReqEventCh   chan ospfNeighborLSAreqMsg
-	neighborLSAUpdEventCh   chan ospfNeighborLSAUpdMsg
-	neighborLSAACKEventCh   chan ospfNeighborLSAAckMsg
-	ospfNbrDBDSendCh        chan ospfNeighborDBDMsg
-	ospfNbrLsaReqSendCh     chan ospfNeighborLSAreqMsg
-	ospfNbrLsaUpdSendCh     chan ospfFloodMsg
-	ospfNbrLsaAckSendCh     chan ospfNeighborAckTxMsg
-	ospfRxNbrPktStopCh      chan bool
-	ospfTxNbrPktStopCh      chan bool
+	asicdSubSocket        *nanomsg.SubSocket
+	asicdSubSocketCh      chan []byte
+	asicdSubSocketErrCh   chan error
+	AreaConfMap           map[AreaConfKey]AreaConf
+	IntfConfMap           map[IntfConfKey]IntfConf
+	IntfTxMap             map[IntfConfKey]IntfTxHandle
+	IntfRxMap             map[IntfConfKey]IntfRxHandle
+	NeighborConfigMap     map[NeighborConfKey]OspfNeighborEntry
+	NeighborListMap       map[IntfConfKey]list.List
+	neighborConfMutex     sync.Mutex
+	neighborHelloEventCh  chan IntfToNeighMsg
+	neighborFSMCtrlCh     chan bool
+	neighborConfCh        chan ospfNeighborConfMsg
+	neighborConfStopCh    chan bool
+	nbrFSMCtrlCh          chan bool
+	neighborSliceRefCh    *time.Ticker
+	neighborSliceStartCh  chan bool
+	neighborBulkSlice     []NeighborConfKey
+	neighborDBDEventCh    chan ospfNeighborDBDMsg
+	neighborIntfEventCh   chan IntfConfKey
+	neighborLSAReqEventCh chan ospfNeighborLSAreqMsg
+	neighborLSAUpdEventCh chan ospfNeighborLSAUpdMsg
+	neighborLSAACKEventCh chan ospfNeighborLSAAckMsg
+	ospfNbrDBDSendCh      chan ospfNeighborDBDMsg
+	ospfNbrLsaReqSendCh   chan ospfNeighborLSAreqMsg
+	ospfNbrLsaUpdSendCh   chan ospfFloodMsg
+	ospfNbrLsaAckSendCh   chan ospfNeighborAckTxMsg
+	ospfRxNbrPktStopCh    chan bool
+	ospfTxNbrPktStopCh    chan bool
 
 	//neighborDBDEventCh   chan IntfToNeighDbdMsg
 
@@ -161,11 +161,11 @@ type OSPFServer struct {
 	SPFTree        map[VertexKey]TreeVertex
 	AreaStubs      map[VertexKey]StubVertex
 
-	dbHdl *dbutils.DBUtil
+	dbHdl        *dbutils.DBUtil
 	DbReadConfig chan bool
-	DbRouteOp chan DbRouteMsg
-	DbLsdbOp chan DbLsdbMsg
-	DbEventOp chan DbEventMsg
+	DbRouteOp    chan DbRouteMsg
+	DbLsdbOp     chan DbLsdbMsg
+	DbEventOp    chan DbEventMsg
 }
 
 func NewOSPFServer(logger *logging.Writer) *OSPFServer {

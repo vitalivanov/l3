@@ -35,13 +35,13 @@ type AreaConfKey struct {
 
 /* TODO - Add list of interfaces for this Area */
 type AreaConf struct {
-	AuthType                            config.AuthType
-	ImportAsExtern                      config.ImportAsExtern
-	AreaSummary                         config.AreaSummary
-	StubDefaultCost                     int32
-	AreaNssaTranslatorRole              config.NssaTranslatorRole
-	TransitCapability                   bool
-	IntfListMap                         map[IntfConfKey]bool
+	AuthType               config.AuthType
+	ImportAsExtern         config.ImportAsExtern
+	AreaSummary            config.AreaSummary
+	StubDefaultCost        int32
+	AreaNssaTranslatorRole config.NssaTranslatorRole
+	TransitCapability      bool
+	IntfListMap            map[IntfConfKey]bool
 }
 
 type AreaState struct {

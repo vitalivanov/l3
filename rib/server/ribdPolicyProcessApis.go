@@ -13,13 +13,13 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 package server
 
@@ -31,6 +31,7 @@ import (
 	"utils/policy"
 	"utils/policy/policyCommonDefs"
 )
+
 /*
    This structure can be used along with policyDefinitionConfig object to pass on any application specific
    info to policy engine
@@ -48,7 +49,7 @@ type Policy struct {
 }
 
 /*
-    Function to create policy condition in the policyEngineDB
+   Function to create policy condition in the policyEngineDB
 */
 func (m RIBDServer) ProcessPolicyConditionConfigCreate(cfg *ribd.PolicyCondition, db *policy.PolicyEngineDB) (val bool, err error) {
 	logger.Debug(fmt.Sprintln("ProcessPolicyConditionConfigCreate:CreatePolicyConditioncfg: ", cfg.Name))
@@ -60,7 +61,7 @@ func (m RIBDServer) ProcessPolicyConditionConfigCreate(cfg *ribd.PolicyCondition
 }
 
 /*
-    Function to delete policy condition in the policyEngineDB
+   Function to delete policy condition in the policyEngineDB
 */
 func (m RIBDServer) ProcessPolicyConditionConfigDelete(cfg *ribd.PolicyCondition, db *policy.PolicyEngineDB) (val bool, err error) {
 	logger.Debug(fmt.Sprintln("ProcessPolicyConditionConfigDelete:DeletePolicyCondition: ", cfg.Name))
@@ -70,34 +71,36 @@ func (m RIBDServer) ProcessPolicyConditionConfigDelete(cfg *ribd.PolicyCondition
 }
 
 /*
-    Function to create policy action in the policyEngineDB
+   Function to create policy action in the policyEngineDB
 */
-func (m RIBDServer) ProcessPolicyActionConfigCreate(cfg *ribdInt.PolicyAction, db *policy.PolicyEngineDB) (val bool, err error) {
+/*func (m RIBDServer) ProcessPolicyActionConfigCreate(cfg *ribdInt.PolicyAction, db *policy.PolicyEngineDB) (val bool, err error) {
 	logger.Debug(fmt.Sprintln("ProcessPolicyActionConfigCreate:CreatePolicyAction"))
 	newAction := policy.PolicyActionConfig{Name: cfg.Name, ActionType: cfg.ActionType, SetAdminDistanceValue: int(cfg.SetAdminDistanceValue), Accept: cfg.Accept, Reject: cfg.Reject, RedistributeAction: cfg.RedistributeAction, RedistributeTargetProtocol: cfg.RedistributeTargetProtocol, NetworkStatementTargetProtocol: cfg.NetworkStatementTargetProtocol}
 	val, err = db.CreatePolicyAction(newAction)
 	return val, err
 }
-
-/*
-    Function to delete policy action in the policyEngineDB
 */
-func (m RIBDServer) ProcessPolicyActionConfigDelete(cfg *ribdInt.PolicyAction, db *policy.PolicyEngineDB) (val bool, err error) {
+/*
+   Function to delete policy action in the policyEngineDB
+*/
+/*func (m RIBDServer) ProcessPolicyActionConfigDelete(cfg *ribdInt.PolicyAction, db *policy.PolicyEngineDB) (val bool, err error) {
 	logger.Debug(fmt.Sprintln("ProcessPolicyActionConfigDelete:CreatePolicyAction"))
 	newAction := policy.PolicyActionConfig{Name: cfg.Name}
 	val, err = db.DeletePolicyAction(newAction)
 	return val, err
 }
-
+*/
 /*
-    Function to create policy stmt in the policyEngineDB
+   Function to create policy stmt in the policyEngineDB
 */
 func (m RIBDServer) ProcessPolicyStmtConfigCreate(cfg *ribd.PolicyStmt, db *policy.PolicyEngineDB) (err error) {
 	logger.Debug(fmt.Sprintln("ProcessPolicyStatementCreate:CreatePolicyStatement"))
 	newPolicyStmt := policy.PolicyStmtConfig{Name: cfg.Name, MatchConditions: cfg.MatchConditions}
-	newPolicyStmt.Conditions = make([]string, 0)
-	for i := 0; i < len(cfg.Conditions); i++ {
-		newPolicyStmt.Conditions = append(newPolicyStmt.Conditions, cfg.Conditions[i])
+	if len(cfg.Conditions) != 0 {
+		newPolicyStmt.Conditions = make([]string, 0)
+		for i := 0; i < len(cfg.Conditions); i++ {
+			newPolicyStmt.Conditions = append(newPolicyStmt.Conditions, cfg.Conditions[i])
+		}
 	}
 	newPolicyStmt.Actions = make([]string, 0)
 	newPolicyStmt.Actions = append(newPolicyStmt.Actions, cfg.Action)
@@ -106,7 +109,7 @@ func (m RIBDServer) ProcessPolicyStmtConfigCreate(cfg *ribd.PolicyStmt, db *poli
 }
 
 /*
-    Function to delete policy stmt in the policyEngineDB
+   Function to delete policy stmt in the policyEngineDB
 */
 func (m RIBDServer) ProcessPolicyStmtConfigDelete(cfg *ribd.PolicyStmt, db *policy.PolicyEngineDB) (err error) {
 	logger.Debug(fmt.Sprintln("ProcessPolicyStatementDelete:DeletePolicyStatement for name ", cfg.Name))
@@ -116,7 +119,7 @@ func (m RIBDServer) ProcessPolicyStmtConfigDelete(cfg *ribd.PolicyStmt, db *poli
 }
 
 /*
-    Function to create policy definition in the policyEngineDB
+   Function to create policy definition in the policyEngineDB
 */
 func (m RIBDServer) ProcessPolicyDefinitionConfigCreate(cfg *ribd.PolicyDefinition, db *policy.PolicyEngineDB) (err error) {
 	logger.Debug(fmt.Sprintln("ProcessPolicyDefinitionCreate:CreatePolicyDefinition"))
@@ -134,7 +137,7 @@ func (m RIBDServer) ProcessPolicyDefinitionConfigCreate(cfg *ribd.PolicyDefiniti
 }
 
 /*
-    Function to delete policy definition in the policyEngineDB
+   Function to delete policy definition in the policyEngineDB
 */
 func (m RIBDServer) ProcessPolicyDefinitionConfigDelete(cfg *ribd.PolicyDefinition, db *policy.PolicyEngineDB) (err error) {
 	logger.Debug(fmt.Sprintln("ProcessPolicyDefinitionDelete:DeletePolicyDefinition for name ", cfg.Name))
@@ -389,8 +392,8 @@ func (m RIBDServer) GetBulkPolicyDefinitionState(fromIndex ribd.Int, rcount ribd
 
 /*
     Function called when apply policy is called by an application
-	Inputs: 
-	        info - type ApplyPolicyInfo - specifies the policy, 
+	Inputs:
+	        info - type ApplyPolicyInfo - specifies the policy,
 			                             Source protocol which is applying the policy,
                                           Conditions when to apply the policy,
                                           Action - what needs to be done on a hit
@@ -435,6 +438,9 @@ func (m RIBDServer) UpdateApplyPolicy(info ApplyPolicyInfo, apply bool, db *poli
 		case "MatchDstIpPrefix":
 		case "MatchSrcIpPrefix":
 			logger.Debug(fmt.Sprintln("IpPrefix:", conditions[j].IpPrefix, "MasklengthRange:", conditions[j].MasklengthRange))
+		default:
+			logger.Err(fmt.Sprintln("Invalid condition type:", conditions[j].ConditionType))
+			return
 		}
 		if err == nil {
 			logger.Debug(fmt.Sprintln("Adding condition ", conditionName, " to conditionNameList"))
@@ -450,6 +456,7 @@ func (m RIBDServer) UpdateApplyPolicy(info ApplyPolicyInfo, apply bool, db *poli
 		break
 	default:
 		logger.Debug(fmt.Sprintln("Action ", action, "currently a no-op"))
+		return
 	}
 	/*
 	   Call the policy library updateApplyPolicy function

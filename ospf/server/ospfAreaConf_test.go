@@ -111,8 +111,18 @@ func areaTestLogic(tNum int) int {
 	case 10:
 		fmt.Println(tNum, ": Running processGlobalConfig ")
 		ospf.processGlobalConfig(gConf)
-
+		conf := ospf.GetOspfGlobalState()
+		fmt.Println("Global conf ", conf)
+		checkAsicdAPIs()
 	}
 
 	return SUCCESS
 }
+
+func checkAsicdAPIs() {
+//ospf.listenForASICdUpdates("ribd")
+ospf.processAsicdNotification(hello)
+err := ospf.initAsicdForRxMulticastPkt()
+fmt.Println("Asicd initialised with err ", err)
+}
+

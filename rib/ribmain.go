@@ -13,30 +13,29 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 package main
 
 import (
 	"flag"
 	"fmt"
+	//	"github.com/davecheney/profile"
 	"l3/rib/rpc"
 	"l3/rib/server"
 	"utils/dbutils"
 	"utils/keepalive"
 	"utils/logging"
-	"os"
-	"os/signal"
-	"syscall"
 )
 
 func main() {
+	//	defer profile.Start(profile.CPUProfile).Stop()
 	var err error
 	paramsDir := flag.String("params", "./params", "Params directory")
 	flag.Parse()
@@ -63,16 +62,6 @@ func main() {
 		logger.Println("routeServer nil")
 		return
 	}
-	sigChan := make(chan os.Signal, 1)
-	signalList := []os.Signal{syscall.SIGHUP}
-	signal.Notify(sigChan, signalList...)
-	go routeServer.SigHandler(sigChan)
-	go routeServer.StartRouteProcessServer()
-	go routeServer.StartDBServer()
-	go routeServer.StartPolicyServer()
-	go routeServer.NotificationServer()
-	go routeServer.StartAsicdServer()
-	go routeServer.StartArpdServer()
 	go routeServer.StartServer(*paramsDir)
 	up := <-routeServer.ServerUpCh
 	//dbHdl.Close()
