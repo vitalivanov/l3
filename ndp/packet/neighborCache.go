@@ -22,17 +22,39 @@
 //
 package packet
 
-const (
-	_ = iota
-	INCOMPLETE
-	REACHABLE
-	STALE
-	DELAY
-	PROBE
+import (
+	"errors"
+	"fmt"
+	"l3/ndp/debug"
+	"net"
 )
 
-type NeighborCache struct {
-	Timer            int // Future Info
-	State            int
-	LinkLayerAddress string
+/*
+ *    Your system is booting up and now linux is sending Neighbor Solicitation message targeted at the
+ *    neighbor. In this case we will wait for linux to finish off the neighbor detection and hence ignore
+ *    sending the NS packet...
+ *    However, if the ipAddr is already cached in the neighbor cache then it means that it has already been
+ *    solicitated before......In this case we will send out multicast solicitation and whoever repsonds will we
+ *    learn about them via Neighbor Advertisement... That way our nexthop neighbor entry is always up-to-date
+ */
+func (p *Packet) SendNSMsgIfRequired(ipAddr string) error {
+	cache, exists := p.NbrCache[ipAddr]
+	if !exists {
+		debug.Logger.Info(fmt.Sprintln("cache entry for ipAddr", ipAddr, "not found in nbr cache.",
+			"Waiting for linux to finish of neighbor duplicate detection"))
+		return nil
+	}
+
+	/* Entry exists so lets send out Neighbor Solicitation with "::" as srcIP and dstIP as
+	 * Solicitated Multicast Address.
+	 * Solicitated Muticast Address is formed by:
+	 *	    Taking lower 24 bits or 3 bytes of an address (unicast or anycast) and appending those
+	 *	    bits or bytes to the prefix of Solicitated-Node Address FF02:0:0:0:0:1:FFXX:XXXX
+	 */
+	ip, _, err := net.ParseCIDR(ipAddr)
+	if err != nil {
+		return errors.New(fmt.Sprintln("Parsing CIDR", ipAddr, "failed with Error:", err))
+	}
+	ConstructNSPacket(ipAddr, "::", cache.LinkLayerAddress, IPV6_ICMPV6_MULTICAST_DST_MAC, ip.To16())
+	return nil
 }

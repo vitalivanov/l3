@@ -20,10 +20,12 @@
 // |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
 // |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
 //
-package rx
+package packet
 
 import (
 	"fmt"
+	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
 	"infra/sysd/sysdCommonDefs"
 	"l3/ndp/debug"
 	"log/syslog"
@@ -33,11 +35,11 @@ import (
 	"utils/logging"
 )
 
-var testPkt = []byte{
+var ndTestPkt = []byte{
 	0xfe, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xc0, 0x00, 0x54, 0xff, 0xfe, 0xf5, 0x00, 0x01,
 }
 
-func NDPTestNewLogger(name string, tag string, listenToConfig bool) (*logging.Writer, error) {
+func NDSTestNewLogger(name string, tag string, listenToConfig bool) (*logging.Writer, error) {
 	var err error
 	srLogger := new(logging.Writer)
 	srLogger.MyComponentName = name
@@ -61,13 +63,13 @@ var OptionRawByteWithTarget = []byte{
 // Test ND Solicitation message Decoder
 func TestNDInfoDecoder(t *testing.T) {
 	var err error
-	logger, err := NDPTestNewLogger("ndpd", "NDPTEST", true)
+	logger, err := NDSTestNewLogger("ndpd", "NDPTEST", true)
 	if err != nil {
 		t.Error("creating logger failed")
 	}
 	debug.NDPSetLogger(logger)
 	nds := &NDInfo{}
-	err = DecodeNDInfo(testPkt, nds)
+	err = DecodeNDInfo(ndTestPkt, nds)
 	if err != nil {
 		t.Error("Decoding ipv6 and icmpv6 header failed", err)
 	}
@@ -189,5 +191,27 @@ func TestValidateNDAInfo(t *testing.T) {
 	err = ValidateNDAInfo(flags1, dstIp)
 	if err != nil {
 		t.Error("Validation of nda failed, error:", err)
+	}
+}
+
+func TestConstructNSPacket(t *testing.T) {
+	targetAddr := "2002::1"
+	srcMac := "00:e0:ec:26:a7:ee"
+	dstMac := "33:33:ff:00:00:01"
+	rcvdBytes := ConstructNSPacket(targetAddr, "::", srcMac, dstMac, net.ParseIP(targetAddr).To16())
+	wantEthLayer := []byte{0x33, 0x33, 0xff, 0x00, 0x00, 0x01, 0x00, 0xe0, 0xec, 0x26, 0xa7, 0xee, 0x86, 0xdd}
+	encodedEthLayer := &layers.Ethernet{}
+	p := gopacket.NewPacket(rcvdBytes, layers.LinkTypeEthernet, gopacket.Default)
+	if p.ErrorLayer() != nil {
+		t.Error("Failed to decode packet:", p.ErrorLayer().Error())
+	}
+	err := getEthLayer(p, encodedEthLayer)
+	if err != nil {
+		t.Error(err)
+	}
+	t.Log(rcvdBytes)
+	t.Log(ndsTest)
+	if !reflect.DeepEqual(encodedEthLayer, wantEthLayer) {
+		t.Error("Ethernet layer construct is invalid")
 	}
 }

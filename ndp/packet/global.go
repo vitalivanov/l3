@@ -22,10 +22,60 @@
 //
 package packet
 
+type PACKET_OPERATION byte
+
 const (
-	HOP_LIMIT                    = 255
-	ICMPv6_CODE                  = 0
-	ICMPv6_MIN_LENGTH            = 24
-	ICMP_HDR_LENGTH              = 8
-	ICMP_PSEUDO_NEXT_HEADER byte = 58
+	PACKET_DROP                  PACKET_OPERATION = 1
+	PACKET_PROCESS               PACKET_OPERATION = 2
+	PACKET_FAILED_VALIDATION     PACKET_OPERATION = 3
+	NEIGBOR_SOLICITATED_PACKET   PACKET_OPERATION = 4
+	NEIGBOR_ADVERTISEMENT_PACKET PACKET_OPERATION = 5
 )
+
+const (
+	_ = iota
+	INCOMPLETE
+	REACHABLE
+	STALE
+	DELAY
+	PROBE
+)
+
+type NDOptionType byte
+
+const (
+	NDOptionTypeSourceLinkLayerAddress NDOptionType = 1
+	NDOptionTypeTargetLinkLayerAddress NDOptionType = 2
+	NDOptionTypePrefixInfo             NDOptionType = 3
+	NDOptionTypeRedirectHeader         NDOptionType = 4
+	NDOptionTypeMTU                    NDOptionType = 5
+)
+
+type NeighborCache struct {
+	Timer            int // Future Info
+	State            int
+	LinkLayerAddress string
+}
+
+type Packet struct {
+	// Neighbor Cache Information
+	NbrCache map[string]NeighborCache
+	//Operation PACKET_OPERATION
+}
+
+const (
+	HOP_LIMIT                            = 255
+	ICMPV6_CODE                          = 0
+	ICMP_HDR_LENGTH                      = 8
+	UNSPECIFIED_IP_ADDRESS               = "::"
+	IPV6_ICMPV6_MULTICAST_DST_MAC        = "33:33:ff:00:00:01"
+	IPV6_ADDRESS_BYTES                   = 16
+	IPV6_MULTICAST_BYTE           byte   = 0xff
+	IPV6_VERSION                  byte   = 6
+	ICMPV6_MIN_LENGTH             uint16 = 24
+	ICMPV6_NEXT_HEADER            byte   = 58
+)
+
+var SOLICITATED_NODE_ADDRESS = []byte{
+	0xff, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0xff, 0x00, 0x00, 0x00,
+}

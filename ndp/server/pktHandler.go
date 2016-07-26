@@ -90,6 +90,7 @@ func (svr *NDPServer) StartRxTx(ifIndex int32) {
 	// Spawn go routines for rx & tx
 	go svr.ReceivedNdpPkts(ipPort.IfIndex)
 	svr.ndpUpL3IntfStateSlice = append(svr.ndpUpL3IntfStateSlice, ifIndex)
+	svr.Packet.SendNSMsgIfRequired(ipPort.IpAddr)
 }
 
 /*

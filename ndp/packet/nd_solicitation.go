@@ -20,24 +20,16 @@
 // |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
 // |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
 //
-package rx
+package packet
 
 import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
 	"net"
 	_ "reflect"
-)
-
-type NDOptionType byte
-
-const (
-	NDOptionTypeSourceLinkLayerAddress NDOptionType = 1
-	NDOptionTypeTargetLinkLayerAddress NDOptionType = 2
-	NDOptionTypePrefixInfo             NDOptionType = 3
-	NDOptionTypeRedirectHeader         NDOptionType = 4
-	NDOptionTypeMTU                    NDOptionType = 5
 )
 
 type NDOption struct {
@@ -50,11 +42,6 @@ type NDInfo struct {
 	TargetAddress net.IP
 	Options       []*NDOption
 }
-
-const (
-	IPV6_ADDRESS_BYTES       = 16
-	IPV6_MULTICAST_BYTE byte = 0xff
-)
 
 /*		ND Solicitation Packet Format Rcvd From ICPMv6
  *    0                   1                   2                   3
@@ -144,4 +131,54 @@ func ValidateNDAInfo(icmpFlags []byte, dstIP net.IP) error {
 	}
 	// @TODO: need to add support for options length
 	return nil
+}
+
+/*
+ *  Generic API to create Neighbor Solicitation Packet based on inputs..
+ */
+func ConstructNSPacket(targetAddr, srcIP, srcMac, dstMac string, ip net.IP) []byte {
+	dstIP := SOLICITATED_NODE_ADDRESS
+	ip = ip.To16()
+	for idx := (len(ip) - 3); idx < len(ip); idx++ {
+		dstIP[idx] = ip[idx]
+	}
+	srcMAC, _ := net.ParseMAC(srcMac)
+	dstMAC, _ := net.ParseMAC(dstMac)
+	eth := &layers.Ethernet{
+		SrcMAC:       srcMAC,
+		DstMAC:       dstMAC,
+		EthernetType: layers.EthernetTypeIPv6,
+	}
+	ipv6 := &layers.IPv6{
+		Version:      IPV6_VERSION,
+		TrafficClass: 0,
+		NextHeader:   layers.IPProtocolICMPv6,
+		SrcIP:        net.ParseIP(srcIP),
+		DstIP:        dstIP,
+	}
+
+	payload := make([]byte, ICMPV6_MIN_LENGTH)
+	payload[0] = byte(layers.ICMPv6TypeNeighborSolicitation)
+	payload[1] = byte(0)
+	binary.BigEndian.PutUint16(payload[2:4], 0) // Putting zero for checksum before calculating checksum
+	binary.BigEndian.PutUint32(payload[4:], 0)  // RESERVED FLAG...
+	copy(payload[8:], ip)
+
+	binary.BigEndian.PutUint16(payload[2:4], getCheckSum(ipv6, payload[8:]))
+	/*
+		typeCode := uint8(layers.ICMPv6TypeNeighborSolicitation<<8) | 0
+		icmpv6Hdr := &layers.ICMPv6{
+			TypeCode: layers.CreateICMPv6TypeCode(layers.ICMPv6TypeNeighborSolicitation, 0),
+			Checksum: 0,
+		}
+	*/
+	buffer := gopacket.NewSerializeBuffer()
+	options := gopacket.SerializeOptions{
+		FixLengths:       true,
+		ComputeChecksums: true,
+	}
+
+	//gopacket.SerializeLayers(buffer, options, eth, ipv6, icmpv6Hdr)
+	gopacket.SerializeLayers(buffer, options, eth, ipv6, gopacket.Payload(payload))
+	return buffer.Bytes()
 }

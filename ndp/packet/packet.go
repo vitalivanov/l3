@@ -28,25 +28,8 @@ import (
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"l3/ndp/config"
-	"l3/ndp/packet/rx"
 	"net"
 )
-
-type PACKET_OPERATION byte
-
-const (
-	PACKET_DROP                  PACKET_OPERATION = 1
-	PACKET_PROCESS               PACKET_OPERATION = 2
-	PACKET_FAILED_VALIDATION     PACKET_OPERATION = 3
-	NEIGBOR_SOLICITATED_PACKET   PACKET_OPERATION = 4
-	NEIGBOR_ADVERTISEMENT_PACKET PACKET_OPERATION = 5
-)
-
-type Packet struct {
-	// Neighbor Cache Information
-	NbrCache map[string]NeighborCache
-	//Operation PACKET_OPERATION
-}
 
 func Init() *Packet {
 	pkt := &Packet{}
@@ -101,114 +84,26 @@ func validateIPv6Hdr(hdr *layers.IPv6) error {
 	if hdr.HopLimit != HOP_LIMIT {
 		return errors.New(fmt.Sprintln("Invalid Hop Limit", hdr.HopLimit))
 	}
-	if hdr.Length < ICMPv6_MIN_LENGTH {
+	if hdr.Length < ICMPV6_MIN_LENGTH {
 		return errors.New(fmt.Sprintln("Invalid ICMP length", hdr.Length))
 	}
 	return nil
 }
 
-func calculateChecksum(content []byte) uint16 {
-	var csum uint32
-	for i := 0; i < len(content); i += 2 {
-		csum += uint32(content[i]) << 8
-		csum += uint32(content[i+1])
-	}
-	return ^uint16((csum >> 16) + csum)
-}
-
-/*
- *	          ICMPv6 PSEUDO-HDR MESSAGE FORMAT
- *
- *    0                   1                   2                   3
- *    0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
- * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- * |                                                               |
- * +                                                               +
- * |                                                               |
- * +                         Source Address                        +
- * |                                                               |
- * +                                                               +
- * |                                                               |
- * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- * |                                                               |
- * +                                                               +
- * |                                                               |
- * +                      Destination Address                      +
- * |                                                               |
- * +                                                               +
- * |                                                               |
- * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- * |                   Upper-Layer Packet Length                   |
- * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- * |                      zero                     |  Next Header  |
- * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- */
-func createPseudoHeader(srcIP, dstIP net.IP, icmpv6Hdr *layers.ICMPv6) []byte {
-	var buf []byte
-	/*
-	 *   PSEUDO HEADER BYTE START
-	 */
-	buf = append(buf, srcIP...)
-	buf = append(buf, dstIP...)
-	buf = append(buf, 0)
-	buf = append(buf, 0)
-	buf = append(buf, byte((ICMP_HDR_LENGTH+len(icmpv6Hdr.LayerPayload()))/256))
-	buf = append(buf, byte((ICMP_HDR_LENGTH+len(icmpv6Hdr.LayerPayload()))%256))
-	buf = append(buf, 0)
-	buf = append(buf, 0)
-	buf = append(buf, 0)
-	buf = append(buf, ICMP_PSEUDO_NEXT_HEADER)
-	/*
-	 *   PSEUDO HEADER BYTE END
-	 */
-	return buf
-}
-
-func validateChecksum(srcIP, dstIP net.IP, icmpv6Hdr *layers.ICMPv6) error {
-	var buf []byte
-	buf = append(buf, createPseudoHeader(srcIP, dstIP, icmpv6Hdr)...)
-	/*
-	 *   ICMPv6 HEADER BYTE START
-	 */
-	buf = append(buf, icmpv6Hdr.TypeCode.Type())
-	buf = append(buf, icmpv6Hdr.TypeCode.Code())
-	// add 2 bytes of Checksum..
-	for idx := 0; idx < 2; idx++ {
-		buf = append(buf, 0)
-	}
-	// add typebytes which is [4]bytes
-	buf = append(buf, icmpv6Hdr.TypeBytes...)
-	// Copy the payload which includes TargetAddress & Options..
-	buf = append(buf, icmpv6Hdr.LayerPayload()...)
-	// Pad to the next 32-bit boundary
-	for idx := 0; idx < 4-(len(icmpv6Hdr.LayerPayload())/4); idx++ {
-		buf = append(buf, 0)
-	}
-	/*
-	 *   ICMPv6 HEADER BYTE END
-	 */
-	rv := calculateChecksum(buf)
-	if rv != icmpv6Hdr.Checksum {
-		return errors.New(fmt.Sprintf("Calculated Checksum 0x%x and wanted checksum is 0x%x",
-			rv, icmpv6Hdr.Checksum))
-	}
-	return nil
-}
-
-func (p *Packet) decodeICMPv6Hdr(hdr *layers.ICMPv6, srcIP net.IP, dstIP net.IP) (*rx.NDInfo, error) {
-	ndInfo := &rx.NDInfo{}
+func (p *Packet) decodeICMPv6Hdr(hdr *layers.ICMPv6, srcIP net.IP, dstIP net.IP) (*NDInfo, error) {
+	ndInfo := &NDInfo{}
 	typeCode := hdr.TypeCode
-	if typeCode.Code() != ICMPv6_CODE {
+	if typeCode.Code() != ICMPV6_CODE {
 		return nil, errors.New(fmt.Sprintln("Invalid Code", typeCode.Code()))
 	}
 	switch typeCode.Type() {
 	case layers.ICMPv6TypeNeighborSolicitation:
-		rx.DecodeNDInfo(hdr.LayerPayload(), ndInfo)
-		if rx.IsTargetMulticast(ndInfo.TargetAddress) {
+		DecodeNDInfo(hdr.LayerPayload(), ndInfo)
+		if IsTargetMulticast(ndInfo.TargetAddress) {
 			return nil, errors.New(fmt.Sprintln("Targent Address specified", ndInfo.TargetAddress,
 				"is a multicast address"))
 		}
-		err := rx.ValidateNDSInfo(srcIP, dstIP, ndInfo.Options)
+		err := ValidateNDSInfo(srcIP, dstIP, ndInfo.Options)
 		if err != nil {
 			return nil, err
 		}
@@ -222,7 +117,7 @@ func (p *Packet) decodeICMPv6Hdr(hdr *layers.ICMPv6, srcIP net.IP, dstIP net.IP)
 			// reachable and create neighbor entry in the platform
 			if len(ndInfo.Options) > 0 {
 				for _, option := range ndInfo.Options {
-					if option.Type == rx.NDOptionTypeSourceLinkLayerAddress {
+					if option.Type == NDOptionTypeSourceLinkLayerAddress {
 						cache.State = REACHABLE
 						mac := net.HardwareAddr(option.Value)
 						cache.LinkLayerAddress = mac.String()
@@ -234,12 +129,12 @@ func (p *Packet) decodeICMPv6Hdr(hdr *layers.ICMPv6, srcIP net.IP, dstIP net.IP)
 			p.NbrCache[ndInfo.TargetAddress.String()] = cache
 		}
 	case layers.ICMPv6TypeNeighborAdvertisement:
-		rx.DecodeNDInfo(hdr.LayerPayload(), ndInfo)
-		if rx.IsTargetMulticast(ndInfo.TargetAddress) {
+		DecodeNDInfo(hdr.LayerPayload(), ndInfo)
+		if IsTargetMulticast(ndInfo.TargetAddress) {
 			return nil, errors.New(fmt.Sprintln("Targent Address specified", ndInfo.TargetAddress,
 				"is a multicast address"))
 		}
-		err := rx.ValidateNDAInfo(hdr.TypeBytes, dstIP)
+		err := ValidateNDAInfo(hdr.TypeBytes, dstIP)
 		if err != nil {
 			return nil, err
 		}
@@ -250,7 +145,7 @@ func (p *Packet) decodeICMPv6Hdr(hdr *layers.ICMPv6, srcIP net.IP, dstIP net.IP)
 		cache.State = REACHABLE
 		if len(ndInfo.Options) > 0 {
 			for _, option := range ndInfo.Options {
-				if option.Type == rx.NDOptionTypeTargetLinkLayerAddress {
+				if option.Type == NDOptionTypeTargetLinkLayerAddress {
 					mac := net.HardwareAddr(option.Value)
 					cache.LinkLayerAddress = mac.String()
 				}
@@ -267,7 +162,7 @@ func (p *Packet) decodeICMPv6Hdr(hdr *layers.ICMPv6, srcIP net.IP, dstIP net.IP)
 }
 
 func (p *Packet) populateNeighborInfo(nbrInfo *config.NeighborInfo, eth *layers.Ethernet, ipv6Hdr *layers.IPv6,
-	icmpv6Hdr *layers.ICMPv6, ndInfo *rx.NDInfo) {
+	icmpv6Hdr *layers.ICMPv6, ndInfo *NDInfo) {
 	if eth == nil || ipv6Hdr == nil || icmpv6Hdr == nil {
 		return
 	}
