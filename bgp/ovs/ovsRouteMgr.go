@@ -13,18 +13,18 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 package ovsMgr
 
 import (
-	"fmt"
+	//"fmt"
 	"l3/bgp/config"
 )
 
@@ -43,7 +43,7 @@ func (mgr *OvsRouteMgr) Start() {
 }
 
 func (mgr *OvsRouteMgr) CreateRoute(cfg *config.RouteConfig) {
-	fmt.Println("Create Route called in", mgr.plugin, "with configs", cfg)
+	//fmt.Println("Create Route called in", mgr.plugin, "with configs", cfg)
 }
 
 func (mgr *OvsRouteMgr) DeleteRoute(cfg *config.RouteConfig) {
@@ -57,8 +57,8 @@ func (mgr *OvsRouteMgr) UpdateRoute(cfg *config.RouteConfig, op string) {
 func (mgr *OvsRouteMgr) GetNextHopInfo(ipAddr string) (*config.NextHopInfo, error) {
 	return nil, nil
 }
-func (mgr *OvsRouteMgr) ApplyPolicy(protocol string,policy string,action string,conditions []*config.ConditionInfo) {
-	return 
+func (mgr *OvsRouteMgr) ApplyPolicy(protocol string, policy string, action string, conditions []*config.ConditionInfo) {
+	return
 }
 func (mgr *OvsRouteMgr) GetRoutes() ([]*config.RouteInfo, []*config.RouteInfo) {
 	return nil, nil

@@ -60,11 +60,13 @@ func handleClient(client *ribd.RIBDServicesClient, maxCount int) (err error) {
 		byte2 := strconv.Itoa(intByt2)
 		byte3 := strconv.Itoa(intByt3)
 		rtNet := byte1 + "." + byte2 + "." + byte3 + "." + byte4
+		nhintf, err := client.GetRouteReachabilityInfo("11.1.10.2")
 		route.DestinationNw = rtNet
 		route.NetworkMask = "255.255.255.0"
 		route.NextHop = make([]*ribd.NextHopInfo, 0)
 		nh := ribd.NextHopInfo{
-			NextHopIp: "11.1.10.2",
+			NextHopIp:     "11.1.10.2",
+			NextHopIntRef: strconv.Itoa(nhintf.NextHopIfIndex),
 		}
 		route.NextHop = append(route.NextHop, &nh)
 		route.Protocol = "STATIC"
@@ -79,16 +81,17 @@ func handleClient(client *ribd.RIBDServicesClient, maxCount int) (err error) {
 			return nil
 		}
 		if maxCount == count {
-			fmt.Println("Done. Total calls executed", count)
+			//			fmt.Println("Done. Total calls executed", count)
 			break
 		}
 
 	}
-	elapsed := time.Since(start)
-	fmt.Println(" ## Elapsed time is ", elapsed)
+	//elapsed := time.Since(start)
+	//	fmt.Println(" ## Elapsed time is ", elapsed)
 	return nil
 }
 func handleBulkClient(client *ribd.RIBDServicesClient, maxCount int) (err error) {
+	fmt.Println("handleBulkClient")
 	var count int = 0
 	//timeFmt := "2006-01-02 15:04:05.999999999 +0000 UTC"
 	//	var maxCount int = 30000
@@ -96,7 +99,7 @@ func handleBulkClient(client *ribd.RIBDServicesClient, maxCount int) (err error)
 	intByt3 := 1
 	byte1 := "42"
 	byte4 := "0"
-	start := time.Now()
+	//	start := time.Now()
 	//	var scaleTestStartTime string
 	//	var scaleTestEndTime string
 	//	var startTime time.Time
@@ -131,13 +134,13 @@ func handleBulkClient(client *ribd.RIBDServicesClient, maxCount int) (err error)
 		routes = append(routes, &route[count])
 		count++
 		if maxCount == count {
-			fmt.Println("Done. Total route configs added ", count)
+			//		fmt.Println("Done. Total route configs added ", count)
 			break
 		}
 
 	}
-	elapsed := time.Since(start)
-	fmt.Println(" ## Elapsed time is ", elapsed)
+	//elapsed := time.Since(start)
+	//fmt.Println(" ## Elapsed time is ", elapsed)
 	client.OnewayCreateBulkIPv4Route(routes)
 	/*	scaleTestEndTime, err = client.GetRouteCreatedTime(ribdInt.Int(int(routeCount) + maxCount))
 		if err != nil {
@@ -178,6 +181,6 @@ func Scale(ribdClient *ribd.RIBDServicesClient, number int) {
 		fmt.Println("RIBd client nil")
 		return
 	}*/
-	//handleClient(ribdClient, number) //ribd.NewRIBDServicesClientFactory(transport, protocolFactory))
-	handleBulkClient(ribdClient, number) //(ribd.NewRIBDServicesClientFactory(transport, protocolFactory))
+	handleClient(ribdClient, number) //ribd.NewRIBDServicesClientFactory(transport, protocolFactory))
+	//handleBulkClient(ribdClient, number) //(ribd.NewRIBDServicesClientFactory(transport, protocolFactory))
 }

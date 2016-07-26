@@ -57,7 +57,11 @@ func (m RIBDServicesHandler) CreateIPv4Route(cfg *ribd.IPv4Route) (val bool, err
 */
 func (m RIBDServicesHandler) OnewayCreateIPv4Route(cfg *ribd.IPv4Route) (err error) {
 	logger.Info(fmt.Sprintln("OnewayCreateIPv4Route - Received create route request for ip", cfg.DestinationNw, " mask ", cfg.NetworkMask, "cfg.NextHopIntRef: ", cfg.NextHop[0].NextHopIntRef))
-	m.CreateIPv4Route(cfg)
+	//m.CreateIPv4Route(cfg)
+	m.server.RouteConfCh <- server.RIBdServerConfig{
+		OrigConfigObject: cfg,
+		Op:               "add",
+	}
 	return err
 }
 
