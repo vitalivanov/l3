@@ -129,6 +129,10 @@ func removeTypeFromPathAttrs(pathAttrs *[]BGPPathAttr, code BGPPathAttrType) BGP
 	return nil
 }
 
+func RemoveNextHop(pathAttrs *[]BGPPathAttr) {
+	removeTypeFromPathAttrs(pathAttrs, BGPPathAttrTypeNextHop)
+}
+
 func RemoveMultiExitDisc(updateMsg *BGPMessage) BGPPathAttr {
 	return removePathAttr(updateMsg, BGPPathAttrTypeMultiExitDisc)
 }
@@ -204,6 +208,24 @@ func SetPathAttrAggregator(pathAttrs []BGPPathAttr, as uint32, ip net.IP) {
 			pathAttrs[idx].(*BGPPathAttrAggregator).IP = ip
 		}
 	}
+}
+
+func HasMPAttrs(pathAttrs []BGPPathAttr) bool {
+	for _, attr := range pathAttrs {
+		if attr.GetCode() == BGPPathAttrTypeMPReachNLRI || attr.GetCode() == BGPPathAttrTypeMPUnreachNLRI {
+			return true
+		}
+	}
+	return false
+}
+
+func HasMPReachNLRI(pathAttrs []BGPPathAttr) bool {
+	for _, attr := range pathAttrs {
+		if attr.GetCode() == BGPPathAttrTypeMPReachNLRI {
+			return true
+		}
+	}
+	return false
 }
 
 func HasASLoop(pathAttrs []BGPPathAttr, localAS uint32) bool {
@@ -458,7 +480,16 @@ func CopyPathAttrs(pathAttrs []BGPPathAttr) []BGPPathAttr {
 
 func ConstructIPPrefix(ipStr string, maskStr string) *IPPrefix {
 	ip := net.ParseIP(ipStr)
-	mask := net.IPMask(net.ParseIP(maskStr).To4())
+	var mask net.IPMask
+	if ip.To4() != nil {
+		utils.Logger.Info(fmt.Sprintf("ConstructIPPrefix IPv6 - mask ip %+v mask ip mask %+v",
+			net.ParseIP(maskStr), net.IPMask(net.ParseIP(maskStr).To4())))
+		mask = net.IPMask(net.ParseIP(maskStr).To4())
+	} else {
+		utils.Logger.Info(fmt.Sprintf("ConstructIPPrefix IPv4 - mask ip %+v mask ip mask %+v",
+			net.ParseIP(maskStr), net.IPMask(net.ParseIP(maskStr).To16())))
+		mask = net.IPMask(net.ParseIP(maskStr).To16())
+	}
 	ones, _ := mask.Size()
 	return NewIPPrefix(ip.Mask(mask), uint8(ones))
 }
@@ -839,6 +870,7 @@ func ConstructMaxSizedUpdatePackets(bgpMsg *BGPMessage) []*BGPMessage {
 		newUpdateMsgs = append(newUpdateMsgs, newMsg)
 		pktLen = BGPUpdateMsgMinLen
 	}
+	mpAttsFound := HasMPAttrs(updateMsg.PathAttributes)
 
 	startIdx = 0
 	lastIdx = 0
@@ -852,11 +884,12 @@ func ConstructMaxSizedUpdatePackets(bgpMsg *BGPMessage) []*BGPMessage {
 			}
 			startIdx = lastIdx
 			pktLen = uint32(BGPUpdateMsgMinLen)
+			mpAttsFound = false
 		}
 		pktLen += nlriLen
 	}
 
-	if (withdrawnRoutes != nil && len(withdrawnRoutes) > 0) || (lastIdx > startIdx) {
+	if (withdrawnRoutes != nil && len(withdrawnRoutes) > 0) || (lastIdx > startIdx) || mpAttsFound {
 		newMsg := NewBGPUpdateMessage(withdrawnRoutes, updateMsg.PathAttributes, updateMsg.NLRI[startIdx:lastIdx])
 		newUpdateMsgs = append(newUpdateMsgs, newMsg)
 	}

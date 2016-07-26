@@ -25,7 +25,10 @@
 package packet
 
 import (
+	"errors"
+	"fmt"
 	"l3/bgp/config"
+	"l3/rib/ribdCommonDefs"
 	"net"
 )
 
@@ -52,6 +55,11 @@ var ProtocolFamilyMap = map[string]uint32{
 var AFINextHopLenMap = map[AFI]int{
 	AfiIP:  4,
 	AfiIP6: 16,
+}
+
+var RIBdAddressTypeToAFI = map[ribdCommonDefs.IPType]AFI{
+	ribdCommonDefs.IPv4: AfiIP,
+	ribdCommonDefs.IPv6: AfiIP6,
 }
 
 func GetProtocolFromConfig(afiSafis *[]config.AfiSafiConfig, neighborAddress net.IP) (map[uint32]bool, bool) {
@@ -105,4 +113,12 @@ func GetProtocolFromOpenMsg(openMsg *BGPOpen) map[uint32]bool {
 	}
 
 	return afiSafiMap
+}
+
+func GetProtocolFamilyFromAddrType(addrType ribdCommonDefs.IPType) (uint32, error) {
+	if afi, ok := RIBdAddressTypeToAFI[addrType]; ok {
+		return GetProtocolFamily(afi, SafiUnicast), nil
+	}
+
+	return 0, errors.New(fmt.Sprintf("Address family not found for address type %d", addrType))
 }

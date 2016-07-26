@@ -633,7 +633,7 @@ func (server *BGPServer) TraverseAndReverseBGPRib(policyData interface{}) {
 		policy.Name))
 	policyExtensions := policy.Extensions.(bgppolicy.PolicyExtensions)
 	if len(policyExtensions.RouteList) == 0 {
-		server.logger.Info("No route affected by this policy, so nothing to do")
+		fmt.Println("No route affected by this policy, so nothing to do")
 		return
 	}
 
@@ -687,25 +687,41 @@ func (server *BGPServer) ProcessUpdate(pktInfo *packet.BGPPktSrc) {
 	server.SendUpdate(updated, withdrawn, updatedAddPaths)
 }
 
-func (server *BGPServer) convertDestIPToIPPrefix(routes []*config.RouteInfo) []packet.NLRI {
-	dest := make([]packet.NLRI, 0, len(routes))
+func (server *BGPServer) convertDestIPToIPPrefix(routes []*config.RouteInfo) map[uint32][]packet.NLRI {
+	pfNLRI := make(map[uint32][]packet.NLRI)
 	for _, r := range routes {
-		server.logger.Info(fmt.Sprintln("Route NS : ", r.NetworkStatement, " Route Origin ", r.RouteOrigin))
+		ip := net.ParseIP(r.IPAddr)
+		if ip == nil {
+			server.logger.Err(fmt.Sprintf("Connected route %s/%s is not a valid IP", r.IPAddr, r.Mask))
+			continue
+		}
+
+		var protoFamily uint32
+		if ip.To4() != nil {
+			protoFamily = packet.GetProtocolFamily(packet.AfiIP, packet.SafiUnicast)
+		} else {
+			protoFamily = packet.GetProtocolFamily(packet.AfiIP6, packet.SafiUnicast)
+		}
+
+		server.logger.Info(fmt.Sprintf("Connected route: addr %s netmask %s", r.IPAddr, r.Mask))
+		if _, ok := pfNLRI[protoFamily]; !ok {
+			pfNLRI[protoFamily] = make([]packet.NLRI, 0)
+		}
+
 		ipPrefix := packet.ConstructIPPrefix(r.IPAddr, r.Mask)
-		dest = append(dest, ipPrefix)
+		pfNLRI[protoFamily] = append(pfNLRI[protoFamily], ipPrefix)
 	}
-	return dest
+	return pfNLRI
 }
 
-func (server *BGPServer) ProcessConnectedRoutes(installedRoutes []*config.RouteInfo,
-	withdrawnRoutes []*config.RouteInfo) {
+func (server *BGPServer) ProcessConnectedRoutes(installedRoutes, withdrawnRoutes []*config.RouteInfo) {
 	server.logger.Info(fmt.Sprintln("valid routes:", installedRoutes, "invalid routes:", withdrawnRoutes))
 	valid := server.convertDestIPToIPPrefix(installedRoutes)
 	invalid := server.convertDestIPToIPPrefix(withdrawnRoutes)
-	protoFamily := packet.GetProtocolFamily(packet.AfiIP, packet.SafiUnicast)
-	updated, withdrawn, updatedAddPaths := server.LocRib.ProcessConnectedRoutes(
-		server.BgpConfig.Global.Config.RouterId.String(), server.ConnRoutesPath, valid, invalid, server.AddPathCount,
-		protoFamily)
+	server.logger.Info(fmt.Sprintln("pfNLRI valid:", valid, "invalid:", invalid))
+	routerId := server.BgpConfig.Global.Config.RouterId.String()
+	updated, withdrawn, updatedAddPaths := server.LocRib.ProcessConnectedRoutes(routerId, server.ConnRoutesPath, valid,
+		invalid, server.AddPathCount)
 	updated, withdrawn, updatedAddPaths = server.CheckForAggregation(updated, withdrawn, updatedAddPaths)
 	server.SendUpdate(updated, withdrawn, updatedAddPaths)
 }
@@ -1292,7 +1308,7 @@ func (server *BGPServer) InitBGPEvent() {
 		server.logger.Err(fmt.Sprintf("DB connect failed with error %s. Exiting!!", err))
 		return
 	}
-	err = eventUtils.InitEvents("BGPD", server.eventDbHdl, server.logger)
+	err = eventUtils.InitEvents("BGPD", server.eventDbHdl, server.logger, 1000)
 	if err != nil {
 		server.logger.Err(fmt.Sprintln("Unable to initialize events", err))
 	}

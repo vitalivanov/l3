@@ -27,13 +27,14 @@ package server
 import (
 	"arpdInt"
 	"fmt"
+	"l3/rib/ribdCommonDefs"
 )
 
 func arpdResolveRoute(routeInfoRecord RouteInfoRecord) {
 	if arpdclnt.IsConnected == false {
 		return
 	}
-	if routeInfoRecord.ipType == ipv6 {
+	if routeInfoRecord.ipType == ribdCommonDefs.IPv6 {
 		return
 	}
 	logger.Debug(fmt.Sprintln(" arpdResolveRoute: Sending ARP Resolve for ", routeInfoRecord.nextHopIp.String(), " routeInfoRecord.nextHopIfIndex ", routeInfoRecord.nextHopIfIndex, " routeInfoRecord.resolvedNextHopIpIntf.NextHopIfIndex ", routeInfoRecord.resolvedNextHopIpIntf.NextHopIfIndex))
@@ -44,7 +45,7 @@ func arpdRemoveRoute(routeInfoRecord RouteInfoRecord) {
 	if arpdclnt.IsConnected == false {
 		return
 	}
-	if routeInfoRecord.ipType == ipv6 {
+	if routeInfoRecord.ipType == ribdCommonDefs.IPv6 {
 		return
 	}
 	logger.Debug(fmt.Sprintln("arpdRemoveRoute: for ", routeInfoRecord.nextHopIp.String()))
