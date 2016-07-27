@@ -98,12 +98,12 @@ func (p *Packet) decodeICMPv6Hdr(hdr *layers.ICMPv6, srcIP net.IP, dstIP net.IP)
 	}
 	switch typeCode.Type() {
 	case layers.ICMPv6TypeNeighborSolicitation:
-		DecodeNDInfo(hdr.LayerPayload(), ndInfo)
-		if IsTargetMulticast(ndInfo.TargetAddress) {
+		ndInfo.DecodeNDInfo(hdr.LayerPayload())
+		if ndInfo.IsTargetMulticast() {
 			return nil, errors.New(fmt.Sprintln("Targent Address specified", ndInfo.TargetAddress,
 				"is a multicast address"))
 		}
-		err := ValidateNDSInfo(srcIP, dstIP, ndInfo.Options)
+		err := ndInfo.ValidateNDSInfo(srcIP, dstIP)
 		if err != nil {
 			return nil, err
 		}
@@ -129,12 +129,12 @@ func (p *Packet) decodeICMPv6Hdr(hdr *layers.ICMPv6, srcIP net.IP, dstIP net.IP)
 			p.NbrCache[ndInfo.TargetAddress.String()] = cache
 		}
 	case layers.ICMPv6TypeNeighborAdvertisement:
-		DecodeNDInfo(hdr.LayerPayload(), ndInfo)
-		if IsTargetMulticast(ndInfo.TargetAddress) {
+		ndInfo.DecodeNDInfo(hdr.LayerPayload())
+		if ndInfo.IsTargetMulticast() {
 			return nil, errors.New(fmt.Sprintln("Targent Address specified", ndInfo.TargetAddress,
 				"is a multicast address"))
 		}
-		err := ValidateNDAInfo(hdr.TypeBytes, dstIP)
+		err := ndInfo.ValidateNDAInfo(hdr.TypeBytes, dstIP)
 		if err != nil {
 			return nil, err
 		}

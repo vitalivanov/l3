@@ -134,7 +134,7 @@ func validateChecksum(srcIP, dstIP net.IP, icmpv6Hdr *layers.ICMPv6) error {
  */
 func getCheckSum(ipv6 *layers.IPv6, payload []byte) uint16 {
 	var buf []byte
-	buf = append(buf, createPseudoHeader(ipv6.SrcIP, ipv6.DstIP, payload)...)
+	buf = append(buf, createPseudoHeader(ipv6.SrcIP, ipv6.DstIP, payload[8:])...)
 
 	buf = append(buf, payload...)
 	// Pad to the next 32-bit boundary

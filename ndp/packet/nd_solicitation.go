@@ -67,25 +67,24 @@ func DecodeOptionLayer(payload []byte) *NDOption {
 	return ndOpt
 }
 
-func DecodeNDInfo(payload []byte, nds *NDInfo) error {
-	if nds.TargetAddress == nil {
-		nds.TargetAddress = make(net.IP, IPV6_ADDRESS_BYTES, IPV6_ADDRESS_BYTES)
+func (nd *NDInfo) DecodeNDInfo(payload []byte) {
+	if nd.TargetAddress == nil {
+		nd.TargetAddress = make(net.IP, IPV6_ADDRESS_BYTES, IPV6_ADDRESS_BYTES)
 	}
-	copy(nds.TargetAddress, payload[0:IPV6_ADDRESS_BYTES])
+	copy(nd.TargetAddress, payload[0:IPV6_ADDRESS_BYTES])
 	if len(payload) > IPV6_ADDRESS_BYTES {
 		//decode option layer also
 		ndOpt := DecodeOptionLayer(payload[IPV6_ADDRESS_BYTES:])
-		nds.Options = append(nds.Options, ndOpt)
+		nd.Options = append(nd.Options, ndOpt)
 	}
-	return nil
 }
 
 /*
  *  According to RFC 2375 https://tools.ietf.org/html/rfc2375 all ipv6 multicast address have first byte as
  *  FF or 0xff, so compare that with the Target address first byte.
  */
-func IsTargetMulticast(in net.IP) bool {
-	if in.IsMulticast() {
+func (nd *NDInfo) IsTargetMulticast() bool {
+	if nd.TargetAddress.IsMulticast() {
 		return true
 	}
 	return false
@@ -97,13 +96,14 @@ func IsTargetMulticast(in net.IP) bool {
  *  if srcIp == "::", i.e Unspecified address then dstIP should be solicited-node address FF02:0:0:0:0:1:FFXX:XXXX
  *  if srcIP == "::", then there should not be any source link-layer option in message
  */
-func ValidateNDSInfo(srcIP net.IP, dstIP net.IP, options []*NDOption) error {
+func (nd *NDInfo) ValidateNDSInfo(srcIP net.IP, dstIP net.IP) error {
 	if srcIP.IsUnspecified() {
 		if !(dstIP[0] == IPV6_MULTICAST_BYTE && dstIP[1]&0x0f == 0x02 &&
 			dstIP[11]&0x0f == 0x01 && dstIP[12] == IPV6_MULTICAST_BYTE) {
 			return errors.New(fmt.Sprintln("Destination IP address",
 				dstIP.String(), "is not Solicited-Node Multicast Address"))
 		}
+		options := nd.Options
 		if len(options) > 0 {
 			for _, option := range options {
 				if option.Type == NDOptionTypeSourceLinkLayerAddress {
@@ -121,7 +121,7 @@ func ValidateNDSInfo(srcIP net.IP, dstIP net.IP, options []*NDOption) error {
  *       Solicited flag is zero.
  * All included options have a length that is greater than zero.
  */
-func ValidateNDAInfo(icmpFlags []byte, dstIP net.IP) error {
+func (nd *NDInfo) ValidateNDAInfo(icmpFlags []byte, dstIP net.IP) error {
 	if dstIP.IsMulticast() {
 		flags := binary.BigEndian.Uint16(icmpFlags[0:2])
 		if (flags & 0x4000) == 0x4000 {
@@ -164,22 +164,13 @@ func ConstructNSPacket(targetAddr, srcIP, srcMac, dstMac string, ip net.IP) []by
 	binary.BigEndian.PutUint16(payload[2:4], 0) // Putting zero for checksum before calculating checksum
 	binary.BigEndian.PutUint32(payload[4:], 0)  // RESERVED FLAG...
 	copy(payload[8:], ip)
-
-	binary.BigEndian.PutUint16(payload[2:4], getCheckSum(ipv6, payload[8:]))
-	/*
-		typeCode := uint8(layers.ICMPv6TypeNeighborSolicitation<<8) | 0
-		icmpv6Hdr := &layers.ICMPv6{
-			TypeCode: layers.CreateICMPv6TypeCode(layers.ICMPv6TypeNeighborSolicitation, 0),
-			Checksum: 0,
-		}
-	*/
+	binary.BigEndian.PutUint16(payload[2:4], getCheckSum(ipv6, payload))
 	buffer := gopacket.NewSerializeBuffer()
 	options := gopacket.SerializeOptions{
 		FixLengths:       true,
 		ComputeChecksums: true,
 	}
 
-	//gopacket.SerializeLayers(buffer, options, eth, ipv6, icmpv6Hdr)
 	gopacket.SerializeLayers(buffer, options, eth, ipv6, gopacket.Payload(payload))
 	return buffer.Bytes()
 }

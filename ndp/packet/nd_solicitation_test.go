@@ -27,6 +27,7 @@ import (
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"infra/sysd/sysdCommonDefs"
+	"l3/ndp/config"
 	"l3/ndp/debug"
 	"log/syslog"
 	"net"
@@ -69,10 +70,7 @@ func TestNDInfoDecoder(t *testing.T) {
 	}
 	debug.NDPSetLogger(logger)
 	nds := &NDInfo{}
-	err = DecodeNDInfo(ndTestPkt, nds)
-	if err != nil {
-		t.Error("Decoding ipv6 and icmpv6 header failed", err)
-	}
+	nds.DecodeNDInfo(ndTestPkt)
 	ndWant := &NDInfo{
 		TargetAddress: net.IP{0xfe, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xc0, 0x00, 0x54, 0xff, 0xfe, 0xf5, 0x00, 0x01},
 	}
@@ -84,10 +82,7 @@ func TestNDInfoDecoder(t *testing.T) {
 // Test ND Options
 func TestNDOptionDecoder(t *testing.T) {
 	nds := &NDInfo{}
-	err := DecodeNDInfo(OptionRawByteWithTarget, nds)
-	if err != nil {
-		t.Error("Decoding ipv6 and icmpv6 header failed", err)
-	}
+	nds.DecodeNDInfo(OptionRawByteWithTarget)
 	ndWant := &NDInfo{
 		TargetAddress: net.IP{0xfe, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xc0, 0x00, 0x54, 0xff, 0xfe, 0xf5, 0x00, 0x01},
 	}
@@ -114,16 +109,18 @@ func TestNDOptionDecoder(t *testing.T) {
 
 // Test ND Solicitation multicast Address Validation
 func TestNDSMulticast(t *testing.T) {
-	b := net.IP{0xfe, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xc0, 0x00, 0x54, 0xff, 0xfe, 0xf5, 0x00, 0x01}
-
-	// b is not multicast address, fail the test case if true is returned
-	if IsTargetMulticast(b) {
-		t.Error("byte is not ipv6 muticast address", b)
+	nd := &NDInfo{
+		TargetAddress: net.IP{0xfe, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xc0, 0x00, 0x54, 0xff, 0xfe, 0xf5, 0x00, 0x01},
 	}
-
-	b[0] = 0xff
+	if nd.IsTargetMulticast() {
+		// b is not multicast address, fail the test case if true is returned
+		//if IsTargetMulticast(b) {
+		t.Error("byte is not ipv6 muticast address", nd.TargetAddress)
+	}
+	b := net.IP{0xff, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xc0, 0x00, 0x54, 0xff, 0xfe, 0xf5, 0x00, 0x01}
+	nd.TargetAddress = b
 	// b is multicast address, fail the test case if false is returned
-	if !IsTargetMulticast(b) {
+	if !nd.IsTargetMulticast() {
 		t.Error("byte is ipv6 muticast address", b)
 	}
 }
@@ -133,7 +130,8 @@ func TestNDSInformation(t *testing.T) {
 	srcIP := net.IP{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
 	dstIP := net.IP{0xff, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0xff, 0x10, 0x78, 0x2e}
 	//t.Log("SrcIP->", srcIP.String(), "DstIP->", dstIP.String())
-	err := ValidateNDSInfo(srcIP, dstIP, nil)
+	nd := &NDInfo{}
+	err := nd.ValidateNDSInfo(srcIP, dstIP)
 	if err != nil {
 		t.Error("Validation of ip address failed with error", err)
 	}
@@ -145,7 +143,7 @@ func TestNDSInformation(t *testing.T) {
 	ndInfo := &NDInfo{}
 	ndInfo.Options = append(ndInfo.Options, optionWant)
 
-	err = ValidateNDSInfo(srcIP, dstIP, ndInfo.Options)
+	err = ndInfo.ValidateNDSInfo(srcIP, dstIP)
 	if err != nil {
 		t.Error("Neigbor solicitation should fail for any option other than Source Link Layer Address", err)
 	}
@@ -156,19 +154,19 @@ func TestNDSInformation(t *testing.T) {
 	}
 	ndInfo1 := &NDInfo{}
 	ndInfo1.Options = append(ndInfo1.Options, optionWant1)
-	err = ValidateNDSInfo(srcIP, dstIP, ndInfo1.Options)
+	err = ndInfo1.ValidateNDSInfo(srcIP, dstIP)
 	if err == nil {
 		t.Error("Neigbor solicitation should fail for any option other than Source Link Layer Address")
 	}
 	srcIP = net.IP{0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
 	//t.Log("SrcIP->", srcIP.String(), "DstIP->", dstIP.String())
-	err = ValidateNDSInfo(srcIP, dstIP, nil)
+	err = nd.ValidateNDSInfo(srcIP, dstIP)
 	if err != nil {
 		t.Error("Validation of ip address", srcIP, "failed with error", err)
 	}
 	dstIP = net.IP{0xfe, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xc0, 0x00, 0x54, 0xff, 0xfe, 0xf5, 0x00, 0x01}
 	//t.Log("SrcIP->", srcIP.String(), "DstIP->", dstIP.String())
-	err = ValidateNDSInfo(srcIP, dstIP, nil)
+	err = nd.ValidateNDSInfo(srcIP, dstIP)
 	if err != nil {
 		t.Error("Validation of ip address", srcIP, "dst Ip", dstIP, "failed with error", err)
 	}
@@ -178,17 +176,18 @@ func TestNDSInformation(t *testing.T) {
 func TestValidateNDAInfo(t *testing.T) {
 	dstIp := net.IP{0xff, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01}
 	flags := []byte{0xa0, 00, 00, 00}
-	err := ValidateNDAInfo(flags, dstIp)
+	nd := &NDInfo{}
+	err := nd.ValidateNDAInfo(flags, dstIp)
 	if err != nil {
 		t.Error("Validation of nda failed, error:", err)
 	}
 	flags1 := []byte{0x40, 00, 00, 00, 00}
-	err = ValidateNDAInfo(flags1, dstIp)
+	err = nd.ValidateNDAInfo(flags1, dstIp)
 	if err == nil {
 		t.Error("Validation of nda didn't failed, error:", err)
 	}
 	dstIp = net.IP{0xfe, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xc0, 0x00, 0x54, 0xff, 0xfe, 0xf5, 0x00, 0x01}
-	err = ValidateNDAInfo(flags1, dstIp)
+	err = nd.ValidateNDAInfo(flags1, dstIp)
 	if err != nil {
 		t.Error("Validation of nda failed, error:", err)
 	}
@@ -203,6 +202,14 @@ type testIPv6 struct {
 	HopLimit     uint8
 	SrcIP        net.IP
 	DstIP        net.IP
+}
+
+type testICMPv6 struct {
+	TypeCode      layers.ICMPv6TypeCode
+	Checksum      uint16
+	Reserved      []byte
+	TargetAddress net.IP
+	Options       []*NDOption
 }
 
 func checkEthLayer(encodedEthLayer *layers.Ethernet, wantSrcMac, wantDstMac net.HardwareAddr,
@@ -247,6 +254,49 @@ func checkIPv6Layer(ipv6Hdr *layers.IPv6, wantIPv6Hdr *testIPv6, t *testing.T) {
 	//t.Log("======== VALIDATING IPV6 HEADER SUCCESS =========")
 }
 
+func checkICMPv6Layer(hdr *layers.ICMPv6, wantICMPv6Hdr *testICMPv6, t *testing.T) {
+	ndsInfo := &NDInfo{}
+	ndsInfo.DecodeNDInfo(hdr.LayerPayload())
+
+	if !reflect.DeepEqual(hdr.TypeCode, wantICMPv6Hdr.TypeCode) {
+		t.Error("TypeCode mismatch", wantICMPv6Hdr.TypeCode, "!=", hdr.TypeCode)
+	}
+
+	if !reflect.DeepEqual(hdr.Checksum, wantICMPv6Hdr.Checksum) {
+		t.Errorf("Checksum mismatch 0x%x != 0x%x", wantICMPv6Hdr.Checksum, hdr.Checksum)
+	}
+
+	if !reflect.DeepEqual(hdr.TypeBytes, wantICMPv6Hdr.Reserved) {
+		t.Error("Reserved bits mismatch", wantICMPv6Hdr.Reserved, "!=", hdr.TypeBytes)
+	}
+	if !reflect.DeepEqual(ndsInfo.TargetAddress, wantICMPv6Hdr.TargetAddress) {
+		t.Error("TargetAddress mismatch", wantICMPv6Hdr.TargetAddress, "!=", ndsInfo.TargetAddress)
+	}
+	if !reflect.DeepEqual(ndsInfo.Options, wantICMPv6Hdr.Options) {
+		t.Error("Options mismatch", wantICMPv6Hdr.Options, "!=", ndsInfo.Options)
+	}
+}
+
+func TestValidateNDSPktForEncode(t *testing.T) {
+	pkt := Init()
+	p := gopacket.NewPacket(ndsTest, layers.LinkTypeEthernet, gopacket.Default)
+	if p.ErrorLayer() != nil {
+		t.Error("Failed to decode packet:", p.ErrorLayer().Error())
+	}
+	nbrInfo := &config.NeighborInfo{}
+	err := pkt.ValidateAndParse(nbrInfo, p)
+	if err != nil {
+		t.Error("Failed to Validate Packet, Error:", err)
+	}
+	if nbrInfo.MacAddr != "00:e0:ec:26:a7:ee" {
+		t.Error("Src Mac copy to NeighborInfo failed")
+	}
+
+	if nbrInfo.IpAddr != "::" {
+		t.Error("src ip address copy failed")
+	}
+}
+
 func TestConstructNSPacket(t *testing.T) {
 	targetAddr := "2002::1"
 	srcMac := "00:e0:ec:26:a7:ee"
@@ -264,8 +314,8 @@ func TestConstructNSPacket(t *testing.T) {
 	wantSrcMac := net.HardwareAddr{0x00, 0xe0, 0xec, 0x26, 0xa7, 0xee}
 	wantDstMac := net.HardwareAddr{0x33, 0x33, 0xff, 0x00, 0x00, 0x01}
 	wantEthType := layers.EthernetTypeIPv6
-	//t.Log(rcvdBytes)
-	//t.Log(ndsTest)
+	t.Log(rcvdBytes)
+	t.Log(ndsTest)
 	checkEthLayer(encodedEthLayer, wantSrcMac, wantDstMac, wantEthType, t)
 	icmpv6Hdr := &layers.ICMPv6{}
 	ipv6Hdr := &layers.IPv6{}
@@ -274,6 +324,7 @@ func TestConstructNSPacket(t *testing.T) {
 		t.Error("Decoding ipv6 and icmpv6 header failed", err)
 	}
 
+	// Validate that constructed ipv6 header has correct information
 	wantIPv6Hdr := &testIPv6{
 		Version:      6,
 		TrafficClass: 0,
@@ -285,4 +336,13 @@ func TestConstructNSPacket(t *testing.T) {
 		DstIP:        net.ParseIP("ff02::1:ff00:1"),
 	}
 	checkIPv6Layer(ipv6Hdr, wantIPv6Hdr, t)
+
+	// Validate That construct icmpv6 header has correct information
+	wantICMPv6Hdr := &testICMPv6{
+		TypeCode:      layers.CreateICMPv6TypeCode(layers.ICMPv6TypeNeighborSolicitation, 0),
+		Checksum:      0x5aa4,
+		Reserved:      []byte{0, 0, 0, 0},
+		TargetAddress: net.ParseIP(targetAddr),
+	}
+	checkICMPv6Layer(icmpv6Hdr, wantICMPv6Hdr, t)
 }
