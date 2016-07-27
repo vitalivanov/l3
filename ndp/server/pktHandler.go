@@ -70,7 +70,7 @@ func (svr *NDPServer) StartRxTx(ifIndex int32) {
 	if !exists {
 		// This will copy msg (intRef, ifIndex, ipAddr) into ipPort
 		// And also create an entry into the ndpL3IntfStateSlice
-		debug.Logger.Err(fmt.Sprintln("Starting RX/TX for interface which was not created, ifIndex:",
+		debug.Logger.Err(fmt.Sprintln("Failed starting RX/TX for interface which was not created, ifIndex:",
 			ifIndex, "is not allowed"))
 		return
 	}
@@ -164,18 +164,28 @@ func (svr *NDPServer) ProcessRxPkt(ifIndex int32, pkt gopacket.Packet) {
 		return
 	}
 	nbrInfo := &config.NeighborInfo{}
-	err := packet.ValidateAndParse(nbrInfo, pkt)
+	err := svr.Packet.ValidateAndParse(nbrInfo, pkt)
 	if err != nil {
 		debug.Logger.Err(fmt.Sprintln("Validating and parsing Pkt Failed:", err))
 		return
 	}
-	switchMac := svr.CheckSrcMac(nbrInfo.MacAddr)
-	if switchMac {
-		debug.Logger.Info(fmt.Sprintln(
-			"Received Packet from same port and hence ignoring the packet:", nbrInfo))
+	if nbrInfo.PktOperation == byte(packet.PACKET_DROP) {
+		debug.Logger.Err(fmt.Sprintln("Dropping Neighbor Solicitation message for", nbrInfo.IpAddr))
 		return
+	} else if nbrInfo.State == packet.INCOMPLETE {
+		debug.Logger.Err(fmt.Sprintln("Received Neighbor Solicitation message for", nbrInfo.IpAddr))
+		return
+	} else if nbrInfo.State == packet.REACHABLE {
+		switchMac := svr.CheckSrcMac(nbrInfo.MacAddr)
+		if switchMac {
+			debug.Logger.Info(fmt.Sprintln(
+				"Received Packet from same port and hence ignoring the packet:", nbrInfo))
+			return
+		}
+		svr.PopulateVlanInfo(nbrInfo, ifIndex)
+		svr.CheckCallUpdateNeighborInfo(nbrInfo)
+	} else {
+		debug.Logger.Alert(fmt.Sprintln("Handle state", nbrInfo.State, "after packet validation & parsing"))
 	}
-	svr.PopulateVlanInfo(nbrInfo, ifIndex)
-	svr.CheckCallUpdateNeighborInfo(nbrInfo)
 	return
 }

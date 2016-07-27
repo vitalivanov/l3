@@ -85,3 +85,7 @@ func GetAllNeigborEntries(from, count int) (int, int, []config.NeighborInfo) {
 	n, c, result := ndpApi.server.GetNeighborEntries(from, count)
 	return n, c, result
 }
+
+func GetNeighborEntry(ipAddr string) *config.NeighborInfo {
+	return ndpApi.server.GetNeighborEntry(ipAddr)
+}

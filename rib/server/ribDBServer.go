@@ -27,6 +27,7 @@ package server
 import (
 	"errors"
 	"fmt"
+	"l3/rib/ribdCommonDefs"
 	"models/objects"
 	"ribd"
 	"strconv"
@@ -268,7 +269,7 @@ func (ribdServiceHandler *RIBDServer) StartDBServer() {
 				for sel := 0; sel < len(routeInfoList); sel++ {
 					if routeInfoList[sel].protocol == int8(RouteProtocolTypeMapDB[routeList.selectedRouteProtocol]) {
 						logger.Debug(fmt.Sprintln("add case iptype = ", routeInfoList[sel].ipType))
-						if routeInfoList[sel].ipType == ipv6 {
+						if routeInfoList[sel].ipType == ribdCommonDefs.IPv6 {
 							info.Op = "addv6"
 						}
 					}
@@ -278,7 +279,7 @@ func (ribdServiceHandler *RIBDServer) StartDBServer() {
 				dbInfo := info.OrigConfigObject.(RouteDBInfo)
 				entry := dbInfo.entry
 				logger.Debug(fmt.Sprintln("del case iptype = ", entry.ipType))
-				if entry.ipType == ipv6 {
+				if entry.ipType == ribdCommonDefs.IPv6 {
 					info.Op = "delv6"
 				}
 			}

@@ -20,44 +20,19 @@
 // |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
 // |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
 //
-package flexswitch
+package packet
 
-import (
-	"ndpd"
-	"testing"
+const (
+	_ = iota
+	INCOMPLETE
+	REACHABLE
+	STALE
+	DELAY
+	PROBE
 )
 
-func TestCreateNDPGlobal(t *testing.T) {
-	h := NewConfigHandler()
-	config := &ndpd.NDPGlobal{}
-	h.CreateNDPGlobal(config)
-}
-
-func TestDeleteNDPGlobal(t *testing.T) {
-	h := NewConfigHandler()
-	config := &ndpd.NDPGlobal{}
-	h.DeleteNDPGlobal(config)
-}
-
-func TestUpdateNDPGlobal(t *testing.T) {
-	h := NewConfigHandler()
-	config := &ndpd.NDPGlobal{}
-	newConfig := &ndpd.NDPGlobal{}
-	attrset := make([]bool, 0)
-	op := make([]*ndpd.PatchOpInfo, 0)
-	h.UpdateNDPGlobal(config, newConfig, attrset, op)
-}
-
-func TestGetBulkNDPEntry(t *testing.T) {
-	/*
-		h := NewConfigHandler()
-		h.GetBulkNDPEntryState(0, 10)
-	*/
-}
-
-func TestGetNDPEntry(t *testing.T) {
-	/*
-		h := NewConfigHandler()
-		h.GetNDPEntryState("")
-	*/
+type NeighborCache struct {
+	Timer            int // Future Info
+	State            int
+	LinkLayerAddress string
 }

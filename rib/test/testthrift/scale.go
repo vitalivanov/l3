@@ -65,6 +65,7 @@ func handleClient(client *ribd.RIBDServicesClient, maxCount int) (err error) {
 		route.NextHop = make([]*ribd.NextHopInfo, 0)
 		nh := ribd.NextHopInfo{
 			NextHopIp: "11.1.10.2",
+			//			NextHopIntRef: "lo1",
 		}
 		route.NextHop = append(route.NextHop, &nh)
 		route.Protocol = "STATIC"

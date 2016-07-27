@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"l3/ndp/config"
 	"l3/ndp/debug"
+	"l3/ndp/packet"
 	_ "models/objects"
 	"os"
 	"os/signal"
@@ -38,6 +39,7 @@ import (
 func NDPNewServer(sPlugin asicdClient.AsicdClientIntf) *NDPServer {
 	svr := &NDPServer{}
 	svr.SwitchPlugin = sPlugin
+	svr.Packet = packet.Init()
 	return svr
 }
 
