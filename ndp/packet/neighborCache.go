@@ -39,31 +39,24 @@ import (
  *    learn about them via Neighbor Advertisement... That way our nexthop neighbor entry is always up-to-date
  */
 func (p *Packet) SendNSMsgIfRequired(ipAddr string, pHdl *pcap.Handle) error {
-	cache, exists := p.NbrCache[ipAddr]
-	if !exists {
-		debug.Logger.Info(fmt.Sprintln("cache entry for ipAddr", ipAddr, "not found in nbr cache.",
-			"Waiting for linux to finish of neighbor duplicate detection"))
-		return nil
-	}
-
-	/* Entry exists so lets send out Neighbor Solicitation with "::" as srcIP and dstIP as
-	 * Solicitated Multicast Address.
-	 * Solicitated Muticast Address is formed by:
-	 *	    Taking lower 24 bits or 3 bytes of an address (unicast or anycast) and appending those
-	 *	    bits or bytes to the prefix of Solicitated-Node Address FF02:0:0:0:0:1:FFXX:XXXX
-	 */
 	ip, _, err := net.ParseCIDR(ipAddr)
 	if err != nil {
 		return errors.New(fmt.Sprintln("Parsing CIDR", ipAddr, "failed with Error:", err))
 	}
-	pktToSend := ConstructNSPacket(ipAddr, "::", cache.LinkLayerAddress, IPV6_ICMPV6_MULTICAST_DST_MAC, ip.To16())
-	return sendNDPkt(pktToSend, pHdl)
+	cache, exists := p.NbrCache[ip.String()]
+	if !exists {
+		debug.Logger.Info(fmt.Sprintln("cache entry for ipAddr", ip, "not found in nbr cache.",
+			"Waiting for linux to finish of neighbor duplicate detection"))
+		return nil
+	}
+	pktToSend := ConstructNSPacket(ip.String(), "::", cache.LinkLayerAddress, IPV6_ICMPV6_MULTICAST_DST_MAC, ip.To16())
+	return p.SendNDPkt(pktToSend, pHdl)
 }
 
 /*
  *    Helper function to send raw bytes on a given pcap handler
  */
-func sendNDPkt(pkt []byte, pHdl *pcap.Handle) error {
+func (p *Packet) SendNDPkt(pkt []byte, pHdl *pcap.Handle) error {
 	if pHdl == nil {
 		return errors.New("Invalid Pcap Handler")
 	}

@@ -22,6 +22,10 @@
 //
 package packet
 
+import (
+	"l3/ndp/config"
+)
+
 type PACKET_OPERATION byte
 
 const (
@@ -54,10 +58,12 @@ const (
 type NeighborCache struct {
 	Timer            int // Future Info
 	State            int
+	PortIfIndex      int32
 	LinkLayerAddress string
 }
 
 type Packet struct {
+	PktCh chan config.PacketData
 	// Neighbor Cache Information
 	NbrCache map[string]NeighborCache
 	//Operation PACKET_OPERATION

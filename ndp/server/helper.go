@@ -251,12 +251,14 @@ func (svr *NDPServer) HandlePhyPortStateNotification(msg *config.StateNotificati
  *		     Stop Rx/Tx in this case
  */
 func (svr *NDPServer) HandleStateNotification(msg *config.StateNotification) {
-	debug.Logger.Info(fmt.Sprintln("Received State:", msg.State, "for ifIndex:", msg.IfIndex, "ipAddr:", msg.IpAddr))
+	debug.Logger.Info(fmt.Sprintln("Received State:", msg.State, "for ifIndex:", msg.IfIndex, "ipAddr:",
+		msg.IpAddr))
 	switch msg.State {
 	case config.STATE_UP:
 		if svr.IsIPv6Addr(msg.IpAddr) {
 			if !svr.IsLinkLocal(msg.IpAddr) {
-				debug.Logger.Info(fmt.Sprintln("Create pkt handler for", msg.IfIndex, "IpAddr:", msg.IpAddr))
+				debug.Logger.Info(fmt.Sprintln("Create pkt handler for", msg.IfIndex,
+					"IpAddr:", msg.IpAddr))
 				svr.StartRxTx(msg.IfIndex)
 			}
 		}
@@ -295,5 +297,4 @@ func (svr *NDPServer) PopulateVlanInfo(nbrInfo *config.NeighborInfo, ifIndex int
 		// in this case use system reserved Vlan id which is -1
 		nbrInfo.VlanId = -1
 	}
-	nbrInfo.IfIndex = ifIndex
 }

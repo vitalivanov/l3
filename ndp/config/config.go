@@ -103,3 +103,8 @@ type VlanNotification struct {
 	Operation  string
 	UntagPorts []int32
 }
+
+type PacketData struct {
+	Data    []byte
+	IfIndex int32
+}

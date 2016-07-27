@@ -24,11 +24,13 @@ package packet
 
 import (
 	"github.com/google/gopacket/pcap"
+	"l3/ndp/config"
 	"testing"
 )
 
 var testPcapHdl *pcap.Handle
 var testPktObj *Packet
+var testPktDataCh chan config.PacketData
 
 const (
 	TEST_PORT = "lo"
@@ -44,7 +46,8 @@ func initPcapHandlerForTest(t *testing.T) {
 }
 
 func initTestPacket() {
-	testPktObj = Init()
+	testPktDataCh = make(chan config.PacketData)
+	testPktObj = Init(testPktDataCh)
 }
 
 func addTestNbrEntry(ipAddr string) {
@@ -57,23 +60,28 @@ func addTestNbrEntry(ipAddr string) {
 }
 
 func TestSendNDPacket(t *testing.T) {
-	err := sendNDPkt(ndsTest, testPcapHdl)
+	initTestPacket()
+	err := testPktObj.SendNDPkt(ndsTest, testPcapHdl)
 	if err == nil {
 		t.Error(err)
 	}
 	initPcapHandlerForTest(t)
-	err = sendNDPkt(ndsTest, testPcapHdl)
+	err = testPktObj.SendNDPkt(ndsTest, testPcapHdl)
 	if err != nil {
 		t.Error(err)
 	}
 }
 
 func TestNDSMsgSend(t *testing.T) {
-	ipAddr := "2002::1/64"
+	ipAddr := "2002::1"
 	initTestPacket()
 	addTestNbrEntry(ipAddr)
 	initPcapHandlerForTest(t)
 	err := testPktObj.SendNSMsgIfRequired(ipAddr, testPcapHdl)
+	if err == nil {
+		t.Error(err)
+	}
+	err = testPktObj.SendNSMsgIfRequired(ipAddr+"/64", testPcapHdl)
 	if err != nil {
 		t.Error(err)
 	}

@@ -285,7 +285,8 @@ func checkICMPv6Layer(hdr *layers.ICMPv6, wantICMPv6Hdr *testICMPv6, t *testing.
 }
 
 func TestValidateNDSPktForEncode(t *testing.T) {
-	pkt := Init()
+	initTestPacket()
+	pkt := testPktObj
 	p := gopacket.NewPacket(ndsTest, layers.LinkTypeEthernet, gopacket.Default)
 	if p.ErrorLayer() != nil {
 		t.Error("Failed to decode packet:", p.ErrorLayer().Error())

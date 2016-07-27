@@ -165,6 +165,9 @@ func (svr *NDPServer) ProcessRxPkt(ifIndex int32, pkt gopacket.Packet) {
 		return
 	}
 	nbrInfo := &config.NeighborInfo{}
+	nbrInfo.IfIndex = ifIndex
+	// @ALERT: always overwrite ifIndex when creating neighbor, if ifIndex has reverse map entry for
+	//	   vlanID
 	err := svr.Packet.ValidateAndParse(nbrInfo, pkt)
 	if err != nil {
 		debug.Logger.Err(fmt.Sprintln("Validating and parsing Pkt Failed:", err))
@@ -189,4 +192,12 @@ func (svr *NDPServer) ProcessRxPkt(ifIndex int32, pkt gopacket.Packet) {
 		debug.Logger.Alert(fmt.Sprintln("Handle state", nbrInfo.State, "after packet validation & parsing"))
 	}
 	return
+}
+
+func (svr *NDPServer) ProcessTimerExpiry(pktData config.PacketData) {
+	l3Port, exists := svr.L3Port[pktData.IfIndex]
+	if !exists {
+		return
+	}
+	svr.Packet.SendNDPkt(pktData.Data, l3Port.PcapBase.PcapHandle)
 }

@@ -31,8 +31,10 @@ import (
 	"net"
 )
 
-func Init() *Packet {
-	pkt := &Packet{}
+func Init(pktCh chan config.PacketData) *Packet {
+	pkt := &Packet{
+		PktCh: pktCh,
+	}
 	pkt.NbrCache = make(map[string]NeighborCache, 100)
 	return pkt
 }
@@ -171,6 +173,9 @@ func (p *Packet) populateNeighborInfo(nbrInfo *config.NeighborInfo, eth *layers.
 	nbrInfo.LinkLocalIp = ndInfo.TargetAddress.String()
 	if entry, exists := p.NbrCache[ndInfo.TargetAddress.String()]; exists {
 		nbrInfo.State = entry.State
+		// updated cache portifIndex when populating neigbor information
+		entry.PortIfIndex = nbrInfo.IfIndex
+		p.NbrCache[ndInfo.TargetAddress.String()] = entry
 	} else {
 		nbrInfo.PktOperation = byte(PACKET_DROP)
 	}

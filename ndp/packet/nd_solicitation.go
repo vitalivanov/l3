@@ -137,11 +137,18 @@ func (nd *NDInfo) ValidateNDAInfo(icmpFlags []byte, dstIP net.IP) error {
  *  Generic API to create Neighbor Solicitation Packet based on inputs..
  */
 func ConstructNSPacket(targetAddr, srcIP, srcMac, dstMac string, ip net.IP) []byte {
+	/* Entry exists so lets send out Neighbor Solicitation with "::" as srcIP and dstIP as
+	 * Solicitated Multicast Address.
+	 * Solicitated Muticast Address is formed by:
+	 *	    Taking lower 24 bits or 3 bytes of an address (unicast or anycast) and appending those
+	 *	    bits or bytes to the prefix of Solicitated-Node Address FF02:0:0:0:0:1:FFXX:XXXX
+	 */
 	dstIP := SOLICITATED_NODE_ADDRESS
 	ip = ip.To16()
 	for idx := (len(ip) - 3); idx < len(ip); idx++ {
 		dstIP[idx] = ip[idx]
 	}
+	// Ethernet Layer Information
 	srcMAC, _ := net.ParseMAC(srcMac)
 	dstMAC, _ := net.ParseMAC(dstMac)
 	eth := &layers.Ethernet{
@@ -149,6 +156,8 @@ func ConstructNSPacket(targetAddr, srcIP, srcMac, dstMac string, ip net.IP) []by
 		DstMAC:       dstMAC,
 		EthernetType: layers.EthernetTypeIPv6,
 	}
+
+	// IPv6 Layer Information
 	ipv6 := &layers.IPv6{
 		Version:      IPV6_VERSION,
 		TrafficClass: 0,
@@ -158,6 +167,7 @@ func ConstructNSPacket(targetAddr, srcIP, srcMac, dstMac string, ip net.IP) []by
 		HopLimit:     HOP_LIMIT,
 	}
 
+	// ICMPV6 Layer Information
 	payload := make([]byte, ICMPV6_MIN_LENGTH)
 	payload[0] = byte(layers.ICMPv6TypeNeighborSolicitation)
 	payload[1] = byte(0)
@@ -165,6 +175,8 @@ func ConstructNSPacket(targetAddr, srcIP, srcMac, dstMac string, ip net.IP) []by
 	binary.BigEndian.PutUint32(payload[4:], 0)  // RESERVED FLAG...
 	copy(payload[8:], ip)
 	binary.BigEndian.PutUint16(payload[2:4], getCheckSum(ipv6, payload))
+
+	// GoPacket serialized buffer that will be used to send out raw bytes
 	buffer := gopacket.NewSerializeBuffer()
 	options := gopacket.SerializeOptions{
 		FixLengths:       true,
