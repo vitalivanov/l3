@@ -25,19 +25,20 @@ package packet
 import (
 	"errors"
 	"fmt"
+	"github.com/google/gopacket/pcap"
 	"l3/ndp/debug"
 	"net"
 )
 
 /*
- *    Your system is booting up and now linux is sending Neighbor Solicitation message targeted at the
+ *    Port is coming up for the first time and linux is sending Neighbor Solicitation message targeted at the
  *    neighbor. In this case we will wait for linux to finish off the neighbor detection and hence ignore
  *    sending the NS packet...
  *    However, if the ipAddr is already cached in the neighbor cache then it means that it has already been
  *    solicitated before......In this case we will send out multicast solicitation and whoever repsonds will we
  *    learn about them via Neighbor Advertisement... That way our nexthop neighbor entry is always up-to-date
  */
-func (p *Packet) SendNSMsgIfRequired(ipAddr string) error {
+func (p *Packet) SendNSMsgIfRequired(ipAddr string, pHdl *pcap.Handle) error {
 	cache, exists := p.NbrCache[ipAddr]
 	if !exists {
 		debug.Logger.Info(fmt.Sprintln("cache entry for ipAddr", ipAddr, "not found in nbr cache.",
@@ -55,6 +56,20 @@ func (p *Packet) SendNSMsgIfRequired(ipAddr string) error {
 	if err != nil {
 		return errors.New(fmt.Sprintln("Parsing CIDR", ipAddr, "failed with Error:", err))
 	}
-	ConstructNSPacket(ipAddr, "::", cache.LinkLayerAddress, IPV6_ICMPV6_MULTICAST_DST_MAC, ip.To16())
+	pktToSend := ConstructNSPacket(ipAddr, "::", cache.LinkLayerAddress, IPV6_ICMPV6_MULTICAST_DST_MAC, ip.To16())
+	return sendNDPkt(pktToSend, pHdl)
+}
+
+/*
+ *    Helper function to send raw bytes on a given pcap handler
+ */
+func sendNDPkt(pkt []byte, pHdl *pcap.Handle) error {
+	if pHdl == nil {
+		return errors.New("Invalid Pcap Handler")
+	}
+	err := pHdl.WritePacketData(pkt)
+	if err != nil {
+		return errors.New("Sending Packet Failed")
+	}
 	return nil
 }
