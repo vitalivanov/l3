@@ -199,7 +199,6 @@ func TestConstructNSPacket(t *testing.T) {
 	srcMac := "00:e0:ec:26:a7:ee"
 	dstMac := "33:33:ff:00:00:01"
 	rcvdBytes := ConstructNSPacket(targetAddr, "::", srcMac, dstMac, net.ParseIP(targetAddr).To16())
-	wantEthLayer := []byte{0x33, 0x33, 0xff, 0x00, 0x00, 0x01, 0x00, 0xe0, 0xec, 0x26, 0xa7, 0xee, 0x86, 0xdd}
 	encodedEthLayer := &layers.Ethernet{}
 	p := gopacket.NewPacket(rcvdBytes, layers.LinkTypeEthernet, gopacket.Default)
 	if p.ErrorLayer() != nil {
@@ -209,9 +208,24 @@ func TestConstructNSPacket(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
+	wantSrcMac := net.HardwareAddr{0x00, 0xe0, 0xec, 0x26, 0xa7, 0xee}
+	wantDstMac := net.HardwareAddr{0x33, 0x33, 0xff, 0x00, 0x00, 0x01}
+	wantEthType := layers.EthernetTypeIPv6
 	t.Log(rcvdBytes)
 	t.Log(ndsTest)
-	if !reflect.DeepEqual(encodedEthLayer, wantEthLayer) {
-		t.Error("Ethernet layer construct is invalid")
+	if !reflect.DeepEqual(encodedEthLayer.SrcMAC, wantSrcMac) {
+		t.Error("SrcMAC is invalid got", encodedEthLayer.SrcMAC, "but wanted", wantSrcMac)
+	}
+	if !reflect.DeepEqual(encodedEthLayer.DstMAC, wantDstMac) {
+		t.Error("DstMAC is invalid got", encodedEthLayer.DstMAC, "but wanted", wantDstMac)
+	}
+	if !reflect.DeepEqual(encodedEthLayer.EthernetType, wantEthType) {
+		t.Error("Ethernet Type is set incorrectly got", encodedEthLayer.EthernetType, "but wanted", wantEthType)
+	}
+	icmpv6Hdr := &layers.ICMPv6{}
+	ipv6Hdr := &layers.IPv6{}
+	err = getIpAndICMPv6Hdr(p, ipv6Hdr, icmpv6Hdr)
+	if err != nil {
+		t.Error("Decoding ipv6 and icmpv6 header failed", err)
 	}
 }
