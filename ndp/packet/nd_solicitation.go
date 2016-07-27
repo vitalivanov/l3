@@ -155,6 +155,7 @@ func ConstructNSPacket(targetAddr, srcIP, srcMac, dstMac string, ip net.IP) []by
 		NextHeader:   layers.IPProtocolICMPv6,
 		SrcIP:        net.ParseIP(srcIP),
 		DstIP:        dstIP,
+		HopLimit:     HOP_LIMIT,
 	}
 
 	payload := make([]byte, ICMPV6_MIN_LENGTH)

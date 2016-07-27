@@ -194,6 +194,59 @@ func TestValidateNDAInfo(t *testing.T) {
 	}
 }
 
+type testIPv6 struct {
+	Version      uint8
+	TrafficClass uint8
+	FlowLabel    uint32
+	Length       uint16
+	NextHeader   layers.IPProtocol
+	HopLimit     uint8
+	SrcIP        net.IP
+	DstIP        net.IP
+}
+
+func checkEthLayer(encodedEthLayer *layers.Ethernet, wantSrcMac, wantDstMac net.HardwareAddr,
+	wantEthType layers.EthernetType, t *testing.T) {
+	//t.Log("========VALIDATING ETH HEADER (ENCODEDETH == WANTETH)=========")
+	if !reflect.DeepEqual(encodedEthLayer.SrcMAC, wantSrcMac) {
+		t.Error("SrcMAC is invalid got", encodedEthLayer.SrcMAC, "but wanted", wantSrcMac)
+	}
+	if !reflect.DeepEqual(encodedEthLayer.DstMAC, wantDstMac) {
+		t.Error("DstMAC is invalid got", encodedEthLayer.DstMAC, "but wanted", wantDstMac)
+	}
+	if !reflect.DeepEqual(encodedEthLayer.EthernetType, wantEthType) {
+		t.Error("Ethernet Type is set incorrectly got", encodedEthLayer.EthernetType, "but wanted",
+			wantEthType)
+	}
+	//t.Log("")
+	//t.Log("======== VALIDATING ETH HEADER SUCCESS =========")
+}
+
+func checkIPv6Layer(ipv6Hdr *layers.IPv6, wantIPv6Hdr *testIPv6, t *testing.T) {
+	//t.Log("========VALIDATING IPV6 HEADER (WANTIPV6 == ENCODEDIPV6)=========")
+	if !reflect.DeepEqual(ipv6Hdr.Version, wantIPv6Hdr.Version) {
+		t.Error("Version is incorrect", wantIPv6Hdr.Version, "!=", ipv6Hdr.Version)
+	}
+	if !reflect.DeepEqual(ipv6Hdr.Length, wantIPv6Hdr.Length) {
+		t.Error("Length is incorrect", wantIPv6Hdr.Length, "!=", ipv6Hdr.Length)
+	}
+	if !reflect.DeepEqual(ipv6Hdr.NextHeader, wantIPv6Hdr.NextHeader) {
+		t.Error("Next Header is incorrect", wantIPv6Hdr.NextHeader, "!=", ipv6Hdr.NextHeader)
+	}
+	if !reflect.DeepEqual(ipv6Hdr.HopLimit, wantIPv6Hdr.HopLimit) {
+		t.Error("Hop Limit is incorrect", wantIPv6Hdr.HopLimit, "!=", ipv6Hdr.HopLimit)
+	}
+
+	if !reflect.DeepEqual(ipv6Hdr.SrcIP, wantIPv6Hdr.SrcIP) {
+		t.Error("Src IP is incorrect", wantIPv6Hdr.SrcIP, "!=", ipv6Hdr.SrcIP)
+	}
+	if !reflect.DeepEqual(ipv6Hdr.DstIP, wantIPv6Hdr.DstIP) {
+		t.Error("Dst IP is incorrect", wantIPv6Hdr.DstIP, "!=", ipv6Hdr.DstIP)
+	}
+	//t.Log("")
+	//t.Log("======== VALIDATING IPV6 HEADER SUCCESS =========")
+}
+
 func TestConstructNSPacket(t *testing.T) {
 	targetAddr := "2002::1"
 	srcMac := "00:e0:ec:26:a7:ee"
@@ -211,21 +264,25 @@ func TestConstructNSPacket(t *testing.T) {
 	wantSrcMac := net.HardwareAddr{0x00, 0xe0, 0xec, 0x26, 0xa7, 0xee}
 	wantDstMac := net.HardwareAddr{0x33, 0x33, 0xff, 0x00, 0x00, 0x01}
 	wantEthType := layers.EthernetTypeIPv6
-	t.Log(rcvdBytes)
-	t.Log(ndsTest)
-	if !reflect.DeepEqual(encodedEthLayer.SrcMAC, wantSrcMac) {
-		t.Error("SrcMAC is invalid got", encodedEthLayer.SrcMAC, "but wanted", wantSrcMac)
-	}
-	if !reflect.DeepEqual(encodedEthLayer.DstMAC, wantDstMac) {
-		t.Error("DstMAC is invalid got", encodedEthLayer.DstMAC, "but wanted", wantDstMac)
-	}
-	if !reflect.DeepEqual(encodedEthLayer.EthernetType, wantEthType) {
-		t.Error("Ethernet Type is set incorrectly got", encodedEthLayer.EthernetType, "but wanted", wantEthType)
-	}
+	//t.Log(rcvdBytes)
+	//t.Log(ndsTest)
+	checkEthLayer(encodedEthLayer, wantSrcMac, wantDstMac, wantEthType, t)
 	icmpv6Hdr := &layers.ICMPv6{}
 	ipv6Hdr := &layers.IPv6{}
 	err = getIpAndICMPv6Hdr(p, ipv6Hdr, icmpv6Hdr)
 	if err != nil {
 		t.Error("Decoding ipv6 and icmpv6 header failed", err)
 	}
+
+	wantIPv6Hdr := &testIPv6{
+		Version:      6,
+		TrafficClass: 0,
+		FlowLabel:    0,
+		Length:       ICMPV6_MIN_LENGTH,
+		NextHeader:   layers.IPProtocolICMPv6,
+		HopLimit:     HOP_LIMIT,
+		SrcIP:        net.ParseIP("::"),
+		DstIP:        net.ParseIP("ff02::1:ff00:1"),
+	}
+	checkIPv6Layer(ipv6Hdr, wantIPv6Hdr, t)
 }
