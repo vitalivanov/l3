@@ -28,11 +28,11 @@ import (
 	"fmt"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
+	"l3/ndp/debug"
 	"net"
 )
 
 /*
- *
  *  Range for Solicited Node Multicast Address from RFC 4291 FF02:0:0:0:0:1:FF00:0000 to FF02:0:0:0:0:1:FFFF:FFFF
  *  if srcIp == "::", i.e Unspecified address then dstIP should be solicited-node address FF02:0:0:0:0:1:FFXX:XXXX
  *  if srcIP == "::", then there should not be any source link-layer option in message
@@ -121,6 +121,18 @@ func ConstructNSPacket(targetAddr, srcIP, srcMac, dstMac string, ip net.IP) []by
 	return buffer.Bytes()
 }
 
+/*
+ *  helper function to handle incoming Neighbor solicitation messages...
+ *  Case 1) SrcIP == "::"
+ *		This is a message which is locally generated. In this case Target Address will be our own
+ *		IP Address, which is not a Neighbor and hence we should not create a entry in NbrCache
+ *  Case 2) SrcIP != "::"
+ *		This is a message coming from our Neighbor. Ok now what do we need to do?
+ *		If no cache entry:
+ *		    Then create a cache entry and mark that entry as incomplete
+ *		If cache entry exists:
+ *		    Then update the state to STALE
+ */
 func (p *Packet) HandleNSMsg(hdr *layers.ICMPv6, srcIP, dstIP net.IP) (*NDInfo, error) {
 	ndInfo := &NDInfo{}
 	ndInfo.DecodeNDInfo(hdr.LayerPayload())
@@ -132,10 +144,13 @@ func (p *Packet) HandleNSMsg(hdr *layers.ICMPv6, srcIP, dstIP net.IP) (*NDInfo, 
 	if err != nil {
 		return nil, err
 	}
+	debug.Logger.Info(fmt.Sprintln("NS: Searching for", srcIP.String(), "in NeighborCache entry for local", ndInfo.TargetAddress.String()))
 	// if source ip is not "::" then only we should update the nbrCache...
 	// In this case Target Address is our own IP Address
 	if !srcIP.IsUnspecified() {
-		cache, exists := p.NbrCache[ndInfo.TargetAddress.String()]
+		//cache, exists := p.NbrCache[ndInfo.TargetAddress.String()]
+		//cache, exists := p.NbrCache[srcIP.String()]
+		cache, exists := p.NbrCache[ndInfo.TargetAddress.String()][srcIP.String()]
 		if exists {
 			// @TODO: need to do something like updating timer or what not
 		}
@@ -152,7 +167,10 @@ func (p *Packet) HandleNSMsg(hdr *layers.ICMPv6, srcIP, dstIP net.IP) (*NDInfo, 
 		} else {
 			cache.State = INCOMPLETE
 		}
-		p.NbrCache[ndInfo.TargetAddress.String()] = cache
+		debug.Logger.Info(fmt.Sprintln("NS: nbrCach (key, value) ---> (", ndInfo.TargetAddress.String(),
+			",", cache, ")"))
+		//p.NbrCache[ndInfo.TargetAddress.String()] = cache
+		p.NbrCache[ndInfo.TargetAddress.String()][srcIP.String()] = cache
 	}
 	return ndInfo, nil
 }

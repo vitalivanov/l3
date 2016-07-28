@@ -64,8 +64,12 @@ type NeighborCache struct {
 
 type Packet struct {
 	PktCh chan config.PacketData
+	//NbrCache map[string]NeighborCache
 	// Neighbor Cache Information
-	NbrCache map[string]NeighborCache
+	// This is map of string to (map of string to NeighborCache). Each key of the outer map is the our own
+	// IP Address with its own Neigbor's map. Each inner map key is a Neighbor IP Address. Each inner map
+	// expression retrieve the information pertaining to that neighbor
+	NbrCache map[string]map[string]NeighborCache
 	//Operation PACKET_OPERATION
 }
 

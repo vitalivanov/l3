@@ -24,10 +24,10 @@ package packet
 
 import (
 	"errors"
-	"fmt"
+	_ "fmt"
 	"github.com/google/gopacket/pcap"
-	"l3/ndp/debug"
-	"net"
+	_ "l3/ndp/debug"
+	_ "net"
 )
 
 /*
@@ -39,18 +39,21 @@ import (
  *    learn about them via Neighbor Advertisement... That way our nexthop neighbor entry is always up-to-date
  */
 func (p *Packet) SendNSMsgIfRequired(ipAddr string, pHdl *pcap.Handle) error {
-	ip, _, err := net.ParseCIDR(ipAddr)
-	if err != nil {
-		return errors.New(fmt.Sprintln("Parsing CIDR", ipAddr, "failed with Error:", err))
-	}
-	cache, exists := p.NbrCache[ip.String()]
-	if !exists {
-		debug.Logger.Info(fmt.Sprintln("cache entry for ipAddr", ip, "not found in nbr cache.",
-			"Waiting for linux to finish of neighbor duplicate detection"))
-		return nil
-	}
-	pktToSend := ConstructNSPacket(ip.String(), "::", cache.LinkLayerAddress, IPV6_ICMPV6_MULTICAST_DST_MAC, ip.To16())
-	return p.SendNDPkt(pktToSend, pHdl)
+	/*
+		ip, _, err := net.ParseCIDR(ipAddr)
+		if err != nil {
+			return errors.New(fmt.Sprintln("Parsing CIDR", ipAddr, "failed with Error:", err))
+		}
+			cache, exists := p.NbrCache[ip.String()]
+			if !exists {
+				debug.Logger.Info(fmt.Sprintln("cache entry for ipAddr", ip, "not found in nbr cache.",
+					"Waiting for linux to finish of neighbor duplicate detection"))
+				return nil
+			}
+			pktToSend := ConstructNSPacket(ip.String(), "::", cache.LinkLayerAddress, IPV6_ICMPV6_MULTICAST_DST_MAC, ip.To16())
+			return p.SendNDPkt(pktToSend, pHdl)
+	*/
+	return nil
 }
 
 /*

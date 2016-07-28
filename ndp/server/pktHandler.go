@@ -90,6 +90,7 @@ func (svr *NDPServer) StartRxTx(ifIndex int32) {
 	// Spawn go routines for rx & tx
 	go svr.ReceivedNdpPkts(ipPort.IfIndex)
 	svr.ndpUpL3IntfStateSlice = append(svr.ndpUpL3IntfStateSlice, ifIndex)
+	// @TODO:When port comes up are we suppose to send out Neigbor Solicitation or Router Solicitation??
 	svr.Packet.SendNSMsgIfRequired(ipPort.IpAddr, ipPort.PcapBase.PcapHandle)
 }
 

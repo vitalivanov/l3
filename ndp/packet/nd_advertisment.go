@@ -27,6 +27,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/google/gopacket/layers"
+	"l3/ndp/debug"
 	"net"
 )
 
@@ -58,7 +59,9 @@ func (p *Packet) HandleNAMsg(hdr *layers.ICMPv6, srcIP, dstIP net.IP) (*NDInfo, 
 	if err != nil {
 		return nil, err
 	}
-	cache, exists := p.NbrCache[ndInfo.TargetAddress.String()]
+	debug.Logger.Info(fmt.Sprintln("NA: Searching for NbrCache", ndInfo.TargetAddress.String()))
+	//cache, exists := p.NbrCache[ndInfo.TargetAddress.String()]
+	cache, exists := p.NbrCache[ndInfo.TargetAddress.String()][srcIP.String()]
 	if !exists {
 		//@TODO: need to drop advertisement packet??
 	}
@@ -71,6 +74,9 @@ func (p *Packet) HandleNAMsg(hdr *layers.ICMPv6, srcIP, dstIP net.IP) (*NDInfo, 
 			}
 		}
 	}
-	p.NbrCache[ndInfo.TargetAddress.String()] = cache
+	debug.Logger.Info(fmt.Sprintln("NA: nbrCach (key, value) ---> (", ndInfo.TargetAddress.String(),
+		",", cache, ")"))
+	//p.NbrCache[ndInfo.TargetAddress.String()] = cache
+	p.NbrCache[ndInfo.TargetAddress.String()][srcIP.String()] = cache
 	return ndInfo, nil
 }
