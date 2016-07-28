@@ -26,9 +26,11 @@ import (
 	"fmt"
 	"l3/ndp/config"
 	"l3/ndp/debug"
+	"l3/ndp/packet"
 	_ "models/objects"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 	"utils/asicdClient"
@@ -37,6 +39,7 @@ import (
 func NDPNewServer(sPlugin asicdClient.AsicdClientIntf) *NDPServer {
 	svr := &NDPServer{}
 	svr.SwitchPlugin = sPlugin
+	svr.Packet = packet.Init()
 	return svr
 }
 
@@ -71,11 +74,12 @@ func (svr *NDPServer) OSSignalHandle() {
 }
 
 func (svr *NDPServer) InitGlobalDS() {
-	svr.PhyPort = make(map[int32]config.PortInfo, NDP_SYSTEM_PORT_MAP_CAPACITY)
-	svr.SwitchMacMapEntries = make(map[string]bool, 1)
-	svr.L3Port = make(map[int32]config.IPv6IntfInfo, NDP_SYSTEM_PORT_MAP_CAPACITY)
-	svr.VlanInfo = make(map[int32]config.VlanInfo, NDP_SYSTEM_PORT_MAP_CAPACITY)
-	svr.VlanIfIdxVlanIdMap = make(map[int32]int32, NDP_SYSTEM_PORT_MAP_CAPACITY)
+	svr.PhyPort = make(map[int32]config.PortInfo, NDP_SERVER_MAP_INITIAL_CAP)
+	svr.SwitchMacMapEntries = make(map[string]struct{}, NDP_SERVER_MAP_INITIAL_CAP)
+	svr.L3Port = make(map[int32]config.IPv6IntfInfo, NDP_SERVER_MAP_INITIAL_CAP)
+	svr.VlanInfo = make(map[int32]config.VlanInfo, NDP_SERVER_MAP_INITIAL_CAP)
+	svr.VlanIfIdxVlanIdMap = make(map[int32]int32, NDP_SERVER_MAP_INITIAL_CAP)
+	svr.NeighborInfo = make(map[string]config.NeighborInfo, NDP_SERVER_MAP_INITIAL_CAP)
 	svr.PhyPortStateCh = make(chan *config.StateNotification)
 	svr.IpIntfCh = make(chan *config.IPIntfNotification)
 	svr.IpStateCh = make(chan *config.StateNotification)
@@ -84,6 +88,7 @@ func (svr *NDPServer) InitGlobalDS() {
 	svr.SnapShotLen = 1024
 	svr.Promiscuous = false
 	svr.Timeout = 1 * time.Second
+	svr.NeigborEntryLock = &sync.RWMutex{}
 }
 
 func (svr *NDPServer) DeInitGlobalDS() {

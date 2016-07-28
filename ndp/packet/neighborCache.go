@@ -20,28 +20,19 @@
 // |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
 // |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
 //
+package packet
 
-// ribNotify.go
-package server
-
-import (
-	"github.com/op/go-nanomsg"
-	"time"
+const (
+	_ = iota
+	INCOMPLETE
+	REACHABLE
+	STALE
+	DELAY
+	PROBE
 )
 
-type NotificationMsg struct {
-	pub_socket *nanomsg.PubSocket
-	msg        []byte
-	eventInfo  string
-}
-
-func (ribdServiceHandler *RIBDServer) NotificationServer() {
-	logger.Info("Starting notification server loop")
-	for {
-		notificationMsg := <-ribdServiceHandler.NotificationChannel
-		logger.Info("Event received with eventInfo: ", notificationMsg.eventInfo)
-		eventInfo := RouteEventInfo{timeStamp: time.Now().String(), eventInfo: notificationMsg.eventInfo}
-		localRouteEventsDB = append(localRouteEventsDB, eventInfo)
-		notificationMsg.pub_socket.Send(notificationMsg.msg, nanomsg.DontWait)
-	}
+type NeighborCache struct {
+	Timer            int // Future Info
+	State            int
+	LinkLayerAddress string
 }

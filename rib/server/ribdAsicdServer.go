@@ -26,20 +26,65 @@ package server
 
 import (
 	"asicdInt"
-	"fmt"
+	//"fmt"
+	"l3/rib/ribdCommonDefs"
 )
 
-var asicdBulkCount = 3000
-var asicdRouteCount = 0
-var asicdRoutes []*asicdInt.IPv4Route
-var asicdRoute []asicdInt.IPv4Route
+var asicdBulkCount = 30000
+var asicdv4RouteCount = 0
+var asicdv4Routes []*asicdInt.IPv4Route
+var asicdv4Route []asicdInt.IPv4Route
+var asicdv6Route []asicdInt.IPv6Route
 
+func addAsicdRouteBulk(routeInfoRecord RouteInfoRecord, bulkEnd bool) {
+	logger.Info("addAsicdRouteBulk, bulkEnd:", bulkEnd)
+	if asicdclnt.IsConnected == false {
+		return
+	}
+	ipType := ""
+	if routeInfoRecord.ipType == ribdCommonDefs.IPv4 {
+		ipType = "IPv4"
+	} else if routeInfoRecord.ipType == ribdCommonDefs.IPv6 {
+		ipType = "IPv6"
+	}
+	logger.Info("addAsicdRoute, weight = ", routeInfoRecord.weight+1, " ipType:", ipType)
+	if routeInfoRecord.ipType == ribdCommonDefs.IPv4 {
+		if asicdv4RouteCount == 0 {
+			asicdv4Routes = make([]*asicdInt.IPv4Route, 0)
+		}
+		asicdv4Routes = append(asicdv4Routes,
+			&asicdInt.IPv4Route{
+				routeInfoRecord.destNetIp.String(),
+				routeInfoRecord.networkMask.String(),
+				[]*asicdInt.IPv4NextHop{
+					&asicdInt.IPv4NextHop{
+						NextHopIp: routeInfoRecord.resolvedNextHopIpIntf.NextHopIp,
+						Weight:    int32(routeInfoRecord.weight + 1),
+					},
+				},
+			})
+		asicdv4RouteCount++
+		if asicdv4RouteCount == asicdBulkCount || bulkEnd {
+			asicdclnt.ClientHdl.OnewayCreateIPv4Route(asicdv4Routes)
+			asicdv4Routes = nil
+			asicdv4RouteCount = 0
+		}
+	} else if routeInfoRecord.ipType == ribdCommonDefs.IPv6 {
+	}
+}
 func addAsicdRoute(routeInfoRecord RouteInfoRecord) {
 	if asicdclnt.IsConnected == false {
 		return
 	}
-	logger.Info(fmt.Sprintln("addAsicdRoute, weight = ", routeInfoRecord.weight+1, " ipType:", routeInfoRecord.ipType))
-	if routeInfoRecord.ipType == ipv4 {
+	ipType := ""
+	if routeInfoRecord.ipType == ribdCommonDefs.IPv4 {
+		ipType = "IPv4"
+	} else if routeInfoRecord.ipType == ribdCommonDefs.IPv6 {
+		ipType = "IPv6"
+	}
+	logger.Info("addAsicdRoute, weight = ", routeInfoRecord.weight+1, " ipType:", ipType)
+	if routeInfoRecord.ipType == ribdCommonDefs.IPv4 {
+		//logger.Info("ipv4 route, calling onewaycreateipv4 route")
 		/*	asicdRoute = make([]asicdInt.IPv4Route, asicdBulkCount)
 			if asicdRouteCount == 0 {
 				asicdRoutes = make([]*asicdInt.IPv4Route, 0)
@@ -73,7 +118,7 @@ func addAsicdRoute(routeInfoRecord RouteInfoRecord) {
 				},
 			},
 		})
-	} else if routeInfoRecord.ipType == ipv6 {
+	} else if routeInfoRecord.ipType == ribdCommonDefs.IPv6 {
 		asicdclnt.ClientHdl.OnewayCreateIPv6Route([]*asicdInt.IPv6Route{
 			&asicdInt.IPv6Route{
 				routeInfoRecord.destNetIp.String(),
@@ -92,8 +137,8 @@ func delAsicdRoute(routeInfoRecord RouteInfoRecord) {
 	if asicdclnt.IsConnected == false {
 		return
 	}
-	logger.Info(fmt.Sprintln("delAsicdRoute with ipType ", routeInfoRecord.ipType))
-	if routeInfoRecord.ipType == ipv4 {
+	logger.Info("delAsicdRoute with ipType ", routeInfoRecord.ipType)
+	if routeInfoRecord.ipType == ribdCommonDefs.IPv4 {
 		asicdclnt.ClientHdl.OnewayDeleteIPv4Route([]*asicdInt.IPv4Route{
 			&asicdInt.IPv4Route{
 				routeInfoRecord.destNetIp.String(),
@@ -107,7 +152,7 @@ func delAsicdRoute(routeInfoRecord RouteInfoRecord) {
 				},
 			},
 		})
-	} else if routeInfoRecord.ipType == ipv6 {
+	} else if routeInfoRecord.ipType == ribdCommonDefs.IPv6 {
 
 		asicdclnt.ClientHdl.OnewayDeleteIPv6Route([]*asicdInt.IPv6Route{
 			&asicdInt.IPv6Route{
@@ -127,12 +172,18 @@ func delAsicdRoute(routeInfoRecord RouteInfoRecord) {
 }
 func (ribdServiceHandler *RIBDServer) StartAsicdServer() {
 	logger.Info("Starting the asicdserver loop")
+	asicdv4Route = make([]asicdInt.IPv4Route, asicdBulkCount)
+	asicdv6Route = make([]asicdInt.IPv6Route, asicdBulkCount)
 	for {
 		select {
 		case route := <-ribdServiceHandler.AsicdRouteCh:
-			logger.Debug(fmt.Sprintln(" received message on AsicdRouteCh, op:", route.Op, " ip type:", route.OrigConfigObject.(RouteInfoRecord).ipType))
+			logger.Debug(" received message on AsicdRouteCh, op:", route.Op, " ip type:", route.OrigConfigObject.(RouteInfoRecord).ipType, " bulk:", route.Bulk, " bulkEnd:", route.BulkEnd)
 			if route.Op == "add" {
-				addAsicdRoute(route.OrigConfigObject.(RouteInfoRecord))
+				if route.Bulk {
+					addAsicdRouteBulk(route.OrigConfigObject.(RouteInfoRecord), route.BulkEnd)
+				} else {
+					addAsicdRoute(route.OrigConfigObject.(RouteInfoRecord))
+				}
 			} else if route.Op == "del" {
 				delAsicdRoute(route.OrigConfigObject.(RouteInfoRecord))
 			}

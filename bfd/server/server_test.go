@@ -25,9 +25,29 @@ package server
 
 import (
 	"fmt"
-	"testing"
+	"infra/sysd/sysdCommonDefs"
+	"log/syslog"
+	//"testing"
+	"utils/logging"
 )
 
-func initTestParams() {
+var bfdTestServer *BFDServer
+var bfdTestSession *BfdSession
+var bfdTestSessionParam *BfdSessionParam
+
+func BfdTestNewLogger() *logging.Writer {
+	logger := new(logging.Writer)
+	logger.SysLogger, _ = syslog.New(syslog.LOG_DEBUG|syslog.LOG_DAEMON, "BFDTEST")
+	logger.GlobalLogging = true
+	logger.MyLogLevel = sysdCommonDefs.DEBUG
+	return logger
+}
+
+func initTestServer() {
+	var paramFile string
 	fmt.Println("Initializing BFD UT params")
+	logger := BfdTestNewLogger()
+	bfdTestServer = NewBFDServer(logger)
+	bfdTestServer.InitServer(paramFile)
+	return
 }

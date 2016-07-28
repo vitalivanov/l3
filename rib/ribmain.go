@@ -26,14 +26,30 @@ package main
 import (
 	"flag"
 	"fmt"
+	//"github.com/davecheney/profile"
 	"l3/rib/rpc"
 	"l3/rib/server"
+	//	"os"
+	//	"runtime/pprof"
 	"utils/dbutils"
 	"utils/keepalive"
 	"utils/logging"
 )
 
+//var cpuprofile = flag.String("cpuprofile", "cpu.prof", "write cpu profile to file")
+//var cpuprofile = "cpu.prof"
+
 func main() {
+	//defer profile.Start(profile.CPUProfile).Stop()
+	/*if cpuprofile != "" {
+		fmt.Println("cpuprofile not empty, start profiling")
+		f, err := os.Create(cpuprofile)
+		if err != nil {
+			fmt.Println("Error: ", err)
+		}
+		pprof.StartCPUProfile(f)
+		defer pprof.StopCPUProfile()
+	}*/
 	var err error
 	paramsDir := flag.String("params", "./params", "Params directory")
 	flag.Parse()
@@ -42,7 +58,7 @@ func main() {
 		fileName = fileName + "/"
 	}
 
-	fmt.Println("Start logger")
+	fmt.Println("RIBD Start logger")
 	logger, err := logging.NewLogger("ribd", "RIB", true)
 	if err != nil {
 		fmt.Println("Failed to start the logger. Nothing will be logged...")

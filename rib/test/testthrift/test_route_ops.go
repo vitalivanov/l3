@@ -36,12 +36,12 @@ var reachabilityTestList []string
 
 func GetTotalRouteCount(client *ribd.RIBDServicesClient) {
 	fmt.Println("GetTotalRouteCount")
-	number, _ := client.GetTotalRouteCount()
+	number, _ := client.GetTotalv4RouteCount()
 	fmt.Println("Number of routes:", number)
 }
 func GetRouteCreatedTime(client *ribd.RIBDServicesClient, number int) {
 	fmt.Println("GetRouteCreatedTime")
-	time, err := client.GetRouteCreatedTime(ribdInt.Int(number))
+	time, err := client.Getv4RouteCreatedTime(ribdInt.Int(number))
 	fmt.Println("err: ", err, " time:", time)
 }
 func Createv4Routes(client *ribd.RIBDServicesClient) {

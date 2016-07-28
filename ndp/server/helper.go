@@ -42,6 +42,7 @@ func (svr *NDPServer) GetPorts() {
 		return
 	}
 	for _, obj := range portsInfo {
+		var empty struct{}
 		port := config.PortInfo{
 			IntfRef:   obj.IntfRef,
 			IfIndex:   obj.IfIndex,
@@ -57,7 +58,7 @@ func (svr *NDPServer) GetPorts() {
 			port.Description = pObj.Description
 		}
 		svr.PhyPort[port.IfIndex] = port
-		svr.SwitchMacMapEntries[port.MacAddr] = true
+		svr.SwitchMacMapEntries[port.MacAddr] = empty
 	}
 
 	debug.Logger.Info("Done with Port State list")
@@ -182,7 +183,16 @@ func (svr *NDPServer) GetIntfRefName(ifIndex int32) string {
 
 func (svr *NDPServer) IsLinkLocal(ipAddr string) bool {
 	ip, _, _ := net.ParseCIDR(ipAddr)
-	return ip.IsLinkLocalUnicast()
+	return ip.IsLinkLocalUnicast() && (ip.To4() == nil)
+}
+
+func (svr *NDPServer) IsIPv6Addr(ipAddr string) bool {
+	ip, _, _ := net.ParseCIDR(ipAddr)
+	if ip.To4() == nil {
+		return true
+	}
+
+	return false
 }
 
 /*  API: will handle IPv6 notifications received from switch/asicd
@@ -244,11 +254,16 @@ func (svr *NDPServer) HandleStateNotification(msg *config.StateNotification) {
 	debug.Logger.Info(fmt.Sprintln("Received State:", msg.State, "for ifIndex:", msg.IfIndex, "ipAddr:", msg.IpAddr))
 	switch msg.State {
 	case config.STATE_UP:
-		if !svr.IsLinkLocal(msg.IpAddr) {
-			svr.StartRxTx(msg.IfIndex)
+		if svr.IsIPv6Addr(msg.IpAddr) {
+			if !svr.IsLinkLocal(msg.IpAddr) {
+				debug.Logger.Info(fmt.Sprintln("Create pkt handler for", msg.IfIndex, "IpAddr:", msg.IpAddr))
+				svr.StartRxTx(msg.IfIndex)
+			}
 		}
 	case config.STATE_DOWN:
-		svr.StopRxTx(msg.IfIndex)
+		if svr.IsIPv6Addr(msg.IpAddr) {
+			svr.StopRxTx(msg.IfIndex)
+		}
 	}
 }
 

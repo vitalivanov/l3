@@ -27,7 +27,6 @@ import (
 	"asicdServices"
 	"encoding/json"
 	"fmt"
-	"git.apache.org/thrift.git/lib/go/thrift"
 	"github.com/google/gopacket/pcap"
 	nanomsg "github.com/op/go-nanomsg"
 	"io/ioutil"
@@ -55,13 +54,6 @@ var (
 type ClientJson struct {
 	Name string `json:Name`
 	Port int    `json:Port`
-}
-
-type BfdClientBase struct {
-	Address            string
-	Transport          thrift.TTransport
-	PtrProtocolFactory *thrift.TBinaryProtocolFactory
-	IsConnected        bool
 }
 
 type RibdClient struct {

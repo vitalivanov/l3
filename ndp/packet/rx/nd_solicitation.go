@@ -110,14 +110,21 @@ func IsTargetMulticast(in net.IP) bool {
  *  if srcIp == "::", i.e Unspecified address then dstIP should be solicited-node address FF02:0:0:0:0:1:FFXX:XXXX
  *  if srcIP == "::", then there should not be any source link-layer option in message
  */
-func ValidateNDSIpAddrs(srcIP net.IP, dstIP net.IP) error {
+func ValidateNDSInfo(srcIP net.IP, dstIP net.IP, options []*NDOption) error {
 	if srcIP.IsUnspecified() {
 		if !(dstIP[0] == IPV6_MULTICAST_BYTE && dstIP[1]&0x0f == 0x02 &&
 			dstIP[11]&0x0f == 0x01 && dstIP[12] == IPV6_MULTICAST_BYTE) {
 			return errors.New(fmt.Sprintln("Destination IP address",
 				dstIP.String(), "is not Solicited-Node Multicast Address"))
 		}
-		// @TODO: need to add support for source link-layer address option
+		if len(options) > 0 {
+			for _, option := range options {
+				if option.Type == NDOptionTypeSourceLinkLayerAddress {
+					return errors.New(fmt.Sprintln("During ND Solicitation with Unspecified address",
+						"Source Link Layer Option should not be set"))
+				}
+			}
+		}
 	}
 	return nil
 }

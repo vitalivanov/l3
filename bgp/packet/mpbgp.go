@@ -35,7 +35,7 @@ import (
 
 var BGPAFIToStructMap = map[AFI]MPNextHop{
 	AfiIP:  &MPNextHopIP{},
-	AfiIP6: &MPNextHopIP{},
+	AfiIP6: &MPNextHopIP6{},
 }
 
 type MPNextHop interface {
@@ -45,6 +45,7 @@ type MPNextHop interface {
 	Len() uint8
 	New() MPNextHop
 	String() string
+	GetNextHop() net.IP
 }
 
 type MPNextHopIP struct {
@@ -61,23 +62,38 @@ func (i *MPNextHopIP) Clone() MPNextHop {
 
 func (i *MPNextHopIP) Encode(pkt []byte) error {
 	pkt[0] = i.Length
-	copy(pkt[1:], i.Value[cap(i.Value)-int(i.Length):])
+	if i.Length != 4 && i.Length != 16 && i.Length != 32 {
+		return errors.New(fmt.Sprintf("Wrong Next hop len %d", i.Length))
+	}
+	ipLen := net.IPv4len
+	if i.Length == 16 || i.Length == 32 {
+		ipLen = net.IPv6len
+	}
+	copy(pkt[1:], i.Value[cap(i.Value)-ipLen:])
 	return nil
 }
 
 func (i *MPNextHopIP) Decode(pkt []byte) error {
 	i.Length = pkt[0]
-	i.Value = make(net.IP, i.Length)
-	if i.Length == 4 {
+	if i.Length != 4 && i.Length != 16 && i.Length != 32 {
+		return errors.New(fmt.Sprintf("Wrong Next hop len %d", i.Length))
+	}
+	ipLen := net.IPv4len
+	if i.Length == 16 || i.Length == 32 {
+		ipLen = net.IPv6len
+	}
+
+	i.Value = make(net.IP, ipLen)
+	if ipLen == 4 {
 		i.Value = net.IPv4(pkt[1], pkt[2], pkt[3], pkt[4])
 	} else {
-		copy(i.Value, pkt[1:1+i.Length])
+		copy(i.Value, pkt[1:])
 	}
 	return nil
 }
 
 func (i *MPNextHopIP) Len() uint8 {
-	return i.Length
+	return i.Length + 1
 }
 
 func (i *MPNextHopIP) New() MPNextHop {
@@ -86,6 +102,10 @@ func (i *MPNextHopIP) New() MPNextHop {
 
 func (i *MPNextHopIP) String() string {
 	return fmt.Sprintf("{NEXTHOP %v}", i.Value)
+}
+
+func (i *MPNextHopIP) GetNextHop() net.IP {
+	return i.Value
 }
 
 func (i *MPNextHopIP) SetNextHop(ip net.IP) error {
@@ -102,6 +122,91 @@ func NewMPNextHopIP() *MPNextHopIP {
 	return &MPNextHopIP{
 		Length: 0,
 		Value:  net.IP{},
+	}
+}
+
+type MPNextHopIP6 struct {
+	*MPNextHopIP
+	LinkLocal net.IP
+}
+
+func (i *MPNextHopIP6) Clone() MPNextHop {
+	x := *i
+	nextHopIP := i.MPNextHopIP.Clone()
+	x.MPNextHopIP = nextHopIP.(*MPNextHopIP)
+	x.Value = make(net.IP, len(i.Value), cap(i.Value))
+	copy(x.Value, i.Value)
+	return &x
+}
+
+func (i *MPNextHopIP6) Encode(pkt []byte) error {
+	err := i.MPNextHopIP.Encode(pkt)
+	if err != nil {
+		return err
+	}
+	if i.LinkLocal != nil {
+		ipLen := net.IPv6len
+		copy(pkt[ipLen+1:], i.LinkLocal[cap(i.LinkLocal)-ipLen:])
+	}
+	return nil
+}
+
+func (i *MPNextHopIP6) Decode(pkt []byte) error {
+	err := i.MPNextHopIP.Decode(pkt)
+	if err != nil {
+		return err
+	}
+
+	if i.Length == 16 || i.Length == 32 {
+		ipLen := net.IPv6len
+		i.LinkLocal = make(net.IP, ipLen)
+		copy(i.LinkLocal, pkt[ipLen+1:])
+	}
+	return nil
+}
+
+func (i *MPNextHopIP6) New() MPNextHop {
+	return &MPNextHopIP{}
+}
+
+func (i *MPNextHopIP6) String() string {
+	return fmt.Sprintf("{NEXTHOP %v}", i.Value)
+}
+
+func (i *MPNextHopIP6) SetGlobalNextHop(ip net.IP) error {
+	if len(ip) != 16 {
+		return errors.New(fmt.Sprintf("IPv6 next hop address is not 16 bytes, length =%d", len(ip)))
+	}
+
+	i.Value = ip
+	if i.LinkLocal != nil {
+		i.Length = uint8(len(ip)) * 2
+	} else {
+		i.Length = uint8(len(ip))
+	}
+	return nil
+}
+
+func (i *MPNextHopIP6) SetLinkLocalNextHop(ip net.IP) error {
+	if len(ip) != 16 {
+		return errors.New(fmt.Sprintf("IPv6 next hop address is not 16 bytes, length =%d", len(ip)))
+	}
+
+	i.LinkLocal = ip
+	if i.LinkLocal != nil {
+		i.Length = uint8(len(ip)) * 2
+	} else {
+		i.Length = uint8(len(ip))
+	}
+	return nil
+}
+
+func NewMPNextHopIP6() *MPNextHopIP6 {
+	return &MPNextHopIP6{
+		MPNextHopIP: &MPNextHopIP{
+			Length: 0,
+			Value:  net.IP{},
+		},
 	}
 }
 
@@ -131,7 +236,7 @@ func (u *MPNextHopUnknown) Decode(pkt []byte) error {
 }
 
 func (i *MPNextHopUnknown) Len() uint8 {
-	return i.Length
+	return i.Length + 1
 }
 
 func (u *MPNextHopUnknown) New() MPNextHop {
@@ -140,6 +245,10 @@ func (u *MPNextHopUnknown) New() MPNextHop {
 
 func (u *MPNextHopUnknown) String() string {
 	return fmt.Sprintf("{NEXTHOP %v}", u.Value)
+}
+
+func (u *MPNextHopUnknown) GetNextHop() net.IP {
+	return u.Value
 }
 
 func (u *MPNextHopUnknown) SetNextHop(nextHop []byte) error {
@@ -193,33 +302,28 @@ func (r *BGPPathAttrMPReachNLRI) Encode() ([]byte, error) {
 		return pkt, nil
 	}
 	idx := int(r.BGPPathAttrBase.BGPPathAttrLen)
-	fmt.Printf("BGPPathAttrMPReachNLRI - path attr base encode done, pkt len=%d, idx =%d\n", len(pkt), idx)
 
 	binary.BigEndian.PutUint16(pkt[idx:idx+2], uint16(r.AFI))
 	idx += 2
 	pkt[idx] = uint8(r.SAFI)
 	idx++
-	fmt.Printf("BGPPathAttrMPReachNLRI - afi safi encode done, pkt len=%d, idx =%d\n", len(pkt), idx)
 
 	err = r.NextHop.Encode(pkt[idx:])
 	if err != nil {
 		return pkt, err
 	}
 	idx += int(r.NextHop.Len())
-	fmt.Printf("BGPPathAttrMPReachNLRI - next hop encode done, pkt len=%d, idx =%d\n", len(pkt), idx)
 
 	pkt[idx] = 0
 	idx++
 
 	for i := 0; i < len(r.NLRI); i++ {
-		bytes, err := r.NLRI[i].Encode()
+		bytes, err := r.NLRI[i].Encode(r.AFI)
 		if err != nil {
 			return pkt, err
 		}
-		fmt.Printf("BGPPathAttrMPReachNLRI - nlri bytes=%d\n", len(bytes))
 		copy(pkt[idx:], bytes)
 		idx += len(bytes)
-		fmt.Printf("BGPPathAttrMPReachNLRI - nlri bytes, pkt len=%d, idx =%d\n", len(pkt), idx)
 	}
 	return pkt, nil
 }
@@ -231,7 +335,6 @@ func (r *BGPPathAttrMPReachNLRI) Decode(pkt []byte, data interface{}) error {
 	}
 
 	idx := int(r.BGPPathAttrBase.BGPPathAttrLen)
-	fmt.Printf("BGPPathAttrMPReachNLRI - path attr base decode done, pkt len=%d, base len=%d, path attr len=%d\n", len(pkt), idx, r.BGPPathAttrBase.Length)
 	r.AFI = AFI(binary.BigEndian.Uint16(pkt[idx : idx+2]))
 	r.SAFI = SAFI(pkt[idx+2])
 	idx += 3
@@ -239,14 +342,14 @@ func (r *BGPPathAttrMPReachNLRI) Decode(pkt []byte, data interface{}) error {
 	nextHop := BGPGetMPNextHop(r.AFI)
 	nextHop.Decode(pkt[idx:])
 	r.NextHop = nextHop
-	idx += int(nextHop.Len() + 1)
+	idx += int(nextHop.Len())
 
 	r.Reserved = pkt[idx]
 	idx++
 
 	r.NLRI = make([]NLRI, 0)
-	length := uint32(r.BGPPathAttrBase.Length) - 5 - uint32(r.NextHop.Len())
-	_, err = decodeNLRI(pkt[idx:], &r.NLRI, length, data)
+	length := uint32(r.BGPPathAttrBase.Length) - 4 - uint32(r.NextHop.Len())
+	_, err = decodeNLRI(pkt[idx:], &r.NLRI, length, r.AFI, data)
 	return err
 }
 
@@ -264,12 +367,19 @@ func (r *BGPPathAttrMPReachNLRI) AddNLRI(nlri NLRI) {
 	r.BGPPathAttrBase.Length += uint16(nlri.Len())
 }
 
+func (r *BGPPathAttrMPReachNLRI) SetNLRIList(nlriList []NLRI) {
+	r.NLRI = nlriList
+	for _, nlri := range nlriList {
+		r.BGPPathAttrBase.Length += uint16(nlri.Len())
+	}
+}
+
 func NewBGPPathAttrMPReachNLRI() *BGPPathAttrMPReachNLRI {
 	return &BGPPathAttrMPReachNLRI{
 		BGPPathAttrBase: BGPPathAttrBase{
-			Flags:          BGPPathAttrFlagOptional & BGPPathAttrFlagExtendedLen,
+			Flags:          BGPPathAttrFlagOptional | BGPPathAttrFlagExtendedLen,
 			Code:           BGPPathAttrTypeMPReachNLRI,
-			Length:         5,
+			Length:         4,
 			BGPPathAttrLen: 4,
 		},
 		Reserved: 0,
@@ -307,7 +417,7 @@ func (u *BGPPathAttrMPUnreachNLRI) Encode() ([]byte, error) {
 	idx++
 
 	for i := 0; i < len(u.NLRI); i++ {
-		bytes, err := u.NLRI[i].Encode()
+		bytes, err := u.NLRI[i].Encode(u.AFI)
 		if err != nil {
 			return pkt, err
 		}
@@ -330,7 +440,7 @@ func (u *BGPPathAttrMPUnreachNLRI) Decode(pkt []byte, data interface{}) error {
 
 	u.NLRI = make([]NLRI, 0)
 	length := uint32(u.BGPPathAttrBase.Length) - 3
-	_, err = decodeNLRI(pkt[idx:], &u.NLRI, length, data)
+	_, err = decodeNLRI(pkt[idx:], &u.NLRI, length, u.AFI, data)
 	return err
 }
 
@@ -343,10 +453,17 @@ func (u *BGPPathAttrMPUnreachNLRI) AddNLRI(nlri NLRI) {
 	u.BGPPathAttrBase.Length += uint16(nlri.Len())
 }
 
+func (u *BGPPathAttrMPUnreachNLRI) AddNLRIList(nlriList []NLRI) {
+	for _, nlri := range nlriList {
+		u.NLRI = append(u.NLRI, nlri)
+		u.BGPPathAttrBase.Length += uint16(nlri.Len())
+	}
+}
+
 func NewBGPPathAttrMPUnreachNLRI() *BGPPathAttrMPUnreachNLRI {
 	return &BGPPathAttrMPUnreachNLRI{
 		BGPPathAttrBase: BGPPathAttrBase{
-			Flags:          BGPPathAttrFlagOptional & BGPPathAttrFlagExtendedLen,
+			Flags:          BGPPathAttrFlagOptional | BGPPathAttrFlagExtendedLen,
 			Code:           BGPPathAttrTypeMPUnreachNLRI,
 			Length:         3,
 			BGPPathAttrLen: 4,

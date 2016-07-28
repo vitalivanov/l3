@@ -20,28 +20,44 @@
 // |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
 // |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
 //
-
-// ribNotify.go
-package server
+package flexswitch
 
 import (
-	"github.com/op/go-nanomsg"
-	"time"
+	"ndpd"
+	"testing"
 )
 
-type NotificationMsg struct {
-	pub_socket *nanomsg.PubSocket
-	msg        []byte
-	eventInfo  string
+func TestCreateNDPGlobal(t *testing.T) {
+	h := NewConfigHandler()
+	config := &ndpd.NDPGlobal{}
+	h.CreateNDPGlobal(config)
 }
 
-func (ribdServiceHandler *RIBDServer) NotificationServer() {
-	logger.Info("Starting notification server loop")
-	for {
-		notificationMsg := <-ribdServiceHandler.NotificationChannel
-		logger.Info("Event received with eventInfo: ", notificationMsg.eventInfo)
-		eventInfo := RouteEventInfo{timeStamp: time.Now().String(), eventInfo: notificationMsg.eventInfo}
-		localRouteEventsDB = append(localRouteEventsDB, eventInfo)
-		notificationMsg.pub_socket.Send(notificationMsg.msg, nanomsg.DontWait)
-	}
+func TestDeleteNDPGlobal(t *testing.T) {
+	h := NewConfigHandler()
+	config := &ndpd.NDPGlobal{}
+	h.DeleteNDPGlobal(config)
+}
+
+func TestUpdateNDPGlobal(t *testing.T) {
+	h := NewConfigHandler()
+	config := &ndpd.NDPGlobal{}
+	newConfig := &ndpd.NDPGlobal{}
+	attrset := make([]bool, 0)
+	op := make([]*ndpd.PatchOpInfo, 0)
+	h.UpdateNDPGlobal(config, newConfig, attrset, op)
+}
+
+func TestGetBulkNDPEntry(t *testing.T) {
+	/*
+		h := NewConfigHandler()
+		h.GetBulkNDPEntryState(0, 10)
+	*/
+}
+
+func TestGetNDPEntry(t *testing.T) {
+	/*
+		h := NewConfigHandler()
+		h.GetNDPEntryState("")
+	*/
 }

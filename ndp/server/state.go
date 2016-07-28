@@ -20,28 +20,46 @@
 // |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
 // |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
 //
-
-// ribNotify.go
 package server
 
 import (
-	"github.com/op/go-nanomsg"
-	"time"
+	_ "fmt"
+	"l3/ndp/config"
+	_ "l3/ndp/debug"
 )
 
-type NotificationMsg struct {
-	pub_socket *nanomsg.PubSocket
-	msg        []byte
-	eventInfo  string
+func (svr *NDPServer) GetNeighborEntries(idx, cnt int) (int, int, []config.NeighborInfo) {
+	var nextIdx int
+	var count int
+	var i, j int
+
+	length := len(svr.neighborKey)
+	if length == 0 {
+		return 0, 0, nil
+	}
+	var result []config.NeighborInfo
+
+	svr.NeigborEntryLock.RLock()
+	for i, j = 0, idx; i < cnt && j < length; j++ {
+		key := svr.neighborKey[j]
+		result = append(result, svr.NeighborInfo[key])
+		i++
+	}
+	svr.NeigborEntryLock.RUnlock()
+	if j == length {
+		nextIdx = 0
+	}
+	count = i
+	return nextIdx, count, result
 }
 
-func (ribdServiceHandler *RIBDServer) NotificationServer() {
-	logger.Info("Starting notification server loop")
-	for {
-		notificationMsg := <-ribdServiceHandler.NotificationChannel
-		logger.Info("Event received with eventInfo: ", notificationMsg.eventInfo)
-		eventInfo := RouteEventInfo{timeStamp: time.Now().String(), eventInfo: notificationMsg.eventInfo}
-		localRouteEventsDB = append(localRouteEventsDB, eventInfo)
-		notificationMsg.pub_socket.Send(notificationMsg.msg, nanomsg.DontWait)
+func (svr *NDPServer) GetNeighborEntry(ipAddr string) *config.NeighborInfo {
+	svr.NeigborEntryLock.RLock()
+	defer svr.NeigborEntryLock.RUnlock()
+
+	nbrEntry, exists := svr.NeighborInfo[ipAddr]
+	if exists {
+		return &nbrEntry
 	}
+	return nil
 }

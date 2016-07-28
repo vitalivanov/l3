@@ -21,27 +21,31 @@
 // |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
 //
 
-// ribNotify.go
-package server
+// fsmState.go
+package config
 
-import (
-	"github.com/op/go-nanomsg"
-	"time"
+type BGPFSMState int
+
+const (
+	BGPFSMNone BGPFSMState = iota
+	BGPFSMIdle
+	BGPFSMConnect
+	BGPFSMActive
+	BGPFSMOpensent
+	BGPFSMOpenconfirm
+	BGPFSMEstablished
 )
 
-type NotificationMsg struct {
-	pub_socket *nanomsg.PubSocket
-	msg        []byte
-	eventInfo  string
+var BGPStateToStr = map[BGPFSMState]string{
+	BGPFSMNone:        "INIT",
+	BGPFSMIdle:        "IDLE",
+	BGPFSMConnect:     "CONNECT",
+	BGPFSMActive:      "ACTIVE",
+	BGPFSMOpensent:    "OPENSENT",
+	BGPFSMOpenconfirm: "OPENCONFIRM",
+	BGPFSMEstablished: "ESTABLISHED",
 }
 
-func (ribdServiceHandler *RIBDServer) NotificationServer() {
-	logger.Info("Starting notification server loop")
-	for {
-		notificationMsg := <-ribdServiceHandler.NotificationChannel
-		logger.Info("Event received with eventInfo: ", notificationMsg.eventInfo)
-		eventInfo := RouteEventInfo{timeStamp: time.Now().String(), eventInfo: notificationMsg.eventInfo}
-		localRouteEventsDB = append(localRouteEventsDB, eventInfo)
-		notificationMsg.pub_socket.Send(notificationMsg.msg, nanomsg.DontWait)
-	}
+func GetBGPStateToStr(stateId BGPFSMState) string {
+	return BGPStateToStr[stateId]
 }

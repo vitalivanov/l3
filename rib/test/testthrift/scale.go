@@ -41,7 +41,7 @@ func handleClient(client *ribd.RIBDServicesClient, maxCount int) (err error) {
 	byte4 := "0"
 	start := time.Now()
 	var route ribd.IPv4Route
-	routeCount, _ := client.GetTotalRouteCount()
+	routeCount, _ := client.GetTotalv4RouteCount()
 	fmt.Println("Route count before scale test start:", routeCount)
 	for {
 		if intByt3 > 254 {
@@ -60,13 +60,14 @@ func handleClient(client *ribd.RIBDServicesClient, maxCount int) (err error) {
 		byte2 := strconv.Itoa(intByt2)
 		byte3 := strconv.Itoa(intByt3)
 		rtNet := byte1 + "." + byte2 + "." + byte3 + "." + byte4
-		nhintf, err := client.GetRouteReachabilityInfo("11.1.10.2")
+		//nhintf, _ := client.GetRouteReachabilityInfo("11.1.10.2")
 		route.DestinationNw = rtNet
 		route.NetworkMask = "255.255.255.0"
 		route.NextHop = make([]*ribd.NextHopInfo, 0)
 		nh := ribd.NextHopInfo{
-			NextHopIp:     "11.1.10.2",
-			NextHopIntRef: strconv.Itoa(nhintf.NextHopIfIndex),
+			NextHopIp: "11.1.10.2",
+			//NextHopIntRef: strconv.Itoa(int(nhintf.NextHopIfIndex)),
+			//			NextHopIntRef: "lo1",
 		}
 		route.NextHop = append(route.NextHop, &nh)
 		route.Protocol = "STATIC"
@@ -108,7 +109,7 @@ func handleBulkClient(client *ribd.RIBDServicesClient, maxCount int) (err error)
 	var routes []*ribdInt.IPv4RouteConfig
 	routes = make([]*ribdInt.IPv4RouteConfig, 0)
 	route = make([]ribdInt.IPv4RouteConfig, maxCount)
-	routeCount, _ := client.GetTotalRouteCount()
+	routeCount, _ := client.GetTotalv4RouteCount()
 	fmt.Println("Route count before scale test start:", routeCount)
 	for {
 		if intByt3 > 254 {
