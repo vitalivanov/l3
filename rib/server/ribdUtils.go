@@ -719,6 +719,9 @@ func isZeros(p net.IP) bool {
 	return true
 }
 func isIPv4Mask(mask net.IP) bool {
+	if len(mask) < 5 {
+		return false
+	}
 	if isZeros(mask[0:10]) &&
 		mask[10] == 0xff &&
 		mask[11] == 0xff {
