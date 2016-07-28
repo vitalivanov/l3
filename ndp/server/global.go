@@ -79,6 +79,9 @@ type NDPServer struct {
 
 	// Neighbor Cache Information
 	Packet *packet.Packet
+
+	// @HACK: Need to find better way of getting Switch Mac Address
+	SwitchMac string
 }
 
 const (

@@ -35,8 +35,7 @@ func Init(pktCh chan config.PacketData) *Packet {
 	pkt := &Packet{
 		PktCh: pktCh,
 	}
-	pkt.NbrCache = make(map[string]map[string]NeighborCache, 100)
-	//pkt.NbrCache = make(map[string]NeighborCache, 100)
+	pkt.LinkInfo = make(map[string]Link, 100)
 	return pkt
 }
 
@@ -126,12 +125,10 @@ func (p *Packet) populateNeighborInfo(nbrInfo *config.NeighborInfo, eth *layers.
 	nbrInfo.MacAddr = (eth.SrcMAC).String()
 	nbrInfo.IpAddr = (ipv6Hdr.SrcIP).String()
 	nbrInfo.LinkLocalIp = ndInfo.TargetAddress.String()
-	//if entry, exists := p.NbrCache[ndInfo.TargetAddress.String()]; exists {
-	if entry, exists := p.NbrCache[ndInfo.TargetAddress.String()][ipv6Hdr.SrcIP.String()]; exists {
+	// Update Link information and Neigbor Cache with state
+	link := p.GetLink(ndInfo.TargetAddress.String())
+	if entry, exists := link.NbrCache[ipv6Hdr.SrcIP.String()]; exists {
 		nbrInfo.State = entry.State
-		// updated cache portifIndex when populating neigbor information
-		entry.PortIfIndex = nbrInfo.IfIndex
-		p.NbrCache[ndInfo.TargetAddress.String()][ipv6Hdr.SrcIP.String()] = entry
 	} else {
 		nbrInfo.PktOperation = byte(PACKET_DROP)
 	}

@@ -59,6 +59,7 @@ func (svr *NDPServer) GetPorts() {
 		}
 		svr.PhyPort[port.IfIndex] = port
 		svr.SwitchMacMapEntries[port.MacAddr] = empty
+		svr.SwitchMac = port.MacAddr // @HACK.... need better solution
 	}
 
 	debug.Logger.Info("Done with Port State list")
@@ -206,6 +207,7 @@ func (svr *NDPServer) HandleCreateIPIntf(obj *config.IPIntfNotification) {
 	ipInfo, exists := svr.L3Port[obj.IfIndex]
 	switch obj.Operation {
 	case config.CONFIG_CREATE:
+		defer svr.Packet.InitLink(obj.IfIndex, obj.IpAddr, svr.SwitchMac)
 		if exists {
 			if svr.IsLinkLocal(obj.IpAddr) {
 				debug.Logger.Info(fmt.Sprintln("Updating link local Ip", obj.IpAddr, "for", obj.IfIndex))

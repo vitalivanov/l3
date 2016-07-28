@@ -48,6 +48,15 @@ func (nd *NDInfo) ValidateNDAInfo(icmpFlags []byte, dstIP net.IP) error {
 	return nil
 }
 
+/*
+ * When we get advertisement packet we need to update the mac address of peer and move the state to
+ * REACHABLE
+ *
+ * If srcIP is my own IP then linux is responding for earlier solicitation message and hence we need to update
+ * our cache entry with reachable
+ * If srcIP is peer ip then we need to use dst ip to get link information and then update cache entry to be
+ * reachable and also update peer mac address into the cache
+ */
 func (p *Packet) HandleNAMsg(hdr *layers.ICMPv6, srcIP, dstIP net.IP) (*NDInfo, error) {
 	ndInfo := &NDInfo{}
 	ndInfo.DecodeNDInfo(hdr.LayerPayload())
@@ -59,24 +68,34 @@ func (p *Packet) HandleNAMsg(hdr *layers.ICMPv6, srcIP, dstIP net.IP) (*NDInfo, 
 	if err != nil {
 		return nil, err
 	}
-	debug.Logger.Info(fmt.Sprintln("NA: Searching for NbrCache", ndInfo.TargetAddress.String()))
-	//cache, exists := p.NbrCache[ndInfo.TargetAddress.String()]
-	cache, exists := p.NbrCache[ndInfo.TargetAddress.String()][srcIP.String()]
-	if !exists {
-		//@TODO: need to drop advertisement packet??
-	}
-	cache.State = REACHABLE
-	if len(ndInfo.Options) > 0 {
-		for _, option := range ndInfo.Options {
-			if option.Type == NDOptionTypeTargetLinkLayerAddress {
-				mac := net.HardwareAddr(option.Value)
-				cache.LinkLayerAddress = mac.String()
+	debug.Logger.Info(fmt.Sprintln("NA: Searching for NbrCache srcIP:", srcIP.String(), "or dstIP:", dstIP.String()))
+
+	// if my own ip is srcIP
+	myLink, exists := p.LinkInfo[srcIP.String()]
+	if exists {
+		cache := myLink.NbrCache[dstIP.String()]
+		cache.State = REACHABLE
+		debug.Logger.Info(fmt.Sprintln("MYOWNNA: nbrCach (key, value) ---> (", dstIP.String(),
+			",", cache, ")"))
+	} else {
+		link := p.LinkInfo[dstIP.String()]
+		cache, exists := link.NbrCache[srcIP.String()]
+		if !exists {
+			//@TODO: need to drop advertisement packet??
+		}
+		cache.State = REACHABLE
+		if len(ndInfo.Options) > 0 {
+			for _, option := range ndInfo.Options {
+				if option.Type == NDOptionTypeTargetLinkLayerAddress {
+					mac := net.HardwareAddr(option.Value)
+					cache.LinkLayerAddress = mac.String()
+				}
 			}
 		}
+		debug.Logger.Info(fmt.Sprintln("PEERNA: nbrCach (key, value) ---> (", srcIP.String(),
+			",", cache, ")"))
+		link.NbrCache[srcIP.String()] = cache
+		p.SetLink(ndInfo.TargetAddress.String(), link)
 	}
-	debug.Logger.Info(fmt.Sprintln("NA: nbrCach (key, value) ---> (", ndInfo.TargetAddress.String(),
-		",", cache, ")"))
-	//p.NbrCache[ndInfo.TargetAddress.String()] = cache
-	p.NbrCache[ndInfo.TargetAddress.String()][srcIP.String()] = cache
 	return ndInfo, nil
 }

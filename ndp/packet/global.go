@@ -58,8 +58,13 @@ const (
 type NeighborCache struct {
 	Timer            int // Future Info
 	State            int
+	LinkLayerAddress string // this is our neighbor port mac address
+}
+
+type Link struct {
+	NbrCache         map[string]NeighborCache
 	PortIfIndex      int32
-	LinkLayerAddress string // this is our port mac address
+	LinkLocalAddress string // This is our link local mac address
 }
 
 type Packet struct {
@@ -69,7 +74,7 @@ type Packet struct {
 	// This is map of string to (map of string to NeighborCache). Each key of the outer map is the our own
 	// IP Address with its own Neigbor's map. Each inner map key is a Neighbor IP Address. Each inner map
 	// expression retrieve the information pertaining to that neighbor
-	NbrCache map[string]map[string]NeighborCache
+	LinkInfo map[string]Link //map[string]NeighborCache
 	//Operation PACKET_OPERATION
 }
 
