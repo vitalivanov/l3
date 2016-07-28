@@ -126,7 +126,7 @@ func (p *Packet) populateNeighborInfo(nbrInfo *config.NeighborInfo, eth *layers.
 	nbrInfo.IpAddr = (ipv6Hdr.SrcIP).String()
 	nbrInfo.LinkLocalIp = ndInfo.TargetAddress.String()
 	// Update Link information and Neigbor Cache with state
-	link := p.GetLink(ndInfo.TargetAddress.String())
+	link, _ := p.GetLink(ndInfo.TargetAddress.String())
 	if entry, exists := link.NbrCache[ipv6Hdr.SrcIP.String()]; exists {
 		nbrInfo.State = entry.State
 	} else {

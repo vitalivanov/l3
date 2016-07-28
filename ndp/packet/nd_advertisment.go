@@ -71,14 +71,14 @@ func (p *Packet) HandleNAMsg(hdr *layers.ICMPv6, srcIP, dstIP net.IP) (*NDInfo, 
 	debug.Logger.Info(fmt.Sprintln("NA: Searching for NbrCache srcIP:", srcIP.String(), "or dstIP:", dstIP.String()))
 
 	// if my own ip is srcIP
-	myLink, exists := p.LinkInfo[srcIP.String()]
+	myLink, exists := p.GetLink(srcIP.String()) //p.LinkInfo[srcIP.String()]
 	if exists {
 		cache := myLink.NbrCache[dstIP.String()]
 		cache.State = REACHABLE
 		debug.Logger.Info(fmt.Sprintln("MYOWNNA: nbrCach (key, value) ---> (", dstIP.String(),
 			",", cache, ")"))
 	} else {
-		link := p.LinkInfo[dstIP.String()]
+		link, _ := p.GetLink(dstIP.String()) //p.LinkInfo[dstIP.String()]
 		cache, exists := link.NbrCache[srcIP.String()]
 		if !exists {
 			//@TODO: need to drop advertisement packet??

@@ -162,7 +162,7 @@ func (p *Packet) HandleNSMsg(hdr *layers.ICMPv6, srcIP, dstIP net.IP) (*NDInfo, 
 				",", cache, ")"))
 		} else {
 			// If it is not my own ip then use Target Address to get link information
-			link := p.GetLink(ndInfo.TargetAddress.String())
+			link, _ := p.GetLink(ndInfo.TargetAddress.String())
 			cache, exists := link.NbrCache[srcIP.String()]
 			if exists {
 				// @TODO: need to do something like updating timer or what not

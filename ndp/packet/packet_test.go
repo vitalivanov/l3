@@ -484,11 +484,14 @@ func TestNDSOption(t *testing.T) {
 
 func TestNeighborSoilicitationSend(t *testing.T) {
 	initTestPacket()
-	pkt := testPktObj
+	//pkt := testPktObj
 	ipAddr := "2002::192:16:1234/64"
-	cache := pkt.NbrCache[ipAddr]
-	cache.State = REACHABLE
-	pkt.NbrCache[ipAddr] = cache
+	addTestNbrEntry(ipAddr)
+	/*
+		cache := pkt.NbrCache[ipAddr]
+		cache.State = REACHABLE
+		pkt.NbrCache[ipAddr] = cache
+	*/
 	/*
 		err := pkt.SendNSMsgIfRequired(ipAddr)
 		if err != nil {
