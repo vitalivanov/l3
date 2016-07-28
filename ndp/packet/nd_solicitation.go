@@ -30,6 +30,7 @@ import (
 	"github.com/google/gopacket/layers"
 	"l3/ndp/debug"
 	"net"
+	"strings"
 )
 
 /*
@@ -72,9 +73,22 @@ func ConstructNSPacket(targetAddr, srcIP, srcMac, dstMac string, ip net.IP) []by
 	for idx := (len(ip) - 3); idx < len(ip); idx++ {
 		dstIP[idx] = ip[idx]
 	}
+
 	// Ethernet Layer Information
 	srcMAC, _ := net.ParseMAC(srcMac)
 	dstMAC, _ := net.ParseMAC(dstMac)
+
+	/* Check dstMac.. if It is solicitated multicast mac address then we need to replace the lower
+	 * 24 bits or 3bytes with srcMac bits or bytes
+	 * for e.g: if SrcMac is aa:bb:cc:dd:ee:ff & DstMac is 33:33:ff:00:00:00
+	 *	    dstMac needst to be updated with 33:33:ff:dd:ee:ff
+	 */
+	if strings.Compare(dstMac, IPV6_ICMPV6_MULTICAST_DST_MAC) == 0 {
+		for idx := (len(srcMAC) - 3); idx < len(srcMAC); idx++ {
+			dstMAC[idx] = srcMAC[idx]
+		}
+	}
+
 	eth := &layers.Ethernet{
 		SrcMAC:       srcMAC,
 		DstMAC:       dstMAC,
