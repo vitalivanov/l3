@@ -81,6 +81,7 @@ func main() {
 
 	// @FIXME: Plugin name should come for json readfile...
 	//plugin := OVSDB_PLUGIN
+	// We need to revisit this plugin logic later. It should always be hidden inside a client
 	plugin := ""
 	switch plugin {
 	case OVSDB_PLUGIN:
