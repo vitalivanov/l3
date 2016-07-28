@@ -41,7 +41,7 @@ type RouteDBInfo struct {
 }
 
 func (m RIBDServer) WriteIPv4RouteStateEntryToDB(dbInfo RouteDBInfo) error {
-	logger.Info("WriteIPv4RouteStateEntryToDB")
+	//	logger.Info("WriteIPv4RouteStateEntryToDB")
 	entry := dbInfo.entry
 	routeList := dbInfo.routeList
 	m.DelIPv4RouteStateEntryFromDB(dbInfo)

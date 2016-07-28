@@ -53,7 +53,7 @@ func arpdRemoveRoute(routeInfoRecord RouteInfoRecord) {
 	//logger.Debug("ARP remove for ", routeInfoRecord.resolvedNextHopIpIntf.NextHopIp, " returned ")
 }
 func (ribdServiceHandler *RIBDServer) StartArpdServer() {
-	//logger.Info("Starting the arpdserver loop")
+	logger.Info("Starting the arpdserver loop")
 	for {
 		select {
 		case route := <-ribdServiceHandler.ArpdRouteCh:
