@@ -379,7 +379,7 @@ func (m RIBDServer) TrackReachabilityStatus(ipAddr string, protocol string, op s
    Returns the longest prefix match route to reach the destination network destNet
 */
 func (m RIBDServer) GetRouteReachabilityInfo(destNet string) (nextHopIntf *ribdInt.NextHopInfo, err error) {
-	logger.Debug("GetRouteReachabilityInfo of ", destNet)
+	//logger.Debug("GetRouteReachabilityInfo of ", destNet)
 	//t1 := time.Now()
 	var retnextHopIntf ribdInt.NextHopInfo
 	nextHopIntf = &retnextHopIntf
@@ -543,7 +543,7 @@ func ResolveNextHop(ipAddr string) (nextHopIntf ribdInt.NextHopInfo, resolvedNex
 		if first {
 			nextHopIntf = *intf
 			first = false
-			logger.Debug("First nexthop network is : ", nextHopIntf.Ipaddr)
+			//logger.Debug("First nexthop network is : ", nextHopIntf.Ipaddr)
 		}
 		//logger.Debug("intf.nextHopIp ", intf.NextHopIp, " intf.Ipaddr:", intf.Ipaddr, " intf.IsReachable:", intf.IsReachable)
 		if intf.NextHopIp == "0.0.0.0" {
@@ -1118,17 +1118,17 @@ func createRoute(routeInfo RouteParams) (rc ribd.Int, err error) {
 	callSelectRoute := false
 	destNetIpAddr, err := getIP(destNetIp)
 	if err != nil {
-		logger.Debug("destNetIpAddr invalid")
+		logger.Err("destNetIpAddr invalid")
 		return 0, err
 	}
 	networkMaskAddr, err := getIP(networkMask)
 	if err != nil {
-		logger.Debug("networkMaskAddr invalid")
+		logger.Err("networkMaskAddr invalid")
 		return 0, err
 	}
 	nextHopIpAddr, err := getIP(nextHopIp)
 	if err != nil {
-		logger.Debug("nextHopIpAddr invalid")
+		logger.Err("nextHopIpAddr invalid")
 		return 0, err
 	}
 	destNet, nwAddr, err := getNetworkPrefix(destNetIpAddr, networkMaskAddr)
@@ -1157,7 +1157,7 @@ func createRoute(routeInfo RouteParams) (rc ribd.Int, err error) {
 	nhIntf, resolvedNextHopIntf, res_err := ResolveNextHop(routeInfoRecord.nextHopIp.String())
 	//_, resolvedNextHopIntf, _ := ResolveNextHop(routeInfoRecord.nextHopIp.String())
 	routeInfoRecord.resolvedNextHopIpIntf = resolvedNextHopIntf
-	logger.Info("nhIntf ipaddr/mask: ", nhIntf.Ipaddr, ":", nhIntf.Mask, " resolvedNex ", resolvedNextHopIntf.NextHopIp, " nexthop ", nextHopIp, " reachable:", resolvedNextHopIntf.IsReachable)
+	//logger.Info("nhIntf ipaddr/mask: ", nhIntf.Ipaddr, ":", nhIntf.Mask, " resolvedNex ", resolvedNextHopIntf.NextHopIp, " nexthop ", nextHopIp, " reachable:", resolvedNextHopIntf.IsReachable)
 
 	routeInfoRecord.routeCreatedTime = time.Now().String()
 	if ipType == ribdCommonDefs.IPv4 {
@@ -1199,20 +1199,20 @@ func createRoute(routeInfo RouteParams) (rc ribd.Int, err error) {
 		destNetSlice = append(destNetSlice, localDBRecord)
 		//call asicd
 		//		if asicdclnt.IsConnected {
-		logger.Debug("New route selected, call asicd to install a new route - ip", routeInfoRecord.destNetIp.String(), " mask ", routeInfoRecord.networkMask.String(), " nextHopIP ", routeInfoRecord.resolvedNextHopIpIntf.NextHopIp)
+		//logger.Debug("New route selected, call asicd to install a new route - ip", routeInfoRecord.destNetIp.String(), " mask ", routeInfoRecord.networkMask.String(), " nextHopIP ", routeInfoRecord.resolvedNextHopIpIntf.NextHopIp)
 		RouteServiceHandler.AsicdRouteCh <- RIBdServerConfig{OrigConfigObject: routeInfoRecord, Op: "add", Bulk: routeInfo.bulk, BulkEnd: routeInfo.bulkEnd}
 		//		}
 		//if arpdclnt.IsConnected &&
 		if routeInfoRecord.protocol != ribdCommonDefs.CONNECTED {
 			if !arpResolveCalled(NextHopInfoKey{routeInfoRecord.resolvedNextHopIpIntf.NextHopIp}) {
 				//call arpd to resolve the ip
-				logger.Debug("Adding ", routeInfoRecord.resolvedNextHopIpIntf.NextHopIp, " to ArpdRouteCh")
+				//logger.Debug("Adding ", routeInfoRecord.resolvedNextHopIpIntf.NextHopIp, " to ArpdRouteCh")
 				RouteServiceHandler.ArpdRouteCh <- RIBdServerConfig{OrigConfigObject: routeInfoRecord, Op: "add"}
 			}
 			//update the ref count for the resolved next hop ip
 			updateNextHopMap(NextHopInfoKey{routeInfoRecord.resolvedNextHopIpIntf.NextHopIp}, add)
 		}
-		logger.Debug("Adding to DBRouteCh from createv4Route")
+		//logger.Debug("Adding to DBRouteCh from createv4Route")
 		RouteServiceHandler.DBRouteCh <- RIBdServerConfig{
 			OrigConfigObject: RouteDBInfo{routeInfoRecord, newRouteInfoRecordList},
 			Op:               "add",
@@ -1226,12 +1226,12 @@ func createRoute(routeInfo RouteParams) (rc ribd.Int, err error) {
 		if res_err == nil {
 			nhPrefix, err := getNetowrkPrefixFromStrings(nhIntf.Ipaddr, nhIntf.Mask)
 			if err == nil {
-				logger.Debug("network address of the nh route: ", nhPrefix)
+				//logger.Debug("network address of the nh route: ", nhPrefix)
 				updateNextHopMap(NextHopInfoKey{string(nhPrefix)}, add)
 			}
 		}
 		if routeInfoRecord.resolvedNextHopIpIntf.IsReachable {
-			logger.Debug(("Mark this network reachable"))
+			//logger.Debug(("Mark this network reachable"))
 			nextHopIntf := ribdInt.NextHopInfo{
 				NextHopIp:      routeInfoRecord.nextHopIp.String(),
 				NextHopIfIndex: ribdInt.Int(routeInfoRecord.nextHopIfIndex),

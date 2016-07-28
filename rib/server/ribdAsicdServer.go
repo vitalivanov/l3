@@ -76,13 +76,13 @@ func addAsicdRoute(routeInfoRecord RouteInfoRecord) {
 	if asicdclnt.IsConnected == false {
 		return
 	}
-	ipType := ""
-	if routeInfoRecord.ipType == ribdCommonDefs.IPv4 {
-		ipType = "IPv4"
-	} else if routeInfoRecord.ipType == ribdCommonDefs.IPv6 {
-		ipType = "IPv6"
-	}
-	logger.Info("addAsicdRoute, weight = ", routeInfoRecord.weight+1, " ipType:", ipType)
+	/*	ipType := ""
+		if routeInfoRecord.ipType == ribdCommonDefs.IPv4 {
+			ipType = "IPv4"
+		} else if routeInfoRecord.ipType == ribdCommonDefs.IPv6 {
+			ipType = "IPv6"
+		}
+		logger.Info("addAsicdRoute, weight = ", routeInfoRecord.weight+1, " ipType:", ipType)*/
 	if routeInfoRecord.ipType == ribdCommonDefs.IPv4 {
 		//logger.Info("ipv4 route, calling onewaycreateipv4 route")
 		/*	asicdRoute = make([]asicdInt.IPv4Route, asicdBulkCount)
@@ -177,7 +177,7 @@ func (ribdServiceHandler *RIBDServer) StartAsicdServer() {
 	for {
 		select {
 		case route := <-ribdServiceHandler.AsicdRouteCh:
-			logger.Debug(" received message on AsicdRouteCh, op:", route.Op, " ip type:", route.OrigConfigObject.(RouteInfoRecord).ipType, " bulk:", route.Bulk, " bulkEnd:", route.BulkEnd)
+			//logger.Debug(" received message on AsicdRouteCh, op:", route.Op, " ip type:", route.OrigConfigObject.(RouteInfoRecord).ipType, " bulk:", route.Bulk, " bulkEnd:", route.BulkEnd)
 			if route.Op == "add" {
 				if route.Bulk {
 					addAsicdRouteBulk(route.OrigConfigObject.(RouteInfoRecord), route.BulkEnd)

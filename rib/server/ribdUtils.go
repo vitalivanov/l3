@@ -701,7 +701,7 @@ func RouteReachabilityStatusUpdate(targetProtocol string, info RouteReachability
 }
 */
 func getIP(ipAddr string) (ip net.IP, err error) {
-	logger.Debug("getIP for ipAddr:", ipAddr)
+	//logger.Debug("getIP for ipAddr:", ipAddr)
 	ip = net.ParseIP(ipAddr)
 	if ip == nil {
 		return ip, errors.New("Invalid destination network IP Address")
@@ -728,7 +728,7 @@ func isIPv4Mask(mask net.IP) bool {
 }
 
 func getPrefixLen(networkMask net.IP) (prefixLen int, err error) {
-	logger.Debug("getPrefixLen for networkMask: ", networkMask)
+	//logger.Debug("getPrefixLen for networkMask: ", networkMask)
 	/*	ipInt, err := getIPInt(networkMask)
 		if err != nil {
 			return -1, err
@@ -743,11 +743,11 @@ func getPrefixLen(networkMask net.IP) (prefixLen int, err error) {
 		prefixLen, _ = mask.Size()
 	}
 	//	prefixLen,bits := mask.Size()
-	////logger.Debug(fmt.Sprintln("prefixLen = ", prefixLen))
+	//logger.Debug(fmt.Sprintln("prefixLen = ", prefixLen))
 	return prefixLen, err
 }
 func validateNetworkPrefix(ipAddr string, mask string) (destNet patriciaDB.Prefix, err error) {
-	logger.Debug("validateNetworkPrefix for ip ", ipAddr, " mask: ", mask)
+	//logger.Debug("validateNetworkPrefix for ip ", ipAddr, " mask: ", mask)
 	destNetIp, err := getIP(ipAddr)
 	if err != nil {
 		logger.Err("destNetIpAddr ", ipAddr, " invalid")
@@ -765,7 +765,7 @@ func validateNetworkPrefix(ipAddr string, mask string) (destNet patriciaDB.Prefi
 	}
 	vdestMask := net.IPMask(networkMask) //net.IPv4Mask(networkMask[0], networkMask[1], networkMask[2], networkMask[3])
 	netIp := destNetIp.Mask(vdestMask)
-	logger.Debug("netIP: ", netIp, " destNetIp ", destNetIp)
+	//logger.Debug("netIP: ", netIp, " destNetIp ", destNetIp)
 	if !(bytes.Equal(destNetIp, netIp)) {
 		logger.Err("Cannot have ip : ", destNetIp, " more specific than mask ")
 		return destNet, errors.New(fmt.Sprintln("IP address ", destNetIp, " more specific than mask ", networkMask))
@@ -781,7 +781,7 @@ func validateNetworkPrefix(ipAddr string, mask string) (destNet patriciaDB.Prefi
 	return destNet, err
 }
 func getNetworkPrefix(destNetIp net.IP, networkMask net.IP) (destNet patriciaDB.Prefix, nwAddr string, err error) {
-	logger.Debug("getNetworkPrefix for ip: ", destNetIp, "  networkMask: ", networkMask)
+	//logger.Debug("getNetworkPrefix for ip: ", destNetIp, "  networkMask: ", networkMask)
 	prefixLen, err := getPrefixLen(networkMask)
 	if err != nil {
 		logger.Err("err when getting prefixLen, err= ", err)
@@ -789,19 +789,19 @@ func getNetworkPrefix(destNetIp net.IP, networkMask net.IP) (destNet patriciaDB.
 	}
 	var netIp net.IP
 	vdestMask := net.IPMask(networkMask)
-	logger.Debug("vdestMask:", vdestMask)
+	//logger.Debug("vdestMask:", vdestMask)
 	if isIPv4Mask(net.IP(vdestMask)) {
 		netIp = destNetIp.Mask(vdestMask[12:16])
-		logger.Debug("ipv4 case, netIp = ", netIp, " vdestMask:", vdestMask[12:16])
+		//logger.Debug("ipv4 case, netIp = ", netIp, " vdestMask:", vdestMask[12:16])
 	} else {
 		netIp = destNetIp.Mask(vdestMask)
-		logger.Debug("ipv6 case, netIp = ", netIp, " vdestMask:", vdestMask)
+		//logger.Debug("ipv6 case, netIp = ", netIp, " vdestMask:", vdestMask)
 	}
 	numbytes := prefixLen / 8
 	if (prefixLen % 8) != 0 {
 		numbytes++
 	}
-	logger.Debug("getNetworkPrefix: prefixLen  = ", prefixLen, " netIp:", netIp, " numbytes:", numbytes, " len(netIp):", len(netIp))
+	//logger.Debug("getNetworkPrefix: prefixLen  = ", prefixLen, " netIp:", netIp, " numbytes:", numbytes, " len(netIp):", len(netIp))
 	destNet = make([]byte, numbytes)
 	for i := 0; i < numbytes; i++ {
 		destNet[i] = netIp[i]
@@ -811,13 +811,13 @@ func getNetworkPrefix(destNetIp net.IP, networkMask net.IP) (destNet patriciaDB.
 	return destNet, nwAddr, err
 }
 func getNetowrkPrefixFromStrings(ipAddr string, mask string) (prefix patriciaDB.Prefix, err error) {
-	logger.Debug("getNetowrkPrefixFromStrings for ip ", ipAddr, " mask: ", mask)
+	//logger.Debug("getNetowrkPrefixFromStrings for ip ", ipAddr, " mask: ", mask)
 	destNetIpAddr, err := getIP(ipAddr)
 	if err != nil {
 		logger.Info("destNetIpAddr ", ipAddr, " invalid")
 		return prefix, err
 	}
-	logger.Debug("getNetworkPrefixFrmStrings:destNetIpAddr:", destNetIpAddr)
+	//logger.Debug("getNetworkPrefixFrmStrings:destNetIpAddr:", destNetIpAddr)
 	networkMaskAddr, err := getIP(mask)
 	if err != nil {
 		logger.Err("networkMaskAddr invalid")
@@ -862,7 +862,7 @@ func getCIDR(ipAddr string, mask string) (addr string, err error) {
 	addr = (destNetIpAddr.Mask(net.IPMask(maskIP))).String() + "/" + strconv.Itoa(prefixLen)
 	if isIPv4Mask(maskIP) {
 		addr = (destNetIpAddr.Mask(net.IPMask(maskIP[12:16]))).String() + "/" + strconv.Itoa(prefixLen)
-		logger.Debug("ipv4 case, addr = ", addr, " maskIP:", maskIP[12:16])
+		//logger.Debug("ipv4 case, addr = ", addr, " maskIP:", maskIP[12:16])
 	}
 	return addr, err
 }
