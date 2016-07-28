@@ -94,72 +94,25 @@ func validateIPv6Hdr(hdr *layers.IPv6) error {
 
 func (p *Packet) decodeICMPv6Hdr(hdr *layers.ICMPv6, srcIP net.IP, dstIP net.IP) (*NDInfo, error) {
 	ndInfo := &NDInfo{}
+	var err error
 	typeCode := hdr.TypeCode
 	if typeCode.Code() != ICMPV6_CODE {
 		return nil, errors.New(fmt.Sprintln("Invalid Code", typeCode.Code()))
 	}
 	switch typeCode.Type() {
 	case layers.ICMPv6TypeNeighborSolicitation:
-		ndInfo.DecodeNDInfo(hdr.LayerPayload())
-		if ndInfo.IsTargetMulticast() {
-			return nil, errors.New(fmt.Sprintln("Targent Address specified", ndInfo.TargetAddress,
-				"is a multicast address"))
-		}
-		err := ndInfo.ValidateNDSInfo(srcIP, dstIP)
-		if err != nil {
-			return nil, err
-		}
-		// if source ip is not "::" then only we should update the nbrCache...
-		// In this case Target Address is our own IP Address
-		if !srcIP.IsUnspecified() {
-			cache, exists := p.NbrCache[ndInfo.TargetAddress.String()]
-			if exists {
-				// @TODO: need to do something like updating timer or what not
-			}
-			// In this case check for Source Link Layer Option... if specified then mark the state as
-			// reachable and create neighbor entry in the platform
-			if len(ndInfo.Options) > 0 {
-				for _, option := range ndInfo.Options {
-					if option.Type == NDOptionTypeSourceLinkLayerAddress {
-						cache.State = REACHABLE
-						mac := net.HardwareAddr(option.Value)
-						cache.LinkLayerAddress = mac.String()
-					}
-				}
-			} else {
-				cache.State = INCOMPLETE
-			}
-			p.NbrCache[ndInfo.TargetAddress.String()] = cache
-		}
+		ndInfo, err = p.HandleNSMsg(hdr, srcIP, dstIP)
+
 	case layers.ICMPv6TypeNeighborAdvertisement:
-		ndInfo.DecodeNDInfo(hdr.LayerPayload())
-		if ndInfo.IsTargetMulticast() {
-			return nil, errors.New(fmt.Sprintln("Targent Address specified", ndInfo.TargetAddress,
-				"is a multicast address"))
-		}
-		err := ndInfo.ValidateNDAInfo(hdr.TypeBytes, dstIP)
-		if err != nil {
-			return nil, err
-		}
-		cache, exists := p.NbrCache[ndInfo.TargetAddress.String()]
-		if !exists {
-			//@TODO: need to drop advertisement packet??
-		}
-		cache.State = REACHABLE
-		if len(ndInfo.Options) > 0 {
-			for _, option := range ndInfo.Options {
-				if option.Type == NDOptionTypeTargetLinkLayerAddress {
-					mac := net.HardwareAddr(option.Value)
-					cache.LinkLayerAddress = mac.String()
-				}
-			}
-		}
-		p.NbrCache[ndInfo.TargetAddress.String()] = cache
+		ndInfo, err = p.HandleNAMsg(hdr, srcIP, dstIP)
 
 	case layers.ICMPv6TypeRouterSolicitation:
 		return nil, errors.New("Router Solicitation is not yet supported")
 	default:
 		return nil, errors.New(fmt.Sprintln("Not Supported ICMPv6 Type:", typeCode.Type()))
+	}
+	if err != nil {
+		return nil, err
 	}
 	return ndInfo, nil
 }

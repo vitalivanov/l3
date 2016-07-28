@@ -29,66 +29,7 @@ import (
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"net"
-	_ "reflect"
 )
-
-type NDOption struct {
-	Type   NDOptionType
-	Length byte
-	Value  []byte
-}
-
-type NDInfo struct {
-	TargetAddress net.IP
-	Options       []*NDOption
-}
-
-/*		ND Solicitation Packet Format Rcvd From ICPMv6
- *    0                   1                   2                   3
- *    0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |                                                               |
- *   +                                                               +
- *   |                                                               |
- *   +                       Target Address                          +
- *   |                                                               |
- *   +                                                               +
- *   |                                                               |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |   Options ...
- *   +-+-+-+-+-+-+-+-+-+-+-+-
- */
-
-func DecodeOptionLayer(payload []byte) *NDOption {
-	ndOpt := &NDOption{}
-	ndOpt.Type = NDOptionType(payload[0])
-	ndOpt.Length = payload[1]
-	ndOpt.Value = append(ndOpt.Value, payload[2:]...)
-	return ndOpt
-}
-
-func (nd *NDInfo) DecodeNDInfo(payload []byte) {
-	if nd.TargetAddress == nil {
-		nd.TargetAddress = make(net.IP, IPV6_ADDRESS_BYTES, IPV6_ADDRESS_BYTES)
-	}
-	copy(nd.TargetAddress, payload[0:IPV6_ADDRESS_BYTES])
-	if len(payload) > IPV6_ADDRESS_BYTES {
-		//decode option layer also
-		ndOpt := DecodeOptionLayer(payload[IPV6_ADDRESS_BYTES:])
-		nd.Options = append(nd.Options, ndOpt)
-	}
-}
-
-/*
- *  According to RFC 2375 https://tools.ietf.org/html/rfc2375 all ipv6 multicast address have first byte as
- *  FF or 0xff, so compare that with the Target address first byte.
- */
-func (nd *NDInfo) IsTargetMulticast() bool {
-	if nd.TargetAddress.IsMulticast() {
-		return true
-	}
-	return false
-}
 
 /*
  *
@@ -113,23 +54,6 @@ func (nd *NDInfo) ValidateNDSInfo(srcIP net.IP, dstIP net.IP) error {
 			}
 		}
 	}
-	return nil
-}
-
-/*
- * If the IP Destination Address is a multicast address the
- *       Solicited flag is zero.
- * All included options have a length that is greater than zero.
- */
-func (nd *NDInfo) ValidateNDAInfo(icmpFlags []byte, dstIP net.IP) error {
-	if dstIP.IsMulticast() {
-		flags := binary.BigEndian.Uint16(icmpFlags[0:2])
-		if (flags & 0x4000) == 0x4000 {
-			return errors.New(fmt.Sprintln("Check for If Destination Address is a multicast address then",
-				"the Solicited flag is zero, Failed"))
-		}
-	}
-	// @TODO: need to add support for options length
 	return nil
 }
 
@@ -195,4 +119,40 @@ func ConstructNSPacket(targetAddr, srcIP, srcMac, dstMac string, ip net.IP) []by
 
 	gopacket.SerializeLayers(buffer, options, eth, ipv6, gopacket.Payload(payload))
 	return buffer.Bytes()
+}
+
+func (p *Packet) HandleNSMsg(hdr *layers.ICMPv6, srcIP, dstIP net.IP) (*NDInfo, error) {
+	ndInfo := &NDInfo{}
+	ndInfo.DecodeNDInfo(hdr.LayerPayload())
+	if ndInfo.IsTargetMulticast() {
+		return nil, errors.New(fmt.Sprintln("Targent Address specified", ndInfo.TargetAddress,
+			"is a multicast address"))
+	}
+	err := ndInfo.ValidateNDSInfo(srcIP, dstIP)
+	if err != nil {
+		return nil, err
+	}
+	// if source ip is not "::" then only we should update the nbrCache...
+	// In this case Target Address is our own IP Address
+	if !srcIP.IsUnspecified() {
+		cache, exists := p.NbrCache[ndInfo.TargetAddress.String()]
+		if exists {
+			// @TODO: need to do something like updating timer or what not
+		}
+		// In this case check for Source Link Layer Option... if specified then mark the state as
+		// reachable and create neighbor entry in the platform
+		if len(ndInfo.Options) > 0 {
+			for _, option := range ndInfo.Options {
+				if option.Type == NDOptionTypeSourceLinkLayerAddress {
+					cache.State = REACHABLE
+					mac := net.HardwareAddr(option.Value)
+					cache.LinkLayerAddress = mac.String()
+				}
+			}
+		} else {
+			cache.State = INCOMPLETE
+		}
+		p.NbrCache[ndInfo.TargetAddress.String()] = cache
+	}
+	return ndInfo, nil
 }
