@@ -59,7 +59,7 @@ type NeighborCache struct {
 	Timer            int // Future Info
 	State            int
 	PortIfIndex      int32
-	LinkLayerAddress string
+	LinkLayerAddress string // this is our port mac address
 }
 
 type Packet struct {
@@ -70,16 +70,17 @@ type Packet struct {
 }
 
 const (
-	HOP_LIMIT                            = 255
-	ICMPV6_CODE                          = 0
-	ICMP_HDR_LENGTH                      = 8
-	UNSPECIFIED_IP_ADDRESS               = "::"
-	IPV6_ICMPV6_MULTICAST_DST_MAC        = "33:33:ff:00:00:01"
-	IPV6_ADDRESS_BYTES                   = 16
-	IPV6_MULTICAST_BYTE           byte   = 0xff
-	IPV6_VERSION                  byte   = 6
-	ICMPV6_MIN_LENGTH             uint16 = 24
-	ICMPV6_NEXT_HEADER            byte   = 58
+	HOP_LIMIT                              = 255
+	ICMPV6_CODE                            = 0
+	ICMP_HDR_LENGTH                        = 8
+	UNSPECIFIED_IP_ADDRESS                 = "::"
+	IPV6_ICMPV6_MULTICAST_DST_MAC          = "33:33:ff:00:00:01"
+	IPV6_ADDRESS_BYTES                     = 16
+	IPV6_MULTICAST_BYTE             byte   = 0xff
+	IPV6_VERSION                    byte   = 6
+	ICMPV6_MIN_LENGTH               uint16 = 24
+	ICMPV6_NEXT_HEADER              byte   = 58
+	ICMPV6_SOURCE_LINK_LAYER_LENGTH uint16 = 8
 )
 
 var SOLICITATED_NODE_ADDRESS = []byte{

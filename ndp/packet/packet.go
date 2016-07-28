@@ -109,7 +109,8 @@ func (p *Packet) decodeICMPv6Hdr(hdr *layers.ICMPv6, srcIP net.IP, dstIP net.IP)
 		if err != nil {
 			return nil, err
 		}
-		// if source ip is not "::" then only we should update the nbrCache
+		// if source ip is not "::" then only we should update the nbrCache...
+		// In this case Target Address is our own IP Address
 		if !srcIP.IsUnspecified() {
 			cache, exists := p.NbrCache[ndInfo.TargetAddress.String()]
 			if exists {

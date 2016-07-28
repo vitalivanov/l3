@@ -173,7 +173,17 @@ func ConstructNSPacket(targetAddr, srcIP, srcMac, dstMac string, ip net.IP) []by
 	payload[1] = byte(0)
 	binary.BigEndian.PutUint16(payload[2:4], 0) // Putting zero for checksum before calculating checksum
 	binary.BigEndian.PutUint32(payload[4:], 0)  // RESERVED FLAG...
-	copy(payload[8:], ip)
+	copy(payload[8:], ip)                       // Copy 16 Bytes of IPV6 address
+
+	// Append Source Link Layer Option here
+	srcOption := NDOption{
+		Type:   NDOptionTypeSourceLinkLayerAddress,
+		Length: 1,
+		Value:  srcMAC,
+	}
+	payload = append(payload, byte(srcOption.Type))
+	payload = append(payload, srcOption.Length)
+	payload = append(payload, srcOption.Value...)
 	binary.BigEndian.PutUint16(payload[2:4], getCheckSum(ipv6, payload))
 
 	// GoPacket serialized buffer that will be used to send out raw bytes

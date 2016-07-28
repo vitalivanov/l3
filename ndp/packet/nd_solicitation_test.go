@@ -335,20 +335,25 @@ func TestConstructNSPacket(t *testing.T) {
 		Version:      6,
 		TrafficClass: 0,
 		FlowLabel:    0,
-		Length:       ICMPV6_MIN_LENGTH,
+		Length:       ICMPV6_MIN_LENGTH + ICMPV6_SOURCE_LINK_LAYER_LENGTH,
 		NextHeader:   layers.IPProtocolICMPv6,
 		HopLimit:     HOP_LIMIT,
 		SrcIP:        net.ParseIP("::"),
 		DstIP:        net.ParseIP("ff02::1:ff00:1"),
 	}
 	checkIPv6Layer(ipv6Hdr, wantIPv6Hdr, t)
-
 	// Validate That construct icmpv6 header has correct information
 	wantICMPv6Hdr := &testICMPv6{
 		TypeCode:      layers.CreateICMPv6TypeCode(layers.ICMPv6TypeNeighborSolicitation, 0),
-		Checksum:      0x5aa4,
+		Checksum:      icmpv6Hdr.Checksum,
 		Reserved:      []byte{0, 0, 0, 0},
 		TargetAddress: net.ParseIP(targetAddr),
 	}
+	optionWant := &NDOption{
+		Type:   1,
+		Length: 1,
+		Value:  []byte{0x00, 0xe0, 0xec, 0x26, 0xa7, 0xee},
+	}
+	wantICMPv6Hdr.Options = append(wantICMPv6Hdr.Options, optionWant)
 	checkICMPv6Layer(icmpv6Hdr, wantICMPv6Hdr, t)
 }
