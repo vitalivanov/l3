@@ -13,20 +13,20 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 package ovsMgr
 
 import (
 	ovsdb "github.com/socketplane/libovsdb"
 
-	"fmt"
+	_ "fmt"
 	"l3/bgp/rpc"
 	"reflect"
 	"utils/logging"
@@ -158,7 +158,7 @@ func (ovsHdl *BGPOvsdbHandler) UpdateInfo(updates ovsdb.TableUpdates) {
 		ovsHdl.logger.Info("BGP_Router table Update")
 		err := ovsHdl.HandleBGPRouteUpd(table)
 		if err != nil {
-			ovsHdl.logger.Err(fmt.Sprintln(err))
+			ovsHdl.logger.Err(err)
 			return
 		}
 	}
@@ -166,10 +166,10 @@ func (ovsHdl *BGPOvsdbHandler) UpdateInfo(updates ovsdb.TableUpdates) {
 	if ok {
 		err := ovsHdl.HandleBGPNeighborUpd(table)
 		if err != nil {
-			ovsHdl.logger.Err(fmt.Sprintln(err))
+			ovsHdl.logger.Err(err)
 			return
 		}
-		ovsHdl.logger.Info(fmt.Sprintln(ovsHdl.routerInfo))
+		ovsHdl.logger.Info(ovsHdl.routerInfo)
 	}
 }
 
