@@ -886,7 +886,7 @@ func (ip *IPPrefix) Clone() NLRI {
 }
 
 func (ip *IPPrefix) Encode(afi AFI) ([]byte, error) {
-	utils.Logger.Info(fmt.Sprintf("IPPrefix:Encode - Length %d Prefix %+v Prefix_len %d Prefix_cap %d ip.Len %d", ip.Length, ip.Prefix, len(ip.Prefix), cap(ip.Prefix), ip.Len()))
+	utils.Logger.Infof("IPPrefix:Encode - Length %d Prefix %+v Prefix_len %d Prefix_cap %d ip.Len %d", ip.Length, ip.Prefix, len(ip.Prefix), cap(ip.Prefix), ip.Len())
 	pkt := make([]byte, ip.Len())
 	pkt[0] = ip.Length
 
@@ -895,7 +895,7 @@ func (ip *IPPrefix) Encode(afi AFI) ([]byte, error) {
 		ipLen = net.IPv6len
 	}
 	ipBytesStart := uint8(cap(ip.Prefix) - ipLen)
-	utils.Logger.Info(fmt.Sprintf("IPPrefix:Encode - ipBytesStart %d", ipBytesStart))
+	utils.Logger.Infof("IPPrefix:Encode - ipBytesStart %d", ipBytesStart)
 	copy(pkt[1:], ip.Prefix[ipBytesStart:ipBytesStart+((ip.Length+7)/8)])
 	return pkt, nil
 }
@@ -1275,10 +1275,10 @@ func (ps *BGPAS2PathSegment) Decode(pkt []byte, data interface{}) error {
 
 func (ps *BGPAS2PathSegment) GetNumASes() uint8 {
 	if ps.Type == BGPASPathSegmentSet {
-		utils.Logger.Info(fmt.Sprintln("BGPAS2PathSegment:GetNumASes - AS SET num =", 1))
+		utils.Logger.Info("BGPAS2PathSegment:GetNumASes - AS SET num =", 1)
 		return 1
 	} else {
-		utils.Logger.Info(fmt.Sprintln("BGPAS2PathSegment:GetNumASes - AS SEQUENCE num =", len(ps.AS), "ASes =", ps.AS))
+		utils.Logger.Info("BGPAS2PathSegment:GetNumASes - AS SEQUENCE num =", len(ps.AS), "ASes =", ps.AS)
 		return uint8(len(ps.AS))
 	}
 }
@@ -1394,10 +1394,10 @@ func (ps *BGPAS4PathSegment) Decode(pkt []byte, data interface{}) error {
 
 func (ps *BGPAS4PathSegment) GetNumASes() uint8 {
 	if ps.Type == BGPASPathSegmentSet {
-		utils.Logger.Info(fmt.Sprintln("BGPAS2PathSegment:GetNumASes - AS SET num =", 1))
+		utils.Logger.Info("BGPAS2PathSegment:GetNumASes - AS SET num =", 1)
 		return 1
 	} else {
-		utils.Logger.Info(fmt.Sprintln("BGPAS2PathSegment:GetNumASes - AS SEQUENCE num =", len(ps.AS), "ASes = ", ps.AS))
+		utils.Logger.Info("BGPAS2PathSegment:GetNumASes - AS SEQUENCE num =", len(ps.AS), "ASes = ", ps.AS)
 		return uint8(len(ps.AS))
 	}
 }
