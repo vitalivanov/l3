@@ -105,6 +105,7 @@ type VlanNotification struct {
 }
 
 type PacketData struct {
-	Data    []byte
-	IfIndex int32
+	IpAddr     string
+	NeighborIp string
+	IfIndex    int32
 }

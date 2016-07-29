@@ -174,6 +174,7 @@ func (p *Packet) HandleNSMsg(hdr *layers.ICMPv6, srcIP, dstIP net.IP) (*NDInfo, 
 			//neighbor cache
 			cache := myLink.NbrCache[ndInfo.TargetAddress.String()]
 			cache.State = STALE
+			cache.Timer(myLink.PortIfIndex, srcIP.String(), ndInfo.TargetAddress.String(), myLink.RetransTimer, p.PktCh)
 			myLink.NbrCache[ndInfo.TargetAddress.String()] = cache
 			p.SetLink(srcIP.String(), myLink)
 			debug.Logger.Info("MYNS: nbrCach (key, value) ---> (", ndInfo.TargetAddress.String(), ",", cache, ")")
@@ -197,6 +198,7 @@ func (p *Packet) HandleNSMsg(hdr *layers.ICMPv6, srcIP, dstIP net.IP) (*NDInfo, 
 			} else {
 				cache.State = INCOMPLETE
 			}
+			cache.Timer(myLink.PortIfIndex, ndInfo.TargetAddress.String(), srcIP.String(), myLink.RetransTimer, p.PktCh)
 			debug.Logger.Info("PEERNS: nbrCach (key, value) ---> (", srcIP.String(), ",", cache, ")")
 			link.NbrCache[srcIP.String()] = cache
 			p.SetLink(ndInfo.TargetAddress.String(), link)

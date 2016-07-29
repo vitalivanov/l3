@@ -218,5 +218,6 @@ func (svr *NDPServer) ProcessTimerExpiry(pktData config.PacketData) {
 	if !exists {
 		return
 	}
-	svr.Packet.SendNDPkt(pktData.Data, l3Port.PcapBase.PcapHandle)
+	svr.Packet.SendNSMsgIfRequired(pktData.IpAddr, l3Port.PcapBase.PcapHandle)
+	//svr.Packet.SendNDPkt(pktData.Data, l3Port.PcapBase.PcapHandle)
 }

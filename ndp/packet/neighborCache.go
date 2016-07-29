@@ -23,50 +23,24 @@
 package packet
 
 import (
-	"errors"
-	"fmt"
-	"github.com/google/gopacket/pcap"
-	"l3/ndp/debug"
-	"net"
+	"l3/ndp/config"
+	"time"
 )
 
 /*
- *    Port is coming up for the first time and linux is sending Neighbor Solicitation message targeted at the
- *    neighbor. In this case we will wait for linux to finish off the neighbor detection and hence ignore
- *    sending the NS packet...
- *    However, if the ipAddr is already cached in the neighbor cache then it means that it has already been
- *    solicitated before......In this case we will send out multicast solicitation and whoever repsonds will we
- *    learn about them via Neighbor Advertisement... That way our nexthop neighbor entry is always up-to-date
+ *    Re-Transmit Timer
  */
-func (p *Packet) SendNSMsgIfRequired(ipAddr string, pHdl *pcap.Handle) error {
-	ip, _, err := net.ParseCIDR(ipAddr)
-	if err != nil {
-		return errors.New(fmt.Sprintln("Parsing CIDR", ipAddr, "failed with Error:", err))
+func (c *NeighborCache) Timer(ifIndex int32, linkIp, nbrIP string, timeValueInMS int, pktCh config.PacketData) {
+	// Reset the timer if it is already running when we receive Neighbor Solicitation
+	if c.RetransTimer != nil {
+		c.RetransTimer.Reset(time.Duration(timeValueInMS) * time.Millisecond)
+	} else {
+		// start the time for the first... provide an after func and move on
+		var ReTransmitNeighborSolicitation_func func()
+		ReTransmitNeighborSolicitation_func = func() {
+			debug.Logger.Info("Timer expired for ifIndex", ifIndex, "IpAddr:", linkIp, "NbrIP:", nbrIP,
+				"time to send NeighborSolicitation")
+			pktCh <- config.PacketData{linkIp, nbrIP, ifIndex}
+		}
 	}
-	link, exists := p.GetLink(ip.String())
-	if !exists {
-		debug.Logger.Info("link entry for ipAddr", ip, "not found in linkInfo.",
-			"Waiting for linux to finish of neighbor duplicate detection")
-		return nil
-	}
-	debug.Logger.Info("link info", link, "ip address", ip)
-	pktToSend := ConstructNSPacket(ip.String(), "::", link.LinkLocalAddress, IPV6_ICMPV6_MULTICAST_DST_MAC, ip)
-	debug.Logger.Info("sending pkt from link", link.LinkLocalAddress, "bytes are:", pktToSend)
-	return p.SendNDPkt(pktToSend, pHdl)
-}
-
-/*
- *    Helper function to send raw bytes on a given pcap handler
- */
-func (p *Packet) SendNDPkt(pkt []byte, pHdl *pcap.Handle) error {
-	if pHdl == nil {
-		debug.Logger.Info("Invalid Pcap Handler")
-		return errors.New("Invalid Pcap Handler")
-	}
-	err := pHdl.WritePacketData(pkt)
-	if err != nil {
-		debug.Logger.Err("Sending Packet failed error:", err)
-		return errors.New("Sending Packet Failed")
-	}
-	return nil
 }

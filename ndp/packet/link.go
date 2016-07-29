@@ -84,6 +84,8 @@ func (p *Packet) InitLink(ifIndex int32, ip, mac string) {
 	link, _ := p.GetLink(ip)
 	link.PortIfIndex = ifIndex
 	link.LinkLocalAddress = mac
+	// @TODO: need to get RETRANS_TIMER from config
+	link.RetransTimer = 1000
 	p.SetLink(ip, link)
 	debug.Logger.Info("Packet Link Info is", p.LinkInfo)
 }
