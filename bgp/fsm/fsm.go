@@ -1211,11 +1211,11 @@ func (fsm *FSM) sendUpdateMessage(bgpMsg *packet.BGPMessage) {
 				"Conn.Write failed to send Update message with error:", err))
 			return
 		}
+		fsm.StartKeepAliveTimer()
 		fsm.neighborConf.Neighbor.State.Messages.Sent.Update++
 		fsm.logger.Info(fmt.Sprintln("Neighbor:", fsm.pConf.NeighborAddress, "FSM", fsm.id,
 			"Conn.Write succeeded. sent Update message of", num, "bytes"))
 	}
-	fsm.StartKeepAliveTimer()
 }
 
 func (fsm *FSM) sendOpenMessage() {

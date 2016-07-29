@@ -552,7 +552,7 @@ func (p *Peer) SendUpdate(updated map[uint32]map[*bgprib.Path][]*bgprib.Destinat
 		var updateMsg *packet.BGPMessage
 		var ipv4List []packet.NLRI
 		protoFamily := packet.GetProtocolFamily(packet.AfiIP, packet.SafiUnicast)
-		if nlriList, ok := withdrawList[protoFamily]; ok {
+		if nlriList, ok := withdrawList[protoFamily]; ok && len(nlriList) > 0 {
 			ipv4List = nlriList
 			delete(withdrawList, protoFamily)
 		}
