@@ -27,7 +27,6 @@ package server
 import (
 	"asicd/asicdCommonDefs"
 	"encoding/json"
-	"fmt"
 	"github.com/op/go-nanomsg"
 	"net"
 	"ribd"
@@ -41,7 +40,7 @@ func (ribdServiceHandler *RIBDServer) ProcessLogicalIntfCreateEvent(logicalIntfN
 		IntfIdNameMap = make(map[int32]IntfEntry)
 	}
 	intfEntry := IntfEntry{name: logicalIntfNotifyMsg.LogicalIntfName}
-	ribdServiceHandler.Logger.Info(fmt.Sprintln("Updating IntfIdMap at index ", ifId, " with name ", logicalIntfNotifyMsg.LogicalIntfName))
+	ribdServiceHandler.Logger.Info("Updating IntfIdMap at index ", ifId, " with name ", logicalIntfNotifyMsg.LogicalIntfName)
 	IntfIdNameMap[int32(ifId)] = intfEntry
 	if IfNameToIfIndex == nil {
 		IfNameToIfIndex = make(map[string]int32)
@@ -51,7 +50,7 @@ func (ribdServiceHandler *RIBDServer) ProcessLogicalIntfCreateEvent(logicalIntfN
 }
 func (ribdServiceHandler *RIBDServer) ProcessVlanCreateEvent(vlanNotifyMsg asicdCommonDefs.VlanNotifyMsg) {
 	ifId := asicdCommonDefs.GetIfIndexFromIntfIdAndIntfType(int(vlanNotifyMsg.VlanId), commonDefs.IfTypeVlan)
-	ribdServiceHandler.Logger.Info(fmt.Sprintln("vlanId ", vlanNotifyMsg.VlanId, " ifId:", ifId))
+	ribdServiceHandler.Logger.Info("vlanId ", vlanNotifyMsg.VlanId, " ifId:", ifId)
 	if IntfIdNameMap == nil {
 		IntfIdNameMap = make(map[int32]IntfEntry)
 	}
@@ -73,7 +72,7 @@ func (ribdServiceHandler *RIBDServer) ProcessIPv4IntfCreateEvent(msg asicdCommon
 	copy(ipMask, ipNet.Mask)
 	ipAddrStr := ip.String()
 	ipMaskStr := net.IP(ipMask).String()
-	ribdServiceHandler.Logger.Info(fmt.Sprintln("Calling createv4Route with ipaddr ", ipAddrStr, " mask ", ipMaskStr, " nextHopIntRef: ", strconv.Itoa(int(msg.IfIndex))))
+	ribdServiceHandler.Logger.Info("Calling createv4Route with ipaddr ", ipAddrStr, " mask ", ipMaskStr, " nextHopIntRef: ", strconv.Itoa(int(msg.IfIndex)))
 	cfg := ribd.IPv4Route{
 		DestinationNw: ipAddrStr,
 		Protocol:      "CONNECTED",
@@ -102,7 +101,7 @@ func (ribdServiceHandler *RIBDServer) ProcessIPv6IntfCreateEvent(msg asicdCommon
 	copy(ipMask, ipNet.Mask)
 	ipAddrStr := ip.String()
 	ipMaskStr := net.IP(ipMask).String()
-	ribdServiceHandler.Logger.Info(fmt.Sprintln("Calling createRoute with ipaddr ", ipAddrStr, " mask ", ipMaskStr, " nextHopIntRef: ", strconv.Itoa(int(msg.IfIndex))))
+	ribdServiceHandler.Logger.Info("Calling createRoute with ipaddr ", ipAddrStr, " mask ", ipMaskStr, " nextHopIntRef: ", strconv.Itoa(int(msg.IfIndex)))
 	cfg := ribd.IPv6Route{
 		DestinationNw: ipAddrStr,
 		Protocol:      "CONNECTED",
@@ -131,7 +130,7 @@ func (ribdServiceHandler *RIBDServer) ProcessIPv4IntfDeleteEvent(msg asicdCommon
 	copy(ipMask, ipNet.Mask)
 	ipAddrStr := ip.String()
 	ipMaskStr := net.IP(ipMask).String()
-	ribdServiceHandler.Logger.Info(fmt.Sprintln("Calling deletev4Route with ipaddr ", ipAddrStr, " mask ", ipMaskStr))
+	ribdServiceHandler.Logger.Info("Calling deletev4Route with ipaddr ", ipAddrStr, " mask ", ipMaskStr)
 	cfg := ribd.IPv4Route{
 		DestinationNw: ipAddrStr,
 		Protocol:      "CONNECTED",
@@ -160,7 +159,7 @@ func (ribdServiceHandler *RIBDServer) ProcessIPv6IntfDeleteEvent(msg asicdCommon
 	copy(ipMask, ipNet.Mask)
 	ipAddrStr := ip.String()
 	ipMaskStr := net.IP(ipMask).String()
-	ribdServiceHandler.Logger.Info(fmt.Sprintln("Calling deleteRoute with ipaddr ", ipAddrStr, " mask ", ipMaskStr))
+	ribdServiceHandler.Logger.Info("Calling deleteRoute with ipaddr ", ipAddrStr, " mask ", ipMaskStr)
 	cfg := ribd.IPv6Route{
 		DestinationNw: ipAddrStr,
 		Protocol:      "CONNECTED",
@@ -181,29 +180,27 @@ func (ribdServiceHandler *RIBDServer) ProcessIPv6IntfDeleteEvent(msg asicdCommon
 func (ribdServiceHandler *RIBDServer) ProcessAsicdEvents(sub *nanomsg.SubSocket) {
 
 	ribdServiceHandler.Logger.Info("in process Asicd events")
-	ribdServiceHandler.Logger.Info(fmt.Sprintln(" asicdCommonDefs.NOTIFY_IPV4INTF_CREATE = ", asicdCommonDefs.NOTIFY_IPV4INTF_CREATE, "asicdCommonDefs.asicdCommonDefs.NOTIFY_IPV4INTF_DELETE: ", asicdCommonDefs.NOTIFY_IPV4INTF_DELETE))
 	for {
-		ribdServiceHandler.Logger.Info("In for loop Asicd events")
 		rcvdMsg, err := sub.Recv(0)
 		if err != nil {
-			ribdServiceHandler.Logger.Info(fmt.Sprintln("Error in receiving ", err))
+			ribdServiceHandler.Logger.Info("Error in receiving ", err)
 			return
 		}
-		ribdServiceHandler.Logger.Info(fmt.Sprintln("After recv rcvdMsg buf", string(rcvdMsg), " getting Notif Info"))
+		ribdServiceHandler.Logger.Info("After recv rcvdMsg buf", string(rcvdMsg), " getting Notif Info")
 		Notif := asicdCommonDefs.AsicdNotification{}
 		err = json.Unmarshal(rcvdMsg, &Notif)
 		if err != nil {
 			ribdServiceHandler.Logger.Info("Error in Unmarshalling rcvdMsg Json")
 			return
 		}
-		ribdServiceHandler.Logger.Debug(fmt.Sprintln("Switch msgtype ", Notif.MsgType))
+		ribdServiceHandler.Logger.Debug("Switch msgtype ", Notif.MsgType)
 		switch Notif.MsgType {
 		case asicdCommonDefs.NOTIFY_LOGICAL_INTF_CREATE:
 			ribdServiceHandler.Logger.Info("NOTIFY_LOGICAL_INTF_CREATE received")
 			var logicalIntfNotifyMsg asicdCommonDefs.LogicalIntfNotifyMsg
 			err = json.Unmarshal(Notif.Msg, &logicalIntfNotifyMsg)
 			if err != nil {
-				ribdServiceHandler.Logger.Info(fmt.Sprintln("Unable to unmashal logicalIntfNotifyMsg:", Notif.Msg))
+				ribdServiceHandler.Logger.Info("Unable to unmashal logicalIntfNotifyMsg:", Notif.Msg)
 				return
 			}
 			ribdServiceHandler.ProcessLogicalIntfCreateEvent(logicalIntfNotifyMsg)
@@ -213,7 +210,7 @@ func (ribdServiceHandler *RIBDServer) ProcessAsicdEvents(sub *nanomsg.SubSocket)
 			var vlanNotifyMsg asicdCommonDefs.VlanNotifyMsg
 			err = json.Unmarshal(Notif.Msg, &vlanNotifyMsg)
 			if err != nil {
-				ribdServiceHandler.Logger.Info(fmt.Sprintln("Unable to unmashal vlanNotifyMsg:", Notif.Msg))
+				ribdServiceHandler.Logger.Info("Unable to unmashal vlanNotifyMsg:", Notif.Msg)
 				return
 			}
 			ribdServiceHandler.ProcessVlanCreateEvent(vlanNotifyMsg)
@@ -223,10 +220,10 @@ func (ribdServiceHandler *RIBDServer) ProcessAsicdEvents(sub *nanomsg.SubSocket)
 			var msg asicdCommonDefs.L3IntfStateNotifyMsg
 			err = json.Unmarshal(Notif.Msg, &msg)
 			if err != nil {
-				ribdServiceHandler.Logger.Info(fmt.Sprintln("Error in reading msg ", err))
+				ribdServiceHandler.Logger.Info("Error in reading msg ", err)
 				return
 			}
-			ribdServiceHandler.Logger.Info(fmt.Sprintln("Msg linkstatus = %d msg ifType = %d ifId = %d\n", msg.IfState, msg.IfIndex))
+			ribdServiceHandler.Logger.Info("Msg linkstatus = %d msg ifType = %d ifId = %d\n", msg.IfState, msg.IfIndex)
 			if msg.IfState == asicdCommonDefs.INTF_STATE_DOWN {
 				//processLinkDownEvent(ribd.Int(msg.IfType), ribd.Int(msg.IfId))
 				ribdServiceHandler.ProcessL3IntfDownEvent(msg.IpAddr)
@@ -240,10 +237,10 @@ func (ribdServiceHandler *RIBDServer) ProcessAsicdEvents(sub *nanomsg.SubSocket)
 			var msg asicdCommonDefs.IPv4IntfNotifyMsg
 			err = json.Unmarshal(Notif.Msg, &msg)
 			if err != nil {
-				ribdServiceHandler.Logger.Info(fmt.Sprintln("Error in reading msg ", err))
+				ribdServiceHandler.Logger.Info("Error in reading msg ", err)
 				return
 			}
-			ribdServiceHandler.Logger.Info(fmt.Sprintln("Received NOTIFY_IPV4INTF_CREATE ipAddr ", msg.IpAddr, " ifIndex = ", msg.IfIndex, " ifType ", asicdCommonDefs.GetIntfTypeFromIfIndex(msg.IfIndex), " ifId ", asicdCommonDefs.GetIntfIdFromIfIndex(msg.IfIndex)))
+			ribdServiceHandler.Logger.Info("Received NOTIFY_IPV4INTF_CREATE ipAddr ", msg.IpAddr, " ifIndex = ", msg.IfIndex, " ifType ", asicdCommonDefs.GetIntfTypeFromIfIndex(msg.IfIndex), " ifId ", asicdCommonDefs.GetIntfIdFromIfIndex(msg.IfIndex))
 			ribdServiceHandler.ProcessIPv4IntfCreateEvent(msg)
 			break
 		case asicdCommonDefs.NOTIFY_IPV6INTF_CREATE:
@@ -251,10 +248,10 @@ func (ribdServiceHandler *RIBDServer) ProcessAsicdEvents(sub *nanomsg.SubSocket)
 			var msg asicdCommonDefs.IPv6IntfNotifyMsg
 			err = json.Unmarshal(Notif.Msg, &msg)
 			if err != nil {
-				ribdServiceHandler.Logger.Info(fmt.Sprintln("Error in reading msg ", err))
+				ribdServiceHandler.Logger.Info("Error in reading msg ", err)
 				return
 			}
-			ribdServiceHandler.Logger.Info(fmt.Sprintln("Received NOTIFY_IPV6INTF_CREATE ipAddr ", msg.IpAddr, " ifIndex = ", msg.IfIndex, " ifType ", asicdCommonDefs.GetIntfTypeFromIfIndex(msg.IfIndex), " ifId ", asicdCommonDefs.GetIntfIdFromIfIndex(msg.IfIndex)))
+			ribdServiceHandler.Logger.Info("Received NOTIFY_IPV6INTF_CREATE ipAddr ", msg.IpAddr, " ifIndex = ", msg.IfIndex, " ifType ", asicdCommonDefs.GetIntfTypeFromIfIndex(msg.IfIndex), " ifId ", asicdCommonDefs.GetIntfIdFromIfIndex(msg.IfIndex))
 			ribdServiceHandler.ProcessIPv6IntfCreateEvent(msg)
 			break
 		case asicdCommonDefs.NOTIFY_IPV4INTF_DELETE:
@@ -262,10 +259,10 @@ func (ribdServiceHandler *RIBDServer) ProcessAsicdEvents(sub *nanomsg.SubSocket)
 			var msg asicdCommonDefs.IPv4IntfNotifyMsg
 			err = json.Unmarshal(Notif.Msg, &msg)
 			if err != nil {
-				ribdServiceHandler.Logger.Info(fmt.Sprintln("Error in reading msg ", err))
+				ribdServiceHandler.Logger.Info("Error in reading msg ", err)
 				return
 			}
-			ribdServiceHandler.Logger.Info(fmt.Sprintln("Received ipv4 intf delete with ipAddr ", msg.IpAddr, " ifIndex = ", msg.IfIndex, " ifType ", asicdCommonDefs.GetIntfTypeFromIfIndex(msg.IfIndex), " ifId ", asicdCommonDefs.GetIntfIdFromIfIndex(msg.IfIndex)))
+			ribdServiceHandler.Logger.Info("Received ipv4 intf delete with ipAddr ", msg.IpAddr, " ifIndex = ", msg.IfIndex, " ifType ", asicdCommonDefs.GetIntfTypeFromIfIndex(msg.IfIndex), " ifId ", asicdCommonDefs.GetIntfIdFromIfIndex(msg.IfIndex))
 			ribdServiceHandler.ProcessIPv4IntfDeleteEvent(msg)
 			break
 		case asicdCommonDefs.NOTIFY_IPV6INTF_DELETE:
@@ -273,10 +270,10 @@ func (ribdServiceHandler *RIBDServer) ProcessAsicdEvents(sub *nanomsg.SubSocket)
 			var msg asicdCommonDefs.IPv6IntfNotifyMsg
 			err = json.Unmarshal(Notif.Msg, &msg)
 			if err != nil {
-				ribdServiceHandler.Logger.Info(fmt.Sprintln("Error in reading msg ", err))
+				ribdServiceHandler.Logger.Info("Error in reading msg ", err)
 				return
 			}
-			ribdServiceHandler.Logger.Info(fmt.Sprintln("Received ipv6 intf delete with ipAddr ", msg.IpAddr, " ifIndex = ", msg.IfIndex, " ifType ", asicdCommonDefs.GetIntfTypeFromIfIndex(msg.IfIndex), " ifId ", asicdCommonDefs.GetIntfIdFromIfIndex(msg.IfIndex)))
+			ribdServiceHandler.Logger.Info("Received ipv6 intf delete with ipAddr ", msg.IpAddr, " ifIndex = ", msg.IfIndex, " ifType ", asicdCommonDefs.GetIntfTypeFromIfIndex(msg.IfIndex), " ifId ", asicdCommonDefs.GetIntfIdFromIfIndex(msg.IfIndex))
 			ribdServiceHandler.ProcessIPv6IntfDeleteEvent(msg)
 			break
 		default:
@@ -285,14 +282,14 @@ func (ribdServiceHandler *RIBDServer) ProcessAsicdEvents(sub *nanomsg.SubSocket)
 	}
 }
 func (ribdServiceHandler *RIBDServer) ProcessEvents(sub *nanomsg.SubSocket, subType ribd.Int) {
-	ribdServiceHandler.Logger.Info(fmt.Sprintln("in process events for sub ", subType))
+	ribdServiceHandler.Logger.Info("in process events for sub ", subType)
 	if subType == SUB_ASICD {
 		ribdServiceHandler.Logger.Info("process Asicd events")
 		ribdServiceHandler.ProcessAsicdEvents(sub)
 	}
 }
 func (ribdServiceHandler *RIBDServer) SetupEventHandler(sub *nanomsg.SubSocket, address string, subtype ribd.Int) {
-	ribdServiceHandler.Logger.Info(fmt.Sprintln("Setting up event handlers for sub type ", subtype))
+	ribdServiceHandler.Logger.Info("Setting up event handlers for sub type ", subtype)
 	sub, err := nanomsg.NewSubSocket()
 	if err != nil {
 		ribdServiceHandler.Logger.Info("Failed to open sub socket")
@@ -301,10 +298,10 @@ func (ribdServiceHandler *RIBDServer) SetupEventHandler(sub *nanomsg.SubSocket, 
 	ribdServiceHandler.Logger.Info("opened socket")
 	ep, err := sub.Connect(address)
 	if err != nil {
-		ribdServiceHandler.Logger.Info(fmt.Sprintln("Failed to connect to pub socket - ", ep))
+		ribdServiceHandler.Logger.Info("Failed to connect to pub socket - ", ep)
 		return
 	}
-	ribdServiceHandler.Logger.Info(fmt.Sprintln("Connected to ", ep.Address))
+	ribdServiceHandler.Logger.Info("Connected to ", ep.Address)
 	err = sub.Subscribe("")
 	if err != nil {
 		ribdServiceHandler.Logger.Info("Failed to subscribe to all topics")

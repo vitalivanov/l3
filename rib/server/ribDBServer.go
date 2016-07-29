@@ -33,13 +33,15 @@ import (
 	"strconv"
 )
 
+var dbRouteReqs []RIBdServerConfig
+
 type RouteDBInfo struct {
 	entry     RouteInfoRecord
 	routeList RouteInfoRecordList
 }
 
 func (m RIBDServer) WriteIPv4RouteStateEntryToDB(dbInfo RouteDBInfo) error {
-	logger.Info(fmt.Sprintln("WriteIPv4RouteStateEntryToDB"))
+	//	logger.Info("WriteIPv4RouteStateEntryToDB")
 	entry := dbInfo.entry
 	routeList := dbInfo.routeList
 	m.DelIPv4RouteStateEntryFromDB(dbInfo)
@@ -49,19 +51,19 @@ func (m RIBDServer) WriteIPv4RouteStateEntryToDB(dbInfo RouteDBInfo) error {
 	obj.Protocol = routeList.selectedRouteProtocol //ReverseRouteProtoTypeMapDB[int(entry.protocol)]
 	obj.NextHopList = make([]*ribd.NextHopInfo, 0)
 	routeInfoList := routeList.routeInfoProtocolMap[routeList.selectedRouteProtocol]
-	logger.Info(fmt.Sprintln("len of routeInfoList - ", len(routeInfoList), "selected route protocol = ", routeList.selectedRouteProtocol, " route Protocol: ", entry.protocol, " route nwAddr: ", entry.networkAddr))
+	//	logger.Info("len of routeInfoList - ", len(routeInfoList), "selected route protocol = ", routeList.selectedRouteProtocol, " route Protocol: ", entry.protocol, " route nwAddr: ", entry.networkAddr)
 	nextHopInfo := make([]ribd.NextHopInfo, len(routeInfoList))
 	i := 0
 	for sel := 0; sel < len(routeInfoList); sel++ {
-		logger.Info(fmt.Sprintln("nextHop ", sel, " weight = ", routeInfoList[sel].weight, " ip ", routeInfoList[sel].nextHopIp, " intref ", routeInfoList[sel].nextHopIfIndex))
+		//	logger.Info("nextHop ", sel, " weight = ", routeInfoList[sel].weight, " ip ", routeInfoList[sel].nextHopIp, " intref ", routeInfoList[sel].nextHopIfIndex)
 		nextHopInfo[i].NextHopIp = routeInfoList[sel].nextHopIp.String()
 		nextHopInfo[i].NextHopIntRef = strconv.Itoa(int(routeInfoList[sel].nextHopIfIndex))
 		intfEntry, ok := IntfIdNameMap[int32(routeInfoList[sel].nextHopIfIndex)]
 		if ok {
-			logger.Debug(fmt.Sprintln("Map foud for ifndex : ", routeInfoList[sel].nextHopIfIndex, "Name = ", intfEntry.name))
+			//	logger.Debug("Map foud for ifndex : ", routeInfoList[sel].nextHopIfIndex, "Name = ", intfEntry.name)
 			nextHopInfo[i].NextHopIntRef = intfEntry.name
 		}
-		logger.Debug(fmt.Sprintln("IntfRef = ", nextHopInfo[i].NextHopIntRef))
+		//logger.Debug("IntfRef = ", nextHopInfo[i].NextHopIntRef)
 		nextHopInfo[i].Weight = int32(routeInfoList[sel].weight)
 		obj.NextHopList = append(obj.NextHopList, &nextHopInfo[i])
 		if routeInfoList[sel].protocol == int8(RouteProtocolTypeMapDB[routeList.selectedRouteProtocol]) {
@@ -100,15 +102,15 @@ func (m RIBDServer) WriteIPv4RouteStateEntryToDB(dbInfo RouteDBInfo) error {
 	objects.ConvertThriftToribdIPv4RouteStateObj(obj, &dbObj)
 	err := dbObj.StoreObjectInDb(m.DbHdl)
 	if err != nil {
-		logger.Err(fmt.Sprintln("Failed to store IPv4RouteState entry in DB, err - ", err))
+		logger.Err("Failed to store IPv4RouteState entry in DB, err - ", err)
 		return errors.New(fmt.Sprintln("Failed to add IPv4RouteState db : ", entry))
 	}
-	logger.Info(fmt.Sprintln("returned successfully after write to DB for IPv4RouteState"))
+	//logger.Info("returned successfully after write to DB for IPv4RouteState")
 	return nil
 }
 
 func (m RIBDServer) WriteIPv6RouteStateEntryToDB(dbInfo RouteDBInfo) error {
-	logger.Info(fmt.Sprintln("WriteIPv6RouteStateEntryToDB"))
+	//logger.Info("WriteIPv6RouteStateEntryToDB")
 	entry := dbInfo.entry
 	routeList := dbInfo.routeList
 	m.DelIPv6RouteStateEntryFromDB(dbInfo)
@@ -118,19 +120,19 @@ func (m RIBDServer) WriteIPv6RouteStateEntryToDB(dbInfo RouteDBInfo) error {
 	obj.Protocol = routeList.selectedRouteProtocol //ReverseRouteProtoTypeMapDB[int(entry.protocol)]
 	obj.NextHopList = make([]*ribd.NextHopInfo, 0)
 	routeInfoList := routeList.routeInfoProtocolMap[routeList.selectedRouteProtocol]
-	logger.Info(fmt.Sprintln("len of routeInfoList - ", len(routeInfoList), "selected route protocol = ", routeList.selectedRouteProtocol, " route Protocol: ", entry.protocol, " route nwAddr: ", entry.networkAddr))
+	//logger.Info("len of routeInfoList - ", len(routeInfoList), "selected route protocol = ", routeList.selectedRouteProtocol, " route Protocol: ", entry.protocol, " route nwAddr: ", entry.networkAddr)
 	nextHopInfo := make([]ribd.NextHopInfo, len(routeInfoList))
 	i := 0
 	for sel := 0; sel < len(routeInfoList); sel++ {
-		logger.Info(fmt.Sprintln("nextHop ", sel, " weight = ", routeInfoList[sel].weight, " ip ", routeInfoList[sel].nextHopIp, " intref ", routeInfoList[sel].nextHopIfIndex))
+		//logger.Info("nextHop ", sel, " weight = ", routeInfoList[sel].weight, " ip ", routeInfoList[sel].nextHopIp, " intref ", routeInfoList[sel].nextHopIfIndex)
 		nextHopInfo[i].NextHopIp = routeInfoList[sel].nextHopIp.String()
 		nextHopInfo[i].NextHopIntRef = strconv.Itoa(int(routeInfoList[sel].nextHopIfIndex))
 		intfEntry, ok := IntfIdNameMap[int32(routeInfoList[sel].nextHopIfIndex)]
 		if ok {
-			logger.Debug(fmt.Sprintln("Map foud for ifndex : ", routeInfoList[sel].nextHopIfIndex, "Name = ", intfEntry.name))
+			//logger.Debug("Map foud for ifndex : ", routeInfoList[sel].nextHopIfIndex, "Name = ", intfEntry.name)
 			nextHopInfo[i].NextHopIntRef = intfEntry.name
 		}
-		logger.Debug(fmt.Sprintln("IntfRef = ", nextHopInfo[i].NextHopIntRef))
+		//logger.Debug("IntfRef = ", nextHopInfo[i].NextHopIntRef)
 		nextHopInfo[i].Weight = int32(routeInfoList[sel].weight)
 		obj.NextHopList = append(obj.NextHopList, &nextHopInfo[i])
 		if routeInfoList[sel].protocol == int8(RouteProtocolTypeMapDB[routeList.selectedRouteProtocol]) {
@@ -169,15 +171,15 @@ func (m RIBDServer) WriteIPv6RouteStateEntryToDB(dbInfo RouteDBInfo) error {
 	objects.ConvertThriftToribdIPv6RouteStateObj(obj, &dbObj)
 	err := dbObj.StoreObjectInDb(m.DbHdl)
 	if err != nil {
-		logger.Err(fmt.Sprintln("Failed to store IPv6RouteState entry in DB, err - ", err))
+		//logger.Err("Failed to store IPv6RouteState entry in DB, err - ", err)
 		return errors.New(fmt.Sprintln("Failed to add IPv6RouteState db : ", entry))
 	}
-	logger.Info(fmt.Sprintln("returned successfully after write to DB for IPv6RouteState"))
+	//logger.Info("returned successfully after write to DB for IPv6RouteState")
 	return nil
 }
 
 func (m RIBDServer) DelIPv4RouteStateEntryFromDB(dbInfo RouteDBInfo) error {
-	logger.Info(fmt.Sprintln("DelIPv4RouteStateEntryFromDB"))
+	//logger.Info("DelIPv4RouteStateEntryFromDB")
 	entry := dbInfo.entry
 	var dbObj objects.IPv4RouteState
 	obj := ribd.NewIPv4RouteState()
@@ -191,7 +193,7 @@ func (m RIBDServer) DelIPv4RouteStateEntryFromDB(dbInfo RouteDBInfo) error {
 }
 
 func (m RIBDServer) DelIPv6RouteStateEntryFromDB(dbInfo RouteDBInfo) error {
-	logger.Info(fmt.Sprintln("DelIPv6RouteStateEntryFromDB"))
+	//logger.Info("DelIPv6RouteStateEntryFromDB")
 	entry := dbInfo.entry
 	var dbObj objects.IPv6RouteState
 	obj := ribd.NewIPv6RouteState()
@@ -205,11 +207,11 @@ func (m RIBDServer) DelIPv6RouteStateEntryFromDB(dbInfo RouteDBInfo) error {
 }
 
 func (m RIBDServer) ReadAndUpdateRoutesFromDB() {
-	logger.Debug("ReadAndUpdateRoutesFromDB")
+	//logger.Debug("ReadAndUpdateRoutesFromDB")
 	var dbObjCfg objects.IPv4Route
 	objList, err := m.DbHdl.GetAllObjFromDb(dbObjCfg)
 	if err == nil {
-		logger.Debug(fmt.Sprintln("Number of routes from DB: ", len((objList))))
+		//logger.Debug("Number of routes from DB: ", len((objList)))
 		for idx := 0; idx < len(objList); idx++ {
 			obj := ribd.NewIPv4Route()
 			dbObj := objList[idx].(objects.IPv4Route)
@@ -225,7 +227,7 @@ func (m RIBDServer) ReadAndUpdateRoutesFromDB() {
 			}
 			/*rv, _ := ribdServiceHandler.ProcessRouteCreateConfig(obj)
 			if rv == false {
-				logger.Err("IPv4Route create failed during init")
+				//logger.Err("IPv4Route create failed during init")
 			}*/
 		}
 	} else {
@@ -233,11 +235,11 @@ func (m RIBDServer) ReadAndUpdateRoutesFromDB() {
 	}
 }
 func (m RIBDServer) ReadAndUpdatev6RoutesFromDB() {
-	logger.Debug("ReadAndUpdatev6RoutesFromDB")
+	//logger.Debug("ReadAndUpdatev6RoutesFromDB")
 	var dbObjCfg objects.IPv6Route
 	objList, err := m.DbHdl.GetAllObjFromDb(dbObjCfg)
 	if err == nil {
-		logger.Debug(fmt.Sprintln("Number of v6 routes from DB: ", len((objList))))
+		//logger.Debug("Number of v6 routes from DB: ", len((objList)))
 		for idx := 0; idx < len(objList); idx++ {
 			obj := ribd.NewIPv6Route()
 			dbObj := objList[idx].(objects.IPv6Route)
@@ -256,7 +258,6 @@ func (m RIBDServer) ReadAndUpdatev6RoutesFromDB() {
 		logger.Err("DB Query failed during IPv6Route query: RIBd init")
 	}
 }
-
 func (ribdServiceHandler *RIBDServer) StartDBServer() {
 	logger.Info("Starting the DB update server loop")
 	for {
@@ -268,22 +269,22 @@ func (ribdServiceHandler *RIBDServer) StartDBServer() {
 				routeInfoList := routeList.routeInfoProtocolMap[routeList.selectedRouteProtocol]
 				for sel := 0; sel < len(routeInfoList); sel++ {
 					if routeInfoList[sel].protocol == int8(RouteProtocolTypeMapDB[routeList.selectedRouteProtocol]) {
-						logger.Debug(fmt.Sprintln("add case iptype = ", routeInfoList[sel].ipType))
+						//logger.Debug("add case iptype = ", routeInfoList[sel].ipType)
 						if routeInfoList[sel].ipType == ribdCommonDefs.IPv6 {
 							info.Op = "addv6"
 						}
 					}
 				}
 			} else if info.Op == "del" {
-				logger.Debug("MADHAVI!! del case")
+				//logger.Debug("MADHAVI!! del case")
 				dbInfo := info.OrigConfigObject.(RouteDBInfo)
 				entry := dbInfo.entry
-				logger.Debug(fmt.Sprintln("del case iptype = ", entry.ipType))
+				//logger.Debug("del case iptype = ", entry.ipType)
 				if entry.ipType == ribdCommonDefs.IPv6 {
 					info.Op = "delv6"
 				}
 			}
-			logger.Info(fmt.Sprintln(" received message on DBRouteCh, op:", info.Op))
+			//logger.Info(" received message on DBRouteCh, op:", info.Op)
 			if info.Op == "add" {
 				ribdServiceHandler.WriteIPv4RouteStateEntryToDB(info.OrigConfigObject.(RouteDBInfo))
 			} else if info.Op == "addv6" {
@@ -295,9 +296,79 @@ func (ribdServiceHandler *RIBDServer) StartDBServer() {
 			} else if info.Op == "fetch" {
 				ribdServiceHandler.ReadAndUpdateRoutesFromDB()
 				ribdServiceHandler.ReadAndUpdatev6RoutesFromDB()
-				logger.Debug(fmt.Sprintln("Signalling dbread to be true"))
+				logger.Info("Signalling dbread to be true")
 				ribdServiceHandler.DBReadDone <- true
 			}
 		}
 	}
 }
+
+/*
+func (ribdServiceHandler *RIBDServer) StartDBServer() {
+	//logger.Info("Starting the DB update server loop with checkDBReq()")
+	for {
+		//logger.Info(fmt.Sprintln("for loop beginning dbReqCount", dbReqCount))
+		select {
+		case dbRouteInfo := <-ribdServiceHandler.DBRouteCh:
+			if dbRouteInfo.Op != "fetch" {
+				//logger.Info(fmt.Sprintln("Not a fetch case, op:", dbRouteInfo.Op))
+				if dbReqCount == 0 {
+					dbRouteReqs = make([]RIBdServerConfig, dbReqCount)
+				}
+				dbReqCount++
+				dbRouteReqs = append(dbRouteReqs, dbRouteInfo)
+				//logger.Info(fmt.Sprintln("dbReqCount", dbReqCount))
+				if dbReqCount < dbReqCountLimit {
+					dbReqCheckCountLimit++
+				} else {
+					//logger.Info(fmt.Sprintln("process dbRouteReqs of len:", len(dbRouteReqs)))
+					for idx := 0; idx < len(dbRouteReqs); idx++ {
+						//logger.Info(fmt.Sprintln("process dbRouteReq idx :", idx))
+						info := dbRouteReqs[idx]
+						if info.Op == "add" {
+							dbInfo := info.OrigConfigObject.(RouteDBInfo)
+							routeList := dbInfo.routeList
+							routeInfoList := routeList.routeInfoProtocolMap[routeList.selectedRouteProtocol]
+							for sel := 0; sel < len(routeInfoList); sel++ {
+								if routeInfoList[sel].protocol == int8(RouteProtocolTypeMapDB[routeList.selectedRouteProtocol]) {
+									//logger.Debug(fmt.Sprintln("add case iptype = ", routeInfoList[sel].ipType))
+									if routeInfoList[sel].ipType == ribdCommonDefs.IPv6 {
+										info.Op = "addv6"
+									}
+								}
+							}
+						} else if info.Op == "del" {
+							dbInfo := info.OrigConfigObject.(RouteDBInfo)
+							entry := dbInfo.entry
+							if entry.ipType == ribdCommonDefs.IPv6 {
+								info.Op = "delv6"
+							}
+						}
+						//logger.Info(fmt.Sprintln(" received message on DBRouteCh, op:", info.Op))
+						if info.Op == "add" {
+							ribdServiceHandler.WriteIPv4RouteStateEntryToDB(info.OrigConfigObject.(RouteDBInfo))
+						} else if info.Op == "addv6" {
+							ribdServiceHandler.WriteIPv6RouteStateEntryToDB(info.OrigConfigObject.(RouteDBInfo))
+						} else if info.Op == "del" {
+							ribdServiceHandler.DelIPv4RouteStateEntryFromDB(info.OrigConfigObject.(RouteDBInfo))
+						} else if info.Op == "delv6" {
+							ribdServiceHandler.DelIPv6RouteStateEntryFromDB(info.OrigConfigObject.(RouteDBInfo))
+						}
+					}
+					dbReqCount = 0
+					dbReqCheckCount = 0
+					dbRouteReqs = nil
+					//logger.Info("else case  - cleared counters")
+				}
+
+			} else { //if dbRouteinfo.Op == "fetch" {
+				//logger.Info(fmt.Sprintln("fetch case, dbReqCount:", dbReqCount))
+				ribdServiceHandler.ReadAndUpdateRoutesFromDB()
+				ribdServiceHandler.ReadAndUpdatev6RoutesFromDB()
+				//logger.Debug(fmt.Sprintln("Signalling dbread to be true"))
+				ribdServiceHandler.DBReadDone <- true
+			}
+		}
+	}
+}
+*/
