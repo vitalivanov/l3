@@ -13,7 +13,7 @@ import (
 	"ribdInt"
 	"strconv"
 	"strings"
-	"utils/policy/policyCommonDefs"
+	//"utils/policy/policyCommonDefs"
 )
 
 /*
@@ -22,7 +22,7 @@ import (
 	   - Validate destinationNw. If provided in CIDR notation, convert to ip addr and mask values
 */
 func (m RIBDServer) IPv6RouteConfigValidationCheckForUpdate(oldcfg *ribd.IPv6Route, cfg *ribd.IPv6Route, attrset []bool) (err error) {
-	logger.Info(fmt.Sprintln("IPv6RouteConfigValidationCheckForUpdate"))
+	logger.Info("IPv6RouteConfigValidationCheckForUpdate")
 	isCidr := strings.Contains(cfg.DestinationNw, "/")
 	if isCidr {
 		/*
@@ -30,7 +30,7 @@ func (m RIBDServer) IPv6RouteConfigValidationCheckForUpdate(oldcfg *ribd.IPv6Rou
 		*/
 		ip, ipNet, err := net.ParseCIDR(cfg.DestinationNw)
 		if err != nil {
-			logger.Err(fmt.Sprintln("Invalid Destination IP address"))
+			logger.Err("Invalid Destination IP address")
 			return errors.New("Invalid Desitnation IP address")
 		}
 		_, err = getNetworkPrefixFromCIDR(cfg.DestinationNw)
@@ -47,7 +47,7 @@ func (m RIBDServer) IPv6RouteConfigValidationCheckForUpdate(oldcfg *ribd.IPv6Rou
 	}
 	_, err = validateNetworkPrefix(cfg.DestinationNw, cfg.NetworkMask)
 	if err != nil {
-		logger.Info(fmt.Sprintln(" getNetowrkPrefixFromStrings returned err ", err))
+		logger.Err(" getNetowrkPrefixFromStrings returned err ", err)
 		return errors.New("Invalid destination ip address")
 	}
 	/*
@@ -397,11 +397,12 @@ func (m RIBDServer) ProcessV6RouteCreateConfig(cfg *ribd.IPv6Route) (val bool, e
 		newCfg.NextHop = append(newCfg.NextHop, &nh)
 	}
 
-	policyRoute := BuildPolicyRouteFromribdIPv6Route(&newCfg)
+	//	policyRoute := BuildPolicyRouteFromribdIPv6Route(&newCfg)
 	params := BuildRouteParamsFromribdIPv6Route(&newCfg, FIBAndRIB, Invalid, len(destNetSlice))
 
 	logger.Debug(fmt.Sprintln("createType = ", params.createType, "deleteType = ", params.deleteType))
-	PolicyEngineFilter(policyRoute, policyCommonDefs.PolicyPath_Import, params)
+	//	PolicyEngineFilter(policyRoute, policyCommonDefs.PolicyPath_Import, params)
+	_, err = createRoute(params)
 
 	return true, err
 }

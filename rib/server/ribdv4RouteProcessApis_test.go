@@ -44,15 +44,15 @@ var patchOpList []*ribd.PatchOpInfo
 
 func InitIpv4AddrInfoList() {
 	ipv4AddrList = make([]testIpInfo, 0)
-	ipv4AddrList = append(ipv4AddrList, testIpInfo{"11.1.10.2/24", "255.255.255.0"})
+	ipv4AddrList = append(ipv4AddrList, testIpInfo{"11.1.10.2", "255.255.255.0"})
 	ipv4AddrList = append(ipv4AddrList, testIpInfo{"12.1.10.2/24", "255.255.255.0"})
 	ipv4AddrList = append(ipv4AddrList, testIpInfo{"12.1.10.20/24", "255.255.255.0"})
-	ipv4AddrList = append(ipv4AddrList, testIpInfo{"13.1.10.2/24", "255.255.255.0"})
+	ipv4AddrList = append(ipv4AddrList, testIpInfo{"13.1.10.2", "255.255.255.0"})
 	ipv4AddrList = append(ipv4AddrList, testIpInfo{"22.1.10.2", "255.255.255.0"})
-	ipv4AddrList = append(ipv4AddrList, testIpInfo{"33.1.10.2/24", "255.255.255.0"})
-	ipv4AddrList = append(ipv4AddrList, testIpInfo{"40.0.1.2/24", "255.255.255.0"})
-	ipv4AddrList = append(ipv4AddrList, testIpInfo{"40.1.10.2/24", "255.255.255.0"})
-	ipv4AddrList = append(ipv4AddrList, testIpInfo{"50.1.10.2/24", "255.255.255.0"})
+	ipv4AddrList = append(ipv4AddrList, testIpInfo{"33.1.10.2", "255.255.255.0"})
+	ipv4AddrList = append(ipv4AddrList, testIpInfo{"40.0.1.2", "255.255.255.0"})
+	ipv4AddrList = append(ipv4AddrList, testIpInfo{"40.1.10.2", "255.255.255.0"})
+	ipv4AddrList = append(ipv4AddrList, testIpInfo{"50.1.10.2", "255.255.255.0"})
 
 }
 func InitIpv4RouteList() {
