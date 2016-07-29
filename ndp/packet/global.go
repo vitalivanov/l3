@@ -91,8 +91,12 @@ const (
 	ICMPV6_MIN_LENGTH               uint16 = 24
 	ICMPV6_NEXT_HEADER              byte   = 58
 	ICMPV6_SOURCE_LINK_LAYER_LENGTH uint16 = 8
+	SOLICITATED_NODE_ADDRESS               = "ff02::1:ff00:0000"
+	SOLICITATED_SRC_IP                     = "::"
 )
 
+/*
 var SOLICITATED_NODE_ADDRESS = []byte{
 	0xff, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0xff, 0x00, 0x00, 0x00,
 }
+*/

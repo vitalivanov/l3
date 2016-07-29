@@ -29,7 +29,6 @@ import (
 	"github.com/google/gopacket/layers"
 	"infra/sysd/sysdCommonDefs"
 	"l3/ndp/config"
-	"l3/ndp/debug"
 	"log/syslog"
 	"net"
 	"reflect"
@@ -132,11 +131,6 @@ func TestEthLayer(t *testing.T) {
 func TestIPv6AndICMPv6Header(t *testing.T) {
 	initTestPacket()
 	var err error
-	logger, err := NDPTestNewLogger("ndpd", "NDPTEST", true)
-	if err != nil {
-		t.Error("creating logger failed")
-	}
-	debug.NDPSetLogger(logger)
 	p := gopacket.NewPacket(testPkt, layers.LinkTypeEthernet, gopacket.Default)
 	if p.ErrorLayer() != nil {
 		t.Error("Failed to decode packet:", p.ErrorLayer().Error())

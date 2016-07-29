@@ -50,7 +50,8 @@ func (p *Packet) SendNSMsgIfRequired(ipAddr string, pHdl *pcap.Handle) error {
 		return nil
 	}
 	debug.Logger.Info("link info", link, "ip address", ip)
-	pktToSend := ConstructNSPacket(ip.String(), "::", link.LinkLocalAddress, IPV6_ICMPV6_MULTICAST_DST_MAC, ip)
+	//pktToSend := ConstructNSPacket(ip.String(), "::", link.LinkLocalAddress, IPV6_ICMPV6_MULTICAST_DST_MAC, ip)
+	pktToSend := ConstructNSPacket(link.LinkLocalAddress, IPV6_ICMPV6_MULTICAST_DST_MAC, ip.String(), SOLICITATED_NODE_ADDRESS)
 	debug.Logger.Info("sending pkt from link", link.LinkLocalAddress, "bytes are:", pktToSend)
 	return p.SendNDPkt(pktToSend, pHdl)
 }
@@ -69,4 +70,25 @@ func (p *Packet) SendNDPkt(pkt []byte, pHdl *pcap.Handle) error {
 		return errors.New("Sending Packet Failed")
 	}
 	return nil
+}
+
+/*
+ *    Send Unicast Neighbor Solicitation on Timer Expiry
+ */
+func (p *Packet) SendUnicastNeighborSolicitation(srcIP, dstIP string, pHdl *pcap.Handle) {
+	link, exists := p.GetLink(srcIP)
+	if !exists {
+		debug.Logger.Err("Sending Unicast NS Failed as link entry for ipAddr", srcIP, "not found in linkInfo.")
+		return
+	}
+	cache, exists := link.NbrCache[dstIP]
+	if !exists {
+		debug.Logger.Err("No Neighbor Entry", dstIP, "found for", srcIP)
+		// @TODO: need to send out multicast neighbor solicitation in this case....
+		return
+	}
+	debug.Logger.Info("link info", link, "src ip address", srcIP, "dst ip", dstIP)
+	pktToSend := ConstructNSPacket(link.LinkLocalAddress, cache.LinkLayerAddress, srcIP, dstIP)
+	debug.Logger.Info("sending pkt from link", link.LinkLocalAddress, "bytes are:", pktToSend)
+	p.SendNDPkt(pktToSend, pHdl)
 }

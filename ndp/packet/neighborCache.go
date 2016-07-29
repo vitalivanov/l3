@@ -24,13 +24,14 @@ package packet
 
 import (
 	"l3/ndp/config"
+	"l3/ndp/debug"
 	"time"
 )
 
 /*
  *    Re-Transmit Timer
  */
-func (c *NeighborCache) Timer(ifIndex int32, linkIp, nbrIP string, timeValueInMS int, pktCh config.PacketData) {
+func (c *NeighborCache) Timer(ifIndex int32, linkIp, nbrIP string, timeValueInMS int, pktCh chan config.PacketData) {
 	// Reset the timer if it is already running when we receive Neighbor Solicitation
 	if c.RetransTimer != nil {
 		c.RetransTimer.Reset(time.Duration(timeValueInMS) * time.Millisecond)
@@ -42,5 +43,7 @@ func (c *NeighborCache) Timer(ifIndex int32, linkIp, nbrIP string, timeValueInMS
 				"time to send NeighborSolicitation")
 			pktCh <- config.PacketData{linkIp, nbrIP, ifIndex}
 		}
+		c.RetransTimer = time.AfterFunc(time.Duration(timeValueInMS)*time.Millisecond,
+			ReTransmitNeighborSolicitation_func)
 	}
 }

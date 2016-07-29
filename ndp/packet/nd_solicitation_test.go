@@ -305,11 +305,12 @@ func TestValidateNDSPktForEncode(t *testing.T) {
 	}
 }
 
-func TestConstructNSPacket(t *testing.T) {
+func TestConstructMulticastNSPacket(t *testing.T) {
+	initTestPacket()
 	targetAddr := "2002::1"
 	srcMac := "00:e0:ec:26:a7:ee"
 	dstMac := "33:33:ff:00:00:01"
-	rcvdBytes := ConstructNSPacket(targetAddr, "::", srcMac, dstMac, net.ParseIP(targetAddr).To16())
+	rcvdBytes := ConstructNSPacket(srcMac, dstMac, targetAddr, SOLICITATED_NODE_ADDRESS)
 	encodedEthLayer := &layers.Ethernet{}
 	p := gopacket.NewPacket(rcvdBytes, layers.LinkTypeEthernet, gopacket.Default)
 	if p.ErrorLayer() != nil {
@@ -347,7 +348,62 @@ func TestConstructNSPacket(t *testing.T) {
 		TypeCode:      layers.CreateICMPv6TypeCode(layers.ICMPv6TypeNeighborSolicitation, 0),
 		Checksum:      icmpv6Hdr.Checksum,
 		Reserved:      []byte{0, 0, 0, 0},
-		TargetAddress: net.ParseIP(targetAddr),
+		TargetAddress: net.ParseIP("ff02::1:ff00:1"),
+	}
+	optionWant := &NDOption{
+		Type:   1,
+		Length: 1,
+		Value:  []byte{0x00, 0xe0, 0xec, 0x26, 0xa7, 0xee},
+	}
+	wantICMPv6Hdr.Options = append(wantICMPv6Hdr.Options, optionWant)
+	checkICMPv6Layer(icmpv6Hdr, wantICMPv6Hdr, t)
+}
+
+func TestConstructUnicastNSPacket(t *testing.T) {
+	initTestPacket()
+	targetAddr := "2002::1"
+	srcMac := "00:e0:ec:26:a7:ee"
+	dstMac := "33:33:ff:00:00:01"
+	dstIP := "2002::2"
+	rcvdBytes := ConstructNSPacket(srcMac, dstMac, targetAddr, dstIP)
+	encodedEthLayer := &layers.Ethernet{}
+	p := gopacket.NewPacket(rcvdBytes, layers.LinkTypeEthernet, gopacket.Default)
+	if p.ErrorLayer() != nil {
+		t.Error("Failed to decode packet:", p.ErrorLayer().Error())
+	}
+	err := getEthLayer(p, encodedEthLayer)
+	if err != nil {
+		t.Error(err)
+	}
+	wantSrcMac := net.HardwareAddr{0x00, 0xe0, 0xec, 0x26, 0xa7, 0xee}
+	wantDstMac := net.HardwareAddr{0x33, 0x33, 0xff, 0x00, 0x00, 0x01}
+	wantEthType := layers.EthernetTypeIPv6
+	checkEthLayer(encodedEthLayer, wantSrcMac, wantDstMac, wantEthType, t)
+	icmpv6Hdr := &layers.ICMPv6{}
+	ipv6Hdr := &layers.IPv6{}
+	err = getIpAndICMPv6Hdr(p, ipv6Hdr, icmpv6Hdr)
+	if err != nil {
+		t.Error("Decoding ipv6 and icmpv6 header failed", err)
+	}
+
+	// Validate that constructed ipv6 header has correct information
+	wantIPv6Hdr := &testIPv6{
+		Version:      6,
+		TrafficClass: 0,
+		FlowLabel:    0,
+		Length:       ICMPV6_MIN_LENGTH + ICMPV6_SOURCE_LINK_LAYER_LENGTH,
+		NextHeader:   layers.IPProtocolICMPv6,
+		HopLimit:     HOP_LIMIT,
+		SrcIP:        net.ParseIP(targetAddr),
+		DstIP:        net.ParseIP(dstIP),
+	}
+	checkIPv6Layer(ipv6Hdr, wantIPv6Hdr, t)
+	// Validate That construct icmpv6 header has correct information
+	wantICMPv6Hdr := &testICMPv6{
+		TypeCode:      layers.CreateICMPv6TypeCode(layers.ICMPv6TypeNeighborSolicitation, 0),
+		Checksum:      icmpv6Hdr.Checksum,
+		Reserved:      []byte{0, 0, 0, 0},
+		TargetAddress: net.ParseIP(dstIP),
 	}
 	optionWant := &NDOption{
 		Type:   1,

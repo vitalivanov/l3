@@ -59,7 +59,6 @@ func initTestPacket() {
 
 func addTestNbrEntry(ipAddr string, peerIP string) {
 	cache := NeighborCache{
-		Timer: 120,
 		State: REACHABLE,
 	}
 	link, _ := testPktObj.GetLink(ipAddr)

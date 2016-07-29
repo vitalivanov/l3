@@ -61,18 +61,9 @@ func (nd *NDInfo) ValidateNDSInfo(srcIP net.IP, dstIP net.IP) error {
 /*
  *  Generic API to create Neighbor Solicitation Packet based on inputs..
  */
-func ConstructNSPacket(targetAddr, srcIP, srcMac, dstMac string, ip net.IP) []byte {
-	/* Entry exists so lets send out Neighbor Solicitation with "::" as srcIP and dstIP as
-	 * Solicitated Multicast Address.
-	 * Solicitated Muticast Address is formed by:
-	 *	    Taking lower 24 bits or 3 bytes of an address (unicast or anycast) and appending those
-	 *	    bits or bytes to the prefix of Solicitated-Node Address FF02:0:0:0:0:1:FFXX:XXXX
-	 */
-	dstIP := SOLICITATED_NODE_ADDRESS
-	ip = ip.To16()
-	for idx := (len(ip) - 3); idx < len(ip); idx++ {
-		dstIP[idx] = ip[idx]
-	}
+//func ConstructNSPacket(targetAddr, srcIP, srcMac, dstMac string, ip net.IP) []byte {
+func ConstructNSPacket(srcMac, dstMac, srcIP, dstIP string) []byte {
+	//var isMulticastSolicitation bool
 
 	// Ethernet Layer Information
 	srcMAC, _ := net.ParseMAC(srcMac)
@@ -97,12 +88,30 @@ func ConstructNSPacket(targetAddr, srcIP, srcMac, dstMac string, ip net.IP) []by
 	debug.Logger.Info("ethernet layer is", *eth)
 
 	// IPv6 Layer Information
+	sip := net.ParseIP(srcIP)
+	dip := net.ParseIP(dstIP)
+	if strings.Compare(dstIP, SOLICITATED_NODE_ADDRESS) == 0 {
+		/*
+		 * Solicitated Multicast Address as dst ip.
+		 * Solicitated Muticast Address is formed by:
+		 *	    Taking lower 24 bits or 3 bytes of an address (unicast or anycast) and appending those
+		 *	    bits or bytes to the prefix of Solicitated-Node Address FF02:0:0:0:0:1:FFXX:XXXX
+		 */
+		ip := sip.To16()
+		for idx := (len(ip) - 3); idx < len(ip); idx++ {
+			dip[idx] = ip[idx]
+		}
+		//isMulticastSolicitation = true
+		// updating src ip with "::"
+		copy(sip, net.ParseIP(SOLICITATED_SRC_IP))
+	}
+
 	ipv6 := &layers.IPv6{
 		Version:      IPV6_VERSION,
 		TrafficClass: 0,
 		NextHeader:   layers.IPProtocolICMPv6,
-		SrcIP:        net.ParseIP(srcIP),
-		DstIP:        dstIP,
+		SrcIP:        sip,
+		DstIP:        dip,
 		HopLimit:     HOP_LIMIT,
 	}
 	debug.Logger.Info("ipv6 layer is", *ipv6)
@@ -112,7 +121,12 @@ func ConstructNSPacket(targetAddr, srcIP, srcMac, dstMac string, ip net.IP) []by
 	payload[1] = byte(0)
 	binary.BigEndian.PutUint16(payload[2:4], 0) // Putting zero for checksum before calculating checksum
 	binary.BigEndian.PutUint32(payload[4:], 0)  // RESERVED FLAG...
-	copy(payload[8:], ip)                       // Copy 16 Bytes of IPV6 address
+	//if isMulticastSolicitation {
+	// use dstIP as Target Address
+	copy(payload[8:], dip.To16())
+	//} else {
+	//	copy(payload[8:], sip.To16()) // Copy 16 Bytes of IPV6 address
+	//}
 	//tA := net.ParseIP("::1")
 	//copy(payload[8:], tA.To16())
 
