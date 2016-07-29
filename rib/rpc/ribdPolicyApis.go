@@ -33,7 +33,7 @@ import (
 )
 
 func (m RIBDServicesHandler) CreatePolicyStmt(cfg *ribd.PolicyStmt) (val bool, err error) {
-	logger.Debug(fmt.Sprintln("CreatePolicyStatement"))
+	logger.Debug("CreatePolicyStatement")
 	newPolicyStmt := policy.PolicyStmtConfig{Name: cfg.Name, MatchConditions: cfg.MatchConditions}
 	if len(cfg.Conditions) != 0 {
 		newPolicyStmt.Conditions = make([]string, 0)

@@ -25,14 +25,13 @@
 package server
 
 import (
-	"fmt"
 	"models/objects"
 	"ribd"
 	"utils/dbutils"
 )
 
 func (ribdServiceHandler *RIBDServer) UpdateRoutesFromDB() (err error) {
-	logger.Debug(fmt.Sprintln("UpdateRoutesFromDB"))
+	logger.Debug("UpdateRoutesFromDB")
 	ribdServiceHandler.DBRouteCh <- RIBdServerConfig{Op: "fetch"}
 	/*	dbHdl := ribdServiceHandler.DbHdl
 		if dbHdl != nil {
@@ -62,7 +61,7 @@ func (ribdServiceHandler *RIBDServer) UpdateRoutesFromDB() (err error) {
 }
 
 func (ribdServiceHandler *RIBDServer) UpdateGlobalPolicyConditionsFromDB(dbHdl *dbutils.DBUtil) (err error) {
-	logger.Debug(fmt.Sprintln("UpdateGlobalPolicyConditionsFromDB"))
+	logger.Debug("UpdateGlobalPolicyConditionsFromDB")
 	if dbHdl != nil {
 		var dbObjCfg objects.PolicyCondition
 		objList, err := dbHdl.GetAllObjFromDb(dbObjCfg)
@@ -83,7 +82,7 @@ func (ribdServiceHandler *RIBDServer) UpdateGlobalPolicyConditionsFromDB(dbHdl *
 	return err
 }
 func (ribdServiceHandler *RIBDServer) UpdateGlobalPolicyStmtsFromDB(dbHdl *dbutils.DBUtil) (err error) {
-	logger.Debug(fmt.Sprintln("UpdateGlobalPolicyStmtsFromDB"))
+	logger.Debug("UpdateGlobalPolicyStmtsFromDB")
 	if dbHdl != nil {
 		var dbObjCfg objects.PolicyStmt
 		objList, err := dbHdl.GetAllObjFromDb(dbObjCfg)
@@ -104,7 +103,7 @@ func (ribdServiceHandler *RIBDServer) UpdateGlobalPolicyStmtsFromDB(dbHdl *dbuti
 	return err
 }
 func (ribdServiceHandler *RIBDServer) UpdateGlobalPolicyFromDB(dbHdl *dbutils.DBUtil) (err error) {
-	logger.Debug(fmt.Sprintln("UpdateGlobalPolicyFromDB"))
+	logger.Debug("UpdateGlobalPolicyFromDB")
 	if dbHdl != nil {
 		var dbObjCfg objects.PolicyDefinition
 		objList, err := dbHdl.GetAllObjFromDb(dbObjCfg)
@@ -125,7 +124,7 @@ func (ribdServiceHandler *RIBDServer) UpdateGlobalPolicyFromDB(dbHdl *dbutils.DB
 	return err
 }
 func (ribdServiceHandler *RIBDServer) UpdatePolicyObjectsFromDB() { //(paramsDir string) (err error) {
-	logger.Debug(fmt.Sprintln("UpdateFromDB"))
+	logger.Debug("UpdateFromDB")
 	dbHdl := ribdServiceHandler.DbHdl
 	ribdServiceHandler.UpdateGlobalPolicyConditionsFromDB(dbHdl) //paramsDir, dbHdl)
 	ribdServiceHandler.UpdateGlobalPolicyStmtsFromDB(dbHdl)
