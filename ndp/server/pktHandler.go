@@ -60,6 +60,25 @@ func (svr *NDPServer) ReceivedNdpPkts(ifIndex int32) {
 }
 
 /*
+ *	SendLinkLocalNSIfRequired
+ *			Check if pcap handle is valid, if so then call sendNSMsgIfRequired
+ */
+func (svr *NDPServer) SendLinkLocalNSIfRequired(ipAddr string, ifIndex int32) {
+	/*
+		ipPort, exists := svr.L3Port[ifIndex]
+		if !exists {
+			// This will copy msg (intRef, ifIndex, ipAddr) into ipPort
+			// And also create an entry into the ndpL3IntfStateSlice
+			debug.Logger.Err("Failed sending ns for interface which was not created, ifIndex:",
+				ifIndex, " and ipAddr:", ipAddr, "is not allowed")
+			return
+		}
+		//svr.Packet.SendNSMsgIfRequired(ipAddr, ipPort.PcapBase.PcapHandle)
+		//svr.Packet.SendNSMsgIfRequired(ipPort.IpAddr, ipPort.PcapBase.PcapHandle)
+	*/
+}
+
+/*
  *	StartRxTx      a) Check if entry is present in the map
  *		       b) If no entry create one do the initialization for the entry
  *		       c) Create Pcap Handler & add the entry to up interface slice
@@ -175,22 +194,21 @@ func (svr *NDPServer) ProcessRxPkt(ifIndex int32, pkt gopacket.Packet) {
 		return
 	}
 	if nbrInfo.PktOperation == byte(packet.PACKET_DROP) {
-		debug.Logger.Err(fmt.Sprintln("Dropping Neighbor Solicitation message for", nbrInfo.IpAddr))
+		debug.Logger.Err("Dropping Neighbor Solicitation message for", nbrInfo.IpAddr)
 		return
 	} else if nbrInfo.State == packet.INCOMPLETE {
-		debug.Logger.Err(fmt.Sprintln("Received Neighbor Solicitation message for", nbrInfo.IpAddr))
+		debug.Logger.Err("Received Neighbor Solicitation message for", nbrInfo.IpAddr)
 		return
 	} else if nbrInfo.State == packet.REACHABLE {
 		switchMac := svr.CheckSrcMac(nbrInfo.MacAddr)
 		if switchMac {
-			debug.Logger.Info(fmt.Sprintln(
-				"Received Packet from same port and hence ignoring the packet:", nbrInfo))
+			debug.Logger.Info("Received Packet from same port and hence ignoring the packet:", nbrInfo)
 			return
 		}
 		svr.PopulateVlanInfo(nbrInfo, ifIndex)
 		svr.CheckCallUpdateNeighborInfo(nbrInfo)
 	} else {
-		debug.Logger.Alert(fmt.Sprintln("Handle state", nbrInfo.State, "after packet validation & parsing"))
+		debug.Logger.Alert("Handle state", nbrInfo.State, "after packet validation & parsing")
 	}
 	return
 }

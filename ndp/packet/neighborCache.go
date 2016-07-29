@@ -45,11 +45,13 @@ func (p *Packet) SendNSMsgIfRequired(ipAddr string, pHdl *pcap.Handle) error {
 	}
 	link, exists := p.GetLink(ip.String())
 	if !exists {
-		debug.Logger.Info(fmt.Sprintln("link entry for ipAddr", ip, "not found in linkInfo.",
-			"Waiting for linux to finish of neighbor duplicate detection"))
+		debug.Logger.Info("link entry for ipAddr", ip, "not found in linkInfo.",
+			"Waiting for linux to finish of neighbor duplicate detection")
 		return nil
 	}
-	pktToSend := ConstructNSPacket(ip.String(), "::", link.LinkLocalAddress, IPV6_ICMPV6_MULTICAST_DST_MAC, ip.To16())
+	debug.Logger.Info("link info", link, "ip address", ip)
+	pktToSend := ConstructNSPacket(ip.String(), "::", link.LinkLocalAddress, IPV6_ICMPV6_MULTICAST_DST_MAC, ip)
+	debug.Logger.Info("sending pkt from link", link.LinkLocalAddress, "bytes are:", pktToSend)
 	return p.SendNDPkt(pktToSend, pHdl)
 }
 
@@ -58,10 +60,12 @@ func (p *Packet) SendNSMsgIfRequired(ipAddr string, pHdl *pcap.Handle) error {
  */
 func (p *Packet) SendNDPkt(pkt []byte, pHdl *pcap.Handle) error {
 	if pHdl == nil {
+		debug.Logger.Info("Invalid Pcap Handler")
 		return errors.New("Invalid Pcap Handler")
 	}
 	err := pHdl.WritePacketData(pkt)
 	if err != nil {
+		debug.Logger.Err("Sending Packet failed error:", err)
 		return errors.New("Sending Packet Failed")
 	}
 	return nil

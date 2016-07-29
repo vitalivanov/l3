@@ -84,7 +84,7 @@ func ConstructNSPacket(targetAddr, srcIP, srcMac, dstMac string, ip net.IP) []by
 	 *	    dstMac needst to be updated with 33:33:ff:dd:ee:ff
 	 */
 	if strings.Compare(dstMac, IPV6_ICMPV6_MULTICAST_DST_MAC) == 0 {
-		for idx := (len(srcMAC) - 3); idx < len(srcMAC); idx++ {
+		for idx := (len(srcMAC) - 4); idx < len(srcMAC); idx++ {
 			dstMAC[idx] = srcMAC[idx]
 		}
 	}
@@ -94,6 +94,7 @@ func ConstructNSPacket(targetAddr, srcIP, srcMac, dstMac string, ip net.IP) []by
 		DstMAC:       dstMAC,
 		EthernetType: layers.EthernetTypeIPv6,
 	}
+	debug.Logger.Info("ethernet layer is", *eth)
 
 	// IPv6 Layer Information
 	ipv6 := &layers.IPv6{
@@ -104,7 +105,7 @@ func ConstructNSPacket(targetAddr, srcIP, srcMac, dstMac string, ip net.IP) []by
 		DstIP:        dstIP,
 		HopLimit:     HOP_LIMIT,
 	}
-
+	debug.Logger.Info("ipv6 layer is", *ipv6)
 	// ICMPV6 Layer Information
 	payload := make([]byte, ICMPV6_MIN_LENGTH)
 	payload[0] = byte(layers.ICMPv6TypeNeighborSolicitation)
@@ -112,6 +113,8 @@ func ConstructNSPacket(targetAddr, srcIP, srcMac, dstMac string, ip net.IP) []by
 	binary.BigEndian.PutUint16(payload[2:4], 0) // Putting zero for checksum before calculating checksum
 	binary.BigEndian.PutUint32(payload[4:], 0)  // RESERVED FLAG...
 	copy(payload[8:], ip)                       // Copy 16 Bytes of IPV6 address
+	//tA := net.ParseIP("::1")
+	//copy(payload[8:], tA.To16())
 
 	// Append Source Link Layer Option here
 	srcOption := NDOption{
@@ -123,7 +126,9 @@ func ConstructNSPacket(targetAddr, srcIP, srcMac, dstMac string, ip net.IP) []by
 	payload = append(payload, srcOption.Length)
 	payload = append(payload, srcOption.Value...)
 	binary.BigEndian.PutUint16(payload[2:4], getCheckSum(ipv6, payload))
-
+	debug.Logger.Info("icmpv6 info is", payload)
+	ipv6.Length = uint16(len(payload))
+	debug.Logger.Info("ipv6 layer is", *ipv6)
 	// GoPacket serialized buffer that will be used to send out raw bytes
 	buffer := gopacket.NewSerializeBuffer()
 	options := gopacket.SerializeOptions{
@@ -158,8 +163,7 @@ func (p *Packet) HandleNSMsg(hdr *layers.ICMPv6, srcIP, dstIP net.IP) (*NDInfo, 
 	if err != nil {
 		return nil, err
 	}
-	debug.Logger.Info(fmt.Sprintln("NS: Searching for SrcIP:", srcIP.String(), "or TargetAddress:",
-		ndInfo.TargetAddress.String()))
+	debug.Logger.Info("NS: Searching for SrcIP:", srcIP.String(), "or TargetAddress:", ndInfo.TargetAddress.String())
 	// if source ip is not "::" then only we should update the nbrCache...
 	// In this case Target Address is our own IP Address
 	if !srcIP.IsUnspecified() {
@@ -172,8 +176,7 @@ func (p *Packet) HandleNSMsg(hdr *layers.ICMPv6, srcIP, dstIP net.IP) (*NDInfo, 
 			cache.State = STALE
 			myLink.NbrCache[ndInfo.TargetAddress.String()] = cache
 			p.SetLink(srcIP.String(), myLink)
-			debug.Logger.Info(fmt.Sprintln("MYNS: nbrCach (key, value) ---> (", ndInfo.TargetAddress.String(),
-				",", cache, ")"))
+			debug.Logger.Info("MYNS: nbrCach (key, value) ---> (", ndInfo.TargetAddress.String(), ",", cache, ")")
 		} else {
 			// If it is not my own ip then use Target Address to get link information
 			link, _ := p.GetLink(ndInfo.TargetAddress.String())
@@ -194,8 +197,7 @@ func (p *Packet) HandleNSMsg(hdr *layers.ICMPv6, srcIP, dstIP net.IP) (*NDInfo, 
 			} else {
 				cache.State = INCOMPLETE
 			}
-			debug.Logger.Info(fmt.Sprintln("PEERNS: nbrCach (key, value) ---> (", srcIP.String(),
-				",", cache, ")"))
+			debug.Logger.Info("PEERNS: nbrCach (key, value) ---> (", srcIP.String(), ",", cache, ")")
 			link.NbrCache[srcIP.String()] = cache
 			p.SetLink(ndInfo.TargetAddress.String(), link)
 		}

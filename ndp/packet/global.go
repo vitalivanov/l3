@@ -83,7 +83,7 @@ const (
 	ICMPV6_CODE                            = 0
 	ICMP_HDR_LENGTH                        = 8
 	UNSPECIFIED_IP_ADDRESS                 = "::"
-	IPV6_ICMPV6_MULTICAST_DST_MAC          = "33:33:ff:00:00:00"
+	IPV6_ICMPV6_MULTICAST_DST_MAC          = "33:33:00:00:00:00"
 	IPV6_ADDRESS_BYTES                     = 16
 	IPV6_MULTICAST_BYTE             byte   = 0xff
 	IPV6_VERSION                    byte   = 6

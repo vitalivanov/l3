@@ -61,7 +61,6 @@ func addTestNbrEntry(ipAddr string, peerIP string) {
 	cache := NeighborCache{
 		Timer: 120,
 		State: REACHABLE,
-		//LinkLayerAddress: "00:e0:ec:26:a7:ee",
 	}
 	link, _ := testPktObj.GetLink(ipAddr)
 	link.NbrCache[peerIP] = cache
@@ -88,8 +87,8 @@ func dumpLinkInfo(t *testing.T) {
 func TestNDSMsgSend(t *testing.T) {
 	ipAddr := "2002::1"
 	initTestPacket()
-	testPktObj.InitLink(100, "2002::1", "00:e0:ec:26:a7:ee")
-	addTestNbrEntry(ipAddr, "2002::2")
+	testPktObj.InitLink(100, "2002::1/64", "00:e0:ec:26:a7:ee")
+	addTestNbrEntry(ipAddr+"/64", "2002::2")
 	initPcapHandlerForTest(t)
 	//dumpLinkInfo(t)
 	var err error

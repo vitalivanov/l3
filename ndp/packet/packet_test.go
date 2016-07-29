@@ -315,7 +315,7 @@ func TestDecodeNDA(t *testing.T) {
 	if err != nil {
 		t.Error("Decoding ipv6 and icmpv6 header failed", err)
 	}
-
+	//dumpLinkInfo(t)
 	nda, err := pkt.decodeICMPv6Hdr(icmpv6Hdr, ipv6Hdr.SrcIP, ipv6Hdr.DstIP)
 	if err != nil {
 		t.Error("Validating ICMPv6 Header failed:", err)
@@ -479,15 +479,5 @@ func TestNDSOption(t *testing.T) {
 
 	if !reflect.DeepEqual(nds.Options[0], optionWant) {
 		t.Error("NDInfo Option is not correct", optionWant, nds.Options[0])
-	}
-}
-
-func TestNeighborSoilicitationSend(t *testing.T) {
-	initTestPacket()
-	ipAddr := "2002::192:16:1234/64"
-	addTestNbrEntry(ipAddr, "2002::2")
-	err := testPktObj.SendNSMsgIfRequired(ipAddr, testPcapHdl)
-	if err != nil {
-		t.Error(err)
 	}
 }

@@ -23,8 +23,8 @@
 package packet
 
 import (
-	"fmt"
 	"l3/ndp/debug"
+	"net"
 )
 
 /*
@@ -40,7 +40,20 @@ func (l *Link) Init() {
  * for a given link local ip address return the link information
  */
 func (p *Packet) GetLink(localIP string) (Link, bool) {
-	link, exists := p.LinkInfo[localIP]
+	debug.Logger.Info("getlink called for", localIP)
+	ip, _, err := net.ParseCIDR(localIP)
+	if err != nil {
+		debug.Logger.Err("ParseCIDR failed for", localIP, "error:", err, "and hence using", localIP, "as key")
+		// if we get nda packet directly or during unit test... on error rather than crashing
+		// we will create an entry in link map using the localIP
+		link, exists := p.LinkInfo[localIP]
+		if !exists {
+			link.Init()
+		}
+		return link, exists
+	}
+	debug.Logger.Info("ParseCIDR success using", ip.String(), "as key")
+	link, exists := p.LinkInfo[ip.String()]
 	if !exists {
 		link.Init()
 	}
@@ -51,7 +64,15 @@ func (p *Packet) GetLink(localIP string) (Link, bool) {
  * Link has been modified update map entry with latest link information
  */
 func (p *Packet) SetLink(localIP string, link Link) {
-	p.LinkInfo[localIP] = link
+	ip, _, err := net.ParseCIDR(localIP)
+	if err != nil {
+		debug.Logger.Err("ParseCIDR failed for", localIP, "error:", err, "and hence using", localIP, "as key")
+		// if we get nda packet directly or during unit test... on error rather than crashing
+		// we will create an entry in link map using the localIP
+		p.LinkInfo[localIP] = link
+	} else {
+		p.LinkInfo[ip.String()] = link
+	}
 }
 
 /*
@@ -59,9 +80,10 @@ func (p *Packet) SetLink(localIP string, link Link) {
  * is created
  */
 func (p *Packet) InitLink(ifIndex int32, ip, mac string) {
-	debug.Logger.Info(fmt.Sprintln("Initializing link with ifIndex:", ifIndex, "ip:", ip, "mac:", mac))
+	debug.Logger.Info("Initializing link with ifIndex:", ifIndex, "ip:", ip, "mac:", mac)
 	link, _ := p.GetLink(ip)
 	link.PortIfIndex = ifIndex
 	link.LinkLocalAddress = mac
 	p.SetLink(ip, link)
+	debug.Logger.Info("Packet Link Info is", p.LinkInfo)
 }

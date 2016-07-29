@@ -262,6 +262,8 @@ func (svr *NDPServer) HandleStateNotification(msg *config.StateNotification) {
 				debug.Logger.Info(fmt.Sprintln("Create pkt handler for", msg.IfIndex,
 					"IpAddr:", msg.IpAddr))
 				svr.StartRxTx(msg.IfIndex)
+			} else {
+				svr.SendLinkLocalNSIfRequired(msg.IpAddr, msg.IfIndex)
 			}
 		}
 	case config.STATE_DOWN:

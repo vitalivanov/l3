@@ -68,15 +68,14 @@ func (p *Packet) HandleNAMsg(hdr *layers.ICMPv6, srcIP, dstIP net.IP) (*NDInfo, 
 	if err != nil {
 		return nil, err
 	}
-	debug.Logger.Info(fmt.Sprintln("NA: Searching for NbrCache srcIP:", srcIP.String(), "or dstIP:", dstIP.String()))
+	debug.Logger.Info("NA: Searching for NbrCache srcIP:", srcIP.String(), "or dstIP:", dstIP.String())
 
 	// if my own ip is srcIP
 	myLink, exists := p.GetLink(srcIP.String()) //p.LinkInfo[srcIP.String()]
 	if exists {
 		cache := myLink.NbrCache[dstIP.String()]
 		cache.State = REACHABLE
-		debug.Logger.Info(fmt.Sprintln("MYOWNNA: nbrCach (key, value) ---> (", dstIP.String(),
-			",", cache, ")"))
+		debug.Logger.Info("MYOWNNA: nbrCach (key, value) ---> (", dstIP.String(), ",", cache, ")")
 	} else {
 		link, _ := p.GetLink(dstIP.String()) //p.LinkInfo[dstIP.String()]
 		cache, exists := link.NbrCache[srcIP.String()]
@@ -92,8 +91,7 @@ func (p *Packet) HandleNAMsg(hdr *layers.ICMPv6, srcIP, dstIP net.IP) (*NDInfo, 
 				}
 			}
 		}
-		debug.Logger.Info(fmt.Sprintln("PEERNA: nbrCach (key, value) ---> (", srcIP.String(),
-			",", cache, ")"))
+		debug.Logger.Info("PEERNA: nbrCach (key, value) ---> (", srcIP.String(), ",", cache, ")")
 		link.NbrCache[srcIP.String()] = cache
 		p.SetLink(ndInfo.TargetAddress.String(), link)
 	}
