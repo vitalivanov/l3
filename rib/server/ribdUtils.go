@@ -719,9 +719,9 @@ func isZeros(p net.IP) bool {
 	return true
 }
 func isIPv4Mask(mask net.IP) bool {
-	if len(mask) < 5 {
+	/*if len(mask) < 5 {
 		return false
-	}
+	}*/
 	if isZeros(mask[0:10]) &&
 		mask[10] == 0xff &&
 		mask[11] == 0xff {
@@ -843,7 +843,7 @@ func getNetworkPrefixFromCIDR(ipAddr string) (ipPrefix patriciaDB.Prefix, err er
 	copy(ipMask, ipNet.Mask)
 	ipAddrStr := ip.String()
 	//ipMaskStr := net.IP(ipMask).String()
-	ipPrefix, err = getNetowrkPrefixFromStrings(ipAddrStr, (net.IP(ipMask)).String()) //ipMaskStr)
+	ipPrefix, err = getNetowrkPrefixFromStrings(ipAddrStr, (net.IP(ipNet.Mask)).String()) //ipMaskStr)
 	return ipPrefix, err
 }
 func getCIDR(ipAddr string, mask string) (addr string, err error) {
