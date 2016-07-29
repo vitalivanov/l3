@@ -13,19 +13,19 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 // bgp.go
 package packet
 
 import (
-	"fmt"
+	_ "fmt"
 	"l3/bgp/utils"
 )
 
@@ -48,7 +48,7 @@ func NewASPathIter(asPath *BGPPathAttrASPath) *ASPathIter {
 		var as4Seg *BGPAS4PathSegment
 		var ok bool
 		if as4Seg, ok = asPath.Value[idx].(*BGPAS4PathSegment); !ok {
-			utils.Logger.Err(fmt.Sprintln("AS path segment", idx, "is not AS4PathSegment"))
+			utils.Logger.Err("AS path segment", idx, "is not AS4PathSegment")
 			return nil
 		}
 		iter.segments = append(iter.segments, as4Seg)
