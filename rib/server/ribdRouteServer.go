@@ -25,7 +25,6 @@
 package server
 
 import (
-	"fmt"
 	"ribd"
 )
 
@@ -34,7 +33,7 @@ func (ribdServiceHandler *RIBDServer) StartRouteProcessServer() {
 	for {
 		select {
 		case routeConf := <-ribdServiceHandler.RouteConfCh:
-			logger.Debug(fmt.Sprintln("received message on RouteConfCh channel, op: ", routeConf.Op))
+			//logger.Debug(fmt.Sprintln("received message on RouteConfCh channel, op: ", routeConf.Op)
 			if routeConf.Op == "add" {
 				ribdServiceHandler.ProcessV4RouteCreateConfig(routeConf.OrigConfigObject.(*ribd.IPv4Route))
 			} else if routeConf.Op == "addBulk" {
