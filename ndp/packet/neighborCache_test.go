@@ -59,7 +59,8 @@ func initTestPacket() {
 
 func addTestNbrEntry(ipAddr string, peerIP string) {
 	cache := NeighborCache{
-		State: REACHABLE,
+		State:            REACHABLE,
+		LinkLayerAddress: "aa:bb:cc:dd:ee:ff",
 	}
 	link, _ := testPktObj.GetLink(ipAddr)
 	link.NbrCache[peerIP] = cache
@@ -96,6 +97,11 @@ func TestNDSMsgSend(t *testing.T) {
 		t.Error(err)
 	}
 	err = testPktObj.SendNSMsgIfRequired(ipAddr+"/64", testPcapHdl)
+	if err != nil {
+		t.Error(err)
+	}
+	dstIP := "2002::2"
+	err = testPktObj.SendUnicastNeighborSolicitation(ipAddr, dstIP, testPcapHdl)
 	if err != nil {
 		t.Error(err)
 	}

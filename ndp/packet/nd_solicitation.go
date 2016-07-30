@@ -63,7 +63,6 @@ func (nd *NDInfo) ValidateNDSInfo(srcIP net.IP, dstIP net.IP) error {
  */
 //func ConstructNSPacket(targetAddr, srcIP, srcMac, dstMac string, ip net.IP) []byte {
 func ConstructNSPacket(srcMac, dstMac, srcIP, dstIP string) []byte {
-	//var isMulticastSolicitation bool
 
 	// Ethernet Layer Information
 	srcMAC, _ := net.ParseMAC(srcMac)
@@ -101,7 +100,6 @@ func ConstructNSPacket(srcMac, dstMac, srcIP, dstIP string) []byte {
 		for idx := (len(ip) - 3); idx < len(ip); idx++ {
 			dip[idx] = ip[idx]
 		}
-		//isMulticastSolicitation = true
 		// updating src ip with "::"
 		copy(sip, net.ParseIP(SOLICITATED_SRC_IP))
 	}
@@ -121,14 +119,7 @@ func ConstructNSPacket(srcMac, dstMac, srcIP, dstIP string) []byte {
 	payload[1] = byte(0)
 	binary.BigEndian.PutUint16(payload[2:4], 0) // Putting zero for checksum before calculating checksum
 	binary.BigEndian.PutUint32(payload[4:], 0)  // RESERVED FLAG...
-	//if isMulticastSolicitation {
-	// use dstIP as Target Address
 	copy(payload[8:], dip.To16())
-	//} else {
-	//	copy(payload[8:], sip.To16()) // Copy 16 Bytes of IPV6 address
-	//}
-	//tA := net.ParseIP("::1")
-	//copy(payload[8:], tA.To16())
 
 	// Append Source Link Layer Option here
 	srcOption := NDOption{

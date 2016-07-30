@@ -42,6 +42,8 @@ func (c *NeighborCache) Timer(ifIndex int32, linkIp, nbrIP string, timeValueInMS
 			debug.Logger.Info("Timer expired for ifIndex", ifIndex, "IpAddr:", linkIp, "NbrIP:", nbrIP,
 				"time to send NeighborSolicitation")
 			pktCh <- config.PacketData{linkIp, nbrIP, ifIndex}
+			// set timer to NIL so after sending a packet... we can re-start the timer
+			c.RetransTimer = nil
 		}
 		c.RetransTimer = time.AfterFunc(time.Duration(timeValueInMS)*time.Millisecond,
 			ReTransmitNeighborSolicitation_func)

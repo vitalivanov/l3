@@ -75,20 +75,29 @@ func (p *Packet) SendNDPkt(pkt []byte, pHdl *pcap.Handle) error {
 /*
  *    Send Unicast Neighbor Solicitation on Timer Expiry
  */
-func (p *Packet) SendUnicastNeighborSolicitation(srcIP, dstIP string, pHdl *pcap.Handle) {
+func (p *Packet) SendUnicastNeighborSolicitation(srcIP, dstIP string, pHdl *pcap.Handle) error {
 	link, exists := p.GetLink(srcIP)
 	if !exists {
 		debug.Logger.Err("Sending Unicast NS Failed as link entry for ipAddr", srcIP, "not found in linkInfo.")
-		return
+		return errors.New(fmt.Sprintln("Sending Unicast NS Failed as link entry for ipAddr", srcIP,
+			"not found in linkInfo."))
 	}
 	cache, exists := link.NbrCache[dstIP]
 	if !exists {
 		debug.Logger.Err("No Neighbor Entry", dstIP, "found for", srcIP)
 		// @TODO: need to send out multicast neighbor solicitation in this case....
-		return
+		return errors.New(fmt.Sprintln("No Neighbor Entry", dstIP, "found for", srcIP))
 	}
 	debug.Logger.Info("link info", link, "src ip address", srcIP, "dst ip", dstIP)
 	pktToSend := ConstructNSPacket(link.LinkLocalAddress, cache.LinkLayerAddress, srcIP, dstIP)
 	debug.Logger.Info("sending pkt from link", link.LinkLocalAddress, "bytes are:", pktToSend)
-	p.SendNDPkt(pktToSend, pHdl)
+	err := p.SendNDPkt(pktToSend, pHdl)
+	if err != nil {
+		debug.Logger.Info("packet send failed:", err)
+		return errors.New(fmt.Sprintln("packet send failed:", err))
+	}
+	cache.Timer(link.PortIfIndex, srcIP, dstIP, link.RetransTimer, p.PktCh)
+	link.NbrCache[dstIP] = cache
+	p.SetLink(srcIP, link)
+	return nil
 }
