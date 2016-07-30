@@ -25,7 +25,7 @@
 package policy
 
 import (
-	"fmt"
+	_ "fmt"
 	"utils/logging"
 	utilspolicy "utils/policy"
 )
@@ -67,20 +67,20 @@ func NewBasePolicyEngine(logger *logging.Writer, policyEngine *utilspolicy.Polic
 
 func (eng *BasePolicyEngine) SetTraverseFuncs(traverseApplyFunc utilspolicy.EntityTraverseAndApplyPolicyfunc,
 	traverseReverseFunc utilspolicy.EntityTraverseAndReversePolicyfunc) {
-	eng.logger.Info(fmt.Sprintln("BasePolicyEngine:SetTraverseFunc traverse apply func %v", traverseApplyFunc))
+	eng.logger.Info("BasePolicyEngine:SetTraverseFunc traverse apply func %v", traverseApplyFunc)
 	if traverseApplyFunc != nil {
 		eng.PolicyEngine.SetTraverseAndApplyPolicyFunc(traverseApplyFunc)
 	}
-	eng.logger.Info(fmt.Sprintln("BasePolicyEngine:SetTraverseFunc traverse reverse func %v", traverseReverseFunc))
+	eng.logger.Info("BasePolicyEngine:SetTraverseFunc traverse reverse func %v", traverseReverseFunc)
 	if traverseReverseFunc != nil {
 		eng.PolicyEngine.SetTraverseAndReversePolicyFunc(traverseReverseFunc)
 	}
 }
 
 func (eng *BasePolicyEngine) SetActionFuncs(actionFuncMap map[int]PolicyActionFunc) {
-	eng.logger.Info(fmt.Sprintf("BasePolicyEngine:SetApplyActionFunc actionFuncMap %v", actionFuncMap))
+	eng.logger.Infof("BasePolicyEngine:SetApplyActionFunc actionFuncMap %v", actionFuncMap)
 	for actionType, actionFuncs := range actionFuncMap {
-		eng.logger.Info(fmt.Sprintln("BasePolicyEngine:SetApplyActionFunc set apply/undo callbacks for action", actionType))
+		eng.logger.Info("BasePolicyEngine:SetApplyActionFunc set apply/undo callbacks for action", actionType)
 		if actionFuncs.ApplyFunc != nil {
 			eng.PolicyEngine.SetActionFunc(actionType, actionFuncs.ApplyFunc)
 		}
@@ -91,21 +91,21 @@ func (eng *BasePolicyEngine) SetActionFuncs(actionFuncMap map[int]PolicyActionFu
 }
 
 func (eng *BasePolicyEngine) SetEntityUpdateFunc(entityUpdateFunc utilspolicy.EntityUpdatefunc) {
-	eng.logger.Info(fmt.Sprintln("BasePolicyEngine:SetEntityUpdateFunc func %v", entityUpdateFunc))
+	eng.logger.Info("BasePolicyEngine:SetEntityUpdateFunc func %v", entityUpdateFunc)
 	if entityUpdateFunc != nil {
 		eng.PolicyEngine.SetEntityUpdateFunc(entityUpdateFunc)
 	}
 }
 
 func (eng *BasePolicyEngine) SetIsEntityPresentFunc(entityPresentFunc utilspolicy.PolicyCheckfunc) {
-	eng.logger.Info(fmt.Sprintln("BasePolicyEngine:SetIsEntityPresentFunc func %v", entityPresentFunc))
+	eng.logger.Info("BasePolicyEngine:SetIsEntityPresentFunc func %v", entityPresentFunc)
 	if entityPresentFunc != nil {
 		eng.PolicyEngine.SetIsEntityPresentFunc(entityPresentFunc)
 	}
 }
 
 func (eng *BasePolicyEngine) SetGetPolicyEntityMapIndexFunc(policyEntityKeyFunc utilspolicy.GetPolicyEnityMapIndexFunc) {
-	eng.logger.Info(fmt.Sprintln("BasePolicyEngine:SetGetPolicyEntityMapIndexFunc func %v", policyEntityKeyFunc))
+	eng.logger.Info("BasePolicyEngine:SetGetPolicyEntityMapIndexFunc func %v", policyEntityKeyFunc)
 	if policyEntityKeyFunc != nil {
 		eng.PolicyEngine.SetGetPolicyEntityMapIndexFunc(policyEntityKeyFunc)
 	}
