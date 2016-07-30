@@ -91,7 +91,7 @@ func NewDestination(rib *LocRib, nlri packet.NLRI, protoFamily uint32, gConf *co
 }
 
 func (d *Destination) GetLocRibPathRoute() *Route {
-	d.logger.Infof("GetLocRibPathRoute for %s\n", d.NLRI.GetPrefix().String())
+	d.logger.Infof("GetLocRibPathRoute for %s", d.NLRI.GetPrefix().String())
 	return d.LocRibPathRoute
 }
 
@@ -184,18 +184,18 @@ func (d *Destination) getPathIdForPath(path *Path) (uint32, bool) {
 		}
 	}
 
-	d.logger.Errf("Destination:getPathIdForPath - path id not found for path %v\n", path)
+	d.logger.Errf("Destination:getPathIdForPath - path id not found for path %v", path)
 	return 0, false
 }
 
 func (d *Destination) setUpdateAggPath(peerIP string, pathId uint32) {
 	pathMap, ok := d.peerPathMap[peerIP]
 	if !ok {
-		d.logger.Errf("setUpdateAggPath - peer ip %s not found in peer path map\n", peerIP)
+		d.logger.Errf("setUpdateAggPath - peer ip %s not found in peer path map", peerIP)
 	} else {
 		path, ok := pathMap[pathId]
 		if !ok {
-			d.logger.Errf("setUpdateAggPath - pathId %d not found in peer %s path map\n", pathId, peerIP)
+			d.logger.Errf("setUpdateAggPath - pathId %d not found in peer %s path map", pathId, peerIP)
 		} else if d.LocRibPath == nil || path == d.LocRibPath ||
 			getRouteSource(d.LocRibPath.routeType) >= getRouteSource(path.routeType) {
 			d.recalculate = true
@@ -305,8 +305,8 @@ func (d *Destination) RemovePath(peerIP string, pathId uint32, path *Path) *Path
 			delete(d.peerPathMap, peerIP)
 		}
 	} else {
-		d.logger.Err("Destination", d.NLRI.GetPrefix().String(), "Path with path id", pathId,
-			"not found from peer", peerIP)
+		d.logger.Err("Destination", d.NLRI.GetPrefix().String(), "Path with path id", pathId, "not found from peer",
+			peerIP)
 	}
 	return oldPath
 }
@@ -429,8 +429,8 @@ func (d *Destination) SelectRouteForLocRib(addPathCount int) (RouteAction, bool,
 		for _, path := range pathMap {
 			if d.LocRibPath == nil || d.LocRibPath != path {
 				if !path.IsReachable(d.protoFamily) {
-					d.logger.Infof("Destination %s peer %s, NEXT_HOP %s is not reachable",
-						d.NLRI.GetPrefix(), peerIP, path.GetNextHop(d.protoFamily))
+					d.logger.Infof("Destination %s peer %s, NEXT_HOP %s is not reachable", d.NLRI.GetPrefix(), peerIP,
+						path.GetNextHop(d.protoFamily))
 					continue
 				}
 
@@ -456,8 +456,8 @@ func (d *Destination) SelectRouteForLocRib(addPathCount int) (RouteAction, bool,
 					} else {
 						updatedPaths = append(updatedPaths, path)
 					}
-					d.logger.Infof("Destination %s route from %s is from a better source type, "+
-						"old type=%d, new type=%d", d.NLRI.GetPrefix(), peerIP, routeSrc, currPathSource)
+					d.logger.Info("Destination", d.NLRI.GetPrefix(), "route from", peerIP,
+						"is from a better source type, old type=", routeSrc, "new type=", currPathSource)
 					routeSrc = currPathSource
 					continue
 				} else {
@@ -467,14 +467,13 @@ func (d *Destination) SelectRouteForLocRib(addPathCount int) (RouteAction, bool,
 		}
 	}
 
-	d.logger.Infof("Destination %s, ECMP routes %v updated paths %v", d.NLRI.GetPrefix(), d.ecmpPaths,
-		updatedPaths)
+	d.logger.Infof("Destination %s, ECMP routes %v updated paths %v", d.NLRI.GetPrefix(), d.ecmpPaths, updatedPaths)
 	firstRoute := true
 	if len(updatedPaths) > 0 {
 		var ecmpPaths [][]*Path
 		var addPaths []*Path
 		if len(updatedPaths) > 1 || (addPathCount > 0) {
-			d.logger.Infof("Found multiple paths with same pref, run path selection algorithm\n")
+			d.logger.Infof("Found multiple paths with same pref, run path selection algorithm")
 			if d.gConf.UseMultiplePaths {
 				updatedPaths, ecmpPaths, addPaths =
 					d.calculateBestPath(updatedPaths, removedPaths, d.gConf.EBGPMaxPaths > 1, d.gConf.IBGPMaxPaths > 1,
@@ -486,8 +485,8 @@ func (d *Destination) SelectRouteForLocRib(addPathCount int) (RouteAction, bool,
 		}
 
 		if len(updatedPaths) > 1 {
-			d.logger.Errf("Have more than one route after the tie breaking rules... using the first one, ",
-				"routes[%s]\n", updatedPaths)
+			d.logger.Errf("Have more than one route after the tie breaking rules... using the first one, routes[%s]",
+				updatedPaths)
 		}
 
 		d.logger.Info("before mod, ecmpPaths =", ecmpPaths)
@@ -504,8 +503,8 @@ func (d *Destination) SelectRouteForLocRib(addPathCount int) (RouteAction, bool,
 				}
 				if route, ok := d.ecmpPaths[path]; ok {
 					// Update path
-					d.logger.Infof("Destination %s path %v at [%d][%d] found in ecmp paths %v",
-						d.NLRI.GetPrefix(), path, idx, pathIdx, d.ecmpPaths)
+					d.logger.Infof("Destination %s path %v at [%d][%d] found in ecmp paths %v", d.NLRI.GetPrefix(),
+						path, idx, pathIdx, d.ecmpPaths)
 					found = true
 					firstRoute = false
 					if (idx == 0) && path.IsAggregate() {
@@ -521,8 +520,8 @@ func (d *Destination) SelectRouteForLocRib(addPathCount int) (RouteAction, bool,
 				// Add route
 				newRoute := d.pathRouteMap[paths[0]]
 				if newRoute == nil {
-					d.logger.Infof("Destination %s path %v NOT found in path route map %v",
-						d.NLRI.GetPrefix(), paths[0], d.pathRouteMap)
+					d.logger.Infof("Destination %s path %v NOT found in path route map %v", d.NLRI.GetPrefix(),
+						paths[0], d.pathRouteMap)
 					continue
 				}
 				newRoute.setAction(RouteActionAdd)
@@ -556,7 +555,7 @@ func (d *Destination) SelectRouteForLocRib(addPathCount int) (RouteAction, bool,
 				route.ResetBestPath()
 				if path.IsAggregate() || !path.IsLocal() {
 					reachInfo := path.GetReachability(d.protoFamily)
-					d.logger.Infof("Remove route for ip=%s nexthop=%s\n", d.NLRI.GetPrefix().String(),
+					d.logger.Infof("Remove route for ip=%s nexthop=%s", d.NLRI.GetPrefix().String(),
 						reachInfo.NextHop)
 					protocol := "IBGP"
 					if path.IsExternal() {
@@ -573,7 +572,7 @@ func (d *Destination) SelectRouteForLocRib(addPathCount int) (RouteAction, bool,
 					}
 					//d.rib.routeMgr.DeleteRoute(&cfg)
 					d.rib.routeMgr.UpdateRoute(&cfg, "remove")
-					d.logger.Infof("DeleteV4Route for ip=%s nexthop=%s DONE\n", d.NLRI.GetPrefix().String(),
+					d.logger.Infof("DeleteV4Route for ip=%s nexthop=%s DONE", d.NLRI.GetPrefix().String(),
 						reachInfo.NextHop)
 				}
 			}
@@ -617,7 +616,7 @@ func (d *Destination) SelectRouteForLocRib(addPathCount int) (RouteAction, bool,
 
 	for _, path := range createRibRoutes {
 		reachInfo := path.GetReachability(d.protoFamily)
-		d.logger.Infof("Add route for ip=%s, mask=%s, next hop=%s\n", d.NLRI.GetPrefix().String(),
+		d.logger.Infof("Add route for ip=%s, mask=%s, next hop=%s", d.NLRI.GetPrefix().String(),
 			d.constructNetmaskFromLen(int(d.NLRI.GetLength()), ipLength*8).String(), reachInfo.NextHop)
 		protocol := "IBGP"
 		if path.IsExternal() {
@@ -669,8 +668,8 @@ func (d *Destination) getRoutesWithHighestPref(updatedPaths []*Path, prunedPaths
 			updatedPaths[0] = updatedPaths[i]
 			idx = 1
 		} else if currPref == maxPref {
-			d.logger.Infof("Destination %s route from %s has same preference, pref=%d",
-				d.NLRI.GetPrefix(), from, maxPref)
+			d.logger.Infof("Destination %s route from %s has same preference, pref=%d", d.NLRI.GetPrefix(), from,
+				maxPref)
 			updatedPaths[idx] = updatedPaths[i]
 			idx++
 		}

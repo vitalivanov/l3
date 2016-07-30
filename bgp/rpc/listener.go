@@ -153,8 +153,7 @@ func (h *BGPHandler) handlePeerGroup() error {
 
 		group, err := h.convertModelToBGPPeerGroup(obj)
 		if err != nil {
-			h.logger.Err("handlePeerGroup - Failed to convert Model object to BGP Peer group, error:",
-				err)
+			h.logger.Err("handlePeerGroup - Failed to convert Model object to BGP Peer group, error:", err)
 			return err
 		}
 
@@ -217,8 +216,7 @@ func (h *BGPHandler) handleNeighborConfig() error {
 
 		neighbor, err := h.convertModelToBGPNeighbor(obj)
 		if err != nil {
-			h.logger.Err("handleNeighborConfig - Failed to convert Model object to BGP neighbor, error:",
-				err)
+			h.logger.Err("handleNeighborConfig - Failed to convert Model object to BGP neighbor, error:", err)
 			return err
 		}
 
@@ -256,8 +254,7 @@ func (h *BGPHandler) handlePolicyConditions() error {
 	for idx := 0; idx < len(conditionList); idx++ {
 		policyCondCfg :=
 			convertModelToPolicyConditionConfig(conditionList[idx].(objects.BGPPolicyCondition))
-		h.logger.Info("handlePolicyConditions - create policy condition",
-			policyCondCfg.Name)
+		h.logger.Info("handlePolicyConditions - create policy condition", policyCondCfg.Name)
 		h.bgpPolicyMgr.ConditionCfgCh <- *policyCondCfg
 	}
 	return nil
@@ -277,16 +274,14 @@ func (h *BGPHandler) handlePolicyActions() error {
 	var actionObj objects.BGPPolicyAction
 	actionList, err := h.dbUtil.GetAllObjFromDb(actionObj)
 	if err != nil {
-		h.logger.Err("handlePolicyActions - Failed to create policy action",
-			"config on restart with error", err)
+		h.logger.Err("handlePolicyActions - Failed to create policy action config on restart with error", err)
 		return err
 	}
 
 	for idx := 0; idx < len(actionList); idx++ {
 		policyActionCfg :=
 			convertModelToPolicyActionConfig(actionList[idx].(objects.BGPPolicyAction))
-		h.logger.Info("handlePolicyActions - create policy action",
-			policyActionCfg.Name)
+		h.logger.Info("handlePolicyActions - create policy action", policyActionCfg.Name)
 		h.bgpPolicyMgr.ActionCfgCh <- *policyActionCfg
 	}
 	return nil
@@ -306,15 +301,13 @@ func (h *BGPHandler) handlePolicyStmts() error {
 	var stmtObj objects.BGPPolicyStmt
 	stmtList, err := h.dbUtil.GetAllObjFromDb(stmtObj)
 	if err != nil {
-		h.logger.Err("handlePolicyStmts - Failed to create policy statement",
-			"config on restart with error", err)
+		h.logger.Err("handlePolicyStmts - Failed to create policy statement config on restart with error", err)
 		return err
 	}
 
 	for idx := 0; idx < len(stmtList); idx++ {
 		policyStmtCfg := convertModelToPolicyStmtConfig(stmtList[idx].(objects.BGPPolicyStmt))
-		h.logger.Info("handlePolicyStmts - create policy statement",
-			policyStmtCfg.Name)
+		h.logger.Info("handlePolicyStmts - create policy statement", policyStmtCfg.Name)
 		h.bgpPolicyMgr.StmtCfgCh <- *policyStmtCfg
 	}
 	return nil
@@ -344,16 +337,14 @@ func (h *BGPHandler) handlePolicyDefinitions() error {
 	var defObj objects.BGPPolicyDefinition
 	definitionList, err := h.dbUtil.GetAllObjFromDb(defObj)
 	if err != nil {
-		h.logger.Err("handlePolicyDefinitions - Failed to create policy",
-			"definition config on restart with error", err)
+		h.logger.Err("handlePolicyDefinitions - Failed to create policy definition config on restart with error", err)
 		return err
 	}
 
 	for idx := 0; idx < len(definitionList); idx++ {
 		policyDefCfg := convertModelToPolicyDefinitionConfig(
 			definitionList[idx].(objects.BGPPolicyDefinition))
-		h.logger.Info("handlePolicyDefinitions - create policy definition",
-			policyDefCfg.Name)
+		h.logger.Info("handlePolicyDefinitions - create policy definition", policyDefCfg.Name)
 		h.bgpPolicyMgr.DefinitionCfgCh <- *policyDefCfg
 	}
 	return nil
@@ -503,38 +494,33 @@ func (h *BGPHandler) getIPAndIfIndexForNeighbor(neighborIP string,
 		// @TODO: this needs to be interface once we decide to move listener
 		ipv4Intf, err = h.server.IntfMgr.GetIPv4Information(neighborIfIndex)
 		if err == nil {
-			h.logger.Info("getIPAndIfIndexForNeighbor - Call ASICd",
-				"to get ip address for interface with ifIndex: ", neighborIfIndex)
+			h.logger.Info("getIPAndIfIndexForNeighbor - Call ASICd to get ip address for interface with ifIndex:",
+				neighborIfIndex)
 			ifIP, ipMask, err := net.ParseCIDR(ipv4Intf)
 			if err != nil {
-				h.logger.Err("getIPAndIfIndexForNeighbor - IpAddr",
-					ipv4Intf, "of the interface", neighborIfIndex,
+				h.logger.Err("getIPAndIfIndexForNeighbor - IpAddr", ipv4Intf, "of the interface", neighborIfIndex,
 					"is not valid, error:", err)
 				err = errors.New(fmt.Sprintf("IpAddr %s of the interface %d is not",
 					"valid, error: %s", ipv4Intf, neighborIfIndex, err))
 				return ip, ifIndex, err
 			}
 			if ipMask.Mask[len(ipMask.Mask)-1] < 252 {
-				h.logger.Err("getIPAndIfIndexForNeighbor - IpAddr",
-					ipv4Intf, "of the interface", neighborIfIndex,
+				h.logger.Err("getIPAndIfIndexForNeighbor - IpAddr", ipv4Intf, "of the interface", neighborIfIndex,
 					"is not /30 or /31 address")
 				err = errors.New(fmt.Sprintln("getIPAndIfIndexForNeighbor - IpAddr %s",
 					"of the interface %s is not /30 or /31 address",
 					ipv4Intf, neighborIfIndex))
 				return ip, ifIndex, err
 			}
-			h.logger.Info("getIPAndIfIndexForNeighbor - IpAddr", ifIP,
-				"of the interface", neighborIfIndex)
+			h.logger.Info("getIPAndIfIndexForNeighbor - IpAddr", ifIP, "of the interface", neighborIfIndex)
 			ifIP[len(ifIP)-1] = ifIP[len(ifIP)-1] ^ (^ipMask.Mask[len(ipMask.Mask)-1])
-			h.logger.Info("getIPAndIfIndexForNeighbor - IpAddr", ifIP,
-				"of the neighbor interface")
+			h.logger.Info("getIPAndIfIndexForNeighbor - IpAddr", ifIP, "of the neighbor interface")
 			ip = ifIP
 			ifIndex = neighborIfIndex
-			h.logger.Info("getIPAndIfIndexForNeighbor - Neighbor IP:",
-				ip.String())
+			h.logger.Info("getIPAndIfIndexForNeighbor - Neighbor IP:", ip.String())
 		} else {
-			h.logger.Err("getIPAndIfIndexForNeighbor - Neighbor IP", neighborIP,
-				"or interface", neighborIfIndex, "not configured ")
+			h.logger.Err("getIPAndIfIndexForNeighbor - Neighbor IP", neighborIP, "or interface", neighborIfIndex,
+				"not configured ")
 		}
 	}
 	return ip, ifIndex, err
@@ -572,9 +558,8 @@ func (h *BGPHandler) ValidateBGPNeighbor(bgpNeighbor *bgpd.BGPNeighbor) (pConf c
 	var ifIndex int32
 	ip, ifIndex, err = h.getIPAndIfIndexForNeighbor(bgpNeighbor.NeighborAddress, bgpNeighbor.IfIndex)
 	if err != nil {
-		h.logger.Info("ValidateBGPNeighbor: getIPAndIfIndexForNeighbor",
-			"failed for neighbor address", bgpNeighbor.NeighborAddress,
-			"and ifIndex", bgpNeighbor.IfIndex)
+		h.logger.Info("ValidateBGPNeighbor: getIPAndIfIndexForNeighbor", "failed for neighbor address",
+			bgpNeighbor.NeighborAddress, "and ifIndex", bgpNeighbor.IfIndex)
 		return pConf, err
 	}
 
@@ -693,8 +678,8 @@ func (h *BGPHandler) GetBGPNeighborState(neighborAddr string,
 	ifIndex int32) (*bgpd.BGPNeighborState, error) {
 	ip, _, err := h.getIPAndIfIndexForNeighbor(neighborAddr, ifIndex)
 	if err != nil {
-		h.logger.Info("GetBGPNeighborState: getIPAndIfIndexForNeighbor",
-			"failed for neighbor address", neighborAddr, "and ifIndex", ifIndex)
+		h.logger.Info("GetBGPNeighborState: getIPAndIfIndexForNeighbor failed for neighbor address", neighborAddr,
+			"and ifIndex", ifIndex)
 		return bgpd.NewBGPNeighborState(), err
 	}
 
@@ -733,10 +718,8 @@ func (h *BGPHandler) DeleteBGPNeighbor(bgpNeighbor *bgpd.BGPNeighbor) (bool, err
 	h.logger.Info("Delete BGP neighbor:", bgpNeighbor.NeighborAddress)
 	ip := net.ParseIP(bgpNeighbor.NeighborAddress)
 	if ip == nil {
-		h.logger.Infof("Can't delete BGP neighbor - IP[%s] not valid",
-			bgpNeighbor.NeighborAddress)
-		return false, errors.New(fmt.Sprintf("Neighbor Address %s not valid",
-			bgpNeighbor.NeighborAddress))
+		h.logger.Infof("Can't delete BGP neighbor - IP[%s] not valid", bgpNeighbor.NeighborAddress)
+		return false, errors.New(fmt.Sprintf("Neighbor Address %s not valid", bgpNeighbor.NeighborAddress))
 	}
 	h.server.RemPeerCh <- bgpNeighbor.NeighborAddress
 	return true, nil
