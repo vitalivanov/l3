@@ -218,6 +218,7 @@ func (svr *NDPServer) ProcessTimerExpiry(pktData config.PacketData) {
 	if !exists {
 		return
 	}
+	// use pktData.IpAddr because that will be your src ip without CIDR format, same goes for NeighborIP
 	svr.Packet.SendUnicastNeighborSolicitation(pktData.IpAddr, pktData.NeighborIp, l3Port.PcapBase.PcapHandle)
 	//svr.Packet.SendNDPkt(pktData.Data, l3Port.PcapBase.PcapHandle)
 }

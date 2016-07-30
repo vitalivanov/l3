@@ -23,9 +23,12 @@
 package packet
 
 import (
+	_ "fmt"
 	"github.com/google/gopacket/pcap"
 	"l3/ndp/config"
 	"l3/ndp/debug"
+	"net"
+	"reflect"
 	"testing"
 )
 
@@ -104,5 +107,45 @@ func TestNDSMsgSend(t *testing.T) {
 	err = testPktObj.SendUnicastNeighborSolicitation(ipAddr, dstIP, testPcapHdl)
 	if err != nil {
 		t.Error(err)
+	}
+}
+
+func TestNeighborCacheReTransmitTimer(t *testing.T) {
+	sip := "2002::1/64"
+	dip := "2002::2/64"
+	ipD, _, _ := net.ParseCIDR(dip)
+	srcMac := "00:e0:ec:26:a7:ee"
+	initTestPacket()
+	testPktObj.InitLink(100, sip, srcMac)
+	addTestNbrEntry(sip, ipD.String())
+	pktCh := make(chan config.PacketData, 3)
+	ipS, _, _ := net.ParseCIDR(sip)
+	link, _ := testPktObj.GetLink(ipS.String())
+	cache, exists := link.NbrCache[ipD.String()]
+	if !exists {
+		t.Error("Initializing failure")
+	} else {
+		go func() {
+			cache.Timer(link.PortIfIndex, ipS.String(), ipD.String(), link.RetransTimer, pktCh)
+		}()
+	}
+
+	var pktData config.PacketData
+	for {
+		select {
+		case pktData = <-pktCh:
+			break
+		}
+		break
+	}
+
+	if !reflect.DeepEqual(pktData.IpAddr, ipS.String()) {
+		t.Error("mismatch in src ip", pktData.IpAddr, "!=", ipS.String())
+	}
+	if !reflect.DeepEqual(pktData.NeighborIp, ipD.String()) {
+		t.Error("mismatch in dst ip", pktData.NeighborIp, "!=", ipD.String())
+	}
+	if pktData.IfIndex != int32(100) {
+		t.Error("invalid ifIndex received on packet channel", pktData.IfIndex)
 	}
 }
