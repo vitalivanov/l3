@@ -120,7 +120,7 @@ func (n *NeighborConf) UpdateNeighborConf(nConf config.NeighborConfig, bgp *conf
 		if peerGroup, ok := bgp.PeerGroups[nConf.PeerGroup]; ok {
 			n.GetNeighConfFromPeerGroup(&peerGroup.Config, &n.RunningConf)
 		} else {
-			n.logger.Err(fmt.Sprintln("Peer group", nConf.PeerGroup, "not found in BGP config"))
+			n.logger.Err("Peer group", nConf.PeerGroup, "not found in BGP config")
 		}
 	}
 	n.GetConfFromNeighbor(&n.Neighbor.Config, &n.RunningConf)
@@ -267,14 +267,14 @@ func (n *NeighborConf) SetPrefixCount(count uint32) {
 func (n *NeighborConf) CanAcceptNewPrefix() bool {
 	if n.RunningConf.MaxPrefixes > 0 {
 		if n.Neighbor.State.TotalPrefixes >= n.RunningConf.MaxPrefixes {
-			n.logger.Warning(fmt.Sprintf("Neighbor %s Number of prefixes received %d exceeds the max prefix limit %d",
-				n.RunningConf.NeighborAddress, n.Neighbor.State.TotalPrefixes, n.MaxPrefixesThreshold))
+			n.logger.Warningf("Neighbor %s Number of prefixes received %d exceeds the max prefix limit %d",
+				n.RunningConf.NeighborAddress, n.Neighbor.State.TotalPrefixes, n.MaxPrefixesThreshold)
 			return false
 		}
 
 		if n.Neighbor.State.TotalPrefixes >= n.MaxPrefixesThreshold {
-			n.logger.Warning(fmt.Sprintf("Neighbor %s Number of prefixes received %d reached the threshold limit %d",
-				n.RunningConf.NeighborAddress, n.Neighbor.State.TotalPrefixes, n.MaxPrefixesThreshold))
+			n.logger.Warningf("Neighbor %s Number of prefixes received %d reached the threshold limit %d",
+				n.RunningConf.NeighborAddress, n.Neighbor.State.TotalPrefixes, n.MaxPrefixesThreshold)
 		}
 	}
 
@@ -291,12 +291,12 @@ func (n *NeighborConf) PublishEvents(stateId uint32) {
 	additionalInfo := fmt.Sprintf("State change from %s to %s", oldState, newState)
 	err := eventUtils.PublishEvents(events.BGPNeighborStateChange, evtKey, additionalInfo)
 	if err != nil {
-		n.logger.Err(fmt.Sprintln("Error publish new events for BGPNeighborStateChange"))
+		n.logger.Err("Error publish new events for BGPNeighborStateChange")
 	}
 }
 
 func (n *NeighborConf) FSMStateChange(state uint32) {
-	n.logger.Info(fmt.Sprintf("Neighbor %s: FSMStateChange %d", n.Neighbor.NeighborAddress, state))
+	n.logger.Infof("Neighbor %s: FSMStateChange %d", n.Neighbor.NeighborAddress, state)
 	n.PublishEvents(state)
 	n.Neighbor.State.SessionState = uint32(state)
 }
@@ -311,13 +311,13 @@ func (n *NeighborConf) SetPeerAttrs(bgpId net.IP, asSize uint8, holdTime uint32,
 		if afi == packet.AfiIP {
 			for _, val := range safiMap {
 				if (val & packet.BGPCapAddPathRx) != 0 {
-					n.logger.Info(fmt.Sprintf("SetPeerAttrs - Neighbor %s set add paths maxtx to %d\n",
-						n.Neighbor.NeighborAddress, n.RunningConf.AddPathsMaxTx))
+					n.logger.Infof("SetPeerAttrs - Neighbor %s set add paths maxtx to %d\n",
+						n.Neighbor.NeighborAddress, n.RunningConf.AddPathsMaxTx)
 					n.Neighbor.State.AddPathsMaxTx = n.RunningConf.AddPathsMaxTx
 				}
 				if (val & packet.BGPCapAddPathTx) != 0 {
-					n.logger.Info(fmt.Sprintf("SetPeerAttrs - Neighbor %s set add paths rx to %s\n",
-						n.Neighbor.NeighborAddress, n.RunningConf.AddPathsRx))
+					n.logger.Infof("SetPeerAttrs - Neighbor %s set add paths rx to %s\n",
+						n.Neighbor.NeighborAddress, n.RunningConf.AddPathsRx)
 					n.Neighbor.State.AddPathsRx = true
 				}
 			}
