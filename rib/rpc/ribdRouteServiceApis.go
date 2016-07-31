@@ -26,7 +26,6 @@ package rpc
 
 import (
 	"errors"
-	"fmt"
 	"l3/rib/server"
 	"models/objects"
 	"ribd"
@@ -37,12 +36,12 @@ import (
  */
 
 func (m RIBDServicesHandler) CreateIPv4Route(cfg *ribd.IPv4Route) (val bool, err error) {
-	logger.Info(fmt.Sprintln("Received create route request for ip", cfg.DestinationNw, " mask ", cfg.NetworkMask))
+	//logger.Info("Received create route request for ip", cfg.DestinationNw, " mask ", cfg.NetworkMask)
 	/* Validate Route config parameters for "add" operation
 	 */
 	err = m.server.RouteConfigValidationCheck(cfg, "add")
 	if err != nil {
-		logger.Err(fmt.Sprintln("validation check failed with error ", err))
+		logger.Err("validation check failed with error ", err)
 		return false, err
 	}
 	m.server.RouteConfCh <- server.RIBdServerConfig{
@@ -56,18 +55,22 @@ func (m RIBDServicesHandler) CreateIPv4Route(cfg *ribd.IPv4Route) (val bool, err
    OnewayCreate API for route
 */
 func (m RIBDServicesHandler) OnewayCreateIPv4Route(cfg *ribd.IPv4Route) (err error) {
-	logger.Info(fmt.Sprintln("OnewayCreateIPv4Route - Received create route request for ip", cfg.DestinationNw, " mask ", cfg.NetworkMask, "cfg.NextHopIntRef: ", cfg.NextHop[0].NextHopIntRef))
+	//logger.Info("OnewayCreateIPv4Route - Received create route request for ip", cfg.DestinationNw, " mask ", cfg.NetworkMask, "cfg.NextHopIntRef: ", cfg.NextHop[0].NextHopIntRef)
 	m.CreateIPv4Route(cfg)
+	/*m.server.RouteConfCh <- server.RIBdServerConfig{
+		OrigConfigObject: cfg,
+		Op:               "add",
+	}*/
 	return err
 }
 
 func (m RIBDServicesHandler) CreateIPv6Route(cfg *ribd.IPv6Route) (val bool, err error) {
-	logger.Info(fmt.Sprintln("Received create route request for ip", cfg.DestinationNw, " mask ", cfg.NetworkMask))
+	logger.Info("Received create route request for ip", cfg.DestinationNw, " mask ", cfg.NetworkMask)
 	/* Validate Route config parameters for "add" operation
 	 */
 	err = m.server.IPv6RouteConfigValidationCheck(cfg, "add")
 	if err != nil {
-		logger.Err(fmt.Sprintln("validation check failed with error ", err))
+		logger.Err("validation check failed with error ", err)
 		return false, err
 	}
 	m.server.RouteConfCh <- server.RIBdServerConfig{
@@ -81,7 +84,7 @@ func (m RIBDServicesHandler) CreateIPv6Route(cfg *ribd.IPv6Route) (val bool, err
    OnewayCreate API for route
 */
 func (m RIBDServicesHandler) OnewayCreateIPv6Route(cfg *ribd.IPv6Route) (err error) {
-	logger.Info(fmt.Sprintln("OnewayCreateIPv4Route - Received create route request for ip", cfg.DestinationNw, " mask ", cfg.NetworkMask, "cfg.NextHopIntRef: ", cfg.NextHop[0].NextHopIntRef))
+	logger.Info("OnewayCreateIPv6Route - Received create route request for ip", cfg.DestinationNw, " mask ", cfg.NetworkMask, "cfg.NextHopIntRef: ", cfg.NextHop[0].NextHopIntRef)
 	m.CreateIPv6Route(cfg)
 	return err
 }
@@ -90,8 +93,7 @@ func (m RIBDServicesHandler) OnewayCreateIPv6Route(cfg *ribd.IPv6Route) (err err
    Create Routes in Bulk using Oneway create API
 */
 func (m RIBDServicesHandler) OnewayCreateBulkIPv4Route(cfg []*ribdInt.IPv4RouteConfig) (err error) {
-	//logger.Info(fmt.Sprintln("OnewayCreateIPv4Route - Received create route request for ip", cfg.DestinationNw, " mask ", cfg.NetworkMask, "cfg.OutgoingIntfType: ", cfg.OutgoingIntfType, "cfg.OutgoingInterface: ", cfg.OutgoingInterface))
-	logger.Info(fmt.Sprintln("OnewayCreateBulkIPv4Route for ", len(cfg), " routes"))
+	logger.Info("OnewayCreateBulkIPv4Route for ", len(cfg), " routes")
 	m.server.RouteConfCh <- server.RIBdServerConfig{
 		OrigBulkRouteConfigObject: cfg,
 		Op: "addBulk",
@@ -119,13 +121,13 @@ func (m RIBDServicesHandler) OnewayCreateBulkIPv4Route(cfg []*ribdInt.IPv4RouteC
    Delete Route
 */
 func (m RIBDServicesHandler) DeleteIPv4Route(cfg *ribd.IPv4Route) (val bool, err error) {
-	logger.Info(fmt.Sprintln("DeleteIPv4Route:Received Route Delete request for ", cfg.DestinationNw, ":", cfg.NetworkMask, "Protocol ", cfg.Protocol, "number of nextHops: ", len(cfg.NextHop)))
+	logger.Info("DeleteIPv4Route:Received Route Delete request for ", cfg.DestinationNw, ":", cfg.NetworkMask, "Protocol ", cfg.Protocol, "number of nextHops: ", len(cfg.NextHop))
 	/*
 	   Validate route config parameters for "del" operation
 	*/
 	err = m.server.RouteConfigValidationCheck(cfg, "del")
 	if err != nil {
-		logger.Err(fmt.Sprintln("validation check failed with error ", err))
+		logger.Err("validation check failed with error ", err)
 		return false, err
 	}
 	m.server.RouteConfCh <- server.RIBdServerConfig{
@@ -139,7 +141,7 @@ func (m RIBDServicesHandler) DeleteIPv4Route(cfg *ribd.IPv4Route) (val bool, err
    Delete route using Oneway Api
 */
 func (m RIBDServicesHandler) OnewayDeleteIPv4Route(cfg *ribd.IPv4Route) (err error) {
-	logger.Info(fmt.Sprintln("OnewayDeleteIPv4Route:RouteReceived Route Delete request for ", cfg.DestinationNw, ":", cfg.NetworkMask, "nextHopIP:", cfg.NextHop[0].NextHopIp, "Protocol ", cfg.Protocol))
+	logger.Info("OnewayDeleteIPv4Route:RouteReceived Route Delete request for ", cfg.DestinationNw, ":", cfg.NetworkMask, "nextHopIP:", cfg.NextHop[0].NextHopIp, "Protocol ", cfg.Protocol)
 	m.DeleteIPv4Route(cfg)
 	return err
 }
@@ -148,13 +150,13 @@ func (m RIBDServicesHandler) OnewayDeleteIPv4Route(cfg *ribd.IPv4Route) (err err
    Delete Route
 */
 func (m RIBDServicesHandler) DeleteIPv6Route(cfg *ribd.IPv6Route) (val bool, err error) {
-	logger.Info(fmt.Sprintln("DeleteIPv6Route:Received Route Delete request for ", cfg.DestinationNw, ":", cfg.NetworkMask, "Protocol ", cfg.Protocol, "number of nextHops: ", len(cfg.NextHop)))
+	logger.Info("DeleteIPv6Route:Received Route Delete request for ", cfg.DestinationNw, ":", cfg.NetworkMask, "Protocol ", cfg.Protocol, "number of nextHops: ", len(cfg.NextHop))
 	/*
 	   Validate route config parameters for "del" operation
 	*/
 	err = m.server.IPv6RouteConfigValidationCheck(cfg, "del")
 	if err != nil {
-		logger.Err(fmt.Sprintln("validation check failed with error ", err))
+		logger.Err("validation check failed with error ", err)
 		return false, err
 	}
 	m.server.RouteConfCh <- server.RIBdServerConfig{
@@ -168,7 +170,7 @@ func (m RIBDServicesHandler) DeleteIPv6Route(cfg *ribd.IPv6Route) (val bool, err
    Delete route using Oneway Api
 */
 func (m RIBDServicesHandler) OnewayDeleteIPv6Route(cfg *ribd.IPv6Route) (err error) {
-	logger.Info(fmt.Sprintln("OnewayDeleteIPv6Route:RouteReceived Route Delete request for ", cfg.DestinationNw, ":", cfg.NetworkMask, "nextHopIP:", cfg.NextHop[0].NextHopIp, "Protocol ", cfg.Protocol))
+	logger.Info("OnewayDeleteIPv6Route:RouteReceived Route Delete request for ", cfg.DestinationNw, ":", cfg.NetworkMask, "nextHopIP:", cfg.NextHop[0].NextHopIp, "Protocol ", cfg.Protocol)
 	m.DeleteIPv6Route(cfg)
 	return err
 }
@@ -177,20 +179,20 @@ func (m RIBDServicesHandler) OnewayDeleteIPv6Route(cfg *ribd.IPv6Route) (err err
    Update route
 */
 func (m RIBDServicesHandler) UpdateIPv4Route(origconfig *ribd.IPv4Route, newconfig *ribd.IPv4Route, attrset []bool, op []*ribd.PatchOpInfo) (val bool, err error) { //[]*ribd.PatchOpInfo) (val bool, err error) {
-	logger.Println("UpdateIPv4Route: Received update route request")
+	logger.Info("UpdateIPv4Route: Received update route request")
 	/*
 	   validate route config parameters for update operation
 	*/
 	if op == nil || len(op) == 0 {
 		err = m.server.RouteConfigValidationCheckForUpdate(origconfig, newconfig, attrset)
 		if err != nil {
-			logger.Err(fmt.Sprintln("validation check failed with error ", err))
+			logger.Err("validation check failed with error ", err)
 			return false, err
 		}
 	} else {
 		err = m.server.RouteConfigValidationCheckForPatchUpdate(origconfig, newconfig, op)
 		if err != nil {
-			logger.Err(fmt.Sprintln("validation check failed with error ", err))
+			logger.Err("validation check failed with error ", err)
 			return false, err
 		}
 	}
@@ -209,7 +211,7 @@ func (m RIBDServicesHandler) UpdateIPv4Route(origconfig *ribd.IPv4Route, newconf
    one way update route function
 */
 func (m RIBDServicesHandler) OnewayUpdateIPv4Route(origconfig *ribd.IPv4Route, newconfig *ribd.IPv4Route, attrset []bool) (err error) {
-	logger.Println("OneWayUpdateIPv4Route: Received update route request")
+	logger.Info("OneWayUpdateIPv4Route: Received update route request")
 	m.UpdateIPv4Route(origconfig, newconfig, attrset, nil)
 	return err
 }
@@ -218,26 +220,26 @@ func (m RIBDServicesHandler) OnewayUpdateIPv4Route(origconfig *ribd.IPv4Route, n
    Update route
 */
 func (m RIBDServicesHandler) UpdateIPv6Route(origconfig *ribd.IPv6Route, newconfig *ribd.IPv6Route, attrset []bool, op []*ribd.PatchOpInfo) (val bool, err error) { //[]*ribd.PatchOpInfo) (val bool, err error) {
-	logger.Println("UpdateIPv6Route: Received update route request")
+	logger.Info("UpdateIPv6Route: Received update route request")
 	/*
 	   validate route config parameters for update operation
 	*/
 	if op == nil || len(op) == 0 {
-		logger.Debug(fmt.Sprintln("UpdateIPv6Route:At the beginning origconfig.destinationnw:", origconfig.DestinationNw, " newconfig.DesinationNw:", newconfig.DestinationNw))
+		logger.Debug("UpdateIPv6Route:At the beginning origconfig.destinationnw:", origconfig.DestinationNw, " newconfig.DesinationNw:", newconfig.DestinationNw)
 		err = m.server.IPv6RouteConfigValidationCheckForUpdate(origconfig, newconfig, attrset)
 		if err != nil {
-			logger.Err(fmt.Sprintln("validation check failed with error ", err))
+			logger.Err("validation check failed with error ", err)
 			return false, err
 		}
-		logger.Debug(fmt.Sprintln("UpdateIPv6Route:At the end origconfig.destinationnw:", origconfig.DestinationNw, " newconfig.DesinationNw:", newconfig.DestinationNw))
+		logger.Debug("UpdateIPv6Route:At the end origconfig.destinationnw:", origconfig.DestinationNw, " newconfig.DesinationNw:", newconfig.DestinationNw)
 	} else {
 		err = m.server.IPv6RouteConfigValidationCheckForPatchUpdate(origconfig, newconfig, op)
 		if err != nil {
-			logger.Err(fmt.Sprintln("validation check failed with error ", err))
+			logger.Err("validation check failed with error ", err)
 			return false, err
 		}
 	}
-	logger.Debug(fmt.Sprintln("UpdateIPv6Route:Call routeconfch origconfig.destinationnw:", origconfig.DestinationNw, " newconfig.DesinationNw:", newconfig.DestinationNw))
+	logger.Debug("UpdateIPv6Route:Call routeconfch origconfig.destinationnw:", origconfig.DestinationNw, " newconfig.DesinationNw:", newconfig.DestinationNw)
 	m.server.RouteConfCh <- server.RIBdServerConfig{
 		OrigConfigObject: origconfig,
 		NewConfigObject:  newconfig,
@@ -253,7 +255,7 @@ func (m RIBDServicesHandler) UpdateIPv6Route(origconfig *ribd.IPv6Route, newconf
    one way update route function
 */
 func (m RIBDServicesHandler) OnewayUpdateIPv6Route(origconfig *ribd.IPv6Route, newconfig *ribd.IPv6Route, attrset []bool) (err error) {
-	logger.Println("OneWayUpdateIPv6Route: Received update route request")
+	logger.Info("OneWayUpdateIPv6Route: Received update route request")
 	m.UpdateIPv6Route(origconfig, newconfig, attrset, nil)
 	return err
 }
@@ -303,12 +305,12 @@ func (m RIBDServicesHandler) GetBulkIPv4RouteState(fromIndex ribd.Int, rcount ri
 	var routeObj objects.IPv4RouteState
 	var routeObjtemp objects.IPv4RouteState
 	err, objCount, nextMarker, more, objs := m.server.DbHdl.GetBulkObjFromDb(routeObj, int64(fromIndex), int64(rcount))
-	logger.Debug(fmt.Sprintln("objCount = ", objCount, " len(obj) ", len(objs), " more ", more, " nextMarker: ", nextMarker))
+	logger.Debug("objCount = ", objCount, " len(obj) ", len(objs), " more ", more, " nextMarker: ", nextMarker)
 	var tempRoute []ribd.IPv4RouteState = make([]ribd.IPv4RouteState, len(objs))
 	if err == nil {
 		for i := 0; i < len(objs); i++ {
 			routeObjtemp = objs[i].(objects.IPv4RouteState)
-			logger.Debug(fmt.Sprintln("obj ", i, routeObjtemp.DestinationNw, " ", routeObjtemp.NextHopList))
+			logger.Debug("obj ", i, routeObjtemp.DestinationNw, " ", routeObjtemp.NextHopList)
 			objects.ConvertribdIPv4RouteStateObjToThrift(&routeObjtemp, &tempRoute[i])
 			returnRoutes = append(returnRoutes, &tempRoute[i])
 		}
@@ -346,12 +348,12 @@ func (m RIBDServicesHandler) GetBulkIPv6RouteState(fromIndex ribd.Int, rcount ri
 	var routeObj objects.IPv6RouteState
 	var routeObjtemp objects.IPv6RouteState
 	err, objCount, nextMarker, more, objs := m.server.DbHdl.GetBulkObjFromDb(routeObj, int64(fromIndex), int64(rcount))
-	logger.Debug(fmt.Sprintln("objCount = ", objCount, " len(obj) ", len(objs), " more ", more, " nextMarker: ", nextMarker))
+	logger.Debug("objCount = ", objCount, " len(obj) ", len(objs), " more ", more, " nextMarker: ", nextMarker)
 	var tempRoute []ribd.IPv6RouteState = make([]ribd.IPv6RouteState, len(objs))
 	if err == nil {
 		for i := 0; i < len(objs); i++ {
 			routeObjtemp = objs[i].(objects.IPv6RouteState)
-			logger.Debug(fmt.Sprintln("obj ", i, routeObjtemp.DestinationNw, " ", routeObjtemp.NextHopList))
+			logger.Debug("obj ", i, routeObjtemp.DestinationNw, " ", routeObjtemp.NextHopList)
 			objects.ConvertribdIPv6RouteStateObjToThrift(&routeObjtemp, &tempRoute[i])
 			returnRoutes = append(returnRoutes, &tempRoute[i])
 		}

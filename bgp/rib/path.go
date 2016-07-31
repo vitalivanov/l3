@@ -26,7 +26,7 @@ package rib
 
 import (
 	"encoding/binary"
-	"fmt"
+	_ "fmt"
 	"l3/bgp/baseobjects"
 	"l3/bgp/packet"
 	"net"
@@ -67,52 +67,53 @@ func getRouteSource(routeType uint8) uint8 {
 	return RouteSrcUnknown
 }
 
-type Path struct {
-	rib              *LocRib
-	logger           *logging.Writer
-	NeighborConf     *base.NeighborConf
-	PathAttrs        []packet.BGPPathAttr
-	withdrawn        bool
-	updated          bool
-	Pref             uint32
+type NHReachabilityInfo struct {
+	nextHop          net.IP
 	reachabilityInfo *ReachabilityInfo
-	routeType        uint8
-	MED              uint32
-	LocalPref        uint32
-	AggregatedPaths  map[string]*Path
 }
 
-func NewPath(locRib *LocRib, peer *base.NeighborConf, pa []packet.BGPPathAttr, withdrawn bool, updated bool,
-	routeType uint8) *Path {
+type Path struct {
+	rib                *LocRib
+	logger             *logging.Writer
+	NeighborConf       *base.NeighborConf
+	PathAttrs          []packet.BGPPathAttr
+	Pref               uint32
+	nhReachabilityInfo map[uint32]*NHReachabilityInfo
+	routeType          uint8
+	MED                uint32
+	LocalPref          uint32
+	AggregatedPaths    map[string]*Path
+}
+
+func NewPath(locRib *LocRib, peer *base.NeighborConf, pa []packet.BGPPathAttr,
+	mpReach *packet.BGPPathAttrMPReachNLRI, routeType uint8) *Path {
 	path := &Path{
-		rib:             locRib,
-		logger:          locRib.logger,
-		NeighborConf:    peer,
-		PathAttrs:       pa,
-		withdrawn:       withdrawn,
-		updated:         updated,
-		routeType:       routeType,
-		AggregatedPaths: make(map[string]*Path),
+		rib:                locRib,
+		logger:             locRib.logger,
+		NeighborConf:       peer,
+		PathAttrs:          pa,
+		nhReachabilityInfo: make(map[uint32]*NHReachabilityInfo),
+		routeType:          routeType,
+		AggregatedPaths:    make(map[string]*Path),
 	}
 
-	path.logger.Info(fmt.Sprintln("Path:NewPath - path attr =", pa, "path.path attrs =", path.PathAttrs))
+	path.logger.Info("Path:NewPath - path attr =", pa, "path.path attrs =", path.PathAttrs)
 	path.Pref = path.calculatePref()
+	path.constructNHReachabilityInfo(mpReach)
 	return path
 }
 
 func (p *Path) Clone() *Path {
 	path := &Path{
-		rib:              p.rib,
-		logger:           p.rib.logger,
-		NeighborConf:     p.NeighborConf,
-		PathAttrs:        p.PathAttrs,
-		withdrawn:        p.withdrawn,
-		updated:          p.updated,
-		Pref:             p.Pref,
-		reachabilityInfo: p.reachabilityInfo,
-		routeType:        p.routeType,
-		MED:              p.MED,
-		LocalPref:        p.LocalPref,
+		rib:                p.rib,
+		logger:             p.rib.logger,
+		NeighborConf:       p.NeighborConf,
+		PathAttrs:          p.PathAttrs,
+		Pref:               p.Pref,
+		nhReachabilityInfo: p.nhReachabilityInfo,
+		routeType:          p.routeType,
+		MED:                p.MED,
+		LocalPref:          p.LocalPref,
 	}
 
 	return path
@@ -139,6 +140,27 @@ func (p *Path) calculatePref() uint32 {
 	return pref
 }
 
+func (p *Path) constructNHReachabilityInfo(mpReach *packet.BGPPathAttrMPReachNLRI) {
+	for _, attr := range p.PathAttrs {
+		if attr.GetCode() == packet.BGPPathAttrTypeNextHop {
+			nextHop := attr.(*packet.BGPPathAttrNextHop)
+			protoFamily := packet.GetProtocolFamily(packet.AfiIP, packet.SafiUnicast)
+			if _, ok := p.nhReachabilityInfo[protoFamily]; !ok {
+				p.nhReachabilityInfo[protoFamily] = &NHReachabilityInfo{}
+			}
+			p.nhReachabilityInfo[protoFamily].nextHop = nextHop.Value
+		}
+	}
+
+	if mpReach != nil {
+		protoFamily := packet.GetProtocolFamily(mpReach.AFI, mpReach.SAFI)
+		if _, ok := p.nhReachabilityInfo[protoFamily]; !ok {
+			p.nhReachabilityInfo[protoFamily] = &NHReachabilityInfo{}
+		}
+		p.nhReachabilityInfo[protoFamily].nextHop = mpReach.NextHop.GetNextHop()
+	}
+}
+
 func (p *Path) IsValid() bool {
 	for _, attr := range p.PathAttrs {
 		if attr.GetCode() == packet.BGPPathAttrTypeOriginatorId {
@@ -158,28 +180,6 @@ func (p *Path) IsValid() bool {
 	}
 
 	return true
-}
-
-func (p *Path) SetWithdrawn(status bool) {
-	p.withdrawn = status
-}
-
-func (p *Path) IsWithdrawn() bool {
-	return p.withdrawn
-}
-
-func (p *Path) UpdatePath(pa []packet.BGPPathAttr) {
-	p.PathAttrs = pa
-	p.Pref = p.calculatePref()
-	p.updated = true
-}
-
-func (p *Path) SetUpdate(status bool) {
-	p.updated = status
-}
-
-func (p *Path) IsUpdated() bool {
-	return p.updated
 }
 
 func (p *Path) GetNeighborConf() *base.NeighborConf {
@@ -213,17 +213,11 @@ func (p *Path) GetAS4ByteList() []string {
 						}
 						asSetStr := strings.Join(asSetList, ", ")
 						asSetStr = "{ " + asSetStr + " }"
-						//asSetStr = append(asSetStr, "}")
 						asList = append(asList, asSetStr)
 					} else if seg.Type == packet.BGPASPathSegmentSequence {
-						//asSeqList := make([]string, 0, len(seg.AS))
 						for _, as := range seg.AS {
-							//asSeq := make([]int32, 1)
-							//asSeq[0] = int32(as)
-							//asSeqList = append(asSeqList, asSeq)
 							asList = append(asList, strconv.Itoa(int(as)))
 						}
-						//asList = append(asList, asSeqList...)
 					}
 				} else {
 					seg := asSegment.(*packet.BGPAS2PathSegment)
@@ -234,18 +228,11 @@ func (p *Path) GetAS4ByteList() []string {
 						}
 						asSetStr := strings.Join(asSetList, ", ")
 						asSetStr = "{ " + asSetStr + " }"
-						//asSetStr = append("{", asSetStr...)
-						//asSetStr = append(asSetStr, "}")
 						asList = append(asList, asSetStr)
 					} else if seg.Type == packet.BGPASPathSegmentSequence {
-						//asSeqList := make([][]int32, 0, len(seg.AS))
 						for _, as := range seg.AS {
-							//asSeq := make([]int32, 1)
-							//asSeq[0] = int32(as)
-							//asSeqList = append(asSeqList, asSeq)
 							asList = append(asList, strconv.Itoa(int(as)))
 						}
-						//asList = append(asList, asSeqList...)
 					}
 				}
 			}
@@ -284,7 +271,7 @@ func (p *Path) GetSourceStr() string {
 }
 
 func (p *Path) GetNumASes() uint32 {
-	p.logger.Info(fmt.Sprintln("Path:GetNumASes - path attrs =", p.PathAttrs))
+	p.logger.Info("Path:GetNumASes - path attrs =", p.PathAttrs)
 	return packet.GetNumASes(p.PathAttrs)
 }
 
@@ -292,8 +279,11 @@ func (p *Path) GetOrigin() uint8 {
 	return packet.GetOrigin(p.PathAttrs)
 }
 
-func (p *Path) GetNextHop() net.IP {
-	return packet.GetNextHop(p.PathAttrs)
+func (p *Path) GetNextHop(protoFamily uint32) net.IP {
+	if nhReachInfo, ok := p.nhReachabilityInfo[protoFamily]; ok {
+		return nhReachInfo.nextHop
+	}
+	return nil
 }
 
 func (p *Path) GetBGPId() uint32 {
@@ -310,21 +300,43 @@ func (p *Path) GetNumClusters() uint16 {
 	return packet.GetNumClusters(p.PathAttrs)
 }
 
-func (p *Path) SetReachabilityInfo(reachabilityInfo *ReachabilityInfo) {
-	p.reachabilityInfo = reachabilityInfo
+func (p *Path) SetReachabilityForFamily(protoFamily uint32, reachabilityInfo *ReachabilityInfo) {
+	if nhReachInfo, ok := p.nhReachabilityInfo[protoFamily]; ok {
+		nhReachInfo.reachabilityInfo = reachabilityInfo
+	}
 }
 
-func (p *Path) IsReachable() bool {
-	if p.routeType == RouteTypeStatic || p.routeType == RouteTypeConnected || p.routeType == RouteTypeIGP ||
-		(p.reachabilityInfo != nil && p.reachabilityInfo.NextHop != "") {
+func (p *Path) SetReachabilityForNextHop(nextHop string, reachabilityInfo *ReachabilityInfo) {
+	for _, nhReachInfo := range p.nhReachabilityInfo {
+		if nhReachInfo.nextHop.String() == nextHop {
+			nhReachInfo.reachabilityInfo = reachabilityInfo
+		}
+	}
+}
+
+func (p *Path) GetReachability(protoFamily uint32) *ReachabilityInfo {
+	if nhReachInfo, ok := p.nhReachabilityInfo[protoFamily]; ok {
+		return nhReachInfo.reachabilityInfo
+	}
+	return nil
+}
+
+func (p *Path) IsReachable(protoFamily uint32) bool {
+	if p.routeType == RouteTypeStatic || p.routeType == RouteTypeConnected || p.routeType == RouteTypeIGP {
 		return true
+	}
+
+	if nhReachInfo, ok := p.nhReachabilityInfo[protoFamily]; ok {
+		if nhReachInfo.reachabilityInfo != nil {
+			return true
+		}
 	}
 	return false
 }
 
 func (p *Path) setAggregatedPath(destIP string, path *Path) {
 	if _, ok := p.AggregatedPaths[destIP]; ok {
-		p.logger.Err(fmt.Sprintf("Path from %s is already added to the aggregated paths %v", destIP, p.AggregatedPaths))
+		p.logger.Errf("Path from %s is already added to the aggregated paths %v", destIP, p.AggregatedPaths)
 	}
 	p.AggregatedPaths[destIP] = path
 }
@@ -344,34 +356,33 @@ func (p *Path) addPathToAggregate(destIP string, path *Path, generateASSet bool)
 
 	if _, ok := p.AggregatedPaths[destIP]; ok {
 		if !isMEDEqual {
-			p.logger.Info(fmt.Sprintln("addPathToAggregate: MED", med, "in the new path", path,
-				"is not the same as the MED", aggMED, "in the agg path, remove the old path..."))
+			p.logger.Info("addPathToAggregate: MED", med, "in the new path", path,
+				"is not the same as the MED", aggMED, "in the agg path, remove the old path...")
 			delete(p.AggregatedPaths, destIP)
 			p.removePathFromAggregate(destIP, generateASSet)
 		} else {
-			p.logger.Info(fmt.Sprintf("addPathToAggregatePath from %s is already aggregated, replace it...", destIP))
+			p.logger.Infof("addPathToAggregatePath from %s is already aggregated, replace it...", destIP)
 			p.AggregatedPaths[destIP] = path
 			p.aggregateAllPaths(generateASSet)
 		}
-		p.updated = true
 
 		return true
 	}
 
 	if !isMEDEqual {
-		p.logger.Info(fmt.Sprintln("addPathToAggregate: Can't aggregate new path MEDs not equal, new path MED =", med,
-			"Agg path MED =", aggMED))
+		p.logger.Info("addPathToAggregate: Can't aggregate new path MEDs not equal, new path MED =", med,
+			"Agg path MED =", aggMED)
 		return false
 	}
 
-	p.updated = true
 	idx, i := 0, 0
 	pathIdx := 0
 	for idx = 0; idx < len(p.PathAttrs); idx++ {
 		for i = pathIdx; i < len(path.PathAttrs) && path.PathAttrs[i].GetCode() < p.PathAttrs[idx].GetCode(); i++ {
 			if path.PathAttrs[i].GetCode() == packet.BGPPathAttrTypeAtomicAggregate {
 				atomicAggregate := packet.NewBGPPathAttrAtomicAggregate()
-				packet.AddPathAttrToPathAttrs(p.PathAttrs, packet.BGPPathAttrTypeAtomicAggregate, atomicAggregate)
+				p.PathAttrs = packet.AddPathAttrToPathAttrs(p.PathAttrs, packet.BGPPathAttrTypeAtomicAggregate,
+					atomicAggregate)
 			}
 		}
 
@@ -388,7 +399,6 @@ func (p *Path) addPathToAggregate(destIP string, path *Path, generateASSet bool)
 }
 
 func (p *Path) removePathFromAggregate(destIP string, generateASSet bool) {
-	p.updated = true
 	delete(p.AggregatedPaths, destIP)
 	p.aggregateAllPaths(generateASSet)
 }

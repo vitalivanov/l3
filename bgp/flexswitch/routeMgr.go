@@ -13,13 +13,13 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 package FSMgr
 
@@ -27,7 +27,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"fmt"
+	_ "fmt"
 	"l3/bgp/api"
 	"l3/bgp/config"
 	"l3/bgp/rpc"
@@ -77,27 +77,27 @@ func (mgr *FSRouteMgr) setupSubSocket(address string) (*nanomsg.SubSocket, error
 	var err error
 	var socket *nanomsg.SubSocket
 	if socket, err = nanomsg.NewSubSocket(); err != nil {
-		mgr.logger.Err(fmt.Sprintf("Failed to create subscribe socket %s",
-			"error:%s", address, err))
+		mgr.logger.Errf("Failed to create subscribe socket %s",
+			"error:%s", address, err)
 		return nil, err
 	}
 
 	if err = socket.Subscribe(""); err != nil {
-		mgr.logger.Err(fmt.Sprintf("Failed to subscribe to \"\" on ",
-			"subscribe socket %s, error:%s", address, err))
+		mgr.logger.Errf("Failed to subscribe to \"\" on ",
+			"subscribe socket %s, error:%s", address, err)
 		return nil, err
 	}
 
 	if _, err = socket.Connect(address); err != nil {
-		mgr.logger.Err(fmt.Sprintf("Failed to connect to publisher socket %s,",
-			"error:%s", address, err))
+		mgr.logger.Errf("Failed to connect to publisher socket %s,",
+			"error:%s", address, err)
 		return nil, err
 	}
 
-	mgr.logger.Info(fmt.Sprintf("Connected to publisher socker %s", address))
+	mgr.logger.Infof("Connected to publisher socker %s", address)
 	if err = socket.SetRecvBuffer(1024 * 1024); err != nil {
-		mgr.logger.Err(fmt.Sprintln("Failed to set the buffer size for",
-			"subsriber socket %s, error:", address, err))
+		mgr.logger.Err("Failed to set the buffer size for",
+			"subsriber socket %s, error:", address, err)
 		return nil, err
 	}
 	return socket, nil
@@ -108,11 +108,11 @@ func (mgr *FSRouteMgr) listenForRIBUpdates(socket *nanomsg.SubSocket) {
 		mgr.logger.Info("Read on RIB subscriber socket...")
 		rxBuf, err := socket.Recv(0)
 		if err != nil {
-			mgr.logger.Err(fmt.Sprintln("Recv on RIB subscriber socket",
-				"failed with error:", err))
+			mgr.logger.Err("Recv on RIB subscriber socket",
+				"failed with error:", err)
 			continue
 		}
-		mgr.logger.Info(fmt.Sprintln("RIB subscriber recv returned:", rxBuf))
+		mgr.logger.Info("RIB subscriber recv returned:", rxBuf)
 		mgr.handleRibUpdates(rxBuf)
 	}
 }
@@ -125,6 +125,7 @@ func (mgr *FSRouteMgr) populateConfigRoute(route *ribdInt.Routes) *config.RouteI
 		Prototype:        int(route.Prototype),
 		NetworkStatement: route.NetworkStatement,
 		RouteOrigin:      route.RouteOrigin,
+		AddressType:      ribdCommonDefs.IPType(route.IPAddrType),
 	}
 	return rv
 }
@@ -140,16 +141,16 @@ func (mgr *FSRouteMgr) handleRibUpdates(rxBuf []byte) {
 	for err := decoder.Decode(&msg); err == nil; err = decoder.Decode(&msg) {
 		err = json.Unmarshal(msg.MsgBuf, &routeListInfo)
 		if err != nil {
-			mgr.logger.Err(fmt.Sprintf(
-				"Unmarshal RIB route update failed with err %s", err))
+			mgr.logger.Errf(
+				"Unmarshal RIB route update failed with err %s", err)
 		}
 		if msg.MsgType == ribdCommonDefs.NOTIFY_ROUTE_DELETED {
 			updateMsg = "Remove"
 		}
-		mgr.logger.Info(fmt.Sprintln(updateMsg, "connected route, dest:",
+		mgr.logger.Info(updateMsg, "connected route, dest:",
 			routeListInfo.RouteInfo.Ipaddr, "netmask:",
 			routeListInfo.RouteInfo.Mask, "nexthop:",
-			routeListInfo.RouteInfo.NextHopIp))
+			routeListInfo.RouteInfo.NextHopIp)
 		route := mgr.populateConfigRoute(&routeListInfo.RouteInfo)
 		routes = append(routes, route)
 	}
@@ -160,20 +161,20 @@ func (mgr *FSRouteMgr) handleRibUpdates(rxBuf []byte) {
 		} else if msg.MsgType == ribdCommonDefs.NOTIFY_ROUTE_DELETED {
 			api.SendRouteNotification(make([]*config.RouteInfo, 0), routes)
 		} else {
-			mgr.logger.Err(fmt.Sprintf("**** Received RIB update with ",
-				"unknown type %d ****", msg.MsgType))
+			mgr.logger.Errf("**** Received RIB update with ",
+				"unknown type %d ****", msg.MsgType)
 		}
 	} else {
-		mgr.logger.Err(fmt.Sprintf("**** Received RIB update type %d with no routes ****",
-			msg.MsgType))
+		mgr.logger.Errf("**** Received RIB update type %d with no routes ****",
+			msg.MsgType)
 	}
 }
 
 func (mgr *FSRouteMgr) GetNextHopInfo(ipAddr string) (*config.NextHopInfo, error) {
 	info, err := mgr.ribdClient.GetRouteReachabilityInfo(ipAddr)
 	if err != nil {
-		mgr.logger.Err(fmt.Sprintln("Getting route reachability for ",
-			ipAddr, "failed, error:", err))
+		mgr.logger.Err("Getting route reachability for ",
+			ipAddr, "failed, error:", err)
 		return nil, err
 	}
 	reachInfo := &config.NextHopInfo{
@@ -187,58 +188,103 @@ func (mgr *FSRouteMgr) GetNextHopInfo(ipAddr string) (*config.NextHopInfo, error
 	return reachInfo, err
 }
 
-func (mgr *FSRouteMgr) createRibdIPv4RouteCfg(cfg *config.RouteConfig,
-	create bool) *ribd.IPv4Route {
+func (mgr *FSRouteMgr) createRibdIPv4RouteCfg(cfg *config.RouteConfig, create bool) *ribd.IPv4Route {
 	rCfg := ribd.IPv4Route{
-		Cost:              cfg.Cost,
-		Protocol:          cfg.Protocol,
-		NetworkMask:       cfg.NetworkMask,
-		DestinationNw:     cfg.DestinationNw,
+		Cost:          cfg.Cost,
+		Protocol:      cfg.Protocol,
+		NetworkMask:   cfg.NetworkMask,
+		DestinationNw: cfg.DestinationNw,
 	}
-	nextHop := ribd.NextHopInfo { 
-		NextHopIp : cfg.NextHopIp,
-		NextHopIntRef:cfg.OutgoingInterface,
+	nextHop := ribd.NextHopInfo{
+		NextHopIp:     cfg.NextHopIp,
+		NextHopIntRef: cfg.OutgoingInterface,
 	}
-	rCfg.NextHop = make([]*ribd.NextHopInfo,0)
-	rCfg.NextHop = append(rCfg.NextHop,&nextHop)
+	rCfg.NextHop = make([]*ribd.NextHopInfo, 0)
+	rCfg.NextHop = append(rCfg.NextHop, &nextHop)
+	return &rCfg
+}
+
+func (mgr *FSRouteMgr) createRibdIPv6RouteCfg(cfg *config.RouteConfig, create bool) *ribd.IPv6Route {
+	rCfg := ribd.IPv6Route{
+		Cost:          cfg.Cost,
+		Protocol:      cfg.Protocol,
+		NetworkMask:   cfg.NetworkMask,
+		DestinationNw: cfg.DestinationNw,
+	}
+	nextHop := ribd.NextHopInfo{
+		NextHopIp:     cfg.NextHopIp,
+		NextHopIntRef: cfg.OutgoingInterface,
+	}
+	rCfg.NextHop = make([]*ribd.NextHopInfo, 0)
+	rCfg.NextHop = append(rCfg.NextHop, &nextHop)
 	return &rCfg
 }
 
 func (mgr *FSRouteMgr) CreateRoute(cfg *config.RouteConfig) {
-	mgr.ribdClient.OnewayCreateIPv4Route(mgr.createRibdIPv4RouteCfg(cfg,
-		true /*create*/))
+	if cfg.IsIPv6 {
+		mgr.ribdClient.OnewayCreateIPv6Route(mgr.createRibdIPv6RouteCfg(cfg, true /*create*/))
+	} else {
+		mgr.ribdClient.OnewayCreateIPv4Route(mgr.createRibdIPv4RouteCfg(cfg, true /*create*/))
+	}
 }
 
 func (mgr *FSRouteMgr) DeleteRoute(cfg *config.RouteConfig) {
-	mgr.ribdClient.OnewayDeleteIPv4Route(mgr.createRibdIPv4RouteCfg(cfg,
-		false /*delete*/))
+	if cfg.IsIPv6 {
+		mgr.ribdClient.OnewayDeleteIPv6Route(mgr.createRibdIPv6RouteCfg(cfg, false /*delete*/))
+	} else {
+		mgr.ribdClient.OnewayDeleteIPv4Route(mgr.createRibdIPv4RouteCfg(cfg, false /*delete*/))
+	}
 }
-func (mgr *FSRouteMgr) UpdateRoute(cfg *config.RouteConfig, op string) {
+
+func (mgr *FSRouteMgr) UpdateV4Route(cfg *config.RouteConfig, nhInfo []*ribd.NextHopInfo, patch []*ribd.PatchOpInfo) {
 	rCfg := ribd.IPv4Route{
-		Cost:              cfg.Cost,
-		Protocol:          cfg.Protocol,
-		NetworkMask:       cfg.NetworkMask,
-		DestinationNw:     cfg.DestinationNw,
+		Cost:          cfg.Cost,
+		Protocol:      cfg.Protocol,
+		NetworkMask:   cfg.NetworkMask,
+		DestinationNw: cfg.DestinationNw,
 	}
-	nextHop := ribd.NextHopInfo { 
-		NextHopIp : cfg.NextHopIp,
-		NextHopIntRef:cfg.OutgoingInterface,
+	rCfg.NextHop = nhInfo
+	mgr.ribdClient.UpdateIPv4Route(&rCfg, &rCfg, nil, patch)
+}
+
+func (mgr *FSRouteMgr) UpdateV6Route(cfg *config.RouteConfig, nhInfo []*ribd.NextHopInfo, patch []*ribd.PatchOpInfo) {
+	rCfg := ribd.IPv6Route{
+		Cost:          cfg.Cost,
+		Protocol:      cfg.Protocol,
+		NetworkMask:   cfg.NetworkMask,
+		DestinationNw: cfg.DestinationNw,
 	}
-    rCfg.NextHop = make([]*ribd.NextHopInfo,0)
-    rCfg.NextHop = append(rCfg.NextHop,&nextHop)
-    value,err := json.Marshal(rCfg.NextHop)
+	rCfg.NextHop = nhInfo
+	mgr.ribdClient.UpdateIPv6Route(&rCfg, &rCfg, nil, patch)
+}
+
+func (mgr *FSRouteMgr) UpdateRoute(cfg *config.RouteConfig, op string) {
+	nextHop := ribd.NextHopInfo{
+		NextHopIp:     cfg.NextHopIp,
+		NextHopIntRef: cfg.OutgoingInterface,
+	}
+
+	nextHopInfo := make([]*ribd.NextHopInfo, 0)
+	nextHopInfo = append(nextHopInfo, &nextHop)
+	value, err := json.Marshal(nextHopInfo)
 	if err != nil {
-		mgr.logger.Err(fmt.Sprintln("Err:", err, " while marshalling nexthop : ", rCfg.NextHop))
+		mgr.logger.Err("Err:", err, " while marshalling nexthop : ", nextHopInfo)
 		return
 	}
-    patchOp := make([]*ribd.PatchOpInfo,0)
-    patchOp = append(patchOp,&ribd.PatchOpInfo {
-			        Op: op,
-                     Path:"NextHop",
-                     Value : string(value),
-                     })
-	mgr.ribdClient.UpdateIPv4Route(&rCfg, &rCfg, nil,patchOp)
+	patchOp := make([]*ribd.PatchOpInfo, 0)
+	patchOp = append(patchOp, &ribd.PatchOpInfo{
+		Op:    op,
+		Path:  "NextHop",
+		Value: string(value),
+	})
+
+	if cfg.IsIPv6 {
+		mgr.UpdateV6Route(cfg, nextHopInfo, patchOp)
+	} else {
+		mgr.UpdateV4Route(cfg, nextHopInfo, patchOp)
+	}
 }
+
 func (mgr *FSRouteMgr) ApplyPolicy(protocol string, policy string, action string, conditions []*config.ConditionInfo) {
 	temp := make([]ribdInt.ConditionInfo, len(conditions))
 	ribdConditions := make([]*ribdInt.ConditionInfo, 0)
@@ -257,21 +303,21 @@ func (mgr *FSRouteMgr) GetRoutes() ([]*config.RouteInfo, []*config.RouteInfo) {
 	routes := make([]*config.RouteInfo, 0)
 	count = 100
 	for {
-		mgr.logger.Info(fmt.Sprintln("Getting ", count,
-			"objects from currMarker", currMarker))
+		mgr.logger.Info("Getting ", count,
+			"objects from currMarker", currMarker)
 		getBulkInfo, err := mgr.ribdClient.GetBulkRoutesForProtocol("BGP",
 			currMarker, count)
 		if err != nil {
-			mgr.logger.Info(fmt.Sprintln("GetBulkRoutesForProtocol with err ", err))
+			mgr.logger.Info("GetBulkRoutesForProtocol with err ", err)
 			break
 		}
 		if getBulkInfo.Count == 0 {
 			mgr.logger.Info("0 objects returned from GetBulkRoutesForProtocol")
 			break
 		}
-		mgr.logger.Info(fmt.Sprintln("len(getBulkInfo.RouteList)  = ",
+		mgr.logger.Info("len(getBulkInfo.RouteList)  = ",
 			len(getBulkInfo.RouteList), " num objects returned = ",
-			getBulkInfo.Count))
+			getBulkInfo.Count)
 		for idx, _ := range getBulkInfo.RouteList {
 			route := mgr.populateConfigRoute(getBulkInfo.RouteList[idx])
 			routes = append(routes, route)

@@ -13,13 +13,13 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 // server.go
 package rpc
@@ -29,7 +29,7 @@ import (
 	"bfdd"
 	"bgpd"
 	"encoding/json"
-	"fmt"
+	_ "fmt"
 	"io/ioutil"
 	"ribd"
 	"strconv"
@@ -52,7 +52,7 @@ func getClient(logger *logging.Writer, fileName string, process string) (*Client
 
 	data, err := ioutil.ReadFile(fileName)
 	if err != nil {
-		logger.Err(fmt.Sprintf("Failed to open BGPd config file:%s, err:%s", fileName, err))
+		logger.Errf("Failed to open BGPd config file:%s, err:%s", fileName, err)
 		return nil, err
 	}
 
@@ -63,7 +63,7 @@ func getClient(logger *logging.Writer, fileName string, process string) (*Client
 		}
 	}
 
-	logger.Err(fmt.Sprintf("Did not find port for %s in config file:%s", process, fileName))
+	logger.Errf("Did not find port for %s in config file:%s", process, fileName)
 	return nil, nil
 }
 
@@ -78,16 +78,16 @@ func StartServer(logger *logging.Writer, handler *BGPHandler, filePath string) {
 	transportFactory := thrift.NewTBufferedTransportFactory(8192)
 	serverTransport, err := thrift.NewTServerSocket("localhost:" + strconv.Itoa(clientJson.Port))
 	if err != nil {
-		logger.Info(fmt.Sprintln("StartServer: NewTServerSocket failed with error:", err))
+		logger.Info("StartServer: NewTServerSocket failed with error:", err)
 		return
 	}
 	processor := bgpd.NewBGPDServicesProcessor(handler)
 	server := thrift.NewTSimpleServer4(processor, serverTransport, transportFactory, protocolFactory)
 	err = server.Serve()
 	if err != nil {
-		logger.Info(fmt.Sprintln("Failed to start the listener, err:", err))
+		logger.Info("Failed to start the listener, err:", err)
 	}
-	logger.Info(fmt.Sprintln("Start the listener successfully"))
+	logger.Info("Start the listener successfully")
 	return
 }
 
@@ -98,7 +98,7 @@ func StartServer(logger *logging.Writer, handler *BGPHandler, filePath string) {
 	transportFactory := thrift.NewTBufferedTransportFactory(8192)
 	clientTransport, err := thrift.NewTSocket("localhost:" + port)
 	if err != nil {
-		logger.Err(fmt.Sprintln("NewTSocket failed with error:", err))
+		logger.Err("NewTSocket failed with error:", err)
 		return nil, nil, err
 	}
 
@@ -123,8 +123,8 @@ func StartAsicdClient(logger *logging.Writer, filePath string,
 	clientTransport, protocolFactory, err := ipcutils.CreateIPCHandles("localhost:" +
 		strconv.Itoa(clientJson.Port))
 	if err != nil {
-		logger.Info(fmt.Sprintf("Failed to connect to ASICd, ",
-			"retrying until connection is successful"))
+		logger.Infof("Failed to connect to ASICd, " +
+			"retrying until connection is successful")
 		count := 0
 		ticker := time.NewTicker(time.Duration(1000) * time.Millisecond)
 		for _ = range ticker.C {
@@ -137,7 +137,7 @@ func StartAsicdClient(logger *logging.Writer, filePath string,
 			}
 			count++
 			if (count % 10) == 0 {
-				logger.Info(fmt.Sprintf("Still can't connect to ASICd, retrying..."))
+				logger.Infof("Still can't connect to ASICd, retrying...")
 			}
 		}
 	}
@@ -156,7 +156,7 @@ func StartRibdClient(logger *logging.Writer, filePath string, ribdClient chan *r
 
 	clientTransport, protocolFactory, err := ipcutils.CreateIPCHandles("localhost:" + strconv.Itoa(clientJson.Port))
 	if err != nil {
-		logger.Info(fmt.Sprintf("Failed to connect to RIBd, retrying until connection is successful"))
+		logger.Infof("Failed to connect to RIBd, retrying until connection is successful")
 		count := 0
 		ticker := time.NewTicker(time.Duration(1000) * time.Millisecond)
 		for _ = range ticker.C {
@@ -167,7 +167,7 @@ func StartRibdClient(logger *logging.Writer, filePath string, ribdClient chan *r
 			}
 			count++
 			if (count % 10) == 0 {
-				logger.Info(fmt.Sprintf("Still can't connect to RIBd, retrying..."))
+				logger.Infof("Still can't connect to RIBd, retrying...")
 			}
 		}
 	}
@@ -186,7 +186,7 @@ func StartBfddClient(logger *logging.Writer, filePath string, bfddClient chan *b
 
 	clientTransport, protocolFactory, err := ipcutils.CreateIPCHandles("localhost:" + strconv.Itoa(clientJson.Port))
 	if err != nil {
-		logger.Info(fmt.Sprintf("Failed to connect to BFDd, retrying until connection is successful"))
+		logger.Infof("Failed to connect to BFDd, retrying until connection is successful")
 		count := 0
 		ticker := time.NewTicker(time.Duration(1000) * time.Millisecond)
 		for _ = range ticker.C {
@@ -197,7 +197,7 @@ func StartBfddClient(logger *logging.Writer, filePath string, bfddClient chan *b
 			}
 			count++
 			if (count % 10) == 0 {
-				logger.Info(fmt.Sprintf("Still can't connect to BFDd, retrying..."))
+				logger.Infof("Still can't connect to BFDd, retrying...")
 			}
 		}
 	}

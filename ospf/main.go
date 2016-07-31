@@ -13,13 +13,13 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 // main.go
 package main
@@ -49,16 +49,16 @@ func main() {
 	}
 	logger.Info("Started the logger successfully.")
 
-	fileName = fileName + "clients.json"
+	cfgFileName := fileName + "clients.json"
 
 	logger.Info(fmt.Sprintln("Starting OSPF Server..."))
 	ospfServer := server.NewOSPFServer(logger)
-	go ospfServer.StartServer(fileName)
+	go ospfServer.StartServer(cfgFileName)
 
 	// Start keepalive routine
 	go keepalive.InitKeepAlive("ospfd", fileName)
 
 	logger.Info(fmt.Sprintln("Starting Config listener..."))
 	confIface := rpc.NewOSPFHandler(ospfServer, logger)
-	rpc.StartServer(logger, confIface, fileName)
+	rpc.StartServer(logger, confIface, cfgFileName)
 }

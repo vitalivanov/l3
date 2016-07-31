@@ -25,7 +25,7 @@
 package packet
 
 import (
-	"fmt"
+	_ "fmt"
 	"l3/bgp/utils"
 	"math"
 	"net"
@@ -86,7 +86,7 @@ func AppendASToAS4PathSeg(asPath *BGPPathAttrASPath, pathSeg BGPASPathSegment, a
 	return pathSeg
 }
 
-func AddPathAttrToPathAttrs(pathAttrs []BGPPathAttr, code BGPPathAttrType, attr BGPPathAttr) {
+func AddPathAttrToPathAttrs(pathAttrs []BGPPathAttr, code BGPPathAttrType, attr BGPPathAttr) []BGPPathAttr {
 	addIdx := -1
 	for idx, pa := range pathAttrs {
 		if pa.GetCode() > code {
@@ -101,32 +101,57 @@ func AddPathAttrToPathAttrs(pathAttrs []BGPPathAttr, code BGPPathAttrType, attr 
 	pathAttrs = append(pathAttrs, attr)
 	copy(pathAttrs[addIdx+1:], pathAttrs[addIdx:])
 	pathAttrs[addIdx] = attr
-	return
+	return pathAttrs
+}
+
+func AddMPReachNLRIToPathAttrs(pathAttrs []BGPPathAttr, mpReach *BGPPathAttrMPReachNLRI) []BGPPathAttr {
+	return AddPathAttrToPathAttrs(pathAttrs, BGPPathAttrTypeMPReachNLRI, mpReach)
 }
 
 func addPathAttr(updateMsg *BGPMessage, code BGPPathAttrType, attr BGPPathAttr) {
 	body := updateMsg.Body.(*BGPUpdate)
-	AddPathAttrToPathAttrs(body.PathAttributes, code, attr)
+	body.PathAttributes = AddPathAttrToPathAttrs(body.PathAttributes, code, attr)
 	return
 }
 
-func removePathAttr(updateMsg *BGPMessage, code BGPPathAttrType) {
+func removePathAttr(updateMsg *BGPMessage, code BGPPathAttrType) BGPPathAttr {
 	body := updateMsg.Body.(*BGPUpdate)
+	return removeTypeFromPathAttrs(&body.PathAttributes, code)
+}
 
-	for idx, pa := range body.PathAttributes {
+func removeTypeFromPathAttrs(pathAttrs *[]BGPPathAttr, code BGPPathAttrType) BGPPathAttr {
+	for idx, pa := range *pathAttrs {
 		if pa.GetCode() == code {
-			body.PathAttributes = append(body.PathAttributes[:idx], body.PathAttributes[idx+1:]...)
-			return
+			(*pathAttrs) = append((*pathAttrs)[:idx], (*pathAttrs)[idx+1:]...)
+			return pa
 		}
 	}
+	return nil
 }
 
-func RemoveMultiExitDisc(updateMsg *BGPMessage) {
-	removePathAttr(updateMsg, BGPPathAttrTypeMultiExitDisc)
+func RemoveNextHop(pathAttrs *[]BGPPathAttr) {
+	removeTypeFromPathAttrs(pathAttrs, BGPPathAttrTypeNextHop)
 }
 
-func RemoveLocalPref(updateMsg *BGPMessage) {
-	removePathAttr(updateMsg, BGPPathAttrTypeLocalPref)
+func RemoveMultiExitDisc(updateMsg *BGPMessage) BGPPathAttr {
+	return removePathAttr(updateMsg, BGPPathAttrTypeMultiExitDisc)
+}
+
+func RemoveLocalPref(updateMsg *BGPMessage) BGPPathAttr {
+	return removePathAttr(updateMsg, BGPPathAttrTypeLocalPref)
+}
+
+func RemoveMPAttrs(pathAttrs *[]BGPPathAttr) (mpReach *BGPPathAttrMPReachNLRI, mpUnreach *BGPPathAttrMPUnreachNLRI) {
+	reach := removeTypeFromPathAttrs(pathAttrs, BGPPathAttrTypeMPReachNLRI)
+	if reach != nil {
+		mpReach = reach.(*BGPPathAttrMPReachNLRI)
+	}
+
+	unreach := removeTypeFromPathAttrs(pathAttrs, BGPPathAttrTypeMPUnreachNLRI)
+	if unreach != nil {
+		mpUnreach = unreach.(*BGPPathAttrMPUnreachNLRI)
+	}
+	return mpReach, mpUnreach
 }
 
 func SetLocalPref(updateMsg *BGPMessage, pref uint32) {
@@ -185,6 +210,24 @@ func SetPathAttrAggregator(pathAttrs []BGPPathAttr, as uint32, ip net.IP) {
 	}
 }
 
+func HasMPAttrs(pathAttrs []BGPPathAttr) bool {
+	for _, attr := range pathAttrs {
+		if attr.GetCode() == BGPPathAttrTypeMPReachNLRI || attr.GetCode() == BGPPathAttrTypeMPUnreachNLRI {
+			return true
+		}
+	}
+	return false
+}
+
+func HasMPReachNLRI(pathAttrs []BGPPathAttr) bool {
+	for _, attr := range pathAttrs {
+		if attr.GetCode() == BGPPathAttrTypeMPReachNLRI {
+			return true
+		}
+	}
+	return false
+}
+
 func HasASLoop(pathAttrs []BGPPathAttr, localAS uint32) bool {
 	for _, attr := range pathAttrs {
 		if attr.GetCode() == BGPPathAttrTypeASPath {
@@ -216,7 +259,7 @@ func HasASLoop(pathAttrs []BGPPathAttr, localAS uint32) bool {
 
 func GetNumASes(pathAttrs []BGPPathAttr) uint32 {
 	var total uint32 = 0
-	utils.Logger.Info(fmt.Sprintln("helpers:GetNumASes - path attrs =", pathAttrs))
+	utils.Logger.Info("helpers:GetNumASes - path attrs =", pathAttrs)
 	for _, attr := range pathAttrs {
 		if attr.GetCode() == BGPPathAttrTypeASPath {
 			asPaths := attr.(*BGPPathAttrASPath).Value
@@ -429,9 +472,24 @@ func ConstructPathAttrForConnRoutes(ip net.IP, as uint32) []BGPPathAttr {
 	return pathAttrs
 }
 
+func CopyPathAttrs(pathAttrs []BGPPathAttr) []BGPPathAttr {
+	newPathAttrs := make([]BGPPathAttr, len(pathAttrs))
+	copy(newPathAttrs, pathAttrs)
+	return newPathAttrs
+}
+
 func ConstructIPPrefix(ipStr string, maskStr string) *IPPrefix {
 	ip := net.ParseIP(ipStr)
-	mask := net.IPMask(net.ParseIP(maskStr).To4())
+	var mask net.IPMask
+	if ip.To4() != nil {
+		utils.Logger.Infof("ConstructIPPrefix IPv6 - mask ip %+v mask ip mask %+v",
+			net.ParseIP(maskStr), net.IPMask(net.ParseIP(maskStr).To4()))
+		mask = net.IPMask(net.ParseIP(maskStr).To4())
+	} else {
+		utils.Logger.Infof("ConstructIPPrefix IPv4 - mask ip %+v mask ip mask %+v",
+			net.ParseIP(maskStr), net.IPMask(net.ParseIP(maskStr).To16()))
+		mask = net.IPMask(net.ParseIP(maskStr).To16())
+	}
 	ones, _ := mask.Size()
 	return NewIPPrefix(ip.Mask(mask), uint8(ones))
 }
@@ -439,7 +497,7 @@ func ConstructIPPrefix(ipStr string, maskStr string) *IPPrefix {
 func ConstructIPPrefixFromCIDR(cidr string) (*IPPrefix, error) {
 	_, ipNet, err := net.ParseCIDR(cidr)
 	if err != nil {
-		utils.Logger.Info(fmt.Sprintln("ConstructIPPrefixFromCIDR: ParseCIDR for IPPrefix", cidr, "failed with err", err))
+		utils.Logger.Info("ConstructIPPrefixFromCIDR: ParseCIDR for IPPrefix", cidr, "failed with err", err)
 		return nil, err
 	}
 
@@ -541,7 +599,7 @@ func ConstructOptParams(as uint32, afiSAfiMap map[uint32]bool, addPathsRx bool, 
 
 	for protoFamily, _ := range afiSAfiMap {
 		afi, safi := GetAfiSafi(protoFamily)
-		utils.Logger.Info(fmt.Sprintf("Advertising capability for afi %d safi %d\n", afi, safi))
+		utils.Logger.Infof("Advertising capability for afi %d safi %d\n", afi, safi)
 		capAfiSafi := NewBGPCapMPExt(afi, safi)
 		capParams = append(capParams, capAfiSafi)
 
@@ -550,7 +608,7 @@ func ConstructOptParams(as uint32, afiSAfiMap map[uint32]bool, addPathsRx bool, 
 	}
 
 	if addPathFlags != 0 {
-		utils.Logger.Info(fmt.Sprintf("Advertising capability for addPaths %+v\n", capAddPaths.Value))
+		utils.Logger.Infof("Advertising capability for addPaths %+v\n", capAddPaths.Value)
 		capParams = append(capParams, capAddPaths)
 	}
 
@@ -581,7 +639,7 @@ func GetAddPathFamily(openMsg *BGPOpen) map[AFI]map[SAFI]uint8 {
 		if capabilities, ok := optParam.(*BGPOptParamCapability); ok {
 			for _, capability := range capabilities.Value {
 				if addPathCap, ok := capability.(*BGPCapAddPath); ok {
-					utils.Logger.Info(fmt.Sprintf("add path capability = %+v\n", addPathCap))
+					utils.Logger.Infof("add path capability = %+v\n", addPathCap)
 					for _, val := range addPathCap.Value {
 						if _, ok := addPathFamily[val.AFI]; !ok {
 							addPathFamily[val.AFI] = make(map[SAFI]uint8)
@@ -603,7 +661,7 @@ func IsAddPathsTxEnabledForIPv4(addPathFamily map[AFI]map[SAFI]uint8) bool {
 	if _, ok := addPathFamily[AfiIP]; ok {
 		for safi, flags := range addPathFamily[AfiIP] {
 			if (safi == SafiUnicast || safi == SafiMulticast) && (flags&BGPCapAddPathTx != 0) {
-				utils.Logger.Info(fmt.Sprintf("isAddPathsTxEnabledForIPv4 - add path Tx enabled for IPv4"))
+				utils.Logger.Infof("isAddPathsTxEnabledForIPv4 - add path Tx enabled for IPv4")
 				enabled = true
 			}
 		}
@@ -812,6 +870,7 @@ func ConstructMaxSizedUpdatePackets(bgpMsg *BGPMessage) []*BGPMessage {
 		newUpdateMsgs = append(newUpdateMsgs, newMsg)
 		pktLen = BGPUpdateMsgMinLen
 	}
+	mpAttsFound := HasMPAttrs(updateMsg.PathAttributes)
 
 	startIdx = 0
 	lastIdx = 0
@@ -825,11 +884,12 @@ func ConstructMaxSizedUpdatePackets(bgpMsg *BGPMessage) []*BGPMessage {
 			}
 			startIdx = lastIdx
 			pktLen = uint32(BGPUpdateMsgMinLen)
+			mpAttsFound = false
 		}
 		pktLen += nlriLen
 	}
 
-	if (withdrawnRoutes != nil && len(withdrawnRoutes) > 0) || (lastIdx > startIdx) {
+	if (withdrawnRoutes != nil && len(withdrawnRoutes) > 0) || (lastIdx > startIdx) || mpAttsFound {
 		newMsg := NewBGPUpdateMessage(withdrawnRoutes, updateMsg.PathAttributes, updateMsg.NLRI[startIdx:lastIdx])
 		newUpdateMsgs = append(newUpdateMsgs, newMsg)
 	}

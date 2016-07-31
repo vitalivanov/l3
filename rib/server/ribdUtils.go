@@ -29,7 +29,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/op/go-nanomsg"
 	"l3/rib/ribdCommonDefs"
 	"net"
 	"ribd"
@@ -39,13 +38,8 @@ import (
 	"strings"
 	"utils/patriciaDB"
 	"utils/policy"
-)
 
-type IPType int
-
-const (
-	ipv4 IPType = iota
-	ipv6
+	"github.com/op/go-nanomsg"
 )
 
 type RouteDistanceConfig struct {
@@ -77,20 +71,20 @@ var RIBD_PUB *nanomsg.PubSocket
 var RIBD_POLICY_PUB *nanomsg.PubSocket
 
 func InitPublisher(pub_str string) (pub *nanomsg.PubSocket) {
-	logger.Info(fmt.Sprintln("Setting up %s", pub_str, "publisher"))
+	logger.Info("Setting up %s", pub_str, "publisher")
 	pub, err := nanomsg.NewPubSocket()
 	if err != nil {
-		logger.Println("Failed to open pub socket")
+		logger.Err("Failed to open pub socket")
 		return nil
 	}
 	ep, err := pub.Bind(pub_str)
 	if err != nil {
-		logger.Info(fmt.Sprintln("Failed to bind pub socket - ", ep))
+		logger.Info("Failed to bind pub socket - ", ep)
 		return nil
 	}
 	err = pub.SetSendBuffer(1024 * 1024)
 	if err != nil {
-		logger.Println("Failed to set send buffer size")
+		logger.Err("Failed to set send buffer size")
 		return nil
 	}
 	return pub
@@ -100,16 +94,16 @@ func BuildPublisherMap() {
 	RIBD_PUB = InitPublisher(ribdCommonDefs.PUB_SOCKET_ADDR)
 	RIBD_POLICY_PUB = InitPublisher(ribdCommonDefs.PUB_SOCKET_POLICY_ADDR)
 	for k, _ := range RouteProtocolTypeMapDB {
-		logger.Info(fmt.Sprintln("Building publisher map for protocol ", k))
+		logger.Info("Building publisher map for protocol ", k)
 		if k == "CONNECTED" || k == "STATIC" {
-			logger.Info(fmt.Sprintln("Publisher info for protocol ", k, " not required"))
+			logger.Info("Publisher info for protocol ", k, " not required")
 			continue
 		}
 		if k == "IBGP" || k == "EBGP" {
 			continue
 		}
 		pub_ipc := "ipc:///tmp/ribd_" + strings.ToLower(k) + "d.ipc"
-		logger.Info(fmt.Sprintln("pub_ipc:", pub_ipc))
+		logger.Info("pub_ipc:", pub_ipc)
 		pub := InitPublisher(pub_ipc)
 		PublisherInfoMap[k] = PublisherMapInfo{pub_ipc, pub}
 	}
@@ -170,10 +164,10 @@ func BuildProtocolAdminDistanceSlice() {
 func (m RIBDServer) ConvertIntfStrToIfIndexStr(intfString string) (ifIndex string, err error) {
 	if val, err := strconv.Atoi(intfString); err == nil {
 		//Verify ifIndex is valid
-		logger.Info(fmt.Sprintln("IfIndex = ", val))
+		logger.Info("IfIndex = ", val)
 		_, ok := IntfIdNameMap[int32(val)]
 		if !ok {
-			logger.Err(fmt.Sprintln("Cannot create ip route on a unknown L3 interface"))
+			logger.Err("Cannot create ip route on a unknown L3 interface")
 			return ifIndex, errors.New("Cannot create ip route on a unknown L3 interface")
 		}
 		ifIndex = intfString
@@ -193,7 +187,7 @@ func arpResolveCalled(key NextHopInfoKey) bool {
 	}
 	info, ok := RouteServiceHandler.NextHopInfoMap[key]
 	if !ok || info.refCount == 0 {
-		logger.Info(fmt.Sprintln("Arp resolve not called for ", key.nextHopIp))
+		logger.Info("Arp resolve not called for ", key.nextHopIp)
 		return false
 	}
 	return true
@@ -205,7 +199,7 @@ func updateNextHopMap(key NextHopInfoKey, op int) (count int) {
 	} else if op == del {
 		opStr = "decrementing"
 	}
-	logger.Info(fmt.Sprintln(opStr, " nextHop Map for ", key.nextHopIp))
+	logger.Info(opStr, " nextHop Map for ", key.nextHopIp)
 	if RouteServiceHandler.NextHopInfoMap == nil {
 		return -1
 	}
@@ -222,30 +216,30 @@ func updateNextHopMap(key NextHopInfoKey, op int) (count int) {
 		RouteServiceHandler.NextHopInfoMap[key] = info
 		count = info.refCount
 	}
-	logger.Info(fmt.Sprintln("Updated refcount = ", count))
+	logger.Info("Updated refcount = ", count)
 	return count
 }
 func findElement(list []string, element string) int {
 	index := -1
 	for i := 0; i < len(list); i++ {
 		if list[i] == element {
-			logger.Info(fmt.Sprintln("Found element ", element, " at index ", i))
+			logger.Info("Found element ", element, " at index ", i)
 			return i
 		}
 	}
-	logger.Info(fmt.Sprintln("Element ", element, " not added to the list"))
+	logger.Info("Element ", element, " not added to the list")
 	return index
 }
 func buildPolicyEntityFromRoute(route ribdInt.Routes, params interface{}) (entity policy.PolicyEngineFilterEntityParams, err error) {
 	routeInfo := params.(RouteParams)
-	logger.Info(fmt.Sprintln("buildPolicyEntityFromRoute: createType: ", routeInfo.createType, " delete type: ", routeInfo.deleteType))
+	logger.Info("buildPolicyEntityFromRoute: createType: ", routeInfo.createType, " delete type: ", routeInfo.deleteType)
 	destNetIp, err := getCIDR(route.Ipaddr, route.Mask)
 	if err != nil {
-		logger.Info(fmt.Sprintln("error getting CIDR address for ", route.Ipaddr, ":", route.Mask))
+		logger.Info("error getting CIDR address for ", route.Ipaddr, ":", route.Mask)
 		return entity, err
 	}
 	entity.DestNetIp = destNetIp
-	logger.Info(fmt.Sprintln("buildPolicyEntityFromRoute: destNetIp:", entity.DestNetIp))
+	logger.Info("buildPolicyEntityFromRoute: destNetIp:", entity.DestNetIp)
 	entity.NextHopIp = route.NextHopIp
 	entity.RouteProtocol = ReverseRouteProtoTypeMapDB[int(route.Prototype)]
 	if routeInfo.createType != Invalid {
@@ -275,7 +269,7 @@ func BuildRouteParamsFromribdIPv4Route(cfg *ribd.IPv4Route, createType int, dele
 	}
 	nextHopIntRef, _ := strconv.Atoi(cfg.NextHop[0].NextHopIntRef)
 	params := RouteParams{destNetIp: cfg.DestinationNw,
-		ipType:         ipv4,
+		ipType:         ribdCommonDefs.IPv4,
 		networkMask:    cfg.NetworkMask,
 		nextHopIp:      nextHopIp,
 		nextHopIfIndex: ribd.Int(nextHopIntRef),
@@ -296,7 +290,7 @@ func BuildRouteParamsFromribdIPv6Route(cfg *ribd.IPv6Route, createType int, dele
 	}
 	nextHopIntRef, _ := strconv.Atoi(cfg.NextHop[0].NextHopIntRef)
 	params := RouteParams{destNetIp: cfg.DestinationNw,
-		ipType:         ipv6,
+		ipType:         ribdCommonDefs.IPv6,
 		networkMask:    cfg.NetworkMask,
 		nextHopIp:      nextHopIp,
 		nextHopIfIndex: ribd.Int(nextHopIntRef),
@@ -317,7 +311,7 @@ func BuildPolicyRouteFromribdIPv4Route(cfg *ribd.IPv4Route) (policyRoute ribdInt
 	}
 	nextHopIntRef, _ := strconv.Atoi(cfg.NextHop[0].NextHopIntRef)
 	policyRoute = ribdInt.Routes{Ipaddr: cfg.DestinationNw,
-		IPAddrType: ribdInt.Int(ipv4),
+		IPAddrType: ribdInt.Int(ribdCommonDefs.IPv4),
 		Mask:       cfg.NetworkMask,
 		NextHopIp:  nextHopIp,
 		IfIndex:    ribdInt.Int(nextHopIntRef), //cfg.NextHopInfp[0].NextHopIntRef,
@@ -335,7 +329,7 @@ func BuildPolicyRouteFromribdIPv6Route(cfg *ribd.IPv6Route) (policyRoute ribdInt
 	}
 	nextHopIntRef, _ := strconv.Atoi(cfg.NextHop[0].NextHopIntRef)
 	policyRoute = ribdInt.Routes{Ipaddr: cfg.DestinationNw,
-		IPAddrType: ribdInt.Int(ipv6),
+		IPAddrType: ribdInt.Int(ribdCommonDefs.IPv6),
 		Mask:       cfg.NetworkMask,
 		NextHopIp:  nextHopIp,
 		IfIndex:    ribdInt.Int(nextHopIntRef), //cfg.NextHopInfp[0].NextHopIntRef,
@@ -346,11 +340,11 @@ func BuildPolicyRouteFromribdIPv6Route(cfg *ribd.IPv6Route) (policyRoute ribdInt
 	return policyRoute
 }
 func findRouteWithNextHop(routeInfoList []RouteInfoRecord, nextHopIP string) (found bool, routeInfoRecord RouteInfoRecord, index int) {
-	logger.Println("findRouteWithNextHop")
+	logger.Info("findRouteWithNextHop")
 	index = -1
 	for i := 0; i < len(routeInfoList); i++ {
 		if routeInfoList[i].nextHopIp.String() == nextHopIP {
-			logger.Println("Next hop IP present")
+			//logger.Info("Next hop IP present")
 			found = true
 			routeInfoRecord = routeInfoList[i]
 			index = i
@@ -360,27 +354,27 @@ func findRouteWithNextHop(routeInfoList []RouteInfoRecord, nextHopIP string) (fo
 	return found, routeInfoRecord, index
 }
 func newNextHopIP(ip string, routeInfoList []RouteInfoRecord) (isNewNextHopIP bool) {
-	logger.Println("newNextHopIP")
+	logger.Info("newNextHopIP")
 	isNewNextHopIP = true
 	for i := 0; i < len(routeInfoList); i++ {
 		if routeInfoList[i].nextHopIp.String() == ip {
-			logger.Println("Next hop IP already present")
+			logger.Info("Next hop IP already present")
 			isNewNextHopIP = false
 		}
 	}
 	return isNewNextHopIP
 }
 func isSameRoute(selectedRoute ribdInt.Routes, route ribdInt.Routes) (same bool) {
-	logger.Println("isSameRoute")
+	logger.Info("isSameRoute")
 	if selectedRoute.Ipaddr == route.Ipaddr && selectedRoute.Mask == route.Mask && selectedRoute.Prototype == route.Prototype {
 		same = true
 	}
 	return same
 }
 func getPolicyRouteMapIndex(entity policy.PolicyEngineFilterEntityParams, policy string) (policyRouteIndex policy.PolicyEntityMapIndex) {
-	logger.Println("getPolicyRouteMapIndex")
+	logger.Info("getPolicyRouteMapIndex")
 	policyRouteIndex = PolicyRouteIndex{destNetIP: entity.DestNetIp, policy: policy}
-	logger.Info(fmt.Sprintln("Returning policyRouteIndex as : ", policyRouteIndex))
+	logger.Info("Returning policyRouteIndex as : ", policyRouteIndex)
 	return policyRouteIndex
 }
 
@@ -388,10 +382,10 @@ func getPolicyRouteMapIndex(entity policy.PolicyEngineFilterEntityParams, policy
    Update routelist for policy
 */
 func addPolicyRouteMap(route ribdInt.Routes, policyName string) {
-	logger.Println("addPolicyRouteMap")
+	logger.Info("addPolicyRouteMap")
 	ipPrefix, err := getNetowrkPrefixFromStrings(route.Ipaddr, route.Mask)
 	if err != nil {
-		logger.Println("Invalid ip prefix")
+		logger.Err("Invalid ip prefix")
 		return
 	}
 	maskIp, err := getIP(route.Mask)
@@ -402,29 +396,29 @@ func addPolicyRouteMap(route ribdInt.Routes, policyName string) {
 	if err != nil {
 		return
 	}
-	logger.Info(fmt.Sprintln("prefixLen= ", prefixLen))
+	logger.Info("prefixLen= ", prefixLen)
 	var newRoute string
 	found := false
 	newRoute = route.Ipaddr + "/" + strconv.Itoa(prefixLen)
 	//	newRoute := string(ipPrefix[:])
-	logger.Info(fmt.Sprintln("Adding ip prefix %s %v ", newRoute, ipPrefix))
+	logger.Info("Adding ip prefix ", newRoute, ipPrefix)
 	policyInfo := PolicyEngineDB.PolicyDB.Get(patriciaDB.Prefix(policyName))
 	if policyInfo == nil {
-		logger.Info(fmt.Sprintln("Unexpected:policyInfo nil for policy ", policyName))
+		logger.Info("Unexpected:policyInfo nil for policy ", policyName)
 		return
 	}
 	tempPolicyInfo := policyInfo.(policy.Policy)
 	tempPolicy := tempPolicyInfo.Extensions.(PolicyExtensions)
 	tempPolicy.hitCounter++
 	if tempPolicy.routeList == nil {
-		logger.Println("routeList nil")
+		logger.Info("routeList nil")
 		tempPolicy.routeList = make([]string, 0)
 	}
-	logger.Info(fmt.Sprintln("routelist len= ", len(tempPolicy.routeList), " prefix list so far"))
+	logger.Info("routelist len= ", len(tempPolicy.routeList), " prefix list so far")
 	for i := 0; i < len(tempPolicy.routeList); i++ {
-		logger.Info(fmt.Sprintln(tempPolicy.routeList[i]))
+		logger.Info(tempPolicy.routeList[i])
 		if tempPolicy.routeList[i] == newRoute {
-			logger.Info(fmt.Sprintln(newRoute, " already is a part of ", policyName, "'s routelist"))
+			logger.Info(newRoute, " already is a part of ", policyName, "'s routelist")
 			found = true
 		}
 	}
@@ -432,11 +426,11 @@ func addPolicyRouteMap(route ribdInt.Routes, policyName string) {
 		tempPolicy.routeList = append(tempPolicy.routeList, newRoute)
 	}
 	found = false
-	logger.Println("routeInfoList details")
+	logger.Info("routeInfoList details")
 	for i := 0; i < len(tempPolicy.routeInfoList); i++ {
-		logger.Info(fmt.Sprintln("IP: ", tempPolicy.routeInfoList[i].Ipaddr, ":", tempPolicy.routeInfoList[i].Mask, " routeType: ", tempPolicy.routeInfoList[i].Prototype))
+		logger.Info("IP: ", tempPolicy.routeInfoList[i].Ipaddr, ":", tempPolicy.routeInfoList[i].Mask, " routeType: ", tempPolicy.routeInfoList[i].Prototype)
 		if tempPolicy.routeInfoList[i].Ipaddr == route.Ipaddr && tempPolicy.routeInfoList[i].Mask == route.Mask && tempPolicy.routeInfoList[i].Prototype == route.Prototype {
-			logger.Info(fmt.Sprintln("route already is a part of ", policyName, "'s routeInfolist"))
+			logger.Info("route already is a part of ", policyName, "'s routeInfolist")
 			found = true
 		}
 	}
@@ -450,10 +444,10 @@ func addPolicyRouteMap(route ribdInt.Routes, policyName string) {
 	PolicyEngineDB.PolicyDB.Set(patriciaDB.Prefix(policyName), tempPolicyInfo)
 }
 func deletePolicyRouteMap(route ribdInt.Routes, policyName string) {
-	logger.Println("deletePolicyRouteMap")
+	logger.Info("deletePolicyRouteMap")
 }
 func updatePolicyRouteMap(route ribdInt.Routes, policy string, op int) {
-	logger.Println("updatePolicyRouteMap")
+	logger.Info("updatePolicyRouteMap")
 	if op == add {
 		addPolicyRouteMap(route, policy)
 	} else if op == del {
@@ -463,7 +457,7 @@ func updatePolicyRouteMap(route ribdInt.Routes, policy string, op int) {
 }
 
 func deleteRoutePolicyStateAll(route ribdInt.Routes) {
-	logger.Println("deleteRoutePolicyStateAll")
+	logger.Info("deleteRoutePolicyStateAll")
 	destNet, err := getNetowrkPrefixFromStrings(route.Ipaddr, route.Mask)
 	if err != nil {
 		return
@@ -471,7 +465,7 @@ func deleteRoutePolicyStateAll(route ribdInt.Routes) {
 
 	routeInfoRecordListItem := RouteInfoMap.Get(destNet)
 	if routeInfoRecordListItem == nil {
-		logger.Info(fmt.Sprintln(" entry not found for prefix %v", destNet))
+		logger.Info(" entry not found for prefix %v", destNet)
 		return
 	}
 	routeInfoRecordList := routeInfoRecordListItem.(RouteInfoRecordList)
@@ -481,7 +475,7 @@ func deleteRoutePolicyStateAll(route ribdInt.Routes) {
 	return
 }
 func addRoutePolicyState(route ribdInt.Routes, policy string, policyStmt string) {
-	logger.Println("addRoutePolicyState")
+	logger.Info("addRoutePolicyState")
 	destNet, err := getNetowrkPrefixFromStrings(route.Ipaddr, route.Mask)
 	if err != nil {
 		return
@@ -489,10 +483,10 @@ func addRoutePolicyState(route ribdInt.Routes, policy string, policyStmt string)
 
 	routeInfoRecordListItem := RouteInfoMap.Get(destNet)
 	if routeInfoRecordListItem == nil {
-		logger.Info(fmt.Sprintln("Unexpected - entry not found for prefix %v", destNet))
+		logger.Info("Unexpected - entry not found for prefix %v", destNet)
 		return
 	}
-	logger.Info(fmt.Sprintln("Adding policy ", policy, " to route ", destNet))
+	logger.Info("Adding policy ", policy, " to route ", destNet)
 	routeInfoRecordList := routeInfoRecordListItem.(RouteInfoRecordList)
 	found := false
 	idx := 0
@@ -503,7 +497,7 @@ func addRoutePolicyState(route ribdInt.Routes, policy string, policyStmt string)
 		}
 	}
 	if found {
-		logger.Info(fmt.Sprintln("Policy ", policy, "already a part of policyList of route ", destNet))
+		logger.Info("Policy ", policy, "already a part of policyList of route ", destNet)
 		return
 	}
 	routeInfoRecordList.policyHitCounter = ribd.Int(route.PolicyHitCounter)
@@ -527,12 +521,12 @@ func addRoutePolicyState(route ribdInt.Routes, policy string, policyStmt string)
 	return
 }
 func deleteRoutePolicyState(ipPrefix patriciaDB.Prefix, policyName string) {
-	logger.Println("deleteRoutePolicyState")
+	logger.Info("deleteRoutePolicyState")
 	found := false
 	idx := 0
 	routeInfoRecordListItem := RouteInfoMap.Get(ipPrefix)
 	if routeInfoRecordListItem == nil {
-		logger.Info(fmt.Sprintln("routeInfoRecordListItem nil for prefix ", ipPrefix))
+		logger.Info("routeInfoRecordListItem nil for prefix ", ipPrefix)
 		return
 	}
 	routeInfoRecordList := routeInfoRecordListItem.(RouteInfoRecordList)
@@ -546,11 +540,11 @@ func deleteRoutePolicyState(ipPrefix patriciaDB.Prefix, policyName string) {
 		}
 	}
 	if !found {
-		logger.Info(fmt.Sprintln("Policy ", policyName, "not found in policyList of route ", ipPrefix))
+		logger.Info("Policy ", policyName, "not found in policyList of route ", ipPrefix)
 		return
 	}
 	if len(routeInfoRecordList.policyList) <= idx+1 {
-		logger.Println("last element")
+		logger.Info("last element")
 		routeInfoRecordList.policyList = routeInfoRecordList.policyList[:idx]
 	} else {
 		routeInfoRecordList.policyList = append(routeInfoRecordList.policyList[:idx], routeInfoRecordList.policyList[idx+1:]...)
@@ -559,7 +553,7 @@ func deleteRoutePolicyState(ipPrefix patriciaDB.Prefix, policyName string) {
 }
 
 func updateRoutePolicyState(route ribdInt.Routes, op int, policy string, policyStmt string) {
-	logger.Println("updateRoutePolicyState")
+	logger.Info("updateRoutePolicyState")
 	if op == delAll {
 		deleteRoutePolicyStateAll(route)
 	} else if op == add {
@@ -567,7 +561,7 @@ func updateRoutePolicyState(route ribdInt.Routes, op int, policy string, policyS
 	}
 }
 func UpdateRedistributeTargetMap(evt int, protocol string, route ribdInt.Routes) {
-	logger.Println("UpdateRedistributeTargetMap")
+	logger.Info("UpdateRedistributeTargetMap")
 	if evt == ribdCommonDefs.NOTIFY_ROUTE_CREATED {
 		redistributeMapInfo := RedistributeRouteMap[protocol]
 		if redistributeMapInfo == nil {
@@ -583,7 +577,7 @@ func UpdateRedistributeTargetMap(evt int, protocol string, route ribdInt.Routes)
 			i := 0
 			for i = 0; i < len(redistributeMapInfo); i++ {
 				if isSameRoute((redistributeMapInfo[i].route), route) {
-					logger.Info(fmt.Sprintln("Found the route that is to be taken off the redistribution list for ", protocol))
+					logger.Info("Found the route that is to be taken off the redistribution list for ", protocol)
 					found = true
 					break
 				}
@@ -600,13 +594,13 @@ func UpdateRedistributeTargetMap(evt int, protocol string, route ribdInt.Routes)
 	}
 }
 func RedistributionNotificationSend(PUB *nanomsg.PubSocket, route ribdInt.Routes, evt int, targetProtocol string) {
-	logger.Println("RedistributionNotificationSend")
+	logger.Info("RedistributionNotificationSend")
 	msgBuf := ribdCommonDefs.RoutelistInfo{RouteInfo: route}
 	msgbufbytes, err := json.Marshal(msgBuf)
 	msg := ribdCommonDefs.RibdNotifyMsg{MsgType: uint16(evt), MsgBuf: msgbufbytes}
 	buf, err := json.Marshal(msg)
 	if err != nil {
-		logger.Println("Error in marshalling Json")
+		logger.Err("Error in marshalling Json")
 		return
 	}
 	var evtStr string
@@ -620,14 +614,14 @@ func RedistributionNotificationSend(PUB *nanomsg.PubSocket, route ribdInt.Routes
 		eventInfo = " Advertise Network Statement "
 	}
 	eventInfo = eventInfo + evtStr + " for route " + route.Ipaddr + " " + route.Mask + " type " + ReverseRouteProtoTypeMapDB[int(route.Prototype)] + " to " + targetProtocol
-	logger.Info(fmt.Sprintln("Adding ", evtStr, " for route ", route.Ipaddr, " ", route.Mask, " to notification channel"))
+	logger.Info("Adding ", evtStr, " for route ", route.Ipaddr, " ", route.Mask, " to notification channel")
 	RouteServiceHandler.NotificationChannel <- NotificationMsg{PUB, buf, eventInfo}
 }
 func RouteReachabilityStatusNotificationSend(targetProtocol string, info RouteReachabilityStatusInfo) {
-	logger.Info(fmt.Sprintln("RouteReachabilityStatusNotificationSend for protocol ", targetProtocol))
+	logger.Info("RouteReachabilityStatusNotificationSend for protocol ", targetProtocol)
 	publisherInfo, ok := PublisherInfoMap[targetProtocol]
 	if !ok {
-		logger.Info(fmt.Sprintln("Publisher not found for protocol ", targetProtocol))
+		logger.Info("Publisher not found for protocol ", targetProtocol)
 		return
 	}
 	evt := ribdCommonDefs.NOTIFY_ROUTE_REACHABILITY_STATUS_UPDATE
@@ -643,25 +637,25 @@ func RouteReachabilityStatusNotificationSend(targetProtocol string, info RouteRe
 	msg := ribdCommonDefs.RibdNotifyMsg{MsgType: uint16(evt), MsgBuf: msgbufbytes}
 	buf, err := json.Marshal(msg)
 	if err != nil {
-		logger.Println("Error in marshalling Json")
+		logger.Err("Error in marshalling Json")
 		return
 	}
 	eventInfo := "Update Route Reachability status " + info.status + " for network " + info.destNet + " for protocol " + targetProtocol
 	if info.status == "Up" {
 		eventInfo = eventInfo + " NextHop IP: " + info.nextHopIntf.NextHopIp + " Index: " + strconv.Itoa(int(info.nextHopIntf.NextHopIfIndex))
 	}
-	logger.Info(fmt.Sprintln("Adding  NOTIFY_ROUTE_REACHABILITY_STATUS_UPDATE with status ", info.status, " for network ", info.destNet, " to notification channel"))
+	logger.Info("Adding  NOTIFY_ROUTE_REACHABILITY_STATUS_UPDATE with status ", info.status, " for network ", info.destNet, " to notification channel")
 	RouteServiceHandler.NotificationChannel <- NotificationMsg{PUB, buf, eventInfo}
 }
 func RouteReachabilityStatusUpdate(targetProtocol string, info RouteReachabilityStatusInfo) {
-	logger.Info(fmt.Sprintln("RouteReachabilityStatusUpdate targetProtocol ", targetProtocol))
+	logger.Info("RouteReachabilityStatusUpdate targetProtocol ", targetProtocol)
 	if targetProtocol != "NONE" {
 		RouteReachabilityStatusNotificationSend(targetProtocol, info)
 	}
 	var ipMask net.IP
 	ip, ipNet, err := net.ParseCIDR(info.destNet)
 	if err != nil {
-		logger.Err(fmt.Sprintln("Error getting IP from cidr: ", info.destNet))
+		logger.Err("Error getting IP from cidr: ", info.destNet)
 		return
 	}
 	ipMask = make(net.IP, 4)
@@ -670,19 +664,19 @@ func RouteReachabilityStatusUpdate(targetProtocol string, info RouteReachability
 	ipMaskStr := net.IP(ipMask).String()
 	destIpPrefix, err := getNetowrkPrefixFromStrings(ipAddrStr, ipMaskStr)
 	if err != nil {
-		logger.Err(fmt.Sprintln("Error getting ip prefix for ip:", ipAddrStr, " mask:", ipMaskStr))
+		logger.Err("Error getting ip prefix for ip:", ipAddrStr, " mask:", ipMaskStr)
 		return
 	}
 	//check the TrackReachabilityMap to see if any other protocols are interested in receiving updates for this network
 	for k, list := range TrackReachabilityMap {
 		prefix, err := getNetowrkPrefixFromStrings(k, ipMaskStr)
 		if err != nil {
-			logger.Err(fmt.Sprintln("Error getting ip prefix for ip:", k, " mask:", ipMaskStr))
+			logger.Err("Error getting ip prefix for ip:", k, " mask:", ipMaskStr)
 			return
 		}
 		if bytes.Equal(destIpPrefix, prefix) {
 			for idx := 0; idx < len(list); idx++ {
-				logger.Info(fmt.Sprintln(" protocol ", list[idx], " interested in receving reachability updates for ipAddr ", info.destNet))
+				logger.Info(" protocol ", list[idx], " interested in receving reachability updates for ipAddr ", info.destNet)
 				info.destNet = k
 				RouteReachabilityStatusNotificationSend(list[idx], info)
 			}
@@ -693,12 +687,12 @@ func RouteReachabilityStatusUpdate(targetProtocol string, info RouteReachability
 
 /*func getIPInt(ip net.IP) (ipInt int, err error) {
 	if ip == nil {
-		logger.Info(fmt.Sprintln("ip address invalid", ip))
+		//logger.Info(fmt.Sprintln("ip address invalid", ip))
 		return ipInt, errors.New("Invalid destination network IP Address")
 	}
 	ip = ip.To4()
 	if ip == nil {
-		logger.Err("ip.To4 nil")
+		//logger.Err("ip.To4 nil")
 		return ipInt, errors.New("ip.To4() nil")
 	}
 	parsedPrefixIP := int(ip[3]) | int(ip[2])<<8 | int(ip[1])<<16 | int(ip[0])<<24
@@ -707,13 +701,13 @@ func RouteReachabilityStatusUpdate(targetProtocol string, info RouteReachability
 }
 */
 func getIP(ipAddr string) (ip net.IP, err error) {
-	logger.Debug(fmt.Sprintln("getIP for ipAddr:", ipAddr))
+	//logger.Debug("getIP for ipAddr:", ipAddr)
 	ip = net.ParseIP(ipAddr)
 	if ip == nil {
 		return ip, errors.New("Invalid destination network IP Address")
 	}
 	//ip = ip.To4()
-	//logger.Debug(fmt.Sprintln("ip after ip.to4():", ip))
+	////logger.Debug(fmt.Sprintln("ip after ip.to4():", ip))
 	return ip, nil
 }
 func isZeros(p net.IP) bool {
@@ -725,6 +719,9 @@ func isZeros(p net.IP) bool {
 	return true
 }
 func isIPv4Mask(mask net.IP) bool {
+	/*if len(mask) < 5 {
+		return false
+	}*/
 	if isZeros(mask[0:10]) &&
 		mask[10] == 0xff &&
 		mask[11] == 0xff {
@@ -734,7 +731,7 @@ func isIPv4Mask(mask net.IP) bool {
 }
 
 func getPrefixLen(networkMask net.IP) (prefixLen int, err error) {
-	logger.Debug(fmt.Sprintln("getPrefixLen for networkMask: ", networkMask))
+	//logger.Debug("getPrefixLen for networkMask: ", networkMask)
 	/*	ipInt, err := getIPInt(networkMask)
 		if err != nil {
 			return -1, err
@@ -749,14 +746,14 @@ func getPrefixLen(networkMask net.IP) (prefixLen int, err error) {
 		prefixLen, _ = mask.Size()
 	}
 	//	prefixLen,bits := mask.Size()
-	logger.Debug(fmt.Sprintln("prefixLen = ", prefixLen))
+	//logger.Debug(fmt.Sprintln("prefixLen = ", prefixLen))
 	return prefixLen, err
 }
 func validateNetworkPrefix(ipAddr string, mask string) (destNet patriciaDB.Prefix, err error) {
-	logger.Debug(fmt.Sprintln("validateNetworkPrefix for ip ", ipAddr, " mask: ", mask))
+	//logger.Debug("validateNetworkPrefix for ip ", ipAddr, " mask: ", mask)
 	destNetIp, err := getIP(ipAddr)
 	if err != nil {
-		logger.Err(fmt.Sprintln("destNetIpAddr ", ipAddr, " invalid"))
+		logger.Err("destNetIpAddr ", ipAddr, " invalid")
 		return destNet, err
 	}
 	networkMask, err := getIP(mask)
@@ -766,14 +763,14 @@ func validateNetworkPrefix(ipAddr string, mask string) (destNet patriciaDB.Prefi
 	}
 	prefixLen, err := getPrefixLen(networkMask)
 	if err != nil {
-		logger.Err(fmt.Sprintln("err when getting prefixLen, err= ", err))
+		logger.Err("err when getting prefixLen, err= ", err)
 		return destNet, errors.New(fmt.Sprintln("Invalid networkmask ", networkMask))
 	}
 	vdestMask := net.IPMask(networkMask) //net.IPv4Mask(networkMask[0], networkMask[1], networkMask[2], networkMask[3])
 	netIp := destNetIp.Mask(vdestMask)
-	logger.Debug(fmt.Sprintln("netIP: ", netIp, " destNetIp ", destNetIp))
+	//logger.Debug("netIP: ", netIp, " destNetIp ", destNetIp)
 	if !(bytes.Equal(destNetIp, netIp)) {
-		logger.Err(fmt.Sprintln("Cannot have ip : ", destNetIp, " more specific than mask "))
+		logger.Err("Cannot have ip : ", destNetIp, " more specific than mask ")
 		return destNet, errors.New(fmt.Sprintln("IP address ", destNetIp, " more specific than mask ", networkMask))
 	}
 	numbytes := prefixLen / 8
@@ -786,51 +783,52 @@ func validateNetworkPrefix(ipAddr string, mask string) (destNet patriciaDB.Prefi
 	}
 	return destNet, err
 }
-func getNetworkPrefix(destNetIp net.IP, networkMask net.IP) (destNet patriciaDB.Prefix, err error) {
-	logger.Debug(fmt.Sprintln("getNetworkPrefix for ip: ", destNetIp, "  networkMask: ", networkMask))
+func getNetworkPrefix(destNetIp net.IP, networkMask net.IP) (destNet patriciaDB.Prefix, nwAddr string, err error) {
+	//logger.Debug("getNetworkPrefix for ip: ", destNetIp, "  networkMask: ", networkMask)
 	prefixLen, err := getPrefixLen(networkMask)
 	if err != nil {
-		logger.Err(fmt.Sprintln("err when getting prefixLen, err= ", err))
-		return destNet, errors.New(fmt.Sprintln("Invalid networkmask ", networkMask))
+		logger.Err("err when getting prefixLen, err= ", err)
+		return destNet, nwAddr, errors.New(fmt.Sprintln("Invalid networkmask ", networkMask))
 	}
 	var netIp net.IP
 	vdestMask := net.IPMask(networkMask)
-	logger.Debug(fmt.Sprintln("vdestMask:", vdestMask))
+	//logger.Debug("vdestMask:", vdestMask)
 	if isIPv4Mask(net.IP(vdestMask)) {
 		netIp = destNetIp.Mask(vdestMask[12:16])
-		logger.Debug(fmt.Sprintln("ipv4 case, netIp = ", netIp, " vdestMask:", vdestMask[12:16]))
+		//logger.Debug("ipv4 case, netIp = ", netIp, " vdestMask:", vdestMask[12:16])
 	} else {
 		netIp = destNetIp.Mask(vdestMask)
-		logger.Debug(fmt.Sprintln("ipv6 case, netIp = ", netIp, " vdestMask:", vdestMask))
+		//logger.Debug("ipv6 case, netIp = ", netIp, " vdestMask:", vdestMask)
 	}
 	numbytes := prefixLen / 8
 	if (prefixLen % 8) != 0 {
 		numbytes++
 	}
-	logger.Debug(fmt.Sprintln("getNetworkPrefix: prefixLen  = ", prefixLen, " netIp:", netIp, " numbytes:", numbytes, " len(netIp):", len(netIp)))
+	//logger.Debug("getNetworkPrefix: prefixLen  = ", prefixLen, " netIp:", netIp, " numbytes:", numbytes, " len(netIp):", len(netIp))
 	destNet = make([]byte, numbytes)
 	for i := 0; i < numbytes; i++ {
 		destNet[i] = netIp[i]
-		logger.Debug(fmt.Sprintln("destnet[i]:", destNet[i], " netIp[i]:", netIp[i]))
+		logger.Debug("destnet[i]:", destNet[i], " netIp[i]:", netIp[i])
 	}
-	return destNet, err
+	nwAddr = (destNetIp.Mask(net.IPMask(networkMask))).String() + "/" + strconv.Itoa(prefixLen)
+	return destNet, nwAddr, err
 }
 func getNetowrkPrefixFromStrings(ipAddr string, mask string) (prefix patriciaDB.Prefix, err error) {
-	logger.Debug(fmt.Sprintln("getNetowrkPrefixFromStrings for ip ", ipAddr, " mask: ", mask))
+	//logger.Debug("getNetowrkPrefixFromStrings for ip ", ipAddr, " mask: ", mask)
 	destNetIpAddr, err := getIP(ipAddr)
 	if err != nil {
-		logger.Info(fmt.Sprintln("destNetIpAddr ", ipAddr, " invalid"))
+		logger.Info("destNetIpAddr ", ipAddr, " invalid")
 		return prefix, err
 	}
-	logger.Debug(fmt.Sprintln("getNetworkPrefixFrmStrings:destNetIpAddr:", destNetIpAddr))
+	//logger.Debug("getNetworkPrefixFrmStrings:destNetIpAddr:", destNetIpAddr)
 	networkMaskAddr, err := getIP(mask)
 	if err != nil {
-		logger.Println("networkMaskAddr invalid")
+		logger.Err("networkMaskAddr invalid")
 		return prefix, err
 	}
-	prefix, err = getNetworkPrefix(destNetIpAddr, networkMaskAddr)
+	prefix, _, err = getNetworkPrefix(destNetIpAddr, networkMaskAddr)
 	if err != nil {
-		logger.Info(fmt.Sprintln("err=", err))
+		logger.Info("err=", err)
 		return prefix, err
 	}
 	return prefix, err
@@ -844,8 +842,8 @@ func getNetworkPrefixFromCIDR(ipAddr string) (ipPrefix patriciaDB.Prefix, err er
 	ipMask = make(net.IP, 16)
 	copy(ipMask, ipNet.Mask)
 	ipAddrStr := ip.String()
-	ipMaskStr := net.IP(ipMask).String()
-	ipPrefix, err = getNetowrkPrefixFromStrings(ipAddrStr, ipMaskStr)
+	//ipMaskStr := net.IP(ipMask).String()
+	ipPrefix, err = getNetowrkPrefixFromStrings(ipAddrStr, (net.IP(ipNet.Mask)).String()) //ipMaskStr)
 	return ipPrefix, err
 }
 func getCIDR(ipAddr string, mask string) (addr string, err error) {
@@ -856,18 +854,18 @@ func getCIDR(ipAddr string, mask string) (addr string, err error) {
 	}
 	maskIP, err := getIP(mask)
 	if err != nil {
-		logger.Err(fmt.Sprintln("err in getting mask IP for mask string", mask))
+		logger.Err("err in getting mask IP for mask string", mask)
 		return addr, err
 	}
 	prefixLen, err := getPrefixLen(maskIP)
 	if err != nil {
-		logger.Err(fmt.Sprintln("err in getting prefix len for mask string", mask))
+		logger.Err("err in getting prefix len for mask string", mask)
 		return addr, err
 	}
 	addr = (destNetIpAddr.Mask(net.IPMask(maskIP))).String() + "/" + strconv.Itoa(prefixLen)
 	if isIPv4Mask(maskIP) {
 		addr = (destNetIpAddr.Mask(net.IPMask(maskIP[12:16]))).String() + "/" + strconv.Itoa(prefixLen)
-		logger.Debug(fmt.Sprintln("ipv4 case, addr = ", addr, " maskIP:", maskIP[12:16]))
+		//logger.Debug("ipv4 case, addr = ", addr, " maskIP:", maskIP[12:16])
 	}
 	return addr, err
 }

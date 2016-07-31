@@ -25,7 +25,7 @@ package server
 
 import (
 	"fmt"
-	"net"
+	//"net"
 	"testing"
 )
 
@@ -46,7 +46,7 @@ func TestConvertIntfStrToIfIndexStr(t *testing.T) {
 	fmt.Println("***************************************")
 }
 func TestGetNetworkPrefixFromStrings(t *testing.T) {
-	fmt.Println("****TestGetNetworkPrefixFromCIDR****")
+	fmt.Println("****TestGetNetworkPrefixFromStrings****")
 	ipAddr := "11.1.10.2"
 	mask := "255.255.255.0"
 	ipPrefix, err := getNetowrkPrefixFromStrings(ipAddr, mask)
@@ -91,9 +91,18 @@ func TestValidateNetworkPrefix(t *testing.T) {
 func TestGetPrefixLen(t *testing.T) {
 	fmt.Println("****TestGetPrefixLen()****")
 	ip := "10.1.10.1"
-	prefixLen, err := getPrefixLen(net.IP(ip))
+	netIP, err := getIP(ip)
+	if err != nil {
+		fmt.Println("netIP invalid")
+	}
+	prefixLen, err := getPrefixLen(netIP)
 	fmt.Println("prefixLen,err:", prefixLen, ",", err, " for ip:", ip)
-	//prefixLen, err = getPrefixLen(net.IP{11, 1, 10, 2})
-	//fmt.Println("prefixLen,err:", prefixLen, ",", err, " for ip:11,1,10,2")
+	ip = "255.255.0.0"
+	netIP, err = getIP(ip)
+	if err != nil {
+		fmt.Println("netIP invalid")
+	}
+	prefixLen, err = getPrefixLen(netIP)
+	fmt.Println("prefixLen,err:", prefixLen, ",", err, " for ip:", ip)
 	fmt.Println("**************************")
 }

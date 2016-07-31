@@ -32,6 +32,28 @@ import (
 	"net"
 )
 
+type PACKET_OPERATION byte
+
+const (
+	PACKET_DROP                  PACKET_OPERATION = 1
+	PACKET_PROCESS               PACKET_OPERATION = 2
+	PACKET_FAILED_VALIDATION     PACKET_OPERATION = 3
+	NEIGBOR_SOLICITATED_PACKET   PACKET_OPERATION = 4
+	NEIGBOR_ADVERTISEMENT_PACKET PACKET_OPERATION = 5
+)
+
+type Packet struct {
+	// Neighbor Cache Information
+	NbrCache map[string]NeighborCache
+	//Operation PACKET_OPERATION
+}
+
+func Init() *Packet {
+	pkt := &Packet{}
+	pkt.NbrCache = make(map[string]NeighborCache, 100)
+	return pkt
+}
+
 func getEthLayer(pkt gopacket.Packet, eth *layers.Ethernet) error {
 	ethLayer := pkt.Layer(layers.LayerTypeEthernet)
 	if ethLayer == nil {
@@ -173,7 +195,7 @@ func validateChecksum(srcIP, dstIP net.IP, icmpv6Hdr *layers.ICMPv6) error {
 	return nil
 }
 
-func decodeICMPv6Hdr(hdr *layers.ICMPv6, srcIP net.IP, dstIP net.IP) (*rx.NDInfo, error) {
+func (p *Packet) decodeICMPv6Hdr(hdr *layers.ICMPv6, srcIP net.IP, dstIP net.IP) (*rx.NDInfo, error) {
 	ndInfo := &rx.NDInfo{}
 	typeCode := hdr.TypeCode
 	if typeCode.Code() != ICMPv6_CODE {
@@ -186,11 +208,31 @@ func decodeICMPv6Hdr(hdr *layers.ICMPv6, srcIP net.IP, dstIP net.IP) (*rx.NDInfo
 			return nil, errors.New(fmt.Sprintln("Targent Address specified", ndInfo.TargetAddress,
 				"is a multicast address"))
 		}
-		err := rx.ValidateNDSIpAddrs(srcIP, dstIP)
+		err := rx.ValidateNDSInfo(srcIP, dstIP, ndInfo.Options)
 		if err != nil {
 			return nil, err
 		}
-
+		// if source ip is not "::" then only we should update the nbrCache
+		if !srcIP.IsUnspecified() {
+			cache, exists := p.NbrCache[ndInfo.TargetAddress.String()]
+			if exists {
+				// @TODO: need to do something like updating timer or what not
+			}
+			// In this case check for Source Link Layer Option... if specified then mark the state as
+			// reachable and create neighbor entry in the platform
+			if len(ndInfo.Options) > 0 {
+				for _, option := range ndInfo.Options {
+					if option.Type == rx.NDOptionTypeSourceLinkLayerAddress {
+						cache.State = REACHABLE
+						mac := net.HardwareAddr(option.Value)
+						cache.LinkLayerAddress = mac.String()
+					}
+				}
+			} else {
+				cache.State = INCOMPLETE
+			}
+			p.NbrCache[ndInfo.TargetAddress.String()] = cache
+		}
 	case layers.ICMPv6TypeNeighborAdvertisement:
 		rx.DecodeNDInfo(hdr.LayerPayload(), ndInfo)
 		if rx.IsTargetMulticast(ndInfo.TargetAddress) {
@@ -201,6 +243,20 @@ func decodeICMPv6Hdr(hdr *layers.ICMPv6, srcIP net.IP, dstIP net.IP) (*rx.NDInfo
 		if err != nil {
 			return nil, err
 		}
+		cache, exists := p.NbrCache[ndInfo.TargetAddress.String()]
+		if !exists {
+			//@TODO: need to drop advertisement packet??
+		}
+		cache.State = REACHABLE
+		if len(ndInfo.Options) > 0 {
+			for _, option := range ndInfo.Options {
+				if option.Type == rx.NDOptionTypeTargetLinkLayerAddress {
+					mac := net.HardwareAddr(option.Value)
+					cache.LinkLayerAddress = mac.String()
+				}
+			}
+		}
+		p.NbrCache[ndInfo.TargetAddress.String()] = cache
 
 	case layers.ICMPv6TypeRouterSolicitation:
 		return nil, errors.New("Router Solicitation is not yet supported")
@@ -210,7 +266,7 @@ func decodeICMPv6Hdr(hdr *layers.ICMPv6, srcIP net.IP, dstIP net.IP) (*rx.NDInfo
 	return ndInfo, nil
 }
 
-func populateNeighborInfo(nbrInfo *config.NeighborInfo, eth *layers.Ethernet, ipv6Hdr *layers.IPv6,
+func (p *Packet) populateNeighborInfo(nbrInfo *config.NeighborInfo, eth *layers.Ethernet, ipv6Hdr *layers.IPv6,
 	icmpv6Hdr *layers.ICMPv6, ndInfo *rx.NDInfo) {
 	if eth == nil || ipv6Hdr == nil || icmpv6Hdr == nil {
 		return
@@ -218,6 +274,11 @@ func populateNeighborInfo(nbrInfo *config.NeighborInfo, eth *layers.Ethernet, ip
 	nbrInfo.MacAddr = (eth.SrcMAC).String()
 	nbrInfo.IpAddr = (ipv6Hdr.SrcIP).String()
 	nbrInfo.LinkLocalIp = ndInfo.TargetAddress.String()
+	if entry, exists := p.NbrCache[ndInfo.TargetAddress.String()]; exists {
+		nbrInfo.State = entry.State
+	} else {
+		nbrInfo.PktOperation = byte(PACKET_DROP)
+	}
 }
 
 /* API: Get IPv6 & ICMPv6 Header
@@ -243,7 +304,7 @@ func populateNeighborInfo(nbrInfo *config.NeighborInfo, eth *layers.Ethernet, ip
  *  - If the IP source address is the unspecified address, there is no
  *    source link-layer address option in the message. <- @TODO: need to be done later
  */
-func ValidateAndParse(nbrInfo *config.NeighborInfo, pkt gopacket.Packet) error {
+func (p *Packet) ValidateAndParse(nbrInfo *config.NeighborInfo, pkt gopacket.Packet) error {
 	// first decode all the layers
 	icmpv6Hdr := &layers.ICMPv6{}
 	ipv6Hdr := &layers.IPv6{}
@@ -269,7 +330,7 @@ func ValidateAndParse(nbrInfo *config.NeighborInfo, pkt gopacket.Packet) error {
 	}
 
 	// Validating icmpv6 header
-	ndInfo, err := decodeICMPv6Hdr(icmpv6Hdr, ipv6Hdr.SrcIP, ipv6Hdr.DstIP)
+	ndInfo, err := p.decodeICMPv6Hdr(icmpv6Hdr, ipv6Hdr.SrcIP, ipv6Hdr.DstIP)
 	if err != nil {
 		return err
 	}
@@ -281,6 +342,6 @@ func ValidateAndParse(nbrInfo *config.NeighborInfo, pkt gopacket.Packet) error {
 	}
 
 	// Populate Neighbor Information
-	populateNeighborInfo(nbrInfo, eth, ipv6Hdr, icmpv6Hdr, ndInfo)
+	p.populateNeighborInfo(nbrInfo, eth, ipv6Hdr, icmpv6Hdr, ndInfo)
 	return nil
 }
