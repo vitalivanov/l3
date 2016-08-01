@@ -38,54 +38,71 @@ func (l *Link) Init() {
 
 /*
  * for a given link local ip address return the link information
+ * link should be created via InitLink only... and it should be accessed in non-CIDR format
  */
 func (p *Packet) GetLink(localIP string) (Link, bool) {
 	debug.Logger.Info("getlink called for", localIP)
-	ip, _, err := net.ParseCIDR(localIP)
-	if err != nil {
-		debug.Logger.Err("ParseCIDR failed for", localIP, "error:", err, "and hence using", localIP, "as key")
-		// if we get nda packet directly or during unit test... on error rather than crashing
-		// we will create an entry in link map using the localIP
-		link, exists := p.LinkInfo[localIP]
-		if !exists {
-			link.Init()
+	/*
+		ip, _, err := net.ParseCIDR(localIP)
+		if err != nil {
+			debug.Logger.Err("ParseCIDR failed for", localIP, "error:", err, "and hence using", localIP,
+				"as key")
+			// if we get nda packet directly or during unit test... on error rather than crashing
+			// we will create an entry in link map using the localIP
+			link, exists := p.LinkInfo[localIP]
+			if !exists {
+				link.Init()
+			}
+			return link, exists
 		}
-		return link, exists
-	}
-	debug.Logger.Info("ParseCIDR success using", ip.String(), "as key")
-	link, exists := p.LinkInfo[ip.String()]
-	if !exists {
-		link.Init()
-	}
+		debug.Logger.Info("ParseCIDR success using", ip.String(), "as key")
+		link, exists := p.LinkInfo[ip.String()]
+	*/
+	link, exists := p.LinkInfo[localIP]
 	return link, exists
 }
 
 /*
- * Link has been modified update map entry with latest link information
+ * Link has been modified update map entry with latest link information, this should only accept non-CIDR
+ * ip address format
  */
 func (p *Packet) SetLink(localIP string, link Link) {
-	ip, _, err := net.ParseCIDR(localIP)
-	if err != nil {
-		debug.Logger.Err("ParseCIDR failed for", localIP, "error:", err, "and hence using", localIP, "as key")
-		// if we get nda packet directly or during unit test... on error rather than crashing
-		// we will create an entry in link map using the localIP
-		p.LinkInfo[localIP] = link
-	} else {
-		p.LinkInfo[ip.String()] = link
-	}
+	p.LinkInfo[localIP] = link
+	/*
+		ip, _, err := net.ParseCIDR(localIP)
+		if err != nil {
+			debug.Logger.Err("ParseCIDR failed for", localIP, "error:", err, "and hence using", localIP,
+				"as key")
+			// if we get nda packet directly or during unit test... on error rather than crashing
+			// we will create an entry in link map using the localIP
+			p.LinkInfo[localIP] = link
+		} else {
+			p.LinkInfo[ip.String()] = link
+		}
+	*/
 }
 
 /*
  * Init Link information with IP Address, PortIfIndex, PortMacAddress, API is called when ip interface
- * is created
+ * is created. Input is expected to be in CIDR format only. This will be called during ip link create
  */
 func (p *Packet) InitLink(ifIndex int32, ip, mac string) {
 	debug.Logger.Info("Initializing link with ifIndex:", ifIndex, "ip:", ip, "mac:", mac)
-	link, _ := p.GetLink(ip)
+	localIP, _, err := net.ParseCIDR(ip)
+	if err != nil {
+		debug.Logger.Err("Creating link for ip:", ip, "mac:", mac, "ifIndex:", ifIndex,
+			"failed with error:", err)
+		return
+	}
+	link, exists := p.LinkInfo[localIP.String()]
+	if !exists {
+		link.Init()
+	}
+	//	link, _ := p.GetLink(ip)
 	link.PortIfIndex = ifIndex
 	link.LinkLocalAddress = mac
 	// @TODO: need to get RETRANS_TIMER from config
 	link.RetransTimer = 1000
-	p.SetLink(ip, link)
+	p.SetLink(localIP.String(), link)
 	debug.Logger.Info("Packet Link Info is", p.LinkInfo)
 }

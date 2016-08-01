@@ -297,6 +297,9 @@ var lotsOfZeros [1024]byte
 
 func TestDecodeNDA(t *testing.T) {
 	initTestPacket()
+	testPktObj.InitLink(100, "ff02::1/64", "00:e0:ec:26:a7:ee")
+	addTestNbrEntry("ff02::1", "2002::2")
+	//dumpLinkInfo(t)
 	p := gopacket.NewPacket(ndaPkt, layers.LinkTypeEthernet, gopacket.Default)
 	if p.ErrorLayer() != nil {
 		t.Error("Failed to decode packet:", p.ErrorLayer().Error())
@@ -309,7 +312,6 @@ func TestDecodeNDA(t *testing.T) {
 	if err != nil {
 		t.Error("Decoding ipv6 and icmpv6 header failed", err)
 	}
-	//dumpLinkInfo(t)
 	nda, err := pkt.decodeICMPv6Hdr(icmpv6Hdr, ipv6Hdr.SrcIP, ipv6Hdr.DstIP)
 	if err != nil {
 		t.Error("Validating ICMPv6 Header failed:", err)
@@ -357,6 +359,8 @@ func TestPseudoChecksumBuf(t *testing.T) {
 
 func TestNDAChecksum(t *testing.T) {
 	initTestPacket()
+	testPktObj.InitLink(100, "ff02::1/64", "00:e0:ec:26:a7:ee")
+	addTestNbrEntry("ff02::1", "2002::2")
 	p := gopacket.NewPacket(ndaPkt, layers.LinkTypeEthernet, gopacket.Default)
 	if p.ErrorLayer() != nil {
 		t.Error("Failed to decode packet:", p.ErrorLayer().Error())
@@ -420,6 +424,8 @@ func TestUnSupportedICMPv6(t *testing.T) {
 
 func TestValidateNDAPkt(t *testing.T) {
 	initTestPacket()
+	testPktObj.InitLink(100, "ff02::1/64", "00:e0:ec:26:a7:ee")
+	addTestNbrEntry("ff02::1", "2002::2")
 	p := gopacket.NewPacket(ndaPkt, layers.LinkTypeEthernet, gopacket.Default)
 	if p.ErrorLayer() != nil {
 		t.Error("Failed to decode packet:", p.ErrorLayer().Error())
@@ -441,6 +447,9 @@ func TestValidateNDAPkt(t *testing.T) {
 
 func TestNDSOption(t *testing.T) {
 	initTestPacket()
+	testPktObj.InitLink(100, "2002::1/64", "00:e0:ec:26:a7:ee")
+	addTestNbrEntry("2002::1", "2002::2")
+	//dumpLinkInfo(t)
 	ndsSourceTestPkt := []byte{0x33, 0x33, 0xff, 0x00, 0x00, 0x01, 0xd8, 0xeb, 0x97, 0xb6, 0x49, 0x7a, 0x86, 0xdd, 0x60, 0x00,
 		0x00, 0x00, 0x00, 0x20, 0x3a, 0xff, 0x20, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,

@@ -28,6 +28,7 @@ import (
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"l3/ndp/config"
+	"l3/ndp/debug"
 	"net"
 )
 
@@ -122,6 +123,7 @@ func (p *Packet) populateNeighborInfo(nbrInfo *config.NeighborInfo, eth *layers.
 	if eth == nil || ipv6Hdr == nil || icmpv6Hdr == nil {
 		return
 	}
+	debug.Logger.Info("populate neighbor called:", nbrInfo, *eth, *ipv6Hdr, *icmpv6Hdr, *ndInfo)
 	nbrInfo.MacAddr = (eth.SrcMAC).String()
 	nbrInfo.IpAddr = (ipv6Hdr.SrcIP).String()
 	nbrInfo.LinkLocalIp = ndInfo.TargetAddress.String()

@@ -65,7 +65,10 @@ func addTestNbrEntry(ipAddr string, peerIP string) {
 		State:            REACHABLE,
 		LinkLayerAddress: "aa:bb:cc:dd:ee:ff",
 	}
-	link, _ := testPktObj.GetLink(ipAddr)
+	link, exists := testPktObj.GetLink(ipAddr)
+	if !exists {
+		return
+	}
 	link.NbrCache[peerIP] = cache
 	testPktObj.SetLink(ipAddr, link)
 }
@@ -91,9 +94,9 @@ func TestNDSMsgSend(t *testing.T) {
 	ipAddr := "2002::1"
 	initTestPacket()
 	testPktObj.InitLink(100, "2002::1/64", "00:e0:ec:26:a7:ee")
-	addTestNbrEntry(ipAddr+"/64", "2002::2")
-	initPcapHandlerForTest(t)
 	//dumpLinkInfo(t)
+	addTestNbrEntry(ipAddr, "2002::2")
+	initPcapHandlerForTest(t)
 	var err error
 	err = testPktObj.SendNSMsgIfRequired(ipAddr, testPcapHdl)
 	if err == nil {
@@ -114,12 +117,12 @@ func TestNeighborCacheReTransmitTimer(t *testing.T) {
 	sip := "2002::1/64"
 	dip := "2002::2/64"
 	ipD, _, _ := net.ParseCIDR(dip)
+	ipS, _, _ := net.ParseCIDR(sip)
 	srcMac := "00:e0:ec:26:a7:ee"
 	initTestPacket()
 	testPktObj.InitLink(100, sip, srcMac)
-	addTestNbrEntry(sip, ipD.String())
+	addTestNbrEntry(ipS.String(), ipD.String())
 	pktCh := make(chan config.PacketData, 3)
-	ipS, _, _ := net.ParseCIDR(sip)
 	link, _ := testPktObj.GetLink(ipS.String())
 	cache, exists := link.NbrCache[ipD.String()]
 	if !exists {

@@ -49,8 +49,8 @@ func (nd *NDInfo) ValidateNDSInfo(srcIP net.IP, dstIP net.IP) error {
 		if len(options) > 0 {
 			for _, option := range options {
 				if option.Type == NDOptionTypeSourceLinkLayerAddress {
-					return errors.New(fmt.Sprintln("During ND Solicitation with Unspecified address",
-						"Source Link Layer Option should not be set"))
+					return errors.New(fmt.Sprintln("During ND Solicitation with Unspecified",
+						"address Source Link Layer Option should not be set"))
 				}
 			}
 		}
@@ -168,24 +168,31 @@ func (p *Packet) HandleNSMsg(hdr *layers.ICMPv6, srcIP, dstIP net.IP) (*NDInfo, 
 	if err != nil {
 		return nil, err
 	}
-	debug.Logger.Info("NS: Searching for SrcIP:", srcIP.String(), "or TargetAddress:", ndInfo.TargetAddress.String())
 	// if source ip is not "::" then only we should update the nbrCache...
 	// In this case Target Address is our own IP Address
 	if !srcIP.IsUnspecified() {
 		// Checking is the src ip address is my own IP address, if so then get mylink directly
+		debug.Logger.Info("NS: Searching for my link informating using SrcIP:", srcIP.String())
 		myLink, exists := p.LinkInfo[srcIP.String()]
 		if exists {
 			// my own IP address is sending NS packet...for now update the state to STALE for
 			//neighbor cache
 			cache := myLink.NbrCache[ndInfo.TargetAddress.String()]
 			cache.State = STALE
-			cache.Timer(myLink.PortIfIndex, srcIP.String(), ndInfo.TargetAddress.String(), myLink.RetransTimer, p.PktCh)
+			cache.Timer(myLink.PortIfIndex, srcIP.String(), ndInfo.TargetAddress.String(),
+				myLink.RetransTimer, p.PktCh)
 			myLink.NbrCache[ndInfo.TargetAddress.String()] = cache
 			p.SetLink(srcIP.String(), myLink)
-			debug.Logger.Info("MYNS: nbrCach (key, value) ---> (", ndInfo.TargetAddress.String(), ",", cache, ")")
+			debug.Logger.Info("MYNS: nbrCach (key, value) ---> (", ndInfo.TargetAddress.String(),
+				",", cache, ")")
 		} else {
 			// If it is not my own ip then use Target Address to get link information
-			link, _ := p.GetLink(ndInfo.TargetAddress.String())
+			debug.Logger.Info("NS: Searching for link informating using TargetAddress:",
+				ndInfo.TargetAddress.String())
+			link, found := p.GetLink(ndInfo.TargetAddress.String())
+			if !found {
+				return nil, errors.New("No link found for:" + ndInfo.TargetAddress.String())
+			}
 			cache, exists := link.NbrCache[srcIP.String()]
 			if exists {
 				// @TODO: need to do something like updating timer or what not
@@ -203,7 +210,8 @@ func (p *Packet) HandleNSMsg(hdr *layers.ICMPv6, srcIP, dstIP net.IP) (*NDInfo, 
 			} else {
 				cache.State = INCOMPLETE
 			}
-			cache.Timer(myLink.PortIfIndex, ndInfo.TargetAddress.String(), srcIP.String(), myLink.RetransTimer, p.PktCh)
+			cache.Timer(link.PortIfIndex, ndInfo.TargetAddress.String(), srcIP.String(),
+				link.RetransTimer, p.PktCh)
 			debug.Logger.Info("PEERNS: nbrCach (key, value) ---> (", srcIP.String(), ",", cache, ")")
 			link.NbrCache[srcIP.String()] = cache
 			p.SetLink(ndInfo.TargetAddress.String(), link)

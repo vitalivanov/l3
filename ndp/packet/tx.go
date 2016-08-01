@@ -50,8 +50,8 @@ func (p *Packet) SendNSMsgIfRequired(ipAddr string, pHdl *pcap.Handle) error {
 		return nil
 	}
 	debug.Logger.Info("link info", link, "ip address", ip)
-	//pktToSend := ConstructNSPacket(ip.String(), "::", link.LinkLocalAddress, IPV6_ICMPV6_MULTICAST_DST_MAC, ip)
-	pktToSend := ConstructNSPacket(link.LinkLocalAddress, IPV6_ICMPV6_MULTICAST_DST_MAC, ip.String(), SOLICITATED_NODE_ADDRESS)
+	pktToSend := ConstructNSPacket(link.LinkLocalAddress, IPV6_ICMPV6_MULTICAST_DST_MAC, ip.String(),
+		SOLICITATED_NODE_ADDRESS)
 	debug.Logger.Info("sending pkt from link", link.LinkLocalAddress, "bytes are:", pktToSend)
 	return p.SendNDPkt(pktToSend, pHdl)
 }
@@ -78,7 +78,8 @@ func (p *Packet) SendNDPkt(pkt []byte, pHdl *pcap.Handle) error {
 func (p *Packet) SendUnicastNeighborSolicitation(srcIP, dstIP string, pHdl *pcap.Handle) error {
 	link, exists := p.GetLink(srcIP)
 	if !exists {
-		debug.Logger.Err("Sending Unicast NS Failed as link entry for ipAddr", srcIP, "not found in linkInfo.")
+		debug.Logger.Err("Sending Unicast NS Failed as link entry for ipAddr", srcIP,
+			"not found in linkInfo.")
 		return errors.New(fmt.Sprintln("Sending Unicast NS Failed as link entry for ipAddr", srcIP,
 			"not found in linkInfo."))
 	}

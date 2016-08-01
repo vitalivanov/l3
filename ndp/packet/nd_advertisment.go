@@ -40,8 +40,8 @@ func (nd *NDInfo) ValidateNDAInfo(icmpFlags []byte, dstIP net.IP) error {
 	if dstIP.IsMulticast() {
 		flags := binary.BigEndian.Uint16(icmpFlags[0:2])
 		if (flags & 0x4000) == 0x4000 {
-			return errors.New(fmt.Sprintln("Check for If Destination Address is a multicast address then",
-				"the Solicited flag is zero, Failed"))
+			return errors.New(fmt.Sprintln("Check for If Destination Address is a multicast",
+				"address then the Solicited flag is zero, Failed"))
 		}
 	}
 	// @TODO: need to add support for options length
@@ -68,20 +68,29 @@ func (p *Packet) HandleNAMsg(hdr *layers.ICMPv6, srcIP, dstIP net.IP) (*NDInfo, 
 	if err != nil {
 		return nil, err
 	}
-	debug.Logger.Info("NA: Searching for NbrCache srcIP:", srcIP.String(), "or dstIP:", dstIP.String())
 
 	// if my own ip is srcIP
-	myLink, exists := p.GetLink(srcIP.String()) //p.LinkInfo[srcIP.String()]
+	debug.Logger.Info("NA: Searching for my link informating using SrcIP:", srcIP.String())
+	myLink, exists := p.GetLink(srcIP.String())
 	if exists {
 		cache := myLink.NbrCache[dstIP.String()]
+		cache.Timer(myLink.PortIfIndex, srcIP.String(), dstIP.String(),
+			myLink.RetransTimer, p.PktCh)
 		cache.State = REACHABLE
 		debug.Logger.Info("MYOWNNA: nbrCach (key, value) ---> (", dstIP.String(), ",", cache, ")")
+		myLink.NbrCache[dstIP.String()] = cache
+		p.SetLink(srcIP.String(), myLink)
 	} else {
-		link, _ := p.GetLink(dstIP.String()) //p.LinkInfo[dstIP.String()]
+		debug.Logger.Info("NA: Searching for link information using dstIP:", dstIP.String())
+		link, found := p.GetLink(dstIP.String())
+		if !found {
+			return nil, errors.New("No link found for:" + dstIP.String())
+		}
 		cache, exists := link.NbrCache[srcIP.String()]
 		if !exists {
 			//@TODO: need to drop advertisement packet??
 		}
+		cache.Timer(link.PortIfIndex, dstIP.String(), srcIP.String(), link.RetransTimer, p.PktCh)
 		cache.State = REACHABLE
 		if len(ndInfo.Options) > 0 {
 			for _, option := range ndInfo.Options {
@@ -93,7 +102,7 @@ func (p *Packet) HandleNAMsg(hdr *layers.ICMPv6, srcIP, dstIP net.IP) (*NDInfo, 
 		}
 		debug.Logger.Info("PEERNA: nbrCach (key, value) ---> (", srcIP.String(), ",", cache, ")")
 		link.NbrCache[srcIP.String()] = cache
-		p.SetLink(ndInfo.TargetAddress.String(), link)
+		p.SetLink(dstIP.String(), link)
 	}
 	return ndInfo, nil
 }

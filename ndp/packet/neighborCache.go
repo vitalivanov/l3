@@ -34,6 +34,7 @@ import (
 func (c *NeighborCache) Timer(ifIndex int32, linkIp, nbrIP string, timeValueInMS int, pktCh chan config.PacketData) {
 	// Reset the timer if it is already running when we receive Neighbor Solicitation
 	if c.RetransTimer != nil {
+		debug.Logger.Info("Resetting timer for ifIndex:", ifIndex, "linkIp:", linkIp, "nbrIp:", nbrIP)
 		c.RetransTimer.Reset(time.Duration(timeValueInMS) * time.Millisecond)
 	} else {
 		// start the time for the first... provide an after func and move on
