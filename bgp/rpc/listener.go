@@ -29,6 +29,7 @@ import (
 	"errors"
 	"fmt"
 	"l3/bgp/config"
+	"l3/bgp/packet"
 	bgppolicy "l3/bgp/policy"
 	"l3/bgp/server"
 	"models/objects"
@@ -397,10 +398,17 @@ func (h *BGPHandler) validateBGPGlobal(bgpGlobal *bgpd.BGPGlobal) (gConf config.
 		return gConf, err
 	}
 
+	asNum := uint32(bgpGlobal.ASNum)
+	if asNum == 0 || asNum == uint32(packet.BGPASTrans) {
+		err = errors.New(fmt.Sprintf("BGPGlobal: AS number %d is not valid", bgpGlobal.ASNum))
+		h.logger.Info("SendBGPGlobal: AS number", bgpGlobal.ASNum, "is not valid")
+		return gConf, err
+	}
+
 	ip := h.convertStrIPToNetIP(bgpGlobal.RouterId)
 	if ip == nil {
-		err = errors.New(fmt.Sprintf("BGPGlobal: IP %s is not valid", bgpGlobal.RouterId))
-		h.logger.Info("SendBGPGlobal: IP", bgpGlobal.RouterId, "is not valid")
+		err = errors.New(fmt.Sprintf("BGPGlobal: Router id %s is not valid", bgpGlobal.RouterId))
+		h.logger.Info("SendBGPGlobal: Router id", bgpGlobal.RouterId, "is not valid")
 		return gConf, err
 	}
 
