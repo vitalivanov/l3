@@ -41,23 +41,7 @@ func (l *Link) Init() {
  * link should be created via InitLink only... and it should be accessed in non-CIDR format
  */
 func (p *Packet) GetLink(localIP string) (Link, bool) {
-	debug.Logger.Info("getlink called for", localIP)
-	/*
-		ip, _, err := net.ParseCIDR(localIP)
-		if err != nil {
-			debug.Logger.Err("ParseCIDR failed for", localIP, "error:", err, "and hence using", localIP,
-				"as key")
-			// if we get nda packet directly or during unit test... on error rather than crashing
-			// we will create an entry in link map using the localIP
-			link, exists := p.LinkInfo[localIP]
-			if !exists {
-				link.Init()
-			}
-			return link, exists
-		}
-		debug.Logger.Info("ParseCIDR success using", ip.String(), "as key")
-		link, exists := p.LinkInfo[ip.String()]
-	*/
+	debug.Logger.Debug("getlink called for", localIP)
 	link, exists := p.LinkInfo[localIP]
 	return link, exists
 }
@@ -68,18 +52,6 @@ func (p *Packet) GetLink(localIP string) (Link, bool) {
  */
 func (p *Packet) SetLink(localIP string, link Link) {
 	p.LinkInfo[localIP] = link
-	/*
-		ip, _, err := net.ParseCIDR(localIP)
-		if err != nil {
-			debug.Logger.Err("ParseCIDR failed for", localIP, "error:", err, "and hence using", localIP,
-				"as key")
-			// if we get nda packet directly or during unit test... on error rather than crashing
-			// we will create an entry in link map using the localIP
-			p.LinkInfo[localIP] = link
-		} else {
-			p.LinkInfo[ip.String()] = link
-		}
-	*/
 }
 
 /*
@@ -87,7 +59,7 @@ func (p *Packet) SetLink(localIP string, link Link) {
  * is created. Input is expected to be in CIDR format only. This will be called during ip link create
  */
 func (p *Packet) InitLink(ifIndex int32, ip, mac string) {
-	debug.Logger.Info("Initializing link with ifIndex:", ifIndex, "ip:", ip, "mac:", mac)
+	debug.Logger.Debug("Initializing link with ifIndex:", ifIndex, "ip:", ip, "mac:", mac)
 	localIP, _, err := net.ParseCIDR(ip)
 	if err != nil {
 		debug.Logger.Err("Creating link for ip:", ip, "mac:", mac, "ifIndex:", ifIndex,
@@ -98,11 +70,11 @@ func (p *Packet) InitLink(ifIndex int32, ip, mac string) {
 	if !exists {
 		link.Init()
 	}
-	//	link, _ := p.GetLink(ip)
 	link.PortIfIndex = ifIndex
 	link.LinkLocalAddress = mac
-	// @TODO: need to get RETRANS_TIMER from config
+	// @TODO: need to get RETRANS_TIMER & REACHABLE_TIMER from config
 	link.RetransTimer = 1000
+	link.ReachableTime = 30000
 	p.SetLink(localIP.String(), link)
-	debug.Logger.Info("Packet Link Info is", p.LinkInfo)
+	debug.Logger.Debug("Packet Link Info is", p.LinkInfo)
 }

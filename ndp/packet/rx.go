@@ -96,15 +96,22 @@ func validateIPv6Hdr(hdr *layers.IPv6) error {
 func (p *Packet) decodeICMPv6Hdr(hdr *layers.ICMPv6, srcIP net.IP, dstIP net.IP) (*NDInfo, error) {
 	ndInfo := &NDInfo{}
 	var err error
+	// Validating checksum received
+	err = validateChecksum(srcIP, dstIP, hdr)
+	if err != nil {
+		return nil, err
+	}
 	typeCode := hdr.TypeCode
 	if typeCode.Code() != ICMPV6_CODE {
 		return nil, errors.New(fmt.Sprintln("Invalid Code", typeCode.Code()))
 	}
 	switch typeCode.Type() {
 	case layers.ICMPv6TypeNeighborSolicitation:
+		debug.Logger.Debug("Neigbor Solicitation Received from", srcIP, "---->", dstIP)
 		ndInfo, err = p.HandleNSMsg(hdr, srcIP, dstIP)
 
 	case layers.ICMPv6TypeNeighborAdvertisement:
+		debug.Logger.Debug("Neigbor Advertisemnt  Received from", srcIP, "---->", dstIP)
 		ndInfo, err = p.HandleNAMsg(hdr, srcIP, dstIP)
 
 	case layers.ICMPv6TypeRouterSolicitation:
@@ -123,16 +130,14 @@ func (p *Packet) populateNeighborInfo(nbrInfo *config.NeighborInfo, eth *layers.
 	if eth == nil || ipv6Hdr == nil || icmpv6Hdr == nil {
 		return
 	}
-	debug.Logger.Info("populate neighbor called:", nbrInfo, *eth, *ipv6Hdr, *icmpv6Hdr, *ndInfo)
-	nbrInfo.MacAddr = (eth.SrcMAC).String()
-	nbrInfo.IpAddr = (ipv6Hdr.SrcIP).String()
-	nbrInfo.LinkLocalIp = ndInfo.TargetAddress.String()
-	// Update Link information and Neigbor Cache with state
-	link, _ := p.GetLink(ndInfo.TargetAddress.String())
-	if entry, exists := link.NbrCache[ipv6Hdr.SrcIP.String()]; exists {
-		nbrInfo.State = entry.State
-	} else {
-		nbrInfo.PktOperation = byte(PACKET_DROP)
+	debug.Logger.Debug("populate neighbor called:", eth.SrcMAC, eth.DstMAC, ipv6Hdr.SrcIP.String(),
+		ipv6Hdr.DstIP.String(), ndInfo.TargetAddress.String())
+
+	switch icmpv6Hdr.TypeCode.Type() {
+	case layers.ICMPv6TypeNeighborSolicitation:
+		*nbrInfo = p.GetNbrInfoUsingNSPkt(eth, ipv6Hdr, ndInfo)
+	case layers.ICMPv6TypeNeighborAdvertisement:
+		*nbrInfo = p.GetNbrInfoUsingNAPkt(eth, ipv6Hdr, ndInfo)
 	}
 }
 
@@ -190,12 +195,13 @@ func (p *Packet) ValidateAndParse(nbrInfo *config.NeighborInfo, pkt gopacket.Pac
 		return err
 	}
 
-	// Validating checksum received
-	err = validateChecksum(ipv6Hdr.SrcIP, ipv6Hdr.DstIP, icmpv6Hdr)
-	if err != nil {
-		return err
-	}
-
+	/*
+		// Validating checksum received
+		err = validateChecksum(ipv6Hdr.SrcIP, ipv6Hdr.DstIP, icmpv6Hdr)
+		if err != nil {
+			return err
+		}
+	*/
 	// Populate Neighbor Information
 	p.populateNeighborInfo(nbrInfo, eth, ipv6Hdr, icmpv6Hdr, ndInfo)
 	return nil

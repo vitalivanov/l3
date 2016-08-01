@@ -287,6 +287,9 @@ func checkICMPv6Layer(hdr *layers.ICMPv6, wantICMPv6Hdr *testICMPv6, t *testing.
 func TestValidateNDSPktForEncode(t *testing.T) {
 	initTestPacket()
 	pkt := testPktObj
+	pkt.InitLink(100, "2002::1/64", "00:e0:ec:26:a7:ee")
+	addTestNbrEntryWithMac("2002::1", "::", "00:e0:ec:26:a7:ee")
+	//dumpLinkInfo(t)
 	p := gopacket.NewPacket(ndsTest, layers.LinkTypeEthernet, gopacket.Default)
 	if p.ErrorLayer() != nil {
 		t.Error("Failed to decode packet:", p.ErrorLayer().Error())
@@ -303,6 +306,11 @@ func TestValidateNDSPktForEncode(t *testing.T) {
 	if nbrInfo.IpAddr != "::" {
 		t.Error("src ip address copy failed")
 	}
+	if nbrInfo.IfIndex != 100 {
+		t.Error("ifIndex is overwritten")
+	}
+	testPktObj.LinkInfo = nil
+	testPktObj = nil
 }
 
 func TestConstructMulticastNSPacket(t *testing.T) {

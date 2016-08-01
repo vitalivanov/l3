@@ -56,18 +56,31 @@ const (
 	NDOptionTypeMTU                    NDOptionType = 5
 )
 
+type ParentLinkInfo struct {
+	IfIndex  int32
+	IpAddr   string
+	ReturnCh chan config.PacketData
+}
+
 type NeighborCache struct {
-	RetransTimer     *time.Timer
-	State            int
-	LinkLayerAddress string // this is our neighbor port mac address
+	BaseReachableTimer  float32
+	RetransTimerConfig  uint32
+	ReachableTimeConfig uint32
+	RecomputeBaseTimer  *time.Timer
+	ReachableTimer      *time.Timer
+	RetransTimer        *time.Timer
+	State               int
+	LinkLayerAddress    string // this is our neighbor port mac address
+	IpAddr              string
+	MyLinkInfo          *ParentLinkInfo
 }
 
 type Link struct {
 	NbrCache         map[string]NeighborCache
 	PortIfIndex      int32
 	LinkLocalAddress string // This is our link local mac address
-	RetransTimer     int    // User should enter the value in mili-seconds
-	ReachableTime    int    // @TODO for future
+	RetransTimer     uint32 // User should enter the value in mili-seconds
+	ReachableTime    uint32 // @TODO for future
 }
 
 type Packet struct {
@@ -93,6 +106,9 @@ const (
 	ICMPV6_SOURCE_LINK_LAYER_LENGTH uint16 = 8
 	SOLICITATED_NODE_ADDRESS               = "ff02::1:ff00:0000"
 	SOLICITATED_SRC_IP                     = "::"
+	MIN_RANDOM_FACTOR                      = 0.5
+	MAX_RANDOM_FACTOR                      = 1.5
+	RECOMPUTE_BASE_REACHABLE_TIMER         = 1 // this is in hour
 )
 
 /*

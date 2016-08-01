@@ -28,6 +28,7 @@ import (
 	"fmt"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
+	"l3/ndp/config"
 	"l3/ndp/debug"
 	"net"
 	"strings"
@@ -84,7 +85,7 @@ func ConstructNSPacket(srcMac, dstMac, srcIP, dstIP string) []byte {
 		DstMAC:       dstMAC,
 		EthernetType: layers.EthernetTypeIPv6,
 	}
-	debug.Logger.Info("ethernet layer is", *eth)
+	debug.Logger.Debug("ethernet layer is", *eth)
 
 	// IPv6 Layer Information
 	sip := net.ParseIP(srcIP)
@@ -112,7 +113,7 @@ func ConstructNSPacket(srcMac, dstMac, srcIP, dstIP string) []byte {
 		DstIP:        dip,
 		HopLimit:     HOP_LIMIT,
 	}
-	debug.Logger.Info("ipv6 layer is", *ipv6)
+	debug.Logger.Debug("ipv6 layer is", *ipv6)
 	// ICMPV6 Layer Information
 	payload := make([]byte, ICMPV6_MIN_LENGTH)
 	payload[0] = byte(layers.ICMPv6TypeNeighborSolicitation)
@@ -131,9 +132,9 @@ func ConstructNSPacket(srcMac, dstMac, srcIP, dstIP string) []byte {
 	payload = append(payload, srcOption.Length)
 	payload = append(payload, srcOption.Value...)
 	binary.BigEndian.PutUint16(payload[2:4], getCheckSum(ipv6, payload))
-	debug.Logger.Info("icmpv6 info is", payload)
+	debug.Logger.Debug("icmpv6 info is", payload)
 	ipv6.Length = uint16(len(payload))
-	debug.Logger.Info("ipv6 layer is", *ipv6)
+	debug.Logger.Debug("ipv6 layer is", *ipv6)
 	// GoPacket serialized buffer that will be used to send out raw bytes
 	buffer := gopacket.NewSerializeBuffer()
 	options := gopacket.SerializeOptions{
@@ -172,22 +173,26 @@ func (p *Packet) HandleNSMsg(hdr *layers.ICMPv6, srcIP, dstIP net.IP) (*NDInfo, 
 	// In this case Target Address is our own IP Address
 	if !srcIP.IsUnspecified() {
 		// Checking is the src ip address is my own IP address, if so then get mylink directly
-		debug.Logger.Info("NS: Searching for my link informating using SrcIP:", srcIP.String())
+		debug.Logger.Debug("NS: Searching for my link informating using SrcIP:", srcIP.String())
 		myLink, exists := p.LinkInfo[srcIP.String()]
 		if exists {
 			// my own IP address is sending NS packet...for now update the state to STALE for
 			//neighbor cache
-			cache := myLink.NbrCache[ndInfo.TargetAddress.String()]
-			cache.State = STALE
-			cache.Timer(myLink.PortIfIndex, srcIP.String(), ndInfo.TargetAddress.String(),
-				myLink.RetransTimer, p.PktCh)
+			cache, found := myLink.NbrCache[ndInfo.TargetAddress.String()]
+			if !found {
+				cache.InitCache(myLink.ReachableTime, myLink.RetransTimer, ndInfo.TargetAddress.String(),
+					srcIP.String(), myLink.PortIfIndex, p.PktCh)
+			} else {
+				cache.State = STALE
+			}
 			myLink.NbrCache[ndInfo.TargetAddress.String()] = cache
 			p.SetLink(srcIP.String(), myLink)
-			debug.Logger.Info("MYNS: nbrCach (key, value) ---> (", ndInfo.TargetAddress.String(),
+			debug.Logger.Debug("MYNS: nbrCach (key, value) ---> (", ndInfo.TargetAddress.String(),
 				",", cache, ")")
 		} else {
 			// If it is not my own ip then use Target Address to get link information
-			debug.Logger.Info("NS: Searching for link informating using TargetAddress:",
+			// meaning NS came from peer for my ip Address
+			debug.Logger.Debug("NS: Searching for link informating using TargetAddress:",
 				ndInfo.TargetAddress.String())
 			link, found := p.GetLink(ndInfo.TargetAddress.String())
 			if !found {
@@ -196,26 +201,70 @@ func (p *Packet) HandleNSMsg(hdr *layers.ICMPv6, srcIP, dstIP net.IP) (*NDInfo, 
 			cache, exists := link.NbrCache[srcIP.String()]
 			if exists {
 				// @TODO: need to do something like updating timer or what not
-			}
-			// In this case check for Source Link Layer Option... if specified then mark the state as
-			// reachable and create neighbor entry in the platform
-			if len(ndInfo.Options) > 0 {
-				for _, option := range ndInfo.Options {
-					if option.Type == NDOptionTypeSourceLinkLayerAddress {
-						cache.State = REACHABLE
-						mac := net.HardwareAddr(option.Value)
-						cache.LinkLayerAddress = mac.String()
-					}
-				}
+				// update information to STALE, as update will be changed to reachable on
+				// NA packet going out from my link
+				cache.State = STALE
 			} else {
-				cache.State = INCOMPLETE
+				// This is a new cache entry.. so lets do Init
+				cache.InitCache(link.ReachableTime, link.RetransTimer, srcIP.String(),
+					ndInfo.TargetAddress.String(), link.PortIfIndex, p.PktCh)
+				// In this case check for Source Link Layer Option... if specified then mark the state as
+				// reachable and create neighbor entry in the platform... which means that
+				// we are not waiting for NA packet anymore and proceeding with creating an
+				// neighbor entry in the hardware
+				if len(ndInfo.Options) > 0 {
+					for _, option := range ndInfo.Options {
+						if option.Type == NDOptionTypeSourceLinkLayerAddress {
+							cache.State = REACHABLE
+							mac := net.HardwareAddr(option.Value)
+							cache.LinkLayerAddress = mac.String()
+						}
+					}
+				} else {
+					// state is moved to incomplete because neighbor is trying to
+					// solicitate our ip address
+					cache.State = INCOMPLETE
+				}
 			}
-			cache.Timer(link.PortIfIndex, ndInfo.TargetAddress.String(), srcIP.String(),
-				link.RetransTimer, p.PktCh)
-			debug.Logger.Info("PEERNS: nbrCach (key, value) ---> (", srcIP.String(), ",", cache, ")")
+			debug.Logger.Debug("PEERNS: nbrCach (key, value) ---> (", srcIP.String(), ",", cache, ")")
 			link.NbrCache[srcIP.String()] = cache
 			p.SetLink(ndInfo.TargetAddress.String(), link)
 		}
 	}
 	return ndInfo, nil
+}
+
+func (p *Packet) GetNbrInfoUsingNSPkt(eth *layers.Ethernet, v6hdr *layers.IPv6, ndInfo *NDInfo) config.NeighborInfo {
+	nbrInfo := config.NeighborInfo{}
+	// Update nbrInfo with state & pkt operation type
+	// During Neighbor Solicitation we will use srcIP to get link Information
+	link, found := p.GetLink(v6hdr.SrcIP.String())
+	var entry NeighborCache
+	var exists bool
+	if found {
+		entry, exists = link.NbrCache[ndInfo.TargetAddress.String()]
+	} else {
+		// You might have received solicitation from peer side...use that to get the state info
+		link, found = p.GetLink(ndInfo.TargetAddress.String())
+		if !found {
+			nbrInfo.PktOperation = byte(PACKET_DROP)
+			debug.Logger.Debug("dropping incoming neighbor solicitation as no link found")
+		}
+		// find cache entry using src ip as the solicitation came from neighbor
+		entry, exists = link.NbrCache[v6hdr.SrcIP.String()]
+	}
+	if exists {
+		nbrInfo.State = entry.State
+		if entry.LinkLayerAddress != "" {
+			nbrInfo.MacAddr = entry.LinkLayerAddress
+		} else {
+			nbrInfo.MacAddr = eth.DstMAC.String()
+		}
+		nbrInfo.IpAddr = entry.IpAddr
+		nbrInfo.IfIndex = link.PortIfIndex
+	} else {
+		nbrInfo.PktOperation = byte(PACKET_DROP)
+		debug.Logger.Debug("dropping incoming neighbor solicitation as no nbr found")
+	}
+	return nbrInfo
 }

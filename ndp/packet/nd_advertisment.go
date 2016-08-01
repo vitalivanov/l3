@@ -27,6 +27,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/google/gopacket/layers"
+	"l3/ndp/config"
 	"l3/ndp/debug"
 	"net"
 )
@@ -56,6 +57,7 @@ func (nd *NDInfo) ValidateNDAInfo(icmpFlags []byte, dstIP net.IP) error {
  * our cache entry with reachable
  * If srcIP is peer ip then we need to use dst ip to get link information and then update cache entry to be
  * reachable and also update peer mac address into the cache
+ * @TODO: handle un-solicited Neighbor Advertisemtn
  */
 func (p *Packet) HandleNAMsg(hdr *layers.ICMPv6, srcIP, dstIP net.IP) (*NDInfo, error) {
 	ndInfo := &NDInfo{}
@@ -70,28 +72,34 @@ func (p *Packet) HandleNAMsg(hdr *layers.ICMPv6, srcIP, dstIP net.IP) (*NDInfo, 
 	}
 
 	// if my own ip is srcIP
-	debug.Logger.Info("NA: Searching for my link informating using SrcIP:", srcIP.String())
+	debug.Logger.Debug("NA: Searching for my link informating using SrcIP:", srcIP.String())
 	myLink, exists := p.GetLink(srcIP.String())
 	if exists {
-		cache := myLink.NbrCache[dstIP.String()]
-		cache.Timer(myLink.PortIfIndex, srcIP.String(), dstIP.String(),
-			myLink.RetransTimer, p.PktCh)
+		cache, found := myLink.NbrCache[dstIP.String()]
+		if !found {
+			debug.Logger.Err("No Neigbor Entry found for:", dstIP.String(), "link IP:", srcIP.String())
+			return nil, errors.New("No Neigbor Entry found for:" + dstIP.String() +
+				" link IP:" + srcIP.String())
+		}
 		cache.State = REACHABLE
-		debug.Logger.Info("MYOWNNA: nbrCach (key, value) ---> (", dstIP.String(), ",", cache, ")")
+		cache.RchTimer()
+		debug.Logger.Debug("MYOWNNA: nbrCach (key, value) ---> (", dstIP.String(), ",", cache, ")")
 		myLink.NbrCache[dstIP.String()] = cache
 		p.SetLink(srcIP.String(), myLink)
 	} else {
-		debug.Logger.Info("NA: Searching for link information using dstIP:", dstIP.String())
+		debug.Logger.Debug("NA: Searching for link information using dstIP:", dstIP.String())
 		link, found := p.GetLink(dstIP.String())
 		if !found {
 			return nil, errors.New("No link found for:" + dstIP.String())
 		}
 		cache, exists := link.NbrCache[srcIP.String()]
 		if !exists {
-			//@TODO: need to drop advertisement packet??
+			debug.Logger.Err("No Neigbor Entry found for:", srcIP.String(), "link IP:", dstIP.String())
+			return nil, errors.New("No Neigbor Entry found for:" + srcIP.String() +
+				" link IP:" + dstIP.String())
 		}
-		cache.Timer(link.PortIfIndex, dstIP.String(), srcIP.String(), link.RetransTimer, p.PktCh)
 		cache.State = REACHABLE
+		cache.RchTimer()
 		if len(ndInfo.Options) > 0 {
 			for _, option := range ndInfo.Options {
 				if option.Type == NDOptionTypeTargetLinkLayerAddress {
@@ -100,9 +108,35 @@ func (p *Packet) HandleNAMsg(hdr *layers.ICMPv6, srcIP, dstIP net.IP) (*NDInfo, 
 				}
 			}
 		}
-		debug.Logger.Info("PEERNA: nbrCach (key, value) ---> (", srcIP.String(), ",", cache, ")")
+		debug.Logger.Debug("PEERNA: nbrCach (key, value) ---> (", srcIP.String(), ",", cache, ")")
 		link.NbrCache[srcIP.String()] = cache
 		p.SetLink(dstIP.String(), link)
 	}
 	return ndInfo, nil
+}
+
+func (p *Packet) GetNbrInfoUsingNAPkt(eth *layers.Ethernet, v6hdr *layers.IPv6, ndInfo *NDInfo) config.NeighborInfo {
+	nbrInfo := config.NeighborInfo{}
+	// Update nbrInfo with state & pkt operation type
+	// During Neighbor Advertisement we will use dstIP to get link information
+	link, found := p.GetLink(v6hdr.DstIP.String())
+	if found {
+		if entry, exists := link.NbrCache[v6hdr.SrcIP.String()]; exists {
+			nbrInfo.State = entry.State
+			if entry.LinkLayerAddress != "" {
+				nbrInfo.MacAddr = entry.LinkLayerAddress
+			} else {
+				nbrInfo.MacAddr = eth.SrcMAC.String()
+			}
+			nbrInfo.IpAddr = entry.IpAddr
+			nbrInfo.IfIndex = link.PortIfIndex
+		} else {
+			nbrInfo.PktOperation = byte(PACKET_DROP)
+			debug.Logger.Debug("dropping incoming neighbor advertisement as no nbr found")
+		}
+	} else {
+		nbrInfo.PktOperation = byte(PACKET_DROP)
+		debug.Logger.Debug("dropping incoming neighbor advertisement as no link found")
+	}
+	return nbrInfo
 }

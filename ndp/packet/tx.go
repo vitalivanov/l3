@@ -45,14 +45,14 @@ func (p *Packet) SendNSMsgIfRequired(ipAddr string, pHdl *pcap.Handle) error {
 	}
 	link, exists := p.GetLink(ip.String())
 	if !exists {
-		debug.Logger.Info("link entry for ipAddr", ip, "not found in linkInfo.",
+		debug.Logger.Debug("link entry for ipAddr", ip, "not found in linkInfo.",
 			"Waiting for linux to finish of neighbor duplicate detection")
 		return nil
 	}
-	debug.Logger.Info("link info", link, "ip address", ip)
+	debug.Logger.Debug("link info", link, "ip address", ip)
 	pktToSend := ConstructNSPacket(link.LinkLocalAddress, IPV6_ICMPV6_MULTICAST_DST_MAC, ip.String(),
 		SOLICITATED_NODE_ADDRESS)
-	debug.Logger.Info("sending pkt from link", link.LinkLocalAddress, "bytes are:", pktToSend)
+	debug.Logger.Debug("sending pkt from link", link.LinkLocalAddress, "bytes are:", pktToSend)
 	return p.SendNDPkt(pktToSend, pHdl)
 }
 
@@ -61,7 +61,7 @@ func (p *Packet) SendNSMsgIfRequired(ipAddr string, pHdl *pcap.Handle) error {
  */
 func (p *Packet) SendNDPkt(pkt []byte, pHdl *pcap.Handle) error {
 	if pHdl == nil {
-		debug.Logger.Info("Invalid Pcap Handler")
+		debug.Logger.Err("Invalid Pcap Handler")
 		return errors.New("Invalid Pcap Handler")
 	}
 	err := pHdl.WritePacketData(pkt)
@@ -89,15 +89,17 @@ func (p *Packet) SendUnicastNeighborSolicitation(srcIP, dstIP string, pHdl *pcap
 		// @TODO: need to send out multicast neighbor solicitation in this case....
 		return errors.New(fmt.Sprintln("No Neighbor Entry", dstIP, "found for", srcIP))
 	}
-	debug.Logger.Info("link info", link, "src ip address", srcIP, "dst ip", dstIP)
+	debug.Logger.Debug("link info", link, "src ip address", srcIP, "dst ip", dstIP)
 	pktToSend := ConstructNSPacket(link.LinkLocalAddress, cache.LinkLayerAddress, srcIP, dstIP)
-	debug.Logger.Info("sending pkt from link", link.LinkLocalAddress, "bytes are:", pktToSend)
+	debug.Logger.Debug("sending pkt from link", link.LinkLocalAddress, "bytes are:", pktToSend)
 	err := p.SendNDPkt(pktToSend, pHdl)
 	if err != nil {
-		debug.Logger.Info("packet send failed:", err)
+		debug.Logger.Err("packet send failed:", err)
 		return errors.New(fmt.Sprintln("packet send failed:", err))
 	}
-	cache.Timer(link.PortIfIndex, srcIP, dstIP, link.RetransTimer, p.PktCh)
+	// when sending unicast packet re-start retransmit timer.. rest all will be taken care of when
+	// NA packet is received..
+	cache.Timer()
 	link.NbrCache[dstIP] = cache
 	p.SetLink(srcIP, link)
 	return nil

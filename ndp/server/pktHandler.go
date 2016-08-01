@@ -91,7 +91,7 @@ func (svr *NDPServer) StartRxTx(ifIndex int32) {
 	go svr.ReceivedNdpPkts(ipPort.IfIndex)
 	svr.ndpUpL3IntfStateSlice = append(svr.ndpUpL3IntfStateSlice, ifIndex)
 	// @TODO:When port comes up are we suppose to send out Neigbor Solicitation or Router Solicitation??
-	svr.Packet.SendNSMsgIfRequired(ipPort.IpAddr, ipPort.PcapBase.PcapHandle)
+	//svr.Packet.SendNSMsgIfRequired(ipPort.IpAddr, ipPort.PcapBase.PcapHandle)
 }
 
 /*
@@ -143,12 +143,14 @@ func (svr *NDPServer) CheckCallUpdateNeighborInfo(nbrInfo *config.NeighborInfo) 
 	if exists {
 		return
 	}
-	debug.Logger.Info(fmt.Sprintln("Calling create ipv6 neighgor for global nbrinfo is", nbrInfo))
-	// ipaddr, macAddr, vlanId, ifIndex --- Global IPv6 Address
+	debug.Logger.Debug("Calling create ipv6 neighgor for global nbrinfo is", nbrInfo.IpAddr, nbrInfo.MacAddr,
+		nbrInfo.VlanId, nbrInfo.IfIndex)
 	_, err := svr.SwitchPlugin.CreateIPv6Neighbor(nbrInfo.IpAddr, nbrInfo.MacAddr,
 		nbrInfo.VlanId, nbrInfo.IfIndex)
 	if err != nil {
-		debug.Logger.Err(fmt.Sprintln("create ipv6 global neigbor failed for", nbrInfo, "error is", err))
+		debug.Logger.Err("create ipv6 global neigbor failed for", nbrInfo, "error is", err)
+		// do not enter that neighbor in our neigbor map
+		return
 	}
 	svr.insertNeigborInfo(nbrInfo)
 }
@@ -167,19 +169,19 @@ func (svr *NDPServer) ProcessRxPkt(ifIndex int32, pkt gopacket.Packet) {
 		return
 	}
 	nbrInfo := &config.NeighborInfo{}
-	nbrInfo.IfIndex = ifIndex
-	// @ALERT: always overwrite ifIndex when creating neighbor, if ifIndex has reverse map entry for
-	//	   vlanID
 	err := svr.Packet.ValidateAndParse(nbrInfo, pkt)
 	if err != nil {
 		debug.Logger.Err(fmt.Sprintln("Validating and parsing Pkt Failed:", err))
 		return
 	}
+	// @ALERT: always overwrite ifIndex when creating neighbor, if ifIndex has reverse map entry for
+	//	   vlanID then that will be overwritten again with vlan ifIndex
+	nbrInfo.IfIndex = ifIndex
 	if nbrInfo.PktOperation == byte(packet.PACKET_DROP) {
 		debug.Logger.Err("Dropping message as PktOperation is PACKET_DROP for", nbrInfo.IpAddr)
 		return
 	} else if nbrInfo.State == packet.INCOMPLETE {
-		debug.Logger.Err("Received message but packet state is INCOMPLETE hence dropping it for",
+		debug.Logger.Err("Received message but packet state is INCOMPLETE hence not calling create ipv6 neighbor for ",
 			nbrInfo.IpAddr)
 		return
 	} else if nbrInfo.State == packet.REACHABLE {

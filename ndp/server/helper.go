@@ -24,7 +24,6 @@ package server
 
 import (
 	_ "errors"
-	"fmt"
 	"github.com/google/gopacket/pcap"
 	"l3/ndp/config"
 	"l3/ndp/debug"
@@ -38,7 +37,7 @@ func (svr *NDPServer) GetPorts() {
 	debug.Logger.Info("Get Port State List")
 	portsInfo, err := svr.SwitchPlugin.GetAllPortState()
 	if err != nil {
-		debug.Logger.Err(fmt.Sprintln("Failed to get all ports from system, ERROR:", err))
+		debug.Logger.Err("Failed to get all ports from system, ERROR:", err)
 		return
 	}
 	for _, obj := range portsInfo {
@@ -51,8 +50,7 @@ func (svr *NDPServer) GetPorts() {
 		}
 		pObj, err := svr.SwitchPlugin.GetPort(obj.Name)
 		if err != nil {
-			debug.Logger.Err(fmt.Sprintln("Getting mac address for",
-				obj.Name, "failed, error:", err))
+			debug.Logger.Err("Getting mac address for", obj.Name, "failed, error:", err)
 		} else {
 			port.MacAddr = pObj.MacAddr
 			port.Description = pObj.Description
@@ -75,14 +73,14 @@ func (svr *NDPServer) GetVlans() {
 	// Get Vlan State Information
 	vlansStateInfo, err := svr.SwitchPlugin.GetAllVlanState()
 	if err != nil {
-		debug.Logger.Err(fmt.Sprintln("Failed to get system vlan information, ERROR:", err))
+		debug.Logger.Err("Failed to get system vlan information, ERROR:", err)
 		return
 	}
 
 	// Get Vlan Config Information
 	vlansConfigInfo, err := svr.SwitchPlugin.GetAllVlan()
 	if err != nil {
-		debug.Logger.Err(fmt.Sprintln("Failed to get system vlan config information, ERROR:", err))
+		debug.Logger.Err("Failed to get system vlan config information, ERROR:", err)
 	}
 
 	// Store untag port information
@@ -99,7 +97,7 @@ func (svr *NDPServer) GetVlans() {
 	for _, vlanState := range vlansStateInfo {
 		entry, ok := svr.VlanInfo[vlanState.VlanId]
 		if !ok {
-			debug.Logger.Warning(fmt.Sprintln("config object for vlan", vlanState.VlanId, "not found"))
+			debug.Logger.Warning("config object for vlan", vlanState.VlanId, "not found")
 		}
 		entry.Name = vlanState.VlanName
 		entry.IfIndex = vlanState.IfIndex
@@ -117,7 +115,7 @@ func (svr *NDPServer) GetIPIntf() {
 	debug.Logger.Info("Get IPv6 Interface List")
 	ipsInfo, err := svr.SwitchPlugin.GetAllIPv6IntfState()
 	if err != nil {
-		debug.Logger.Err(fmt.Sprintln("Failed to get all ipv6 interfaces from system, ERROR:", err))
+		debug.Logger.Err("Failed to get all ipv6 interfaces from system, ERROR:", err)
 		return
 	}
 	for _, obj := range ipsInfo {
@@ -140,13 +138,13 @@ func (svr *NDPServer) GetIPIntf() {
 func (svr *NDPServer) CreatePcapHandler(name string) (pHdl *pcap.Handle, err error) {
 	pHdl, err = pcap.OpenLive(name, svr.SnapShotLen, svr.Promiscuous, svr.Timeout)
 	if err != nil {
-		debug.Logger.Err(fmt.Sprintln("Creating Pcap Handler failed for", name, "Error:", err))
+		debug.Logger.Err("Creating Pcap Handler failed for", name, "Error:", err)
 		return pHdl, err
 	}
 	filter := "(ip6[6] == 0x3a) and (ip6[40] >= 133 && ip6[40] <= 137)"
 	err = pHdl.SetBPFFilter(filter)
 	if err != nil {
-		debug.Logger.Err(fmt.Sprintln("Creating BPF Filter failed Error", err))
+		debug.Logger.Err("Creating BPF Filter failed Error", err)
 		pHdl = nil
 		return pHdl, err
 	}
@@ -210,14 +208,14 @@ func (svr *NDPServer) HandleCreateIPIntf(obj *config.IPIntfNotification) {
 		defer svr.Packet.InitLink(obj.IfIndex, obj.IpAddr, svr.SwitchMac)
 		if exists {
 			if svr.IsLinkLocal(obj.IpAddr) {
-				debug.Logger.Info(fmt.Sprintln("Updating link local Ip", obj.IpAddr, "for", obj.IfIndex))
+				debug.Logger.Debug("Updating link local Ip", obj.IpAddr, "for", obj.IfIndex)
 				ipInfo.LinkLocalIp = obj.IpAddr
 				svr.L3Port[obj.IfIndex] = ipInfo
 				return
 			}
-			debug.Logger.Err(fmt.Sprintln("Received create notification for ifIndex", obj.IfIndex,
+			debug.Logger.Err("Received create notification for ifIndex", obj.IfIndex,
 				"when entry already exist in the database. Dumping IpAddr for debugging info.",
-				"Received Ip:", obj.IpAddr, "stored Ip:", ipInfo.IpAddr))
+				"Received Ip:", obj.IpAddr, "stored Ip:", ipInfo.IpAddr)
 			return
 		}
 		ipInfo = config.IPv6IntfInfo{
@@ -226,10 +224,10 @@ func (svr *NDPServer) HandleCreateIPIntf(obj *config.IPIntfNotification) {
 		}
 		ipInfo.IntfRef = svr.GetIntfRefName(ipInfo.IfIndex)
 		if ipInfo.IntfRef == INTF_REF_NOT_FOUND {
-			debug.Logger.Alert(fmt.Sprintln("Couldn't find name for ifIndex:", ipInfo.IfIndex,
-				"and hence pcap create will be failure"))
+			debug.Logger.Alert("Couldn't find name for ifIndex:", ipInfo.IfIndex,
+				"and hence pcap create will be failure")
 		}
-		debug.Logger.Info(fmt.Sprintln("Created IP inteface", ipInfo.IntfRef, "ifIndex:", ipInfo.IfIndex))
+		debug.Logger.Info("Created IP inteface", ipInfo.IntfRef, "ifIndex:", ipInfo.IfIndex)
 		svr.L3Port[ipInfo.IfIndex] = ipInfo
 		svr.ndpL3IntfStateSlice = append(svr.ndpL3IntfStateSlice, ipInfo.IfIndex)
 	case config.CONFIG_DELETE:
@@ -253,14 +251,12 @@ func (svr *NDPServer) HandlePhyPortStateNotification(msg *config.StateNotificati
  *		     Stop Rx/Tx in this case
  */
 func (svr *NDPServer) HandleStateNotification(msg *config.StateNotification) {
-	debug.Logger.Info(fmt.Sprintln("Received State:", msg.State, "for ifIndex:", msg.IfIndex, "ipAddr:",
-		msg.IpAddr))
+	debug.Logger.Info("Received State:", msg.State, "for ifIndex:", msg.IfIndex, "ipAddr:", msg.IpAddr)
 	switch msg.State {
 	case config.STATE_UP:
 		if svr.IsIPv6Addr(msg.IpAddr) {
 			if !svr.IsLinkLocal(msg.IpAddr) {
-				debug.Logger.Info(fmt.Sprintln("Create pkt handler for", msg.IfIndex,
-					"IpAddr:", msg.IpAddr))
+				debug.Logger.Info("Create pkt handler for", msg.IfIndex, "IpAddr:", msg.IpAddr)
 				svr.StartRxTx(msg.IfIndex)
 			}
 		}

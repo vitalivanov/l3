@@ -51,7 +51,7 @@ func initPcapHandlerForTest(t *testing.T) {
 
 func initTestPacket() {
 	t := &testing.T{}
-	testPktDataCh = make(chan config.PacketData)
+	testPktDataCh = make(chan config.PacketData, 3)
 	testPktObj = Init(testPktDataCh)
 	logger, err := NDPTestNewLogger("ndpd", "NDPTEST", true)
 	if err != nil {
@@ -60,15 +60,32 @@ func initTestPacket() {
 	debug.NDPSetLogger(logger)
 }
 
-func addTestNbrEntry(ipAddr string, peerIP string) {
+func addTestNbrEntryWithMac(ipAddr string, peerIP string, macAddr string) {
 	cache := NeighborCache{
 		State:            REACHABLE,
-		LinkLayerAddress: "aa:bb:cc:dd:ee:ff",
+		LinkLayerAddress: macAddr,
+		IpAddr:           peerIP,
 	}
 	link, exists := testPktObj.GetLink(ipAddr)
 	if !exists {
 		return
 	}
+	cache.InitCache(link.ReachableTime, link.RetransTimer, cache.IpAddr, ipAddr, link.PortIfIndex, testPktDataCh)
+	link.NbrCache[peerIP] = cache
+	testPktObj.SetLink(ipAddr, link)
+}
+
+func addTestNbrEntry(ipAddr string, peerIP string) {
+	cache := NeighborCache{
+		State:            REACHABLE,
+		LinkLayerAddress: "aa:bb:cc:dd:ee:ff",
+		IpAddr:           peerIP,
+	}
+	link, exists := testPktObj.GetLink(ipAddr)
+	if !exists {
+		return
+	}
+	cache.InitCache(link.ReachableTime, link.RetransTimer, cache.IpAddr, ipAddr, link.PortIfIndex, testPktDataCh)
 	link.NbrCache[peerIP] = cache
 	testPktObj.SetLink(ipAddr, link)
 }
@@ -113,6 +130,89 @@ func TestNDSMsgSend(t *testing.T) {
 	}
 }
 
+func cacheInitHelper() NeighborCache {
+	cache := NeighborCache{}
+	cache.InitCache(30000, 1000, "2002::3", "2002::1", 123, testPktDataCh)
+	return cache
+}
+
+func TestReTransmitTimer(t *testing.T) {
+	cache := cacheInitHelper()
+	if cache.RetransTimer != nil {
+		t.Error("Re-Transmit timer should not be started until reachable timer fires")
+	}
+	cache.Timer()
+	cache.StopReTransmitTimer()
+	if cache.RetransTimer != nil {
+		t.Error("Failed to stop re-transmit timer")
+	}
+}
+
+func TestReachableTimer(t *testing.T) {
+	cache := cacheInitHelper()
+	if cache.ReachableTimer == nil {
+		t.Error("Failed to start reachable timer")
+	}
+	cache.RchTimer()
+	cache.StopReachableTimer()
+	if cache.ReachableTimer != nil {
+		t.Error("Failed to stop Reachable timer")
+	}
+}
+
+func TestReComputerTimer(t *testing.T) {
+	cache := cacheInitHelper()
+	if cache.RecomputeBaseTimer == nil {
+		t.Error("Failed to start re-compute base timer")
+	}
+	cache.ReComputeBaseReachableTimer()
+	cache.StopReComputeBaseTimer()
+	if cache.RetransTimer != nil {
+		t.Error("Failed to stop recompute base timer")
+	}
+}
+
+func TestNeighborCacheInitDeInit(t *testing.T) {
+	cache := cacheInitHelper()
+	wantCache := NeighborCache{
+		ReachableTimeConfig: 30000,
+		RetransTimerConfig:  1000,
+		IpAddr:              "2002::3",
+	}
+	wantCache.MyLinkInfo = &ParentLinkInfo{
+		IpAddr:   "2002::1",
+		IfIndex:  123,
+		ReturnCh: testPktDataCh,
+	}
+
+	if !reflect.DeepEqual(cache.MyLinkInfo, wantCache.MyLinkInfo) {
+		t.Error("Failed populating parent link information")
+	}
+
+	if !cache.ReachableTimer.Stop() {
+		t.Error("failed stopping reachable timer")
+	}
+
+	if !cache.RecomputeBaseTimer.Stop() {
+		t.Error("failed to stop recompute timer")
+	}
+
+	cache.DeInitCache()
+
+	if cache.RetransTimer != nil {
+		t.Error("Failed to stop retranst timer")
+	}
+	if cache.RecomputeBaseTimer != nil {
+		t.Error("Failed to delete recompute timer")
+	}
+	if cache.ReachableTimer != nil {
+		t.Error("Failed to delete reachable timer")
+	}
+	if cache.MyLinkInfo != nil {
+		t.Error("failed to delete neighbor -> parent link information")
+	}
+}
+
 func TestNeighborCacheReTransmitTimer(t *testing.T) {
 	sip := "2002::1/64"
 	dip := "2002::2/64"
@@ -122,21 +222,20 @@ func TestNeighborCacheReTransmitTimer(t *testing.T) {
 	initTestPacket()
 	testPktObj.InitLink(100, sip, srcMac)
 	addTestNbrEntry(ipS.String(), ipD.String())
-	pktCh := make(chan config.PacketData, 3)
 	link, _ := testPktObj.GetLink(ipS.String())
 	cache, exists := link.NbrCache[ipD.String()]
 	if !exists {
 		t.Error("Initializing failure")
 	} else {
 		go func() {
-			cache.Timer(link.PortIfIndex, ipS.String(), ipD.String(), link.RetransTimer, pktCh)
+			cache.Timer()
 		}()
 	}
 
 	var pktData config.PacketData
 	for {
 		select {
-		case pktData = <-pktCh:
+		case pktData = <-testPktDataCh:
 			break
 		}
 		break
