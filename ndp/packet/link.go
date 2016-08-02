@@ -86,25 +86,46 @@ func (p *Packet) InitLink(ifIndex int32, ip, mac string) {
  *  We will iterate over all the neighbors, stop its timer and delete the neighbor cache
  *  @NOTE: Always start from the bottom most layer as we never know when golang will run its garbage collector
  */
-func (p *Packet) FlushNeighbors(ip string) error {
+func (p *Packet) FlushNeighbors(ip string) ([]string, error) {
 	debug.Logger.Debug("Deleting all neighbor entries for link", ip)
+	deleteEntries := make([]string, 0)
 	localIp, _, err := net.ParseCIDR(ip)
 	if err != nil {
 		debug.Logger.Err("Parsing ip", ip, "failed with err:", err)
-		return errors.New(fmt.Sprintln("Parsing ip", ip, "failed with err:", err))
+		return deleteEntries, errors.New(fmt.Sprintln("Parsing ip", ip, "failed with err:", err))
 	}
 	link, exists := p.LinkInfo[localIp.String()]
 	if !exists {
 		debug.Logger.Err("Cannot delete neighbors for", localIp.String(), "as there is no such link entry")
-		return errors.New(fmt.Sprintln("Cannot delete neighbors for", localIp.String(),
+		return deleteEntries, errors.New(fmt.Sprintln("Cannot delete neighbors for", localIp.String(),
 			"as there is no such link entry"))
 	}
 	for _, cache := range link.NbrCache {
 		key := cache.IpAddr
+		deleteEntries = append(deleteEntries, key)
 		debug.Logger.Debug("Deleting Neighbor", cache.IpAddr)
 		cache.DeInitCache()
 		delete(link.NbrCache, key)
 	}
+	// do not delete link information here... only if IP interface is deleted then we need to delete
+	// link information
+	return deleteEntries, nil
+}
+
+/*
+ *  On delete ipv6 interface, we will get a request to delete the link.. we will call flush neighbor entries
+ *  internally within the api and return the caller list of neighbor entries that need to be deleted from
+ *  hardware
+ *  @NOTE: input should in CIDR format
+ */
+func (p *Packet) DeleteLink(ip string) []string {
+	deleteEntries, _ := p.FlushNeighbors(ip)
+	localIp, _, err := net.ParseCIDR(ip)
+	if err != nil {
+		debug.Logger.Err("Parsing ip", ip, "failed with err:", err)
+		return deleteEntries
+	}
+	// @TODO: add api to handle ip interface delete
 	delete(p.LinkInfo, localIp.String())
-	return nil
+	return deleteEntries
 }

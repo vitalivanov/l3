@@ -134,6 +134,9 @@ func (svr *NDPServer) CheckSrcMac(macAddr string) bool {
 	return exists
 }
 
+/*
+ *	insertNeighborInfo: Helper API to update list of neighbor keys that are created by ndp
+ */
 func (svr *NDPServer) insertNeigborInfo(nbrInfo *config.NeighborInfo) {
 	svr.NeigborEntryLock.Lock()
 	svr.NeighborInfo[nbrInfo.IpAddr] = *nbrInfo
@@ -142,12 +145,27 @@ func (svr *NDPServer) insertNeigborInfo(nbrInfo *config.NeighborInfo) {
 }
 
 /*
- *	CheckCallUpdateNeighborInfo
+ *	deleteNeighborInfo: Helper API to update list of neighbor keys that are deleted by ndp
+ *	@NOTE: caller is responsible for acquiring the lock to access slice
+ *	//@TODO: need optimazation here...
+ */
+func (svr *NDPServer) deleteNeighborInfo(nbrIp string) {
+	for idx, _ := range svr.neighborKey {
+		if svr.neighborKey[idx] == nbrIp {
+			svr.neighborKey = append(svr.neighborKey[:idx],
+				svr.neighborKey[idx+1:]...)
+			break
+		}
+	}
+}
+
+/*
+ *	 CreateNeighborInfo
  *			a) It will first check whether a neighbor exists in the neighbor cache
  *			b) If it doesn't exists then we create neighbor in the platform
  *		        a) It will update ndp server neighbor info cache with the latest information
  */
-func (svr *NDPServer) CheckCallUpdateNeighborInfo(nbrInfo *config.NeighborInfo) {
+func (svr *NDPServer) CreateNeighborInfo(nbrInfo *config.NeighborInfo) {
 	_, exists := svr.NeighborInfo[nbrInfo.IpAddr]
 	if exists {
 		return
@@ -162,6 +180,30 @@ func (svr *NDPServer) CheckCallUpdateNeighborInfo(nbrInfo *config.NeighborInfo) 
 		return
 	}
 	svr.insertNeigborInfo(nbrInfo)
+}
+
+/*
+ *	 DeleteNeighborInfo
+ *			a) It will first check whether a neighbor exists in the neighbor cache
+ *			b) If it doesn't exists then we will move on to next neighbor
+ *		        c) If exists then we will call DeleteIPV6Neighbor for that entry and remove
+ *			   the entry from our runtime information
+ */
+func (svr *NDPServer) DeleteNeighborInfo(deleteEntries []string) {
+	svr.NeigborEntryLock.Lock()
+	for _, nbrIp := range deleteEntries {
+		nbrEntry, exists := svr.NeighborInfo[nbrIp]
+		if !exists {
+			continue
+		}
+		_, err := svr.SwitchPlugin.DeleteIPv6Neighbor(nbrEntry.IpAddr) //, nbrEntry.MacAddr,
+		//			nbrEntry.VlanId, nbrEntry.IfIndex)
+		if err != nil {
+			debug.Logger.Err("delete ipv6 neigbor failed for", nbrEntry, "error is", err)
+		}
+		svr.deleteNeighborInfo(nbrIp)
+	}
+	svr.NeigborEntryLock.Unlock()
 }
 
 /*
@@ -201,7 +243,7 @@ func (svr *NDPServer) ProcessRxPkt(ifIndex int32, pkt gopacket.Packet) {
 			return
 		}
 		svr.PopulateVlanInfo(nbrInfo, ifIndex)
-		svr.CheckCallUpdateNeighborInfo(nbrInfo)
+		svr.CreateNeighborInfo(nbrInfo)
 	} else {
 		debug.Logger.Alert("Handle state", nbrInfo.State, "after packet validation & parsing")
 	}

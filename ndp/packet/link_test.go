@@ -38,15 +38,25 @@ func TestLinkFlushNeighbor(t *testing.T) {
 	testPktObj.InitLink(100, ipAddr, "00:e0:ec:26:a7:ee")
 	ip, _, _ := net.ParseCIDR(ipAddr)
 	addTestNbrEntry(ip.String(), nbrIp)
-	err := testPktObj.FlushNeighbors(ipAddr)
+	deleteEntries, err := testPktObj.FlushNeighbors(ipAddr)
 	if err != nil {
 		t.Error("Failed to flush neighbor cache from packet LinkInfo, error:", err)
 	}
-	if len(testPktObj.LinkInfo) > 0 {
-		t.Error("failed to delete links from packet linkInfo", testPktObj.LinkInfo)
+	if deleteEntries[0] != nbrIp {
+		t.Error("Invalid Delete Entry information", deleteEntries)
 	}
-	err = testPktObj.FlushNeighbors(ipAddr)
+	if len(testPktObj.LinkInfo) == 0 {
+		t.Error("When flushing neighbors packet linkInfo should not be deleted", testPktObj.LinkInfo)
+	}
+	testPktObj.DeleteLink(ipAddr)
+	if len(testPktObj.LinkInfo) > 0 {
+		t.Error("Failed to delete link")
+	}
+	deleteEntries, err = testPktObj.FlushNeighbors(ipAddr)
 	if err == nil {
 		t.Error("There is no entry in Neighbor Cache and we still didn't receive error message")
+	}
+	if len(deleteEntries) > 0 {
+		t.Error("There should be zero delete entries")
 	}
 }

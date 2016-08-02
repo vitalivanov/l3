@@ -265,9 +265,15 @@ func (svr *NDPServer) HandlePhyPortStateNotification(msg *config.StateNotificati
 		debug.Logger.Info("Stop receiving frames for", l3Port.IntfRef)
 		svr.StopRxTx(msg.IfIndex)
 		debug.Logger.Info("Deleting Neigbors for", l3Port.IpAddr)
-		svr.Packet.FlushNeighbors(l3Port.IpAddr)
+		deleteEntries, err := svr.Packet.FlushNeighbors(l3Port.IpAddr)
+		if len(deleteEntries) > 0 && err == nil {
+			svr.DeleteNeighborInfo(deleteEntries)
+		}
 		debug.Logger.Info("Deleting Neigbors for", l3Port.LinkLocalIp)
-		svr.Packet.FlushNeighbors(l3Port.LinkLocalIp)
+		deleteEntries, err = svr.Packet.FlushNeighbors(l3Port.LinkLocalIp)
+		if len(deleteEntries) > 0 && err == nil {
+			svr.DeleteNeighborInfo(deleteEntries)
+		}
 	}
 }
 
@@ -297,7 +303,10 @@ func (svr *NDPServer) HandleStateNotification(msg *config.StateNotification) {
 				// @TODO: what about link local??
 				// delete neighbor entries first for the link
 				// stop the timer
-				svr.Packet.FlushNeighbors(msg.IpAddr)
+				deleteEntries, err := svr.Packet.FlushNeighbors(msg.IpAddr)
+				if len(deleteEntries) > 0 && err == nil {
+					svr.DeleteNeighborInfo(deleteEntries)
+				}
 			}
 		}
 	}
