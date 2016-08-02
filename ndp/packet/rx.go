@@ -139,6 +139,7 @@ func (p *Packet) populateNeighborInfo(nbrInfo *config.NeighborInfo, eth *layers.
 	case layers.ICMPv6TypeNeighborAdvertisement:
 		*nbrInfo = p.GetNbrInfoUsingNAPkt(eth, ipv6Hdr, ndInfo)
 	}
+	debug.Logger.Debug("Neighbor Populated:", *nbrInfo)
 }
 
 /* API: Get IPv6 & ICMPv6 Header

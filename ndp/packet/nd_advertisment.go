@@ -117,26 +117,37 @@ func (p *Packet) HandleNAMsg(hdr *layers.ICMPv6, srcIP, dstIP net.IP) (*NDInfo, 
 
 func (p *Packet) GetNbrInfoUsingNAPkt(eth *layers.Ethernet, v6hdr *layers.IPv6, ndInfo *NDInfo) config.NeighborInfo {
 	nbrInfo := config.NeighborInfo{}
+	var entry NeighborCache
+	var exists bool
 	// Update nbrInfo with state & pkt operation type
 	// During Neighbor Advertisement we will use dstIP to get link information
+	//d8:eb:97:b6:49:78 00:e0:ec:26:a7:ee 2003::2 fe80::2e0:ecff:fe26:a7ee 2003::2]
+	// eth.SrcMAC, eth.DstMAC, ipv6Hdr.SrcIP.String(), ipv6Hdr.DstIP.String(), ndInfo.TargetAddress.String())
 	link, found := p.GetLink(v6hdr.DstIP.String())
 	if found {
-		if entry, exists := link.NbrCache[v6hdr.SrcIP.String()]; exists {
-			nbrInfo.State = entry.State
-			if entry.LinkLayerAddress != "" {
-				nbrInfo.MacAddr = entry.LinkLayerAddress
-			} else {
-				nbrInfo.MacAddr = eth.SrcMAC.String()
-			}
-			nbrInfo.IpAddr = entry.IpAddr
-			nbrInfo.IfIndex = link.PortIfIndex
-		} else {
+		entry, exists = link.NbrCache[v6hdr.SrcIP.String()]
+	} else {
+		link, found = p.GetLink(v6hdr.SrcIP.String())
+		if !found {
 			nbrInfo.PktOperation = byte(PACKET_DROP)
 			debug.Logger.Debug("dropping incoming neighbor advertisement as no nbr found")
+			return nbrInfo
 		}
+		// find cache entry using dst ip as the advertisement came from neighbor
+		entry, exists = link.NbrCache[v6hdr.DstIP.String()]
+	}
+	if exists {
+		nbrInfo.State = entry.State
+		if entry.LinkLayerAddress != "" {
+			nbrInfo.MacAddr = entry.LinkLayerAddress
+		} else {
+			nbrInfo.MacAddr = eth.SrcMAC.String()
+		}
+		nbrInfo.IpAddr = entry.IpAddr
+		nbrInfo.IfIndex = link.PortIfIndex
 	} else {
 		nbrInfo.PktOperation = byte(PACKET_DROP)
-		debug.Logger.Debug("dropping incoming neighbor advertisement as no link found")
+		debug.Logger.Debug("dropping incoming neighbor advertisement as no neighbor found for", link)
 	}
 	return nbrInfo
 }

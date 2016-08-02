@@ -236,11 +236,11 @@ func (p *Packet) HandleNSMsg(hdr *layers.ICMPv6, srcIP, dstIP net.IP) (*NDInfo, 
 
 func (p *Packet) GetNbrInfoUsingNSPkt(eth *layers.Ethernet, v6hdr *layers.IPv6, ndInfo *NDInfo) config.NeighborInfo {
 	nbrInfo := config.NeighborInfo{}
+	var entry NeighborCache
+	var exists bool
 	// Update nbrInfo with state & pkt operation type
 	// During Neighbor Solicitation we will use srcIP to get link Information
 	link, found := p.GetLink(v6hdr.SrcIP.String())
-	var entry NeighborCache
-	var exists bool
 	if found {
 		entry, exists = link.NbrCache[ndInfo.TargetAddress.String()]
 	} else {
@@ -249,6 +249,7 @@ func (p *Packet) GetNbrInfoUsingNSPkt(eth *layers.Ethernet, v6hdr *layers.IPv6, 
 		if !found {
 			nbrInfo.PktOperation = byte(PACKET_DROP)
 			debug.Logger.Debug("dropping incoming neighbor solicitation as no link found")
+			return nbrInfo
 		}
 		// find cache entry using src ip as the solicitation came from neighbor
 		entry, exists = link.NbrCache[v6hdr.SrcIP.String()]
@@ -264,7 +265,7 @@ func (p *Packet) GetNbrInfoUsingNSPkt(eth *layers.Ethernet, v6hdr *layers.IPv6, 
 		nbrInfo.IfIndex = link.PortIfIndex
 	} else {
 		nbrInfo.PktOperation = byte(PACKET_DROP)
-		debug.Logger.Debug("dropping incoming neighbor solicitation as no nbr found")
+		debug.Logger.Debug("dropping incoming neighbor solicitation as no nbr found for link", link)
 	}
 	return nbrInfo
 }

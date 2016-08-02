@@ -94,7 +94,7 @@ func (p *Packet) FlushNeighbors(ip string) ([]string, error) {
 		debug.Logger.Err("Parsing ip", ip, "failed with err:", err)
 		return deleteEntries, errors.New(fmt.Sprintln("Parsing ip", ip, "failed with err:", err))
 	}
-	link, exists := p.LinkInfo[localIp.String()]
+	link, exists := p.GetLink(localIp.String())
 	if !exists {
 		debug.Logger.Err("Cannot delete neighbors for", localIp.String(), "as there is no such link entry")
 		return deleteEntries, errors.New(fmt.Sprintln("Cannot delete neighbors for", localIp.String(),
@@ -107,6 +107,7 @@ func (p *Packet) FlushNeighbors(ip string) ([]string, error) {
 		cache.DeInitCache()
 		delete(link.NbrCache, key)
 	}
+	p.SetLink(localIp.String(), link)
 	// do not delete link information here... only if IP interface is deleted then we need to delete
 	// link information
 	return deleteEntries, nil

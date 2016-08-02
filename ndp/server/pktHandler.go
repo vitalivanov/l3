@@ -194,14 +194,17 @@ func (svr *NDPServer) DeleteNeighborInfo(deleteEntries []string) {
 	for _, nbrIp := range deleteEntries {
 		nbrEntry, exists := svr.NeighborInfo[nbrIp]
 		if !exists {
+			debug.Logger.Debug("Neighbor Info for:", nbrIp, "doesn't exists:")
 			continue
 		}
-		_, err := svr.SwitchPlugin.DeleteIPv6Neighbor(nbrEntry.IpAddr) //, nbrEntry.MacAddr,
-		//			nbrEntry.VlanId, nbrEntry.IfIndex)
+		debug.Logger.Debug("Calling delete ipv6 neighbor for nbrIp:", nbrEntry.IpAddr)
+		_, err := svr.SwitchPlugin.DeleteIPv6Neighbor(nbrEntry.IpAddr)
 		if err != nil {
 			debug.Logger.Err("delete ipv6 neigbor failed for", nbrEntry, "error is", err)
 		}
 		svr.deleteNeighborInfo(nbrIp)
+		// delete the entry from neighbor map
+		delete(svr.NeighborInfo, nbrIp)
 	}
 	svr.NeigborEntryLock.Unlock()
 }
