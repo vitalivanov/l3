@@ -60,27 +60,23 @@ func (mgr *FSPolicyMgr) setupSubSocket(address string) (*nanomsg.SubSocket, erro
 	var err error
 	var socket *nanomsg.SubSocket
 	if socket, err = nanomsg.NewSubSocket(); err != nil {
-		mgr.logger.Errf("Failed to create subscribe socket %s",
-			"error:%s", address, err)
+		mgr.logger.Errf("Failed to create subscribe socket %s error:%s", address, err)
 		return nil, err
 	}
 
 	if err = socket.Subscribe(""); err != nil {
-		mgr.logger.Errf("Failed to subscribe to \"\" on ",
-			"subscribe socket %s, error:%s", address, err)
+		mgr.logger.Errf("Failed to subscribe to \"\" on subscribe socket %s, error:%s", address, err)
 		return nil, err
 	}
 
 	if _, err = socket.Connect(address); err != nil {
-		mgr.logger.Errf("Failed to connect to publisher socket %s,",
-			"error:%s", address, err)
+		mgr.logger.Errf("Failed to connect to publisher socket %s, error:%s", address, err)
 		return nil, err
 	}
 
 	mgr.logger.Infof("Connected to publisher socker %s", address)
 	if err = socket.SetRecvBuffer(1024 * 1024); err != nil {
-		mgr.logger.Err("Failed to set the buffer size for",
-			"subsriber socket %s, error:", address, err)
+		mgr.logger.Err("Failed to set the buffer size for subscriber socket", address, "error:", err)
 		return nil, err
 	}
 	return socket, nil
@@ -126,8 +122,7 @@ func (mgr *FSPolicyMgr) handlePolicyConditionUpdates(msg ribdCommonDefs.RibdNoti
 		return
 	}
 
-	mgr.logger.Info(updateMsg, "Policy Condition", policyCondition.Name, "type:",
-		policyCondition.ConditionType)
+	mgr.logger.Info(updateMsg, "Policy Condition", policyCondition.Name, "type:", policyCondition.ConditionType)
 	condition := convertModelsToPolicyConditionConfig(&policyCondition)
 	if condition == nil {
 		mgr.logger.Err(updateMsg, "Policy Condition", policyCondition.Name, "conversion failed")
@@ -268,8 +263,7 @@ func (mgr *FSPolicyMgr) handlePolicyUpdates(rxBuf []byte) {
 		ribdCommonDefs.NOTIFY_POLICY_CONDITION_UPDATED:
 		mgr.handlePolicyConditionUpdates(msg)
 	default:
-		mgr.logger.Errf("**** Received Policy update with ",
-			"unknown type %d ****", msg.MsgType)
+		mgr.logger.Errf("**** Received Policy update with unknown type %d ****", msg.MsgType)
 	}
 }
 
@@ -278,8 +272,7 @@ func (mgr *FSPolicyMgr) listenForPolicyUpdates(socket *nanomsg.SubSocket) {
 		mgr.logger.Info("Read on Policy subscriber socket...")
 		rxBuf, err := socket.Recv(0)
 		if err != nil {
-			mgr.logger.Err("Recv on Policy subscriber socket",
-				"failed with error:", err)
+			mgr.logger.Err("Recv on Policy subscriber socket failed with error:", err)
 			continue
 		}
 		mgr.logger.Info("Policy subscriber recv returned:", rxBuf)

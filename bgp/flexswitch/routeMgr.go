@@ -49,7 +49,7 @@ func NewFSRouteMgr(logger *logging.Writer, fileName string) (*FSRouteMgr, error)
 	go rpc.StartRibdClient(logger, fileName, ribdClientChan)
 	ribdClient = <-ribdClientChan
 	if ribdClient == nil {
-		logger.Err("Failed to connect to RIBd\n")
+		logger.Err("Failed to connect to RIBd")
 		return nil, errors.New("Failed to connect to RIBd")
 	} else {
 		logger.Info("Connected to RIBd")
@@ -77,27 +77,23 @@ func (mgr *FSRouteMgr) setupSubSocket(address string) (*nanomsg.SubSocket, error
 	var err error
 	var socket *nanomsg.SubSocket
 	if socket, err = nanomsg.NewSubSocket(); err != nil {
-		mgr.logger.Errf("Failed to create subscribe socket %s",
-			"error:%s", address, err)
+		mgr.logger.Errf("Failed to create subscribe socket %s error:%s", address, err)
 		return nil, err
 	}
 
 	if err = socket.Subscribe(""); err != nil {
-		mgr.logger.Errf("Failed to subscribe to \"\" on ",
-			"subscribe socket %s, error:%s", address, err)
+		mgr.logger.Errf("Failed to subscribe to \"\" on subscribe socket %s, error:%s", address, err)
 		return nil, err
 	}
 
 	if _, err = socket.Connect(address); err != nil {
-		mgr.logger.Errf("Failed to connect to publisher socket %s,",
-			"error:%s", address, err)
+		mgr.logger.Errf("Failed to connect to publisher socket %s, error:%s", address, err)
 		return nil, err
 	}
 
 	mgr.logger.Infof("Connected to publisher socker %s", address)
 	if err = socket.SetRecvBuffer(1024 * 1024); err != nil {
-		mgr.logger.Err("Failed to set the buffer size for",
-			"subsriber socket %s, error:", address, err)
+		mgr.logger.Err("Failed to set the buffer size for subsriber socket %s, error:", address, err)
 		return nil, err
 	}
 	return socket, nil
@@ -108,8 +104,7 @@ func (mgr *FSRouteMgr) listenForRIBUpdates(socket *nanomsg.SubSocket) {
 		mgr.logger.Info("Read on RIB subscriber socket...")
 		rxBuf, err := socket.Recv(0)
 		if err != nil {
-			mgr.logger.Err("Recv on RIB subscriber socket",
-				"failed with error:", err)
+			mgr.logger.Err("Recv on RIB subscriber socket failed with error:", err)
 			continue
 		}
 		mgr.logger.Info("RIB subscriber recv returned:", rxBuf)
@@ -141,16 +136,13 @@ func (mgr *FSRouteMgr) handleRibUpdates(rxBuf []byte) {
 	for err := decoder.Decode(&msg); err == nil; err = decoder.Decode(&msg) {
 		err = json.Unmarshal(msg.MsgBuf, &routeListInfo)
 		if err != nil {
-			mgr.logger.Errf(
-				"Unmarshal RIB route update failed with err %s", err)
+			mgr.logger.Errf("Unmarshal RIB route update failed with err %s", err)
 		}
 		if msg.MsgType == ribdCommonDefs.NOTIFY_ROUTE_DELETED {
 			updateMsg = "Remove"
 		}
-		mgr.logger.Info(updateMsg, "connected route, dest:",
-			routeListInfo.RouteInfo.Ipaddr, "netmask:",
-			routeListInfo.RouteInfo.Mask, "nexthop:",
-			routeListInfo.RouteInfo.NextHopIp)
+		mgr.logger.Info(updateMsg, "connected route, dest:", routeListInfo.RouteInfo.Ipaddr, "netmask:",
+			routeListInfo.RouteInfo.Mask, "nexthop:", routeListInfo.RouteInfo.NextHopIp)
 		route := mgr.populateConfigRoute(&routeListInfo.RouteInfo)
 		routes = append(routes, route)
 	}
@@ -161,20 +153,17 @@ func (mgr *FSRouteMgr) handleRibUpdates(rxBuf []byte) {
 		} else if msg.MsgType == ribdCommonDefs.NOTIFY_ROUTE_DELETED {
 			api.SendRouteNotification(make([]*config.RouteInfo, 0), routes)
 		} else {
-			mgr.logger.Errf("**** Received RIB update with ",
-				"unknown type %d ****", msg.MsgType)
+			mgr.logger.Errf("**** Received RIB update with unknown type %d ****", msg.MsgType)
 		}
 	} else {
-		mgr.logger.Errf("**** Received RIB update type %d with no routes ****",
-			msg.MsgType)
+		mgr.logger.Errf("**** Received RIB update type %d with no routes ****", msg.MsgType)
 	}
 }
 
 func (mgr *FSRouteMgr) GetNextHopInfo(ipAddr string) (*config.NextHopInfo, error) {
 	info, err := mgr.ribdClient.GetRouteReachabilityInfo(ipAddr)
 	if err != nil {
-		mgr.logger.Err("Getting route reachability for ",
-			ipAddr, "failed, error:", err)
+		mgr.logger.Err("Getting route reachability for ", ipAddr, "failed, error:", err)
 		return nil, err
 	}
 	reachInfo := &config.NextHopInfo{
@@ -303,10 +292,8 @@ func (mgr *FSRouteMgr) GetRoutes() ([]*config.RouteInfo, []*config.RouteInfo) {
 	routes := make([]*config.RouteInfo, 0)
 	count = 100
 	for {
-		mgr.logger.Info("Getting ", count,
-			"objects from currMarker", currMarker)
-		getBulkInfo, err := mgr.ribdClient.GetBulkRoutesForProtocol("BGP",
-			currMarker, count)
+		mgr.logger.Info("Getting ", count, "objects from currMarker", currMarker)
+		getBulkInfo, err := mgr.ribdClient.GetBulkRoutesForProtocol("BGP", currMarker, count)
 		if err != nil {
 			mgr.logger.Info("GetBulkRoutesForProtocol with err ", err)
 			break
@@ -315,8 +302,7 @@ func (mgr *FSRouteMgr) GetRoutes() ([]*config.RouteInfo, []*config.RouteInfo) {
 			mgr.logger.Info("0 objects returned from GetBulkRoutesForProtocol")
 			break
 		}
-		mgr.logger.Info("len(getBulkInfo.RouteList)  = ",
-			len(getBulkInfo.RouteList), " num objects returned = ",
+		mgr.logger.Info("len(getBulkInfo.RouteList)  = ", len(getBulkInfo.RouteList), " num objects returned = ",
 			getBulkInfo.Count)
 		for idx, _ := range getBulkInfo.RouteList {
 			route := mgr.populateConfigRoute(getBulkInfo.RouteList[idx])

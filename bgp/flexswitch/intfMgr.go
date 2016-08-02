@@ -75,27 +75,23 @@ func (mgr *FSIntfMgr) setupSubSocket(address string) (*nanomsg.SubSocket, error)
 	var err error
 	var socket *nanomsg.SubSocket
 	if socket, err = nanomsg.NewSubSocket(); err != nil {
-		mgr.logger.Errf("Failed to create subscribe socket %s, error:%s",
-			address, err)
+		mgr.logger.Errf("Failed to create subscribe socket %s, error:%s", address, err)
 		return nil, err
 	}
 
 	if err = socket.Subscribe(""); err != nil {
-		mgr.logger.Errf("Failed to subscribe to \"\" on subscribe socket %s,",
-			"error:%s", address, err)
+		mgr.logger.Errf("Failed to subscribe to \"\" on subscribe socket %s, error:%s", address, err)
 		return nil, err
 	}
 
 	if _, err = socket.Connect(address); err != nil {
-		mgr.logger.Errf("Failed to connect to publisher socket %s, error:%s",
-			address, err)
+		mgr.logger.Errf("Failed to connect to publisher socket %s, error:%s", address, err)
 		return nil, err
 	}
 
 	mgr.logger.Infof("Connected to publisher socker %s", address)
 	if err = socket.SetRecvBuffer(1024 * 1024); err != nil {
-		mgr.logger.Err("Failed to set the buffer size for subsriber socket %s,",
-			"error:", address, err)
+		mgr.logger.Err("Failed to set the buffer size for subsriber socket %s, error:", address, err)
 		return nil, err
 	}
 	return socket, nil
@@ -125,13 +121,11 @@ func (mgr *FSIntfMgr) listenForAsicdEvents() {
 			var msg asicdCommonDefs.L3IntfStateNotifyMsg
 			err = json.Unmarshal(event.Msg, &msg)
 			if err != nil {
-				mgr.logger.Errf("Unmarshal Asicd L3INTF",
-					"event failed with err %s", err)
+				mgr.logger.Errf("Unmarshal Asicd L3INTF event failed with err %s", err)
 				return
 			}
 
-			mgr.logger.Infof("Asicd L3INTF event idx %d ip %s state %d\n", msg.IfIndex, msg.IpAddr,
-				msg.IfState)
+			mgr.logger.Infof("Asicd L3INTF event idx %d ip %s state %d", msg.IfIndex, msg.IpAddr, msg.IfState)
 			if msg.IfState == asicdCommonDefs.INTF_STATE_DOWN {
 				api.SendIntfNotification(msg.IfIndex, msg.IpAddr, config.INTF_STATE_DOWN)
 			} else {
@@ -146,7 +140,7 @@ func (mgr *FSIntfMgr) listenForAsicdEvents() {
 				return
 			}
 
-			mgr.logger.Infof("Asicd IPV4INTF event idx %d ip %s\n", msg.IfIndex, msg.IpAddr)
+			mgr.logger.Infof("Asicd IPV4INTF event idx %d ip %s", msg.IfIndex, msg.IpAddr)
 			if event.MsgType == asicdCommonDefs.NOTIFY_IPV4INTF_CREATE {
 				api.SendIntfNotification(msg.IfIndex, msg.IpAddr, config.INTF_CREATED)
 			} else {
@@ -162,8 +156,7 @@ func (mgr *FSIntfMgr) GetIPv4Intfs() []*config.IntfStateInfo {
 	intfs := make([]*config.IntfStateInfo, 0)
 	count = 100
 	for {
-		mgr.logger.Info("Getting ", count,
-			"IPv4IntfState objects from currMarker", currMarker)
+		mgr.logger.Info("Getting ", count, "IPv4IntfState objects from currMarker", currMarker)
 		getBulkInfo, err := mgr.AsicdClient.GetBulkIPv4IntfState(currMarker, count)
 		if err != nil {
 			mgr.logger.Info("GetBulkIPv4IntfState failed with error", err)
