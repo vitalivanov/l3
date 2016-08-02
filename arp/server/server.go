@@ -230,7 +230,7 @@ func (server *ARPServer) InitServer(asicdPlugin asicdClient.AsicdClientIntf) {
 	}
 
 	// Initialize Events
-	err = eventUtils.InitEvents("ARPD", server.dbHdl, server.logger, 1000)
+	err = eventUtils.InitEvents("ARPD", server.dbHdl, server.dbHdl, server.logger, 1000)
 	if err != nil {
 		server.logger.Err(fmt.Sprintln("Unable to initialize events", err))
 	}
