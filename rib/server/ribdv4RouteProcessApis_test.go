@@ -53,12 +53,20 @@ func InitIpv4AddrInfoList() {
 	ipv4AddrList = append(ipv4AddrList, testIpInfo{"40.0.1.2", "255.255.255.0"})
 	ipv4AddrList = append(ipv4AddrList, testIpInfo{"40.1.10.2", "255.255.255.0"})
 	ipv4AddrList = append(ipv4AddrList, testIpInfo{"50.1.10.2", "255.255.255.0"})
+	ipv4AddrList = append(ipv4AddrList, testIpInfo{"41.1.10.2", "255.255.255.0"})
+	ipv4AddrList = append(ipv4AddrList, testIpInfo{"60.1.10.2", "255.255.255.0"})
 
 }
 func InitIpv4RouteList() {
 	ipv4RouteList = make([]*ribd.IPv4Route, 0)
 	ipv4RouteList = append(ipv4RouteList, &ribd.IPv4Route{
 		DestinationNw: "40.1.10.0",
+		NetworkMask:   "255.255.255.0",
+		NextHop:       []*ribd.NextHopInfo{&ribd.NextHopInfo{NextHopIp: "11.1.10.2", NextHopIntRef: "lo1"}},
+		Protocol:      "EBGP",
+	})
+	ipv4RouteList = append(ipv4RouteList, &ribd.IPv4Route{
+		DestinationNw: "41.1.10.0",
 		NetworkMask:   "255.255.255.0",
 		NextHop:       []*ribd.NextHopInfo{&ribd.NextHopInfo{NextHopIp: "11.1.10.2", NextHopIntRef: "lo1"}},
 		Protocol:      "EBGP",
