@@ -1308,7 +1308,7 @@ func (server *BGPServer) InitBGPEvent() {
 		server.logger.Err(fmt.Sprintf("DB connect failed with error %s. Exiting!!", err))
 		return
 	}
-	err = eventUtils.InitEvents("BGPD", server.eventDbHdl, server.logger, 1000)
+	err = eventUtils.InitEvents("BGPD", server.eventDbHdl, server.eventDbHdl, server.logger, 1000)
 	if err != nil {
 		server.logger.Err(fmt.Sprintln("Unable to initialize events", err))
 	}
