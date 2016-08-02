@@ -23,7 +23,7 @@
 package server
 
 import (
-	"fmt"
+	_ "fmt"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"l3/ndp/config"
@@ -38,7 +38,7 @@ import (
 func (svr *NDPServer) ReceivedNdpPkts(ifIndex int32) {
 	ipPort, _ := svr.L3Port[ifIndex]
 	if ipPort.PcapBase.PcapHandle == nil {
-		debug.Logger.Err(fmt.Sprintln("pcap handler for port:", ipPort.IntfRef, "is not valid. ABORT!!!!"))
+		debug.Logger.Err("pcap handler for port:", ipPort.IntfRef, "is not valid. ABORT!!!!")
 		return
 	}
 	src := gopacket.NewPacketSource(ipPort.PcapBase.PcapHandle, layers.LayerTypeEthernet)
@@ -51,12 +51,11 @@ func (svr *NDPServer) ReceivedNdpPkts(ifIndex int32) {
 			}
 			svr.RxPktCh <- &RxPktInfo{pkt, ipPort.IfIndex}
 		case <-ipPort.PcapBase.PcapCtrl:
-			svr.DeletePcapHandler(&ipPort.PcapBase.PcapHandle)
-			svr.L3Port[ifIndex] = ipPort
 			ipPort.PcapBase.PcapCtrl <- true
 			return
 		}
 	}
+	return
 }
 
 /*
@@ -74,7 +73,6 @@ func (svr *NDPServer) StartRxTx(ifIndex int32) {
 			ifIndex, "is not allowed")
 		return
 	}
-	svr.L3Port[ifIndex] = ipPort
 	// create pcap handler if there is none created right now
 	if ipPort.PcapBase.PcapHandle == nil {
 		var err error
@@ -82,10 +80,13 @@ func (svr *NDPServer) StartRxTx(ifIndex int32) {
 		if err != nil {
 			return
 		}
-		svr.L3Port[ifIndex] = ipPort
 	}
-	debug.Logger.Info(fmt.Sprintln("Start rx/tx for port:", ipPort.IntfRef, "ifIndex:", ipPort.IfIndex,
-		"ip address", ipPort.IpAddr))
+	// create pcap ctrl channel if not created
+	if ipPort.PcapBase.PcapCtrl == nil {
+		ipPort.PcapBase.PcapCtrl = make(chan bool)
+	}
+	svr.L3Port[ifIndex] = ipPort
+	debug.Logger.Info("Start rx/tx for port:", ipPort.IntfRef, "ifIndex:", ipPort.IfIndex, "ip address", ipPort.IpAddr)
 
 	// Spawn go routines for rx & tx
 	go svr.ReceivedNdpPkts(ipPort.IfIndex)
@@ -103,14 +104,22 @@ func (svr *NDPServer) StartRxTx(ifIndex int32) {
 func (svr *NDPServer) StopRxTx(ifIndex int32) {
 	ipPort, exists := svr.L3Port[ifIndex]
 	if !exists {
-		debug.Logger.Err(fmt.Sprintln("No entry found for ifIndex:", ifIndex))
+		debug.Logger.Err("No entry found for ifIndex:", ifIndex)
 		return
 	}
-	// Blocking call until Pcap is deleted
+	// Inform go routine spawned for ipPort to exit..
 	ipPort.PcapBase.PcapCtrl <- true
 	<-ipPort.PcapBase.PcapCtrl
-	debug.Logger.Info(fmt.Sprintln("Stop rx/tx for port:", ipPort.IntfRef, "ifIndex:", ipPort.IfIndex,
-		"ip address", ipPort.IpAddr, "is done"))
+
+	// once go routine is exited, delete pcap handler
+	svr.DeletePcapHandler(&ipPort.PcapBase.PcapHandle)
+
+	// deleted ctrl channel to avoid any memory usage
+	ipPort.PcapBase.PcapCtrl = nil
+	svr.L3Port[ifIndex] = ipPort
+
+	debug.Logger.Info("Stop rx/tx for port:", ipPort.IntfRef, "ifIndex:", ipPort.IfIndex,
+		"ip address", ipPort.IpAddr, "is done")
 	// Delete Entry from Slice
 	svr.DeleteL3IntfFromUpState(ipPort.IfIndex)
 }
@@ -171,7 +180,7 @@ func (svr *NDPServer) ProcessRxPkt(ifIndex int32, pkt gopacket.Packet) {
 	nbrInfo := &config.NeighborInfo{}
 	err := svr.Packet.ValidateAndParse(nbrInfo, pkt)
 	if err != nil {
-		debug.Logger.Err(fmt.Sprintln("Validating and parsing Pkt Failed:", err))
+		debug.Logger.Err("Validating and parsing Pkt Failed:", err)
 		return
 	}
 	// @ALERT: always overwrite ifIndex when creating neighbor, if ifIndex has reverse map entry for

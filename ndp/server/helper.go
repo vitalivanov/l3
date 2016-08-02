@@ -262,16 +262,13 @@ func (svr *NDPServer) HandlePhyPortStateNotification(msg *config.StateNotificati
 	case config.STATE_DOWN:
 		// if the port state is down, then we need to delete all the neighbors for that ifIndex...which
 		// includes deleting neighbor from link local ip address also
+		debug.Logger.Info("Stop receiving frames for", l3Port.IntfRef)
+		svr.StopRxTx(msg.IfIndex)
 		debug.Logger.Info("Deleting Neigbors for", l3Port.IpAddr)
 		svr.Packet.FlushNeighbors(l3Port.IpAddr)
 		debug.Logger.Info("Deleting Neigbors for", l3Port.LinkLocalIp)
 		svr.Packet.FlushNeighbors(l3Port.LinkLocalIp)
-		debug.Logger.Info("Stop receiving frames for", l3Port.IntfRef)
-		svr.StopRxTx(msg.IfIndex)
 	}
-
-	// if the port state is up, then we should restart rx/tx and send out solicitation as needed...
-	//@TODO: do we need to handle this case... i don't think so
 }
 
 /*  API: will handle IPv6 notifications received from switch/asicd
@@ -295,12 +292,12 @@ func (svr *NDPServer) HandleStateNotification(msg *config.StateNotification) {
 		if svr.IsIPv6Addr(msg.IpAddr) {
 			if !svr.IsLinkLocal(msg.IpAddr) {
 				debug.Logger.Info("Delete pkt handler for", msg.IfIndex, "IpAddr:", msg.IpAddr)
+				// stop pcap handler
+				svr.StopRxTx(msg.IfIndex)
 				// @TODO: what about link local??
 				// delete neighbor entries first for the link
 				// stop the timer
 				svr.Packet.FlushNeighbors(msg.IpAddr)
-				// stop pcap handler
-				svr.StopRxTx(msg.IfIndex)
 			}
 		}
 	}
