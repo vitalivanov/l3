@@ -23,7 +23,7 @@
 package packet
 
 import (
-	_ "fmt"
+	"fmt"
 	"github.com/google/gopacket/pcap"
 	"l3/ndp/config"
 	"l3/ndp/debug"
@@ -83,6 +83,7 @@ func addTestNbrEntry(ipAddr string, peerIP string) {
 	}
 	link, exists := testPktObj.GetLink(ipAddr)
 	if !exists {
+		fmt.Println("ERROR: link should exists", ipAddr, "peerIP:", peerIP)
 		return
 	}
 	cache.InitCache(link.ReachableTime, link.RetransTimer, cache.IpAddr, ipAddr, link.PortIfIndex, testPktDataCh)
@@ -101,10 +102,6 @@ func TestSendNDPacket(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-}
-
-func dumpLinkInfo(t *testing.T) {
-	t.Log(testPktObj.LinkInfo)
 }
 
 func TestNDSMsgSend(t *testing.T) {

@@ -96,7 +96,7 @@ func validateIPv6Hdr(hdr *layers.IPv6) error {
 func (p *Packet) decodeICMPv6Hdr(hdr *layers.ICMPv6, srcIP net.IP, dstIP net.IP) (*NDInfo, error) {
 	ndInfo := &NDInfo{}
 	var err error
-	// Validating checksum received
+	// Validating checksum received, if success then only start parsing icmp payload
 	err = validateChecksum(srcIP, dstIP, hdr)
 	if err != nil {
 		return nil, err
@@ -195,13 +195,6 @@ func (p *Packet) ValidateAndParse(nbrInfo *config.NeighborInfo, pkt gopacket.Pac
 		return err
 	}
 
-	/*
-		// Validating checksum received
-		err = validateChecksum(ipv6Hdr.SrcIP, ipv6Hdr.DstIP, icmpv6Hdr)
-		if err != nil {
-			return err
-		}
-	*/
 	// Populate Neighbor Information
 	p.populateNeighborInfo(nbrInfo, eth, ipv6Hdr, icmpv6Hdr, ndInfo)
 	return nil

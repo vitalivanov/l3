@@ -235,11 +235,42 @@ func (svr *NDPServer) HandleCreateIPIntf(obj *config.IPIntfNotification) {
 	}
 }
 
+func (svr *NDPServer) findL3Port(ifIndex int32) (config.IPv6IntfInfo, bool) {
+	l3port, exists := svr.L3Port[ifIndex]
+	return l3port, exists
+}
+
 /*  API: will handle l2/physical notifications received from switch/asicd
  *	  Update map entry and then call state notification
  *
  */
 func (svr *NDPServer) HandlePhyPortStateNotification(msg *config.StateNotification) {
+	debug.Logger.Info("Received State:", msg.State, "for ifIndex:", msg.IfIndex)
+	l3Port, exists := svr.findL3Port(msg.IfIndex)
+	if !exists {
+		debug.Logger.Err("No l3 port exists for ifIndex:", msg.IfIndex, "ignoring port state notification")
+		return
+	}
+	// search this ifIndex in l3 map to get the ifIndex -> ipAddr map
+	switch msg.State {
+	case config.STATE_UP:
+		// if the port state is up, then we need to start RX/TX only for global scope ip address,
+		// if it is not started
+		debug.Logger.Info("Create pkt handler for", msg.IfIndex, "IpAddr:", l3Port.IpAddr)
+		svr.StartRxTx(msg.IfIndex)
+
+	case config.STATE_DOWN:
+		// if the port state is down, then we need to delete all the neighbors for that ifIndex...which
+		// includes deleting neighbor from link local ip address also
+		debug.Logger.Info("Deleting Neigbors for", l3Port.IpAddr)
+		svr.Packet.FlushNeighbors(l3Port.IpAddr)
+		debug.Logger.Info("Deleting Neigbors for", l3Port.LinkLocalIp)
+		svr.Packet.FlushNeighbors(l3Port.LinkLocalIp)
+		debug.Logger.Info("Stop receiving frames for", l3Port.IntfRef)
+		svr.StopRxTx(msg.IfIndex)
+	}
+
+	// if the port state is up, then we should restart rx/tx and send out solicitation as needed...
 	//@TODO: do we need to handle this case... i don't think so
 }
 
@@ -262,11 +293,15 @@ func (svr *NDPServer) HandleStateNotification(msg *config.StateNotification) {
 		}
 	case config.STATE_DOWN:
 		if svr.IsIPv6Addr(msg.IpAddr) {
-			// @TODO:
-			// delete neighbor entries first for the link
-			// stop the timer
-			// stop pcap handler
-			svr.StopRxTx(msg.IfIndex)
+			if !svr.IsLinkLocal(msg.IpAddr) {
+				debug.Logger.Info("Delete pkt handler for", msg.IfIndex, "IpAddr:", msg.IpAddr)
+				// @TODO: what about link local??
+				// delete neighbor entries first for the link
+				// stop the timer
+				svr.Packet.FlushNeighbors(msg.IpAddr)
+				// stop pcap handler
+				svr.StopRxTx(msg.IfIndex)
+			}
 		}
 	}
 }

@@ -23,6 +23,8 @@
 package packet
 
 import (
+	"errors"
+	"fmt"
 	"l3/ndp/debug"
 	"net"
 )
@@ -77,4 +79,32 @@ func (p *Packet) InitLink(ifIndex int32, ip, mac string) {
 	link.ReachableTime = 30000
 	p.SetLink(localIP.String(), link)
 	debug.Logger.Debug("Packet Link Info is", p.LinkInfo)
+}
+
+/*
+ *  On link down.. server will request to delete all the neighbors from the cache..
+ *  We will iterate over all the neighbors, stop its timer and delete the neighbor cache
+ *  @NOTE: Always start from the bottom most layer as we never know when golang will run its garbage collector
+ */
+func (p *Packet) FlushNeighbors(ip string) error {
+	debug.Logger.Debug("Deleting all neighbor entries for link", ip)
+	localIp, _, err := net.ParseCIDR(ip)
+	if err != nil {
+		debug.Logger.Err("Parsing ip", ip, "failed with err:", err)
+		return errors.New(fmt.Sprintln("Parsing ip", ip, "failed with err:", err))
+	}
+	link, exists := p.LinkInfo[localIp.String()]
+	if !exists {
+		debug.Logger.Err("Cannot delete neighbors for", localIp.String(), "as there is no such link entry")
+		return errors.New(fmt.Sprintln("Cannot delete neighbors for", localIp.String(),
+			"as there is no such link entry"))
+	}
+	for _, cache := range link.NbrCache {
+		key := cache.IpAddr
+		debug.Logger.Debug("Deleting Neighbor", cache.IpAddr)
+		cache.DeInitCache()
+		delete(link.NbrCache, key)
+	}
+	delete(p.LinkInfo, localIp.String())
+	return nil
 }
