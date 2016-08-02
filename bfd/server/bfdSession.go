@@ -37,25 +37,6 @@ import (
 	"time"
 )
 
-func convertIpToNwAddr(ipAddr string, port string) string {
-	var nwAddr string
-	addr := net.ParseIP(ipAddr)
-	if addr.To4() != nil {
-		if ipAddr != "" {
-			nwAddr = ipAddr + ":" + port
-		} else {
-			nwAddr = ":" + port
-		}
-	} else {
-		if ipAddr != "" {
-			nwAddr = "[" + ipAddr + "]" + ":" + port
-		} else {
-			nwAddr = ":" + port
-		}
-	}
-	return nwAddr
-}
-
 func (session *BfdSession) StartSessionServer() error {
 	session.server.logger.Info(fmt.Sprintln("Started session server for ", session.state.SessionId))
 	for {
@@ -76,7 +57,7 @@ func (session *BfdSession) StartSessionClient(server *BFDServer) error {
 	var err error
 	server.logger.Info(fmt.Sprintln("Starting session client for ", session.state.SessionId))
 	//destAddr := session.state.IpAddr + ":" + strconv.Itoa(DEST_PORT)
-	destAddr := convertIpToNwAddr(session.state.IpAddr, strconv.Itoa(DEST_PORT))
+	destAddr := net.JoinHostPort(session.state.IpAddr, strconv.Itoa(DEST_PORT))
 	ServerAddr, err := net.ResolveUDPAddr("udp", destAddr)
 	if err != nil {
 		server.logger.Info(fmt.Sprintln("Failed ResolveUDPAddr ", destAddr, err))
@@ -84,7 +65,7 @@ func (session *BfdSession) StartSessionClient(server *BFDServer) error {
 		return err
 	}
 	//localAddr := ":" + strconv.Itoa(int(SRC_PORT+session.state.SessionId))
-	localAddr := convertIpToNwAddr("", strconv.Itoa(int(SRC_PORT+session.state.SessionId)))
+	localAddr := net.JoinHostPort("", strconv.Itoa(int(SRC_PORT+session.state.SessionId)))
 	ClientAddr, err := net.ResolveUDPAddr("udp", localAddr)
 	if err != nil {
 		server.logger.Info(fmt.Sprintln("Failed ResolveUDPAddr ", localAddr, err))
