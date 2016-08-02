@@ -545,6 +545,14 @@ func (h *BGPHandler) isValidIP(ip string) bool {
 	return true
 }
 
+func (h *BGPHandler) isAuthPasswordValid(neighborAddress net.IP, authPassword string) error {
+	if neighborAddress.To4() != nil && authPassword != "" {
+		return errors.New(fmt.Sprint("Cannot create neighbor", neighborAddress,
+			"Auth password can be used only with IPv4 address"))
+	}
+	return nil
+}
+
 // Set BGP Default values.. This needs to move to API Layer once Northbound interfaces are implemented
 // for all the listeners
 func (h *BGPHandler) setDefault(pconf *config.NeighborConfig) {
@@ -573,6 +581,12 @@ func (h *BGPHandler) ValidateBGPNeighbor(bgpNeighbor *bgpd.BGPNeighbor) (pConf c
 
 	if !h.isValidIP(bgpNeighbor.UpdateSource) {
 		err = errors.New(fmt.Sprintf("Update source %s not a valid IP", bgpNeighbor.UpdateSource))
+		return pConf, err
+	}
+
+	if err = h.isAuthPasswordValid(ip, bgpNeighbor.AuthPassword); err != nil {
+		h.logger.Info("ValidateBGPNeighbor: isAuthPasswordValid failed for neighbor", bgpNeighbor.NeighborAddress,
+			"auth password", bgpNeighbor.AuthPassword, "with error:", err)
 		return pConf, err
 	}
 
