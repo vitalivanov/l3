@@ -80,8 +80,7 @@ func (i *InterfaceMgr) GetIfaceIP(ifIndex int32) (ip string, err error) {
 func (i *InterfaceMgr) AddIface(ifIndex int32, addr string) {
 	i.rwMutex.Lock()
 	defer i.rwMutex.Unlock()
-	i.logger.Info("AddIface: ifIndex", ifIndex, "ip", addr, "ifIndexToIP", i.ifIndexToIP, "ipToIfIndex",
-		i.ipToIfIndex)
+	i.logger.Info("AddIface: ifIndex", ifIndex, "ip", addr, "ifIndexToIP", i.ifIndexToIP, "ipToIfIndex", i.ipToIfIndex)
 
 	ip, _, err := net.ParseCIDR(addr)
 	if err != nil {
