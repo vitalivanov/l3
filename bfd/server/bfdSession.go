@@ -56,7 +56,6 @@ func (session *BfdSession) StartSessionServer() error {
 func (session *BfdSession) StartSessionClient(server *BFDServer) error {
 	var err error
 	server.logger.Info(fmt.Sprintln("Starting session client for ", session.state.SessionId))
-	//destAddr := session.state.IpAddr + ":" + strconv.Itoa(DEST_PORT)
 	destAddr := net.JoinHostPort(session.state.IpAddr, strconv.Itoa(DEST_PORT))
 	ServerAddr, err := net.ResolveUDPAddr("udp", destAddr)
 	if err != nil {
@@ -64,7 +63,6 @@ func (session *BfdSession) StartSessionClient(server *BFDServer) error {
 		server.FailedSessionClientCh <- session.state.SessionId
 		return err
 	}
-	//localAddr := ":" + strconv.Itoa(int(SRC_PORT+session.state.SessionId))
 	localAddr := net.JoinHostPort("", strconv.Itoa(int(SRC_PORT+session.state.SessionId)))
 	ClientAddr, err := net.ResolveUDPAddr("udp", localAddr)
 	if err != nil {
