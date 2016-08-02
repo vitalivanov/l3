@@ -121,11 +121,9 @@ func (mgr *FSMManager) Init() {
 	for {
 		select {
 		case inConn := <-mgr.AcceptCh:
-			mgr.logger.Infof("Neighbor %s: Received a connection OPEN from far end",
-				mgr.pConf.NeighborAddress)
+			mgr.logger.Infof("Neighbor %s: Received a connection OPEN from far end", mgr.pConf.NeighborAddress)
 			if !mgr.acceptConn {
-				mgr.logger.Info("Can't accept connection from ", mgr.pConf.NeighborAddress,
-					"yet.")
+				mgr.logger.Info("Can't accept connection from ", mgr.pConf.NeighborAddress, "yet.")
 				inConn.Close()
 			} else {
 				foundInConn := false
@@ -140,8 +138,8 @@ func (mgr *FSMManager) Init() {
 				if !foundInConn {
 					for fsmId, fsm = range mgr.fsms {
 						if fsm != nil {
-							mgr.logger.Infof("Neighbor %s: Send inConn message to FSM %d",
-								mgr.pConf.NeighborAddress, fsmId)
+							mgr.logger.Infof("Neighbor %s: Send inConn message to FSM %d", mgr.pConf.NeighborAddress,
+								fsmId)
 							fsm.inConnCh <- inConn
 						}
 					}
@@ -154,8 +152,8 @@ func (mgr *FSMManager) Init() {
 			mgr.fsmTcpConnFailed(fsmId)
 
 		case newConn := <-mgr.newConnCh:
-			mgr.logger.Infof("FSMManager: Neighbor %s FSM %d Handle another connection",
-				mgr.pConf.NeighborAddress, newConn.id)
+			mgr.logger.Infof("FSMManager: Neighbor %s FSM %d Handle another connection", mgr.pConf.NeighborAddress,
+				newConn.id)
 			newId := mgr.getNewId(newConn.id)
 			mgr.handleAnotherConnection(newId, newConn.connDir, newConn.conn)
 
@@ -168,14 +166,13 @@ func (mgr *FSMManager) Init() {
 
 		case fsmCommand := <-mgr.CommandCh:
 			event := BGPFSMEvent(fsmCommand.Command)
-			mgr.logger.Infof("FSMManager: Neighbor %s: Received FSM command %d",
-				mgr.pConf.NeighborAddress, event)
+			mgr.logger.Infof("FSMManager: Neighbor %s: Received FSM command %d", mgr.pConf.NeighborAddress, event)
 			if (event == BGPEventManualStart) || (event == BGPEventManualStop) || (event == BGPEventAutoStop) ||
 				(event == BGPEventManualStartPassTcpEst) {
 				for id, fsm := range mgr.fsms {
 					if fsm != nil {
-						mgr.logger.Infof("FSMManager: Neighbor %s: FSM %d Send command %d",
-							mgr.pConf.NeighborAddress, id, event)
+						mgr.logger.Infof("FSMManager: Neighbor %s: FSM %d Send command %d", mgr.pConf.NeighborAddress,
+							id, event)
 						fsm.eventRxCh <- PeerFSMEvent{event, fsmCommand.Reason}
 					}
 				}
@@ -222,7 +219,8 @@ func (mgr *FSMManager) fsmEstablished(id uint8, conn *net.Conn) {
 		mgr.activeFSM = id
 		mgr.fsmConnCh <- PeerFSMConn{mgr.neighborConf.Neighbor.NeighborAddress.String(), true, conn}
 	} else {
-		mgr.logger.Infof("FSMManager: Peer %s FSM %d not found in fsms dict %v", mgr.pConf.NeighborAddress.String(), id, mgr.fsms)
+		mgr.logger.Infof("FSMManager: Peer %s FSM %d not found in fsms dict %v", mgr.pConf.NeighborAddress.String(),
+			id, mgr.fsms)
 	}
 	//mgr.Peer.PeerConnEstablished(conn)
 }
@@ -359,8 +357,8 @@ func (mgr *FSMManager) receivedBGPOpenMessage(id uint8, connDir config.ConnDir, 
 	}
 
 	if closeConnDir == connDir {
-		mgr.logger.Infof("FSMManager: Peer %s, FSM %d Closing FSM... return false",
-			mgr.pConf.NeighborAddress.String(), id)
+		mgr.logger.Infof("FSMManager: Peer %s, FSM %d Closing FSM... return false", mgr.pConf.NeighborAddress.String(),
+			id)
 		return false
 	} else {
 		return true

@@ -274,8 +274,7 @@ func (l *LocRib) ProcessRoutes(peerIP string, add, rem []packet.NLRI, addPath, r
 				addedAllPrefixes = false
 				continue
 			}
-			l.logger.Infof("Increment prefix count for destination %s from Peer %s",
-				nlri.GetPrefix().String(), peerIP)
+			l.logger.Infof("Increment prefix count for destination %s from Peer %s", nlri.GetPrefix().String(), peerIP)
 			addPath.NeighborConf.IncrPrefixCount()
 		}
 
@@ -307,8 +306,8 @@ func (l *LocRib) ProcessRoutesForReachableRoutes(nextHop string, reachabilityInf
 			path.SetReachabilityForNextHop(nextHop, reachabilityInfo)
 			peerIP := path.GetPeerIP()
 			if peerIP == "" {
-				l.logger.Errf("ProcessRoutesForReachableRoutes: nexthop %s peer ip not found for path %+v",
-					nextHop, path)
+				l.logger.Errf("ProcessRoutesForReachableRoutes: nexthop %s peer ip not found for path %+v", nextHop,
+					path)
 				continue
 			}
 

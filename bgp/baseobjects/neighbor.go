@@ -311,12 +311,12 @@ func (n *NeighborConf) SetPeerAttrs(bgpId net.IP, asSize uint8, holdTime uint32,
 		if afi == packet.AfiIP {
 			for _, val := range safiMap {
 				if (val & packet.BGPCapAddPathRx) != 0 {
-					n.logger.Infof("SetPeerAttrs - Neighbor %s set add paths maxtx to %d\n",
+					n.logger.Infof("SetPeerAttrs - Neighbor %s set add paths maxtx to %d",
 						n.Neighbor.NeighborAddress, n.RunningConf.AddPathsMaxTx)
 					n.Neighbor.State.AddPathsMaxTx = n.RunningConf.AddPathsMaxTx
 				}
 				if (val & packet.BGPCapAddPathTx) != 0 {
-					n.logger.Infof("SetPeerAttrs - Neighbor %s set add paths rx to %s\n",
+					n.logger.Infof("SetPeerAttrs - Neighbor %s set add paths rx to %s",
 						n.Neighbor.NeighborAddress, n.RunningConf.AddPathsRx)
 					n.Neighbor.State.AddPathsRx = true
 				}
