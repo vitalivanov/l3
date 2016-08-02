@@ -26,12 +26,19 @@ package server
 
 import (
 	"encoding/json"
-	"fmt"
 	"github.com/op/go-nanomsg"
 	"l3/rib/ribdCommonDefs"
 	"models/objects"
 	"ribd"
+	"ribdInt"
 )
+
+type ApplyPolicyInfo struct {
+	Source     string //source application/protocol
+	Policy     string
+	Action     string
+	Conditions []*ribdInt.ConditionInfo
+}
 
 /*
    Function to send PolicyCondition Notification
@@ -61,7 +68,7 @@ func (ribdServiceHandler *RIBDServer) PolicyConditionNotificationSend(PUB *nanom
 		evtStr = " POLICY_CONDITION_DELETED "
 	}
 	eventInfo := evtStr + " for condition " + cfg.Name + " " + " type " + cfg.ConditionType
-	logger.Debug(fmt.Sprintln("Adding ", evtStr, " to notification channel"))
+	logger.Debug("Adding ", evtStr, " to notification channel")
 	ribdServiceHandler.NotificationChannel <- NotificationMsg{PUB, buf, eventInfo}
 }
 
@@ -95,7 +102,7 @@ func (ribdServiceHandler *RIBDServer) PolicyStmtNotificationSend(PUB *nanomsg.Pu
 		evtStr = " POLICY_STMT_DELETED "
 	}
 	eventInfo := evtStr + " for policy stmt " + cfg.Name
-	logger.Debug(fmt.Sprintln("Adding ", evtStr, " to notification channel"))
+	logger.Debug("Adding ", evtStr, " to notification channel")
 	ribdServiceHandler.NotificationChannel <- NotificationMsg{PUB, buf, eventInfo}
 }
 
@@ -133,7 +140,7 @@ func (ribdServiceHandler *RIBDServer) PolicyDefinitionNotificationSend(PUB *nano
 		evtStr = " POLICY_DEFINITION_DELETED "
 	}
 	eventInfo := evtStr + " for policy " + cfg.Name
-	logger.Debug(fmt.Sprintln("Adding ", evtStr, " to notification channel"))
+	logger.Debug("Adding ", evtStr, " to notification channel")
 	ribdServiceHandler.NotificationChannel <- NotificationMsg{PUB, buf, eventInfo}
 }
 
@@ -152,7 +159,7 @@ func (ribdServiceHandler *RIBDServer) StartPolicyServer() {
 	for {
 		select {
 		case condConf := <-ribdServiceHandler.PolicyConditionConfCh:
-			logger.Debug(fmt.Sprintln("received message on PolicyConditionConfCh channel, op: ", condConf.Op))
+			logger.Debug("received message on PolicyConditionConfCh channel, op: ", condConf.Op)
 			if condConf.Op == "add" {
 				_, err := ribdServiceHandler.ProcessPolicyConditionConfigCreate(condConf.OrigConfigObject.(*ribd.PolicyCondition), ribdServiceHandler.GlobalPolicyEngineDB)
 				if err == nil {
@@ -167,7 +174,7 @@ func (ribdServiceHandler *RIBDServer) StartPolicyServer() {
 				}
 			}
 		case stmtConf := <-ribdServiceHandler.PolicyStmtConfCh:
-			logger.Debug(fmt.Sprintln("received message on PolicyStmtConfCh channel, op: ", stmtConf.Op))
+			logger.Debug("received message on PolicyStmtConfCh channel, op: ", stmtConf.Op)
 			if stmtConf.Op == "add" {
 				err := ribdServiceHandler.ProcessPolicyStmtConfigCreate(stmtConf.OrigConfigObject.(*ribd.PolicyStmt), GlobalPolicyEngineDB)
 				if err == nil {
@@ -182,7 +189,7 @@ func (ribdServiceHandler *RIBDServer) StartPolicyServer() {
 				}
 			}
 		case policyConf := <-ribdServiceHandler.PolicyDefinitionConfCh:
-			logger.Debug(fmt.Sprintln("received message on PolicyDefinitionConfCh channel, op:", policyConf.Op))
+			logger.Debug("received message on PolicyDefinitionConfCh channel, op:", policyConf.Op)
 			if policyConf.Op == "add" {
 				err := ribdServiceHandler.ProcessPolicyDefinitionConfigCreate(policyConf.OrigConfigObject.(*ribd.PolicyDefinition), GlobalPolicyEngineDB)
 				if err == nil {

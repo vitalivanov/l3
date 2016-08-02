@@ -27,6 +27,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	//	"github.com/davecheney/profile"
 	"l3/bgp/api"
 	"l3/bgp/flexswitch"
 	"l3/bgp/ovs"
@@ -51,6 +52,7 @@ const (
 )
 
 func main() {
+	//	defer profile.Start(profile.CPUProfile).Stop()
 	fmt.Println("Starting bgp daemon")
 	paramsDir := flag.String("params", "./params", "Params directory")
 	flag.Parse()
@@ -79,6 +81,7 @@ func main() {
 
 	// @FIXME: Plugin name should come for json readfile...
 	//plugin := OVSDB_PLUGIN
+	// We need to revisit this plugin logic later. It should always be hidden inside a client
 	plugin := ""
 	switch plugin {
 	case OVSDB_PLUGIN:

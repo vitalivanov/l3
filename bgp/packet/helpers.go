@@ -25,7 +25,7 @@
 package packet
 
 import (
-	"fmt"
+	_ "fmt"
 	"l3/bgp/utils"
 	"math"
 	"net"
@@ -259,7 +259,7 @@ func HasASLoop(pathAttrs []BGPPathAttr, localAS uint32) bool {
 
 func GetNumASes(pathAttrs []BGPPathAttr) uint32 {
 	var total uint32 = 0
-	utils.Logger.Info(fmt.Sprintln("helpers:GetNumASes - path attrs =", pathAttrs))
+	utils.Logger.Info("helpers:GetNumASes - path attrs =", pathAttrs)
 	for _, attr := range pathAttrs {
 		if attr.GetCode() == BGPPathAttrTypeASPath {
 			asPaths := attr.(*BGPPathAttrASPath).Value
@@ -482,12 +482,12 @@ func ConstructIPPrefix(ipStr string, maskStr string) *IPPrefix {
 	ip := net.ParseIP(ipStr)
 	var mask net.IPMask
 	if ip.To4() != nil {
-		utils.Logger.Info(fmt.Sprintf("ConstructIPPrefix IPv6 - mask ip %+v mask ip mask %+v",
-			net.ParseIP(maskStr), net.IPMask(net.ParseIP(maskStr).To4())))
+		utils.Logger.Infof("ConstructIPPrefix IPv6 - mask ip %+v mask ip mask %+v", net.ParseIP(maskStr),
+			net.IPMask(net.ParseIP(maskStr).To4()))
 		mask = net.IPMask(net.ParseIP(maskStr).To4())
 	} else {
-		utils.Logger.Info(fmt.Sprintf("ConstructIPPrefix IPv4 - mask ip %+v mask ip mask %+v",
-			net.ParseIP(maskStr), net.IPMask(net.ParseIP(maskStr).To16())))
+		utils.Logger.Infof("ConstructIPPrefix IPv4 - mask ip %+v mask ip mask %+v", net.ParseIP(maskStr),
+			net.IPMask(net.ParseIP(maskStr).To16()))
 		mask = net.IPMask(net.ParseIP(maskStr).To16())
 	}
 	ones, _ := mask.Size()
@@ -497,7 +497,7 @@ func ConstructIPPrefix(ipStr string, maskStr string) *IPPrefix {
 func ConstructIPPrefixFromCIDR(cidr string) (*IPPrefix, error) {
 	_, ipNet, err := net.ParseCIDR(cidr)
 	if err != nil {
-		utils.Logger.Info(fmt.Sprintln("ConstructIPPrefixFromCIDR: ParseCIDR for IPPrefix", cidr, "failed with err", err))
+		utils.Logger.Info("ConstructIPPrefixFromCIDR: ParseCIDR for IPPrefix", cidr, "failed with err", err)
 		return nil, err
 	}
 
@@ -599,7 +599,7 @@ func ConstructOptParams(as uint32, afiSAfiMap map[uint32]bool, addPathsRx bool, 
 
 	for protoFamily, _ := range afiSAfiMap {
 		afi, safi := GetAfiSafi(protoFamily)
-		utils.Logger.Info(fmt.Sprintf("Advertising capability for afi %d safi %d\n", afi, safi))
+		utils.Logger.Infof("Advertising capability for afi %d safi %d", afi, safi)
 		capAfiSafi := NewBGPCapMPExt(afi, safi)
 		capParams = append(capParams, capAfiSafi)
 
@@ -608,7 +608,7 @@ func ConstructOptParams(as uint32, afiSAfiMap map[uint32]bool, addPathsRx bool, 
 	}
 
 	if addPathFlags != 0 {
-		utils.Logger.Info(fmt.Sprintf("Advertising capability for addPaths %+v\n", capAddPaths.Value))
+		utils.Logger.Infof("Advertising capability for addPaths %+v", capAddPaths.Value)
 		capParams = append(capParams, capAddPaths)
 	}
 
@@ -639,7 +639,7 @@ func GetAddPathFamily(openMsg *BGPOpen) map[AFI]map[SAFI]uint8 {
 		if capabilities, ok := optParam.(*BGPOptParamCapability); ok {
 			for _, capability := range capabilities.Value {
 				if addPathCap, ok := capability.(*BGPCapAddPath); ok {
-					utils.Logger.Info(fmt.Sprintf("add path capability = %+v\n", addPathCap))
+					utils.Logger.Infof("add path capability = %+v", addPathCap)
 					for _, val := range addPathCap.Value {
 						if _, ok := addPathFamily[val.AFI]; !ok {
 							addPathFamily[val.AFI] = make(map[SAFI]uint8)
@@ -661,7 +661,7 @@ func IsAddPathsTxEnabledForIPv4(addPathFamily map[AFI]map[SAFI]uint8) bool {
 	if _, ok := addPathFamily[AfiIP]; ok {
 		for safi, flags := range addPathFamily[AfiIP] {
 			if (safi == SafiUnicast || safi == SafiMulticast) && (flags&BGPCapAddPathTx != 0) {
-				utils.Logger.Info(fmt.Sprintf("isAddPathsTxEnabledForIPv4 - add path Tx enabled for IPv4"))
+				utils.Logger.Infof("isAddPathsTxEnabledForIPv4 - add path Tx enabled for IPv4")
 				enabled = true
 			}
 		}

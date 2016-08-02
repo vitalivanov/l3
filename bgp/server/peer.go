@@ -25,7 +25,7 @@
 package server
 
 import (
-	"fmt"
+	_ "fmt"
 	"l3/bgp/baseobjects"
 	"l3/bgp/config"
 	"l3/bgp/fsm"
@@ -86,8 +86,7 @@ func (p *Peer) IsBfdStateUp() bool {
 	if p.NeighborConf.Neighbor.State.UseBfdState {
 		if p.NeighborConf.RunningConf.BfdEnable &&
 			p.NeighborConf.Neighbor.State.BfdNeighborState == "down" {
-			p.logger.Info(fmt.Sprintf("Neighbor's bfd state is down for %s\n",
-				p.NeighborConf.Neighbor.NeighborAddress))
+			p.logger.Infof("Neighbor's bfd state is down for %s", p.NeighborConf.Neighbor.NeighborAddress)
 			up = false
 		}
 	}
@@ -96,8 +95,7 @@ func (p *Peer) IsBfdStateUp() bool {
 
 func (p *Peer) Init() {
 	if p.fsmManager == nil {
-		p.logger.Info(fmt.Sprintf("Instantiating new FSM Manager for neighbor %s\n",
-			p.NeighborConf.Neighbor.NeighborAddress))
+		p.logger.Infof("Instantiating new FSM Manager for neighbor %s", p.NeighborConf.Neighbor.NeighborAddress)
 		p.fsmManager = fsm.NewFSMManager(p.logger, p.NeighborConf, p.server.BGPPktSrcCh,
 			p.server.PeerFSMConnCh, p.server.ReachabilityCh)
 	}
@@ -131,8 +129,8 @@ func (p *Peer) getIfIdx() int32 {
 
 func (p *Peer) AcceptConn(conn *net.TCPConn) {
 	if p.fsmManager == nil {
-		p.logger.Info(fmt.Sprintf("FSM Manager is not instantiated yet for neighbor %s\n",
-			p.NeighborConf.Neighbor.NeighborAddress))
+		p.logger.Infof("FSM Manager is not instantiated yet for neighbor %s",
+			p.NeighborConf.Neighbor.NeighborAddress)
 		(*conn).Close()
 		return
 	}
@@ -141,8 +139,8 @@ func (p *Peer) AcceptConn(conn *net.TCPConn) {
 
 func (p *Peer) Command(command int, reason int) {
 	if p.fsmManager == nil {
-		p.logger.Info(fmt.Sprintf("FSM Manager is not instantiated yet for neighbor %s\n",
-			p.NeighborConf.Neighbor.NeighborAddress))
+		p.logger.Infof("FSM Manager is not instantiated yet for neighbor %s",
+			p.NeighborConf.Neighbor.NeighborAddress)
 		return
 	}
 	p.fsmManager.CommandCh <- fsm.PeerFSMCommand{command, reason}
@@ -164,22 +162,22 @@ func (p *Peer) ProcessBfd(add bool) {
 	ipAddr := p.NeighborConf.Neighbor.NeighborAddress.String()
 	sessionParam := p.NeighborConf.RunningConf.BfdSessionParam
 	if add && p.NeighborConf.RunningConf.BfdEnable {
-		p.logger.Info(fmt.Sprintln("Bfd enabled on", p.NeighborConf.Neighbor.NeighborAddress))
+		p.logger.Info("Bfd enabled on", p.NeighborConf.Neighbor.NeighborAddress)
 		ret, err := p.server.bfdMgr.CreateBfdSession(ipAddr, sessionParam)
 		if !ret {
-			p.logger.Info(fmt.Sprintln("BfdSessionConfig FAILED, ret:", ret, "err:", err))
+			p.logger.Info("BfdSessionConfig FAILED, ret:", ret, "err:", err)
 		} else {
-			p.logger.Info(fmt.Sprintln("Bfd session configured: ", ipAddr, " param: ", sessionParam))
+			p.logger.Info("Bfd session configured: ", ipAddr, " param: ", sessionParam)
 			p.NeighborConf.Neighbor.State.BfdNeighborState = "up"
 		}
 	} else {
 		if p.NeighborConf.Neighbor.State.BfdNeighborState != "" {
-			p.logger.Info(fmt.Sprintln("Bfd disabled on", p.NeighborConf.Neighbor.NeighborAddress))
+			p.logger.Info("Bfd disabled on", p.NeighborConf.Neighbor.NeighborAddress)
 			ret, err := p.server.bfdMgr.DeleteBfdSession(ipAddr)
 			if !ret {
-				p.logger.Info(fmt.Sprintln("BfdSessionConfig FAILED, ret:", ret, "err:", err))
+				p.logger.Info("BfdSessionConfig FAILED, ret:", ret, "err:", err)
 			} else {
-				p.logger.Info(fmt.Sprintln("Bfd session removed for", p.NeighborConf.Neighbor.NeighborAddress))
+				p.logger.Info("Bfd session removed for", p.NeighborConf.Neighbor.NeighborAddress)
 				p.NeighborConf.Neighbor.State.BfdNeighborState = ""
 			}
 		}
@@ -190,8 +188,8 @@ func (p *Peer) ProcessBfd(add bool) {
 func (p *Peer) PeerConnEstablished(conn *net.Conn) {
 	host, _, err := net.SplitHostPort((*conn).LocalAddr().String())
 	if err != nil {
-		p.logger.Err(fmt.Sprintf("Neighbor %s: Can't find local address from the peer connection: %s",
-			p.NeighborConf.Neighbor.NeighborAddress, (*conn).LocalAddr()))
+		p.logger.Errf("Neighbor %s: Can't find local address from the peer connection: %s",
+			p.NeighborConf.Neighbor.NeighborAddress, (*conn).LocalAddr())
 		return
 	}
 	p.NeighborConf.Neighbor.Transport.Config.LocalAddress = net.ParseIP(host)
@@ -215,8 +213,7 @@ func (p *Peer) ReceiveUpdate(msg *packet.BGPMessage) {
 
 	update := msg.Body.(*packet.BGPUpdate)
 	if packet.HasASLoop(update.PathAttributes, p.NeighborConf.RunningConf.LocalAS) {
-		p.logger.Info(fmt.Sprintf("Neighbor %s: Recived Update message has AS loop",
-			p.NeighborConf.Neighbor.NeighborAddress))
+		p.logger.Infof("Neighbor %s: Recived Update message has AS loop", p.NeighborConf.Neighbor.NeighborAddress)
 		return
 	}
 
@@ -224,14 +221,14 @@ func (p *Peer) ReceiveUpdate(msg *packet.BGPMessage) {
 	for _, nlri := range update.WithdrawnRoutes {
 		ip := nlri.GetPrefix().String()
 		if pathIdRouteMap, ok = p.ribIn[protoFamily][ip]; !ok {
-			p.logger.Err(fmt.Sprintf("Neighbor %s: Withdraw Prefix %s not found in RIB-In",
-				p.NeighborConf.Neighbor.NeighborAddress, ip))
+			p.logger.Errf("Neighbor %s: Withdraw Prefix %s not found in RIB-In",
+				p.NeighborConf.Neighbor.NeighborAddress, ip)
 			continue
 		}
 
 		if _, ok = pathIdRouteMap[nlri.GetPathId()]; !ok {
-			p.logger.Err(fmt.Sprintf("Neighbor %s: Withdraw Prefix %s Path id %d not found in RIB-In",
-				p.NeighborConf.Neighbor.NeighborAddress, ip, nlri.GetPathId()))
+			p.logger.Errf("Neighbor %s: Withdraw Prefix %s Path id %d not found in RIB-In",
+				p.NeighborConf.Neighbor.NeighborAddress, ip, nlri.GetPathId())
 			continue
 		}
 
@@ -255,14 +252,14 @@ func (p *Peer) ReceiveUpdate(msg *packet.BGPMessage) {
 
 func (p *Peer) updatePathAttrs(bgpMsg *packet.BGPMessage, path *bgprib.Path) bool {
 	if p.NeighborConf.Neighbor.Transport.Config.LocalAddress == nil {
-		p.logger.Err(fmt.Sprintf("Neighbor %s: Can't send Update message, FSM is not",
-			"in Established state\n", p.NeighborConf.Neighbor.NeighborAddress))
+		p.logger.Errf("Neighbor %s: Can't send Update message, FSM is not in Established state",
+			p.NeighborConf.Neighbor.NeighborAddress)
 		return false
 	}
 
 	if bgpMsg == nil || bgpMsg.Body.(*packet.BGPUpdate).PathAttributes == nil {
-		p.logger.Err(fmt.Sprintf("Neighbor %s: Path attrs not found in BGP Update message\n",
-			p.NeighborConf.Neighbor.NeighborAddress))
+		p.logger.Errf("Neighbor %s: Path attrs not found in BGP Update message",
+			p.NeighborConf.Neighbor.NeighborAddress)
 		return false
 	}
 
@@ -359,8 +356,8 @@ func (p *Peer) calculateAddPathsAdvertisements(dest *bgprib.Destination, path *b
 	protoFamily := dest.GetProtocolFamily()
 
 	if _, ok := p.ribOut[protoFamily][ip]; !ok {
-		p.logger.Info(fmt.Sprintf("Neighbor %s: calculateAddPathsAdvertisements - processing updates, dest %s not",
-			"found in rib out", p.NeighborConf.Neighbor.NeighborAddress, ip))
+		p.logger.Info("Neighbor", p.NeighborConf.Neighbor.NeighborAddress,
+			"calculateAddPathsAdvertisements - processing updates, dest", ip, "not found in rib out")
 		p.ribOut[protoFamily][ip] = make(map[uint32]*bgprib.AdjRIBRoute)
 	}
 
@@ -443,11 +440,11 @@ func (p *Peer) calculateAddPathsAdvertisements(dest *bgprib.Destination, path *b
 
 func (p *Peer) SendUpdate(updated map[uint32]map[*bgprib.Path][]*bgprib.Destination, withdrawn,
 	updatedAddPaths []*bgprib.Destination) {
-	p.logger.Info(fmt.Sprintf("Neighbor %s: Send update message valid routes:%v, withdraw routes:%v",
-		p.NeighborConf.Neighbor.NeighborAddress, updated, withdrawn))
+	p.logger.Infof("Neighbor %s: Send update message valid routes:%v, withdraw routes:%v",
+		p.NeighborConf.Neighbor.NeighborAddress, updated, withdrawn)
 	if p.NeighborConf.Neighbor.Transport.Config.LocalAddress == nil {
-		p.logger.Err(fmt.Sprintf("Neighbor %s: Can't send Update message, FSM is not in Established state",
-			p.NeighborConf.Neighbor.NeighborAddress))
+		p.logger.Errf("Neighbor %s: Can't send Update message, FSM is not in Established state",
+			p.NeighborConf.Neighbor.NeighborAddress)
 		return
 	}
 
@@ -467,8 +464,8 @@ func (p *Peer) SendUpdate(updated map[uint32]map[*bgprib.Path][]*bgprib.Destinat
 					if addPathsTx > 0 {
 						pathIdMap, ok := p.ribOut[protoFamily][ip]
 						if !ok {
-							p.logger.Err(fmt.Sprintf("Neighbor %s: processing withdraws, dest %s not found in rib out",
-								p.NeighborConf.Neighbor.NeighborAddress, ip))
+							p.logger.Errf("Neighbor %s: processing withdraws, dest %s not found in rib out",
+								p.NeighborConf.Neighbor.NeighborAddress, ip)
 							continue
 						}
 						for pathId, _ := range pathIdMap {
@@ -547,12 +544,12 @@ func (p *Peer) SendUpdate(updated map[uint32]map[*bgprib.Path][]*bgprib.Destinat
 	}
 
 	if withdrawList != nil {
-		p.logger.Info(fmt.Sprintf("Neighbor %s: Send update message withdraw routes:%+v",
-			p.NeighborConf.Neighbor.NeighborAddress, withdrawList))
+		p.logger.Infof("Neighbor %s: Send update message withdraw routes:%+v",
+			p.NeighborConf.Neighbor.NeighborAddress, withdrawList)
 		var updateMsg *packet.BGPMessage
 		var ipv4List []packet.NLRI
 		protoFamily := packet.GetProtocolFamily(packet.AfiIP, packet.SafiUnicast)
-		if nlriList, ok := withdrawList[protoFamily]; ok {
+		if nlriList, ok := withdrawList[protoFamily]; ok && len(nlriList) > 0 {
 			ipv4List = nlriList
 			delete(withdrawList, protoFamily)
 		}
@@ -576,8 +573,7 @@ func (p *Peer) SendUpdate(updated map[uint32]map[*bgprib.Path][]*bgprib.Destinat
 		}
 	}
 
-	p.logger.Info(fmt.Sprintf("Neighbor %s: new updated routes:%+v",
-		p.NeighborConf.Neighbor.NeighborAddress, newUpdated))
+	p.logger.Infof("Neighbor %s: new updated routes:%+v", p.NeighborConf.Neighbor.NeighborAddress, newUpdated)
 	for path, pfNLRIMap := range newUpdated {
 		var updateMsg *packet.BGPMessage
 		var ipv4List []packet.NLRI
@@ -602,16 +598,16 @@ func (p *Peer) SendUpdate(updated map[uint32]map[*bgprib.Path][]*bgprib.Destinat
 				mpReachNLRI.SetNLRIList(nlriList)
 				pa = packet.AddMPReachNLRIToPathAttrs(pa, mpReachNLRI)
 				updateMsg = packet.NewBGPUpdateMessage(nil, pa, ipv4List)
-				p.logger.Info(fmt.Sprintf("Neighbor %s: Send update message valid routes:%+v, path attrs:%+v",
-					p.NeighborConf.Neighbor.NeighborAddress, nlriList, path.PathAttrs))
+				p.logger.Infof("Neighbor %s: Send update message valid routes:%+v, path attrs:%+v",
+					p.NeighborConf.Neighbor.NeighborAddress, nlriList, path.PathAttrs)
 				p.sendUpdateMsg(updateMsg.Clone(), path)
 				ipv4List = nil
 			}
 		}
 
 		if ipv4List != nil {
-			p.logger.Info(fmt.Sprintf("Neighbor %s: Send update message valid routes:%+v, path attrs:%+v",
-				p.NeighborConf.Neighbor.NeighborAddress, ipv4List, path.PathAttrs))
+			p.logger.Infof("Neighbor %s: Send update message valid routes:%+v, path attrs:%+v",
+				p.NeighborConf.Neighbor.NeighborAddress, ipv4List, path.PathAttrs)
 			updateMsg := packet.NewBGPUpdateMessage(make([]packet.NLRI, 0), path.PathAttrs, ipv4List)
 			p.sendUpdateMsg(updateMsg.Clone(), path)
 		}

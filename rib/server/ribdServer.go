@@ -24,42 +24,31 @@
 package server
 
 import (
-	"arpd"
 	"asicd/asicdCommonDefs"
 	"asicdServices"
 	//	"database/sql"
-	"encoding/json"
 	"fmt"
-	"git.apache.org/thrift.git/lib/go/thrift"
 	"github.com/op/go-nanomsg"
-	"io/ioutil"
 	"l3/rib/ribdCommonDefs"
 	"net"
 	"os"
 	"os/signal"
 	"ribd"
 	"ribdInt"
-	"strconv"
 	"syscall"
-	"time"
 	"utils/dbutils"
-	"utils/ipcutils"
 	"utils/logging"
 	"utils/patriciaDB"
 	"utils/policy"
 	"utils/policy/policyCommonDefs"
 )
 
-type RouteConfigInfo struct {
-	OrigRoute *ribd.IPv4Route
-	NewRoute  *ribd.IPv4Route
-	Attrset   []bool
-	Op        string //"add"/"del"/"update"
-}
 type RIBdServerConfig struct {
 	OrigConfigObject          interface{}
 	NewConfigObject           interface{}
 	OrigBulkRouteConfigObject []*ribdInt.IPv4RouteConfig
+	Bulk                      bool
+	BulkEnd                   bool
 	AttrSet                   []bool
 	Op                        string //"add"/"del"/"update/get"
 	PatchOp                   []*ribd.PatchOpInfo
@@ -70,23 +59,6 @@ type RIBdServerConfig struct {
 	NewRoute  *ribd.IPv4Route
 	Op        []*ribd.PatchOpInfo
 }*/
-type TrackReachabilityInfo struct {
-	IpAddr   string
-	Protocol string
-	Op       string
-}
-type NextHopInfoKey struct {
-	nextHopIp string
-}
-type NextHopInfo struct {
-	refCount int //number of routes using this as a next hop
-}
-type ApplyPolicyInfo struct {
-	Source     string //source application/protocol
-	Policy     string
-	Action     string
-	Conditions []*ribdInt.ConditionInfo
-}
 type RIBDServer struct {
 	Logger                 *logging.Writer
 	PolicyEngineDB         *policy.PolicyEngineDB
@@ -108,24 +80,8 @@ type RIBDServer struct {
 	ServerUpCh             chan bool
 	DBReadDone             chan bool
 	DbHdl                  *dbutils.DBUtil
+	Clients                map[string]ClientIf
 	//RouteInstallCh                 chan RouteParams
-}
-
-type RIBClientBase struct {
-	Address            string
-	Transport          thrift.TTransport
-	PtrProtocolFactory *thrift.TBinaryProtocolFactory
-	IsConnected        bool
-}
-
-type AsicdClient struct {
-	RIBClientBase
-	ClientHdl *asicdServices.ASICDServicesClient
-}
-
-type ArpdClient struct {
-	RIBClientBase
-	ClientHdl *arpd.ARPDServicesClient
 }
 
 const (
@@ -153,11 +109,6 @@ const (
 	SUB_ASICD = 0
 )
 
-type ClientJson struct {
-	Name string `json:Name`
-	Port int    `json:Port`
-}
-
 type localDB struct {
 	prefix     patriciaDB.Prefix
 	isValid    bool
@@ -168,8 +119,6 @@ type IntfEntry struct {
 	name string
 }
 
-var asicdclnt AsicdClient
-var arpdclnt ArpdClient
 var count int
 var ConnectedRoutes []*ribdInt.Routes
 var logger *logging.Writer
@@ -184,6 +133,11 @@ var v4rtCount int
 var v4routeCreatedTimeMap map[int]string
 var v6rtCount int
 var v6routeCreatedTimeMap map[int]string
+
+var dbReqCount = 0
+var dbReqCountLimit = 1
+var dbReqCheckCount = 0
+var dbReqCheckCountLimit = 5
 
 /*
    Handle Interface down event
@@ -222,11 +176,11 @@ func (ribdServiceHandler *RIBDServer) ProcessL3IntfUpEvent(ipAddr string) {
 	copy(ipMask, ipNet.Mask)
 	ipAddrStr := ip.String()
 	ipMaskStr := net.IP(ipMask).String()
-	logger.Info(fmt.Sprintln(" processL3IntfUpEvent for  ipaddr ", ipAddrStr, " mask ", ipMaskStr))
+	logger.Info(" processL3IntfUpEvent for  ipaddr ", ipAddrStr, " mask ", ipMaskStr)
 	for i := 0; i < len(ConnectedRoutes); i++ {
-		logger.Info(fmt.Sprintln("Current state of this connected route is ", ConnectedRoutes[i].IsValid))
+		logger.Info("Current state of this connected route is ", ConnectedRoutes[i].IsValid)
 		if ConnectedRoutes[i].Ipaddr == ipAddrStr && ConnectedRoutes[i].Mask == ipMaskStr && ConnectedRoutes[i].IsValid == false {
-			logger.Info(fmt.Sprintln("Add this route with destAddress = ", ConnectedRoutes[i].Ipaddr, " nwMask = ", ConnectedRoutes[i].Mask))
+			logger.Info("Add this route with destAddress = ", ConnectedRoutes[i].Ipaddr, " nwMask = ", ConnectedRoutes[i].Mask)
 
 			ConnectedRoutes[i].IsValid = true
 			policyRoute := ribdInt.Routes{Ipaddr: ConnectedRoutes[i].Ipaddr, Mask: ConnectedRoutes[i].Mask, NextHopIp: ConnectedRoutes[i].NextHopIp, IfIndex: ConnectedRoutes[i].IfIndex, Metric: ConnectedRoutes[i].Metric, Prototype: ConnectedRoutes[i].Prototype}
@@ -242,20 +196,20 @@ func getLogicalIntfInfo() {
 	var count asicdServices.Int
 	count = 100
 	for {
-		logger.Info(fmt.Sprintln("Getting ", count, "GetBulkLogicalIntf objects from currMarker:", currMarker))
+		logger.Info("Getting ", count, "GetBulkLogicalIntf objects from currMarker:", currMarker)
 		bulkInfo, err := asicdclnt.ClientHdl.GetBulkLogicalIntfState(currMarker, count)
 		if err != nil {
-			logger.Info(fmt.Sprintln("GetBulkLogicalIntfState with err ", err))
+			logger.Info("GetBulkLogicalIntfState with err ", err)
 			return
 		}
 		if bulkInfo.Count == 0 {
 			logger.Info("0 objects returned from GetBulkLogicalIntfState")
 			return
 		}
-		logger.Info(fmt.Sprintln("len(bulkInfo.GetBulkLogicalIntfState)  = ", len(bulkInfo.LogicalIntfStateList), " num objects returned = ", bulkInfo.Count))
+		logger.Info("len(bulkInfo.GetBulkLogicalIntfState)  = ", len(bulkInfo.LogicalIntfStateList), " num objects returned = ", bulkInfo.Count)
 		for i := 0; i < int(bulkInfo.Count); i++ {
 			ifId := (bulkInfo.LogicalIntfStateList[i].IfIndex)
-			logger.Info(fmt.Sprintln("logical interface = ", bulkInfo.LogicalIntfStateList[i].Name, "ifId = ", ifId))
+			logger.Info("logical interface = ", bulkInfo.LogicalIntfStateList[i].Name, "ifId = ", ifId)
 			if IntfIdNameMap == nil {
 				IntfIdNameMap = make(map[int32]IntfEntry)
 			}
@@ -279,20 +233,20 @@ func getVlanInfo() {
 	var count asicdServices.Int
 	count = 100
 	for {
-		logger.Info(fmt.Sprintln("Getting ", count, "GetBulkVlan objects from currMarker:", currMarker))
+		logger.Info("Getting ", count, "GetBulkVlan objects from currMarker:", currMarker)
 		bulkInfo, err := asicdclnt.ClientHdl.GetBulkVlanState(currMarker, count)
 		if err != nil {
-			logger.Info(fmt.Sprintln("GetBulkVlan with err ", err))
+			logger.Info("GetBulkVlan with err ", err)
 			return
 		}
 		if bulkInfo.Count == 0 {
 			logger.Info("0 objects returned from GetBulkVlan")
 			return
 		}
-		logger.Info(fmt.Sprintln("len(bulkInfo.GetBulkVlan)  = ", len(bulkInfo.VlanStateList), " num objects returned = ", bulkInfo.Count))
+		logger.Info("len(bulkInfo.GetBulkVlan)  = ", len(bulkInfo.VlanStateList), " num objects returned = ", bulkInfo.Count)
 		for i := 0; i < int(bulkInfo.Count); i++ {
 			ifId := (bulkInfo.VlanStateList[i].IfIndex)
-			logger.Info(fmt.Sprintln("vlan = ", bulkInfo.VlanStateList[i].VlanId, "ifId = ", ifId))
+			logger.Info("vlan = ", bulkInfo.VlanStateList[i].VlanId, "ifId = ", ifId)
 			if IntfIdNameMap == nil {
 				IntfIdNameMap = make(map[int32]IntfEntry)
 			}
@@ -316,20 +270,20 @@ func getPortInfo() {
 	var count asicdServices.Int
 	count = 100
 	for {
-		logger.Info(fmt.Sprintln("Getting ", count, "objects from currMarker:", currMarker))
+		logger.Info("Getting ", count, "objects from currMarker:", currMarker)
 		bulkInfo, err := asicdclnt.ClientHdl.GetBulkPortState(currMarker, count)
 		if err != nil {
-			logger.Info(fmt.Sprintln("GetBulkPortState with err ", err))
+			logger.Info("GetBulkPortState with err ", err)
 			return
 		}
 		if bulkInfo.Count == 0 {
-			logger.Println("0 objects returned from GetBulkPortState")
+			logger.Info("0 objects returned from GetBulkPortState")
 			return
 		}
-		logger.Info(fmt.Sprintln("len(bulkInfo.PortStateList)  = ", len(bulkInfo.PortStateList), " num objects returned = ", bulkInfo.Count))
+		logger.Info("len(bulkInfo.PortStateList)  = ", len(bulkInfo.PortStateList), " num objects returned = ", bulkInfo.Count)
 		for i := 0; i < int(bulkInfo.Count); i++ {
 			ifId := bulkInfo.PortStateList[i].IfIndex
-			logger.Info(fmt.Sprintln("ifId = ", ifId))
+			logger.Info("ifId = ", ifId)
 			if IntfIdNameMap == nil {
 				IntfIdNameMap = make(map[int32]IntfEntry)
 			}
@@ -341,7 +295,7 @@ func getPortInfo() {
 			IfNameToIfIndex[bulkInfo.PortStateList[i].Name] = ifId
 		}
 		if bulkInfo.More == false {
-			logger.Info(fmt.Sprintln("more returned as false, so no more get bulks"))
+			logger.Info("more returned as false, so no more get bulks")
 			return
 		}
 		currMarker = asicdServices.Int(bulkInfo.EndIdx)
@@ -357,108 +311,16 @@ func (ribdServiceHandler *RIBDServer) AcceptConfigActions() {
 	RouteServiceHandler.AcceptConfig = true
 	getIntfInfo()
 	getConnectedRoutes()
-	//ribdServiceHandler.UpdateRoutesFromDB()
 	//update dbRouteCh to fetch route data
 	ribdServiceHandler.DBRouteCh <- RIBdServerConfig{Op: "fetch"}
 	dbRead := <-ribdServiceHandler.DBReadDone
-	logger.Debug(fmt.Sprintln("Received dbread: "))
+	logger.Info("Received dbread: ")
 	if dbRead != true {
 		logger.Err("DB read failed")
 	}
 	go ribdServiceHandler.SetupEventHandler(AsicdSub, asicdCommonDefs.PUB_SOCKET_ADDR, SUB_ASICD)
 	logger.Info("All set to signal start the RIBd server")
 	ribdServiceHandler.ServerUpCh <- true
-}
-func (ribdServiceHandler *RIBDServer) connectToClient(client ClientJson) {
-	var timer *time.Timer
-	logger.Info(fmt.Sprintln("in go routine ConnectToClient for connecting to %s\n", client.Name))
-	for {
-		timer = time.NewTimer(time.Second * 10)
-		<-timer.C
-		if client.Name == "asicd" {
-			logger.Info(fmt.Sprintln("found asicd at port ", client.Port))
-			asicdclnt.Address = "localhost:" + strconv.Itoa(client.Port)
-			asicdclnt.Transport, asicdclnt.PtrProtocolFactory, _ = ipcutils.CreateIPCHandles(asicdclnt.Address)
-			if asicdclnt.Transport != nil && asicdclnt.PtrProtocolFactory != nil {
-				logger.Info(fmt.Sprintln("connecting to asicd,arpdclnt.IsConnected:", arpdclnt.IsConnected))
-				asicdclnt.ClientHdl = asicdServices.NewASICDServicesClientFactory(asicdclnt.Transport, asicdclnt.PtrProtocolFactory)
-				asicdclnt.IsConnected = true
-				if arpdclnt.IsConnected == true {
-					logger.Info(fmt.Sprintln(" Connected to all clients: call AcceptConfigActions"))
-					ribdServiceHandler.AcceptConfigActions()
-				}
-				timer.Stop()
-				return
-			}
-		}
-		if client.Name == "arpd" {
-			logger.Info(fmt.Sprintln("found arpd at port ", client.Port))
-			arpdclnt.Address = "localhost:" + strconv.Itoa(client.Port)
-			arpdclnt.Transport, arpdclnt.PtrProtocolFactory, _ = ipcutils.CreateIPCHandles(arpdclnt.Address)
-			if arpdclnt.Transport != nil && arpdclnt.PtrProtocolFactory != nil {
-				logger.Info(fmt.Sprintln("connecting to arpd,asicdclnt.IsConnected:", asicdclnt.IsConnected))
-				arpdclnt.ClientHdl = arpd.NewARPDServicesClientFactory(arpdclnt.Transport, arpdclnt.PtrProtocolFactory)
-				arpdclnt.IsConnected = true
-				if asicdclnt.IsConnected == true {
-					logger.Info(fmt.Sprintln(" Connected to all clients: call AcceptConfigActions"))
-					ribdServiceHandler.AcceptConfigActions()
-				}
-				timer.Stop()
-				return
-			}
-		}
-	}
-}
-func (ribdServiceHandler *RIBDServer) ConnectToClients(paramsFile string) {
-	var clientsList []ClientJson
-
-	bytes, err := ioutil.ReadFile(paramsFile)
-	if err != nil {
-		logger.Err("Error in reading configuration file")
-		return
-	}
-
-	err = json.Unmarshal(bytes, &clientsList)
-	if err != nil {
-		logger.Err("Error in Unmarshalling Json")
-		return
-	}
-
-	for _, client := range clientsList {
-		logger.Info(fmt.Sprintln("#### Client name is ", client.Name))
-		if client.Name == "asicd" {
-			logger.Info(fmt.Sprintln("found asicd at port ", client.Port))
-			asicdclnt.Address = "localhost:" + strconv.Itoa(client.Port)
-			asicdclnt.Transport, asicdclnt.PtrProtocolFactory, _ = ipcutils.CreateIPCHandles(asicdclnt.Address)
-			if asicdclnt.Transport != nil && asicdclnt.PtrProtocolFactory != nil {
-				logger.Info(fmt.Sprintln("connecting to asicd,arpdclnt.IsConnected:", arpdclnt.IsConnected))
-				asicdclnt.ClientHdl = asicdServices.NewASICDServicesClientFactory(asicdclnt.Transport, asicdclnt.PtrProtocolFactory)
-				asicdclnt.IsConnected = true
-				if arpdclnt.IsConnected == true {
-					logger.Info(fmt.Sprintln(" Connected to all clients: call AcceptConfigActions"))
-					ribdServiceHandler.AcceptConfigActions()
-				}
-			} else {
-				go ribdServiceHandler.connectToClient(client)
-			}
-		}
-		if client.Name == "arpd" {
-			logger.Info(fmt.Sprintln("found arpd at port ", client.Port))
-			arpdclnt.Address = "localhost:" + strconv.Itoa(client.Port)
-			arpdclnt.Transport, arpdclnt.PtrProtocolFactory, _ = ipcutils.CreateIPCHandles(arpdclnt.Address)
-			if arpdclnt.Transport != nil && arpdclnt.PtrProtocolFactory != nil {
-				logger.Info(fmt.Sprintln("connecting to arpd,asicdclnt.IsConnected:", asicdclnt.IsConnected))
-				arpdclnt.ClientHdl = arpd.NewARPDServicesClientFactory(arpdclnt.Transport, arpdclnt.PtrProtocolFactory)
-				arpdclnt.IsConnected = true
-				if asicdclnt.IsConnected == true {
-					logger.Info(fmt.Sprintln(" Connected to all clients: call AcceptConfigActions"))
-					ribdServiceHandler.AcceptConfigActions()
-				}
-			} else {
-				go ribdServiceHandler.connectToClient(client)
-			}
-		}
-	}
 }
 
 func (ribdServiceHandler *RIBDServer) InitializeGlobalPolicyDB() *policy.PolicyEngineDB {
@@ -507,6 +369,7 @@ func NewRIBDServicesHandler(dbHdl *dbutils.DBUtil, loggerC *logging.Writer) *RIB
 	logger = loggerC
 	localRouteEventsDB = make([]RouteEventInfo, 0)
 	RedistributeRouteMap = make(map[string][]RedistributeRouteInfo)
+	ribdServicesHandler.Clients = make(map[string]ClientIf)
 	TrackReachabilityMap = make(map[string][]string)
 	v4routeCreatedTimeMap = make(map[int]string)
 	v6routeCreatedTimeMap = make(map[int]string)
@@ -543,6 +406,7 @@ func (s *RIBDServer) InitServer() {
 	sigChan := make(chan os.Signal, 1)
 	signalList := []os.Signal{syscall.SIGHUP}
 	signal.Notify(sigChan, signalList...)
+	go s.ListenToClientStateChanges()
 	go s.SigHandler(sigChan)
 	go s.StartRouteProcessServer()
 	go s.StartDBServer()
@@ -554,13 +418,14 @@ func (s *RIBDServer) InitServer() {
 }
 func (ribdServiceHandler *RIBDServer) StartServer(paramsDir string) {
 	ribdServiceHandler.InitServer()
+	logger.Info("Starting RIB server comment out logger. calls")
 	DummyRouteInfoRecord.protocol = PROTOCOL_NONE
 	configFile := paramsDir + "/clients.json"
-	logger.Debug(fmt.Sprintln("configfile = ", configFile))
+	logger.Info(fmt.Sprintln("configfile = ", configFile))
 	PARAMSDIR = paramsDir
 	ribdServiceHandler.UpdatePolicyObjectsFromDB() //(paramsDir)
 	ribdServiceHandler.ConnectToClients(configFile)
-	logger.Debug("Starting the server loop")
+	logger.Info("Starting the server loop")
 	count := 0
 	for {
 		if !RouteServiceHandler.AcceptConfig {
@@ -572,29 +437,29 @@ func (ribdServiceHandler *RIBDServer) StartServer(paramsDir string) {
 		}
 		select {
 		case info := <-ribdServiceHandler.PolicyApplyCh:
-			logger.Debug("received message on PolicyApplyCh channel")
+			//logger.Debug("received message on PolicyApplyCh channel")
 			//update the local policyEngineDB
 			ribdServiceHandler.UpdateApplyPolicy(info, true, PolicyEngineDB)
 			ribdServiceHandler.PolicyUpdateApplyCh <- info
 		case info := <-ribdServiceHandler.TrackReachabilityCh:
-			logger.Debug("received message on TrackReachabilityCh channel")
+			//logger.Debug("received message on TrackReachabilityCh channel")
 			ribdServiceHandler.TrackReachabilityStatus(info.IpAddr, info.Protocol, info.Op)
 		}
 	}
 }
 
 func (ribdServiceHandler *RIBDServer) SigHandler(sigChan <-chan os.Signal) {
-	logger.Debug("Inside sigHandler....")
+	//logger.Debug("Inside sigHandler....")
 	signal := <-sigChan
 	switch signal {
 	case syscall.SIGHUP:
-		logger.Debug("Received SIGHUP signal")
-		logger.Debug("Closing DB handler")
+		//logger.Debug("Received SIGHUP signal")
+		//logger.Debug("Closing DB handler")
 		if ribdServiceHandler.DbHdl != nil {
 			ribdServiceHandler.DbHdl.Disconnect()
 		}
 		os.Exit(0)
 	default:
-		logger.Err(fmt.Sprintln("Unhandled signal : ", signal))
+		//logger.Err(fmt.Sprintln("Unhandled signal : ", signal))
 	}
 }

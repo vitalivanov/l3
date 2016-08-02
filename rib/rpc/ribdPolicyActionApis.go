@@ -13,43 +13,42 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 // ribdPolicyActionApis.go
 package rpc
 
 import (
-	"fmt"
 	"l3/rib/server"
 	"ribdInt"
 )
 
 func (m RIBDServicesHandler) CreatePolicyAction(cfg *ribdInt.PolicyAction) (val bool, err error) {
-	logger.Info(fmt.Sprintln("CreatePolicyAction"))
+	logger.Info("CreatePolicyAction")
 	m.server.PolicyActionConfCh <- server.RIBdServerConfig{
-	                                   OrigConfigObject:cfg,
-	                                   Op : "add",
-	                              }
+		OrigConfigObject: cfg,
+		Op:               "add",
+	}
 	return true, err
 }
 
 func (m RIBDServicesHandler) DeletePolicyAction(cfg *ribdInt.PolicyAction) (val bool, err error) {
-	logger.Info(fmt.Sprintln("CreatePolicyAction"))
+	logger.Info("CreatePolicyAction")
 	m.server.PolicyActionConfCh <- server.RIBdServerConfig{
-	                                   OrigConfigObject:cfg,
-	                                   Op : "del",
-	                              }
+		OrigConfigObject: cfg,
+		Op:               "del",
+	}
 	return true, err
 }
 
 func (m RIBDServicesHandler) UpdatePolicyAction(origconfig *ribdInt.PolicyAction, newconfig *ribdInt.PolicyAction, attrset []bool, op []*ribdInt.PatchOpInfo) (val bool, err error) {
-	logger.Info(fmt.Sprintln("UpdatePolicyAction"))
+	logger.Info("UpdatePolicyAction")
 	return true, err
 }
 

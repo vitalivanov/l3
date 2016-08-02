@@ -13,23 +13,24 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 package ovsMgr
 
 import (
 	"bgpd"
 	"errors"
-	"fmt"
-	ovsdb "github.com/socketplane/libovsdb"
+	_ "fmt"
 	"net"
 	"strings"
+
+	ovsdb "github.com/socketplane/libovsdb"
 )
 
 const (
@@ -92,7 +93,7 @@ func (ovsHdl *BGPOvsdbHandler) GetBGPRouterAsn(table ovsdb.TableUpdate) (*BGPOvs
 				return nil, errors.New("Multiple bgp routers " +
 					"configured on vrf_default")
 			}
-			ovsHdl.logger.Info(fmt.Sprintln(bgpRouters))
+			ovsHdl.logger.Info(bgpRouters)
 			for key, value := range bgpRouters {
 				asn = uint32(key.(float64))
 				id = ovsHdl.getObjUUID(value)
@@ -122,7 +123,7 @@ func (ovsHdl *BGPOvsdbHandler) GetBGPRouterId(rtUuid UUID, table ovsdb.TableUpda
 		if sameUUID(rtUuid, key) {
 			rtrId, ok = value.New.Fields["router_id"].(string)
 			if ok {
-				ovsHdl.logger.Info("Router ID is " + rtrId)
+				ovsHdl.logger.Info("Router ID is", rtrId)
 				return rtrId
 			}
 		}
@@ -179,9 +180,9 @@ func (ovsHdl *BGPOvsdbHandler) DumpBgpNeighborInfo(addrs []net.IP, uuids []UUID,
 	for key, value := range table.Rows {
 		for idx, uuid := range uuids {
 			if sameUUID(uuid, key) {
-				//ovsHdl.logger.Info(fmt.Sprintln("new value:", value.New))
-				//ovsHdl.logger.Info(fmt.Sprintln("old value:", value.Old))
-				//ovsHdl.logger.Info(fmt.Sprintln("uuid", uuid, "key uuid", key))
+				//ovsHdl.logger.Info("new value:", value.New)
+				//ovsHdl.logger.Info("old value:", value.Old)
+				//ovsHdl.logger.Info("uuid", uuid, "key uuid", key)
 				newPeerAS, ok := value.New.Fields["remote_as"].(float64)
 				if !ok {
 					ovsHdl.logger.Warning("no asn")
@@ -195,20 +196,18 @@ func (ovsHdl *BGPOvsdbHandler) DumpBgpNeighborInfo(addrs []net.IP, uuids []UUID,
 					LocalAS:         int32(ovsHdl.routerInfo.asn),
 					NeighborAddress: newNeighborAddr,
 				}
-				ovsHdl.logger.Info(fmt.Sprintln("PeerAS",
-					newPeerAS))
-				ovsHdl.logger.Info(fmt.Sprintln("Neighbor Addr",
-					newNeighborAddr))
+				ovsHdl.logger.Info("PeerAS", newPeerAS)
+				ovsHdl.logger.Info("Neighbor Addr", newNeighborAddr)
 				newDesc, ok := value.New.Fields["description"].(string)
 				if ok {
-					ovsHdl.logger.Info(fmt.Sprintln("Description", newDesc))
+					ovsHdl.logger.Info("Description", newDesc)
 					neighborCfg.Description = newDesc
 				}
 
 				/* Not Support yet from OVS-DB
 				newLocalAS, ok := value.New.Fields["local_as"].(ovsdb.OvsSet)
 				if ok {
-					ovsHdl.logger.Info(fmt.Sprintln("Local AS:", newLocalAS))
+					ovsHdl.logger.Info("Local AS:", newLocalAS)
 				} else {
 					// if not configured then we will use cached asn value from
 					// routerInfo
@@ -220,8 +219,7 @@ func (ovsHdl *BGPOvsdbHandler) DumpBgpNeighborInfo(addrs []net.IP, uuids []UUID,
 				if ok {
 					//@TODO: jgheewala talk with Harsha and figure out what is this
 					//interval
-					ovsHdl.logger.Info(fmt.Sprintln("Advertisement Interval",
-						newAdverInt))
+					ovsHdl.logger.Info("Advertisement Interval", newAdverInt)
 				}
 				// CreateBGPNeighbor(bgpNeighbor *bgpd.BGPNeighbor)
 				/*
@@ -283,8 +281,7 @@ func (ovsHdl *BGPOvsdbHandler) HandleBGPNeighborUpd(table ovsdb.TableUpdate) err
 	if err != nil {
 		return err
 	}
-	ovsHdl.logger.Info(fmt.Sprintln("neighborAddrs:", neighborAddrs, "uuid's:",
-		neighborUUIDs))
+	ovsHdl.logger.Info("neighborAddrs:", neighborAddrs, "uuid's:", neighborUUIDs)
 	ovsHdl.DumpBgpNeighborInfo(neighborAddrs, neighborUUIDs, table)
 	return nil
 }
@@ -296,8 +293,8 @@ func (ovsHdl *BGPOvsdbHandler) HandleBGPRouteUpd(table ovsdb.TableUpdate) error 
 		if err != nil {
 			return err
 		}
-		ovsHdl.logger.Info(fmt.Sprintln("Got BGP_Router Update asn:",
-			ovsHdl.routerInfo.asn, "BGP_Router UUID:", ovsHdl.routerInfo.uuid))
+		ovsHdl.logger.Info("Got BGP_Router Update asn:", ovsHdl.routerInfo.asn, "BGP_Router UUID:",
+			ovsHdl.routerInfo.uuid)
 	} else {
 		ovsHdl.routerInfo.routerId = ovsHdl.GetBGPRouterId(ovsHdl.routerInfo.uuid, table)
 	}
@@ -306,6 +303,6 @@ func (ovsHdl *BGPOvsdbHandler) HandleBGPRouteUpd(table ovsdb.TableUpdate) error 
 		return nil
 	}
 	bgpGlobal := ovsHdl.CreateBgpGlobalConfig(ovsHdl.routerInfo)
-	ovsHdl.logger.Info(fmt.Sprintln(bgpGlobal))
+	ovsHdl.logger.Info(bgpGlobal)
 	return nil
 }
