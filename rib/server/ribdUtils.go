@@ -340,7 +340,7 @@ func BuildPolicyRouteFromribdIPv6Route(cfg *ribd.IPv6Route) (policyRoute ribdInt
 	return policyRoute
 }
 func findRouteWithNextHop(routeInfoList []RouteInfoRecord, nextHopIP string) (found bool, routeInfoRecord RouteInfoRecord, index int) {
-	logger.Info("findRouteWithNextHop")
+	logger.Info("findRouteWithNextHop ", nextHopIP)
 	index = -1
 	for i := 0; i < len(routeInfoList); i++ {
 		if routeInfoList[i].nextHopIp.String() == nextHopIP {

@@ -30,7 +30,15 @@ import (
 	"l3/rib/ribdCommonDefs"
 	"models/objects"
 	"ribd"
+	"ribdInt"
 )
+
+type ApplyPolicyInfo struct {
+	Source     string //source application/protocol
+	Policy     string
+	Action     string
+	Conditions []*ribdInt.ConditionInfo
+}
 
 /*
    Function to send PolicyCondition Notification
