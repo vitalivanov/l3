@@ -205,8 +205,8 @@ func deleteRoutePolicyStateAll(route *bgprib.Route) {
 }
 
 func deletePolicyRouteMapEntry(route *bgprib.Route, policy string) {
-	utils.Logger.Info("deletePolicyRouteMapEntry for policy ", policy, "route ",
-		route.Dest.BGPRouteState.Network, "/", route.Dest.BGPRouteState.CIDRLen)
+	utils.Logger.Info("deletePolicyRouteMapEntry for policy ", policy, "route ", route.Dest.BGPRouteState.Network, "/",
+		route.Dest.BGPRouteState.CIDRLen)
 	if PolicyRouteMap == nil {
 		utils.Logger.Info("PolicyRouteMap empty")
 		return

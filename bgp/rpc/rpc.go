@@ -123,8 +123,7 @@ func StartAsicdClient(logger *logging.Writer, filePath string,
 	clientTransport, protocolFactory, err := ipcutils.CreateIPCHandles("localhost:" +
 		strconv.Itoa(clientJson.Port))
 	if err != nil {
-		logger.Infof("Failed to connect to ASICd, " +
-			"retrying until connection is successful")
+		logger.Infof("Failed to connect to ASICd, retrying until connection is successful")
 		count := 0
 		ticker := time.NewTicker(time.Duration(1000) * time.Millisecond)
 		for _ = range ticker.C {
