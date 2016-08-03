@@ -208,6 +208,7 @@ func TestSendBfdNotification(t *testing.T) {
 	t.Log("Sent BFD state notification")
 }
 
+/*
 func TestSendPeriodicControlPackets(t *testing.T) {
 	bfdTestSession.SendPeriodicControlPackets()
 	t.Log("Sent BFD packet for session to ", bfdTestSession.state.IpAddr)
@@ -226,6 +227,7 @@ func TestProcessBfdPacket(t *testing.T) {
 	bfdTestSession.ProcessBfdPacket(bfdTestSession.bfdPacket)
 	t.Log("Processing BFD packet - ", bfdTestSession.bfdPacket)
 }
+*/
 
 func TestInitiatePollSequence(t *testing.T) {
 	bfdTestSession.InitiatePollSequence()
