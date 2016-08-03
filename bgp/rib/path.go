@@ -26,7 +26,7 @@ package rib
 
 import (
 	"encoding/binary"
-	"fmt"
+	_ "fmt"
 	"l3/bgp/baseobjects"
 	"l3/bgp/packet"
 	"net"
@@ -97,7 +97,7 @@ func NewPath(locRib *LocRib, peer *base.NeighborConf, pa []packet.BGPPathAttr,
 		AggregatedPaths:    make(map[string]*Path),
 	}
 
-	path.logger.Info(fmt.Sprintln("Path:NewPath - path attr =", pa, "path.path attrs =", path.PathAttrs))
+	path.logger.Info("Path:NewPath - path attr =", pa, "path.path attrs =", path.PathAttrs)
 	path.Pref = path.calculatePref()
 	path.constructNHReachabilityInfo(mpReach)
 	return path
@@ -271,7 +271,7 @@ func (p *Path) GetSourceStr() string {
 }
 
 func (p *Path) GetNumASes() uint32 {
-	p.logger.Info(fmt.Sprintln("Path:GetNumASes - path attrs =", p.PathAttrs))
+	p.logger.Info("Path:GetNumASes - path attrs =", p.PathAttrs)
 	return packet.GetNumASes(p.PathAttrs)
 }
 
@@ -336,7 +336,7 @@ func (p *Path) IsReachable(protoFamily uint32) bool {
 
 func (p *Path) setAggregatedPath(destIP string, path *Path) {
 	if _, ok := p.AggregatedPaths[destIP]; ok {
-		p.logger.Err(fmt.Sprintf("Path from %s is already added to the aggregated paths %v", destIP, p.AggregatedPaths))
+		p.logger.Errf("Path from %s is already added to the aggregated paths %v", destIP, p.AggregatedPaths)
 	}
 	p.AggregatedPaths[destIP] = path
 }
@@ -356,12 +356,12 @@ func (p *Path) addPathToAggregate(destIP string, path *Path, generateASSet bool)
 
 	if _, ok := p.AggregatedPaths[destIP]; ok {
 		if !isMEDEqual {
-			p.logger.Info(fmt.Sprintln("addPathToAggregate: MED", med, "in the new path", path,
-				"is not the same as the MED", aggMED, "in the agg path, remove the old path..."))
+			p.logger.Info("addPathToAggregate: MED", med, "in the new path", path,
+				"is not the same as the MED", aggMED, "in the agg path, remove the old path...")
 			delete(p.AggregatedPaths, destIP)
 			p.removePathFromAggregate(destIP, generateASSet)
 		} else {
-			p.logger.Info(fmt.Sprintf("addPathToAggregatePath from %s is already aggregated, replace it...", destIP))
+			p.logger.Infof("addPathToAggregatePath from %s is already aggregated, replace it...", destIP)
 			p.AggregatedPaths[destIP] = path
 			p.aggregateAllPaths(generateASSet)
 		}
@@ -370,8 +370,8 @@ func (p *Path) addPathToAggregate(destIP string, path *Path, generateASSet bool)
 	}
 
 	if !isMEDEqual {
-		p.logger.Info(fmt.Sprintln("addPathToAggregate: Can't aggregate new path MEDs not equal, new path MED =", med,
-			"Agg path MED =", aggMED))
+		p.logger.Info("addPathToAggregate: Can't aggregate new path MEDs not equal, new path MED =", med,
+			"Agg path MED =", aggMED)
 		return false
 	}
 
