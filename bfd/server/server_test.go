@@ -190,6 +190,7 @@ func TestAdminDownBfdSession(t *testing.T) {
 	t.Log("Session state changed to - ", bfdTestSession.state.SessionState)
 }
 
+/*
 func TestAdminUpBfdSession(t *testing.T) {
 	sessionMgmt := BfdSessionMgmt{
 		DestIp:   "10.1.1.1",
@@ -200,6 +201,7 @@ func TestAdminUpBfdSession(t *testing.T) {
 		t.Fatal("Failed to change session state to ADMIN_DOWN")
 	}
 }
+*/
 
 func TestSendBfdNotification(t *testing.T) {
 	bfdTestSession.SendBfdNotification()
