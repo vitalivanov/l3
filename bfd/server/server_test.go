@@ -90,57 +90,95 @@ func startTestServerChans() {
 
 func TestCreateBfdServer(t *testing.T) {
 	initTestServer()
+	if bfdTestServer == nil {
+		t.Fatal("Failed to initialize BFD server instance")
+	} else {
+		t.Log("Successfully initialize BFD server instance")
+	}
 	go startTestServerChans()
+	t.Log("Started go routine to accept messages from all channels supported by server")
 }
 
 func TestBuildPortPropertyMap(t *testing.T) {
-	bfdTestServer.BuildPortPropertyMap()
+	err := bfdTestServer.BuildPortPropertyMap()
+	if err == nil {
+		t.Log("Successfully built port property map: ", len(bfdTestServer.portPropertyMap), " ports")
+	} else {
+		t.Fatal("Failed to build port property map")
+	}
 }
 
 func TestCreateASICdSubscriber(t *testing.T) {
 	go bfdTestServer.CreateASICdSubscriber()
+	t.Log("Created asicd subscriber go routine")
 }
 
 func TestCreateRIBdSubscriber(t *testing.T) {
 	go bfdTestServer.CreateRIBdSubscriber()
+	t.Log("Created ribd subscriber go routine")
 }
 
 func TestNewNormalBfdSession(t *testing.T) {
 	bfdTestServer.createDefaultSessionParam()
 	fmt.Println("Creating BFD session to 10.1.1.1")
 	bfdTestSession = bfdTestServer.NewNormalBfdSession(0, "10.1.1.1", "default", false, 2)
+	if bfdTestSession != nil {
+		t.Log("Created BFD session to ", bfdTestSession.state.IpAddr, " session id ", bfdTestSession.state.SessionId)
+		if bfdTestSession.state.SessionState != STATE_DOWN {
+			t.Fatal("Session created in ", bfdTestSession.state.SessionState, " state")
+		}
+	} else {
+		t.Fatal("Failed to create session")
+	}
 }
 
 func TestStartSessionServer(t *testing.T) {
 	go bfdTestSession.StartSessionServer()
+	t.Log("Stated session server for ", bfdTestSession.state.SessionId)
 }
 
 func TestStartSessionClient(t *testing.T) {
 	go bfdTestSession.StartSessionClient(bfdTestServer)
+	t.Log("Stated session client for ", bfdTestSession.state.SessionId)
 }
 
 func TestFindBfdSession(t *testing.T) {
 	sessionId, found := bfdTestServer.FindBfdSession("10.1.1.1")
 	if found {
-		fmt.Println("Found session: ", sessionId)
+		t.Log("Found session: ", sessionId)
+	} else {
+		t.Fatal("Failed to find session to 10.1.1.1")
 	}
 }
 
 func TestEventHandler(t *testing.T) {
+	t.Log("Session state before REMOTE_DOWN event is ", bfdTestSession.state.SessionState)
 	bfdTestSession.EventHandler(REMOTE_DOWN)
+	t.Log("Session state after REMOTE_DOWN event is ", bfdTestSession.state.SessionState)
 	bfdTestSession.EventHandler(REMOTE_INIT)
+	t.Log("Session state after REMOTE_INIT event is ", bfdTestSession.state.SessionState)
 	bfdTestSession.EventHandler(TIMEOUT)
+	t.Log("Session state after TIMEOUT event is ", bfdTestSession.state.SessionState)
 	bfdTestSession.EventHandler(REMOTE_ADMIN_DOWN)
+	t.Log("Session state after REMOTE_ADMIN_DOWN event is ", bfdTestSession.state.SessionState)
 	bfdTestSession.EventHandler(ADMIN_UP)
+	t.Log("Session state after ADMIN_UP event is ", bfdTestSession.state.SessionState)
 	bfdTestSession.EventHandler(REMOTE_UP)
+	t.Log("Session state after REMOTE_UP event is ", bfdTestSession.state.SessionState)
 }
 
 func TestUpdateBfdSessionControlPacket(t *testing.T) {
 	bfdTestSession.UpdateBfdSessionControlPacket()
+	t.Log("Updated control packet for session to ", bfdTestSession.state.IpAddr)
+	t.Log("BFD control packet is - ", bfdTestSession.bfdPacket)
 }
 
 func TestCheckIfAnyProtocolRegistered(t *testing.T) {
-	bfdTestSession.CheckIfAnyProtocolRegistered()
+	owner := bfdTestSession.CheckIfAnyProtocolRegistered()
+	t.Log("Registered protocols for session to ", bfdTestSession.state.IpAddr, " is ", bfdTestSession.state.RegisteredProtocols)
+	if owner != true {
+		t.Fatal("Expecting USER as owner registered with session to ", bfdTestSession.state.IpAddr)
+	}
 }
 
 func TestAdminDownBfdSession(t *testing.T) {
@@ -149,6 +187,9 @@ func TestAdminDownBfdSession(t *testing.T) {
 		Protocol: 2,
 	}
 	bfdTestServer.AdminDownBfdSession(sessionMgmt)
+	if bfdTestSession.state.SessionState != ADMIN_DOWN {
+		t.Fatal("Failed to change session state to ADMIN_DOWN")
+	}
 }
 
 func TestAdminUpBfdSession(t *testing.T) {
@@ -157,14 +198,19 @@ func TestAdminUpBfdSession(t *testing.T) {
 		Protocol: 2,
 	}
 	bfdTestServer.AdminUpBfdSession(sessionMgmt)
+	if bfdTestSession.state.SessionState != ADMIN_UP {
+		t.Fatal("Failed to change session state to ADMIN_DOWN")
+	}
 }
 
 func TestSendBfdNotification(t *testing.T) {
 	bfdTestSession.SendBfdNotification()
+	t.Log("Sent BFD state notification")
 }
 
 func TestSendPeriodicControlPackets(t *testing.T) {
 	bfdTestSession.SendPeriodicControlPackets()
+	t.Log("Sent BFD packet for session to ", bfdTestSession.state.IpAddr)
 }
 
 func TestHandleSessionTimeout(t *testing.T) {
