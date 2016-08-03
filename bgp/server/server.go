@@ -90,6 +90,7 @@ type BGPServer struct {
 	ribInPE          *bgppolicy.AdjRibPPolicyEngine
 	ribOutPE         *bgppolicy.AdjRibPPolicyEngine
 	listener         *net.TCPListener
+	listenerIPv6     *net.TCPListener
 	ifaceMgr         *utils.InterfaceMgr
 	BgpConfig        config.Bgp
 	GlobalConfigCh   chan GlobalUpdate
@@ -184,8 +185,7 @@ func NewBGPServer(logger *logging.Writer, policyManager *bgppolicy.BGPPolicyMana
 	return bgpServer
 }
 
-func (s *BGPServer) createListener() (*net.TCPListener, error) {
-	proto := "tcp4"
+func (s *BGPServer) createListener(proto string) (*net.TCPListener, error) {
 	addr := ":" + config.BGPPort
 	s.logger.Infof("Listening for incomig connections on %s", addr)
 	tcpAddr, err := net.ResolveTCPAddr(proto, addr)
@@ -1019,7 +1019,8 @@ func (s *BGPServer) listenChannelUpdates() {
 					s.logger.Info("Clean up peer", oldPeer.NeighborAddress.String())
 					peer.Cleanup()
 					s.ProcessRemoveNeighbor(oldPeer.NeighborAddress.String(), peer)
-					if peer.NeighborConf.RunningConf.AuthPassword != "" {
+					if peer.NeighborConf.RunningConf.NeighborAddress.To4() != nil &&
+						peer.NeighborConf.RunningConf.AuthPassword != "" {
 						err := netUtils.SetTCPListenerMD5(s.listener, oldPeer.NeighborAddress.String(), "")
 						if err != nil {
 							s.logger.Info("Failed to add MD5 authentication for old neighbor",
@@ -1054,7 +1055,8 @@ func (s *BGPServer) listenChannelUpdates() {
 				}
 				s.logger.Info("Add neighbor, ip:", newPeer.NeighborAddress.String())
 				peer = NewPeer(s, s.LocRib, &s.BgpConfig.Global.Config, groupConfig, newPeer)
-				if peer.NeighborConf.RunningConf.AuthPassword != "" {
+				if peer.NeighborConf.RunningConf.NeighborAddress.To4() != nil &&
+					peer.NeighborConf.RunningConf.AuthPassword != "" {
 					err := netUtils.SetTCPListenerMD5(s.listener, newPeer.NeighborAddress.String(),
 						peer.NeighborConf.RunningConf.AuthPassword)
 					if err != nil {
@@ -1274,7 +1276,7 @@ func (s *BGPServer) InitBGPEvent() {
 		s.logger.Errf("DB connect failed with error %s. Exiting!!", err)
 		return
 	}
-	err = eventUtils.InitEvents("BGPD", s.eventDbHdl, s.logger, 1000)
+	err = eventUtils.InitEvents("BGPD", s.eventDbHdl, s.eventDbHdl, s.logger, 1000)
 	if err != nil {
 		s.logger.Err("Unable to initialize events", err)
 	}
@@ -1299,8 +1301,11 @@ func (s *BGPServer) StartServer() {
 	// channel for accepting connections
 	s.acceptCh = make(chan *net.TCPConn)
 
-	s.listener, _ = s.createListener()
+	s.listener, _ = s.createListener("tcp4")
 	go s.listenForPeers(s.listener, s.acceptCh)
+
+	s.listenerIPv6, _ = s.createListener("tcp6")
+	go s.listenForPeers(s.listenerIPv6, s.acceptCh)
 
 	s.logger.Info("Start all managers and initialize API Layer")
 	s.IntfMgr.Start()

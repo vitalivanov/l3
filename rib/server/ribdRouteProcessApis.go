@@ -779,6 +779,7 @@ func addNewRoute(destNetPrefix patriciaDB.Prefix,
 	   Update route info in RouteMap
 	*/
 	RouteInfoMap.Set(patriciaDB.Prefix(destNetPrefix), routeInfoRecordList)
+	UpdateProtocolRouteMap(ReverseRouteProtoTypeMapDB[int(routeInfoRecord.protocol)], "add", string(destNetPrefix))
 
 	if ReverseRouteProtoTypeMapDB[int(routeInfoRecord.protocol)] != routeInfoRecordList.selectedRouteProtocol {
 		logger.Debug("This is not a selected route, so nothing more to do here")
@@ -941,6 +942,7 @@ func deleteRoute(destNetPrefix patriciaDB.Prefix, //route prefix of the route be
 					Op:               "del",
 				}
 				RouteInfoMap.Delete(destNetPrefix)
+				UpdateProtocolRouteMap(ReverseRouteProtoTypeMapDB[int(routeInfoRecord.protocol)], "del", string(destNetPrefix))
 				nodeDeleted = true
 			}
 		}
@@ -950,6 +952,7 @@ func deleteRoute(destNetPrefix patriciaDB.Prefix, //route prefix of the route be
 				Op:               "add",
 			}
 			RouteInfoMap.Set(destNetPrefix, routeInfoRecordList)
+			UpdateProtocolRouteMap(ReverseRouteProtoTypeMapDB[int(routeInfoRecord.protocol)], "del", string(destNetPrefix))
 		}
 	} else if delType == FIBOnly {
 		/*
@@ -1192,6 +1195,7 @@ func createRoute(routeInfo RouteParams) (rc ribd.Int, err error) {
 			logger.Err("Route map insert return value not ok")
 			return 0, err
 		}
+		UpdateProtocolRouteMap(ReverseRouteProtoTypeMapDB[int(routeType)], "add", string(destNet))
 		localDBRecord := localDB{prefix: destNet, isValid: true, nextHopIp: nextHopIp}
 		if destNetSlice == nil {
 			destNetSlice = make([]localDB, 0)
