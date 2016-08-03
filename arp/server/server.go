@@ -212,7 +212,7 @@ func (server *ARPServer) initializeEvents() error {
 		return err
 	}
 
-	return eventUtils.InitEvents("ARPD", server.eventDbHdl, server.logger, 1000)
+	return eventUtils.InitEvents("ARPD", server.eventDbHdl, server.eventDbHdl, server.logger, 1000)
 }
 
 func (server *ARPServer) InitServer(asicdPlugin asicdClient.AsicdClientIntf) {
