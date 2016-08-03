@@ -215,14 +215,21 @@ func TestSendPeriodicControlPackets(t *testing.T) {
 
 func TestHandleSessionTimeout(t *testing.T) {
 	bfdTestSession.HandleSessionTimeout()
+	if bfdTestSession.state.SessionState == STATE_DOWN {
+		t.Log("Session ", bfdTestSession.state.SessionId, " went to down state due to timeout")
+	} else {
+		t.Fatal("Session timeout failed")
+	}
 }
 
 func TestProcessBfdPacket(t *testing.T) {
 	bfdTestSession.ProcessBfdPacket(bfdTestSession.bfdPacket)
+	t.Log("Processing BFD packet - ", bfdTestSession.bfdPacket)
 }
 
 func TestInitiatePollSequence(t *testing.T) {
 	bfdTestSession.InitiatePollSequence()
+	t.Log("Session ", bfdTestSession.state.SessionId, " initiated poll sequence")
 }
 
 func TestDecodeBfdControlPacket(t *testing.T) {
