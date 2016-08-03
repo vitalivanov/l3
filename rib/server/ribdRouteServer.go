@@ -28,8 +28,62 @@ import (
 	"ribd"
 )
 
+type RouteConfigInfo struct {
+	OrigRoute *ribd.IPv4Route
+	NewRoute  *ribd.IPv4Route
+	Attrset   []bool
+	Op        string //"add"/"del"/"update"
+}
+type TrackReachabilityInfo struct {
+	IpAddr   string
+	Protocol string
+	Op       string
+}
+type NextHopInfoKey struct {
+	nextHopIp string
+}
+type NextHopInfo struct {
+	refCount int //number of routes using this as a next hop
+}
+
+var ProtocolRouteMap map[string]map[string]int
+
+func UpdateProtocolRouteMap(protocol string, op string, value string) {
+	if ProtocolRouteMap == nil {
+		if op == "del" {
+			return
+		}
+		ProtocolRouteMap = make(map[string]map[string]int)
+	}
+	_, ok := ProtocolRouteMap[protocol]
+	if !ok {
+		if op == "del" {
+			return
+		}
+		ProtocolRouteMap[protocol] = make(map[string]int)
+	}
+	protocolroutemap, ok := ProtocolRouteMap[protocol]
+	if !ok {
+		return
+	}
+	count, ok := protocolroutemap[value]
+	if !ok {
+		if op == "del" {
+			return
+		}
+	}
+	if op == "add" {
+		count++
+	} else if op == "del" {
+		count--
+	}
+	protocolroutemap[value] = count
+	ProtocolRouteMap[protocol] = protocolroutemap
+
+}
 func (ribdServiceHandler *RIBDServer) StartRouteProcessServer() {
 	logger.Info("Starting the routeserver loop")
+	ProtocolRouteMap = make(map[string]map[string]int)
 	for {
 		select {
 		case routeConf := <-ribdServiceHandler.RouteConfCh:
