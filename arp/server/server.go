@@ -94,6 +94,7 @@ type ARPServer struct {
 	AsicdSubSocketCh chan commonDefs.AsicdNotifyMsg
 	//AsicdSubSocketErrCh     chan error
 	dbHdl                   *dbutils.DBUtil
+	eventDbHdl              *dbutils.DBUtil
 	snapshotLen             int32
 	pcapTimeout             time.Duration
 	promiscuous             bool
@@ -203,6 +204,17 @@ func (server *ARPServer) sigHandler(sigChan <-chan os.Signal) {
 	}
 }
 
+func (server *ARPServer) initializeEvents() error {
+	server.eventDbHdl = dbutils.NewDBUtil(server.logger)
+	err := server.eventDbHdl.Connect()
+	if err != nil {
+		server.logger.Err("Failed to create the DB handle")
+		return err
+	}
+
+	return eventUtils.InitEvents("ARPD", server.eventDbHdl, server.eventDbHdl, server.logger, 1000)
+}
+
 func (server *ARPServer) InitServer(asicdPlugin asicdClient.AsicdClientIntf) {
 	server.initArpParams()
 
@@ -230,7 +242,7 @@ func (server *ARPServer) InitServer(asicdPlugin asicdClient.AsicdClientIntf) {
 	}
 
 	// Initialize Events
-	err = eventUtils.InitEvents("ARPD", server.dbHdl, server.logger, 1000)
+	err = server.initializeEvents()
 	if err != nil {
 		server.logger.Err(fmt.Sprintln("Unable to initialize events", err))
 	}
