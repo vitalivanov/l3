@@ -200,9 +200,6 @@ func (server *BFDServer) SigHandler(dbHdl *dbutils.DBUtil) {
 		case signal := <-sigChan:
 			switch signal {
 			case syscall.SIGHUP:
-				server.SendAdminDownToAllNeighbors()
-				time.Sleep(500 * time.Millisecond)
-				server.logger.Info("Sent admin_down to all neighbors")
 				server.SendDeleteToAllSessions()
 				time.Sleep(500 * time.Millisecond)
 				server.logger.Info("Stopped all sessions")
