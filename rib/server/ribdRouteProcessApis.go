@@ -163,8 +163,8 @@ func IsRoutePresent(routeInfoRecordList RouteInfoRecordList,
 	return found
 }
 
-func getConnectedRoutes() {
-	//logger.Debug("Getting connected routes from portd")
+func getV4ConnectedRoutes() {
+	//logger.Debug("Getting v4 connected routes from asicd")
 	var currMarker asicdServices.Int
 	var count asicdServices.Int
 	count = 100
@@ -212,6 +212,56 @@ func getConnectedRoutes() {
 		}
 		if IPIntfBulk.More == false {
 			//logger.Debug("more returned as false, so no more get bulks")
+			return
+		}
+		currMarker = asicdServices.Int(IPIntfBulk.EndIdx)
+	}
+}
+func getV6ConnectedRoutes() {
+	//logger.Debug("Gettingv6  connected routes from asicd")
+	var currMarker asicdServices.Int
+	var count asicdServices.Int
+	count = 100
+	for {
+		IPIntfBulk, err := asicdclnt.ClientHdl.GetBulkIPv6IntfState(currMarker, count)
+		if err != nil {
+			logger.Debug("GetBulkIPv6IntfState with err ", err)
+			return
+		}
+		if IPIntfBulk.Count == 0 {
+			logger.Info("0 objects returned from GetBulkIPv6IntfState")
+			return
+		}
+		for i := 0; i < int(IPIntfBulk.Count); i++ {
+			var ipMask net.IP
+			ip, ipNet, err := net.ParseCIDR(IPIntfBulk.IPv6IntfStateList[i].IpAddr)
+			if err != nil {
+				return
+			}
+			ipMask = make(net.IP, 16)
+			copy(ipMask, ipNet.Mask)
+			ipAddrStr := ip.String()
+			ipMaskStr := net.IP(ipMask).String()
+			logger.Debug("Calling createv6Route with ipaddr ", ipAddrStr, " mask ", ipMaskStr, "ifIndex : ", IPIntfBulk.IPv6IntfStateList[i].IfIndex)
+			cfg := ribd.IPv6Route{
+				DestinationNw: ipAddrStr,
+				Protocol:      "CONNECTED",
+				Cost:          0,
+				NetworkMask:   ipMaskStr,
+			}
+			nextHop := ribd.NextHopInfo{
+				NextHopIp:     "0.0.0.0",
+				NextHopIntRef: strconv.Itoa(int(IPIntfBulk.IPv6IntfStateList[i].IfIndex)), //strconv.Itoa(int(asicdCommonDefs.GetIntfIdFromIfIndex(IPIntfBulk.IPv4IntfStateList[i].IfIndex))),
+			}
+			cfg.NextHop = make([]*ribd.NextHopInfo, 0)
+			cfg.NextHop = append(cfg.NextHop, &nextHop)
+			RouteServiceHandler.RouteConfCh <- RIBdServerConfig{
+				OrigConfigObject: &cfg,
+				Op:               "addv6",
+			}
+		}
+		if IPIntfBulk.More == false {
+			logger.Debug("more returned as false, so no more get bulks")
 			return
 		}
 		currMarker = asicdServices.Int(IPIntfBulk.EndIdx)
