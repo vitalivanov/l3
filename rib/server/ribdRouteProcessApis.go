@@ -1269,16 +1269,16 @@ func createRoute(routeInfo RouteParams) (rc ribd.Int, err error) {
 				callSelectRoute = true
 			} else if routeInfoList[0].metric == metric {
 				if !newNextHopIP(nextHopIp, routeInfoList) {
-					//logger.Debug("same cost and next hop ip, so reject this route")
+					logger.Debug("same cost and next hop ip, so reject this route")
 					err = errors.New("Duplicate route creation")
 					return 0, err
 				}
 				//adding equal cost route
-				//logger.Debug("Adding a equal cost route for the selected route")
+				logger.Debug("Adding a equal cost route for the selected route")
 				callSelectRoute = true
 				//}
 			} else { //if metric > routeInfoRecordList.routeInfoList[idx].metric
-				//logger.Debug("Duplicate route creation with higher cost, rejecting the route")
+				logger.Debug("Duplicate route creation with higher cost, rejecting the route")
 				err = errors.New("Duplicate route creation with higher cost, rejecting the route")
 				return 0, err
 			}

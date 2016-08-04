@@ -39,7 +39,7 @@ func main() {
 			number, _ := strconv.Atoi(route_ops[i+1])
 			i++
 			fmt.Println("Scale test for ", number, " routes")
-			routeThriftTest.Scale(ribdClient, number)
+			routeThriftTest.Scale(ribdClient, int64(number))
 		case "RouteCount":
 			fmt.Println("RouteCount")
 			routeThriftTest.GetTotalRouteCount(ribdClient)
