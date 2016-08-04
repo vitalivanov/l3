@@ -26,6 +26,10 @@ package main
 import (
 	"flag"
 	"fmt"
+	"os"
+	"os/signal"
+	"syscall"
+
 	//"github.com/davecheney/profile"
 	"l3/rib/rpc"
 	"l3/rib/server"
@@ -38,6 +42,26 @@ import (
 
 //var cpuprofile = flag.String("cpuprofile", "cpu.prof", "write cpu profile to file")
 //var cpuprofile = "cpu.prof"
+func SigHandler(logger *logging.Writer, dbHdl *dbutils.DBUtil, routeServer *server.RIBDServer) {
+	logger.Debug("Inside sigHandler....")
+	sigChan := make(chan os.Signal, 1)
+	signalList := []os.Signal{syscall.SIGHUP}
+	signal.Notify(sigChan, signalList...)
+
+	signal := <-sigChan
+	switch signal {
+	case syscall.SIGHUP:
+		logger.Debug("Received SIGHUP signal")
+		routeServer.StopServer()
+		if dbHdl != nil {
+			logger.Debug("Closing DB handler")
+			dbHdl.Disconnect()
+		}
+		os.Exit(0)
+	default:
+		//logger.Err(fmt.Sprintln("Unhandled signal : ", signal))
+	}
+}
 
 func main() {
 	//defer profile.Start(profile.CPUProfile).Stop()
@@ -87,7 +111,7 @@ func main() {
 
 	// Start keepalive routine
 	go keepalive.InitKeepAlive("ribd", fileName)
-
+	go SigHandler(logger, dbHdl, routeServer)
 	ribdServicesHandler := rpc.NewRIBdHandler(logger, routeServer)
 	rpc.NewRIBdRPCServer(logger, ribdServicesHandler, fileName)
 }

@@ -31,11 +31,11 @@ import (
 	"github.com/op/go-nanomsg"
 	"l3/rib/ribdCommonDefs"
 	"net"
-	"os"
-	"os/signal"
+	//	"os"
+	//	"os/signal"
 	"ribd"
 	"ribdInt"
-	"syscall"
+	//	"syscall"
 	"utils/dbutils"
 	"utils/logging"
 	"utils/patriciaDB"
@@ -310,7 +310,8 @@ func (ribdServiceHandler *RIBDServer) AcceptConfigActions() {
 	logger.Info("AcceptConfigActions: Setting AcceptConfig to true")
 	RouteServiceHandler.AcceptConfig = true
 	getIntfInfo()
-	getConnectedRoutes()
+	getV4ConnectedRoutes()
+	getV6ConnectedRoutes()
 	//update dbRouteCh to fetch route data
 	ribdServiceHandler.DBRouteCh <- RIBdServerConfig{Op: "fetch"}
 	dbRead := <-ribdServiceHandler.DBReadDone
@@ -379,8 +380,8 @@ func NewRIBDServicesHandler(dbHdl *dbutils.DBUtil, loggerC *logging.Writer) *RIB
 	PublisherInfoMap = make(map[string]PublisherMapInfo)
 	ribdServicesHandler.NextHopInfoMap = make(map[NextHopInfoKey]NextHopInfo)
 	ribdServicesHandler.TrackReachabilityCh = make(chan TrackReachabilityInfo, 1000)
-	ribdServicesHandler.RouteConfCh = make(chan RIBdServerConfig, 30000)
-	ribdServicesHandler.AsicdRouteCh = make(chan RIBdServerConfig, 30000)
+	ribdServicesHandler.RouteConfCh = make(chan RIBdServerConfig, 100000)
+	ribdServicesHandler.AsicdRouteCh = make(chan RIBdServerConfig, 100000)
 	ribdServicesHandler.ArpdRouteCh = make(chan RIBdServerConfig, 5000)
 	ribdServicesHandler.NotificationChannel = make(chan NotificationMsg, 5000)
 	ribdServicesHandler.PolicyConditionConfCh = make(chan RIBdServerConfig, 5000)
@@ -389,7 +390,7 @@ func NewRIBDServicesHandler(dbHdl *dbutils.DBUtil, loggerC *logging.Writer) *RIB
 	ribdServicesHandler.PolicyDefinitionConfCh = make(chan RIBdServerConfig, 5000)
 	ribdServicesHandler.PolicyApplyCh = make(chan ApplyPolicyInfo, 100)
 	ribdServicesHandler.PolicyUpdateApplyCh = make(chan ApplyPolicyInfo, 100)
-	ribdServicesHandler.DBRouteCh = make(chan RIBdServerConfig, 30000)
+	ribdServicesHandler.DBRouteCh = make(chan RIBdServerConfig, 100000)
 	ribdServicesHandler.ServerUpCh = make(chan bool)
 	ribdServicesHandler.DBReadDone = make(chan bool)
 	ribdServicesHandler.DbHdl = dbHdl
@@ -403,11 +404,11 @@ func NewRIBDServicesHandler(dbHdl *dbutils.DBUtil, loggerC *logging.Writer) *RIB
 	return ribdServicesHandler
 }
 func (s *RIBDServer) InitServer() {
-	sigChan := make(chan os.Signal, 1)
-	signalList := []os.Signal{syscall.SIGHUP}
-	signal.Notify(sigChan, signalList...)
+	/*	sigChan := make(chan os.Signal, 1)
+		signalList := []os.Signal{syscall.SIGHUP}
+		signal.Notify(sigChan, signalList...)*/
 	go s.ListenToClientStateChanges()
-	go s.SigHandler(sigChan)
+	//go s.SigHandler(sigChan)
 	go s.StartRouteProcessServer()
 	go s.StartDBServer()
 	go s.StartPolicyServer()
@@ -447,19 +448,10 @@ func (ribdServiceHandler *RIBDServer) StartServer(paramsDir string) {
 		}
 	}
 }
-
-func (ribdServiceHandler *RIBDServer) SigHandler(sigChan <-chan os.Signal) {
-	//logger.Debug("Inside sigHandler....")
-	signal := <-sigChan
-	switch signal {
-	case syscall.SIGHUP:
-		//logger.Debug("Received SIGHUP signal")
-		//logger.Debug("Closing DB handler")
-		if ribdServiceHandler.DbHdl != nil {
-			ribdServiceHandler.DbHdl.Disconnect()
-		}
-		os.Exit(0)
-	default:
-		//logger.Err(fmt.Sprintln("Unhandled signal : ", signal))
-	}
+func (s *RIBDServer) StopServer() {
+	logger.Debug("StopServer")
+	//clean up IPv4RouteState* from DB
+	s.DbHdl.DeleteObjectWithKeyFromDb("IPv4RouteState*")
+	//clean up IPv6RouteState* from DB
+	s.DbHdl.DeleteObjectWithKeyFromDb("IPv6RouteState*")
 }
