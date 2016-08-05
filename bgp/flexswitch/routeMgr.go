@@ -183,6 +183,7 @@ func (mgr *FSRouteMgr) createRibdIPv4RouteCfg(cfg *config.RouteConfig, create bo
 		Protocol:      cfg.Protocol,
 		NetworkMask:   cfg.NetworkMask,
 		DestinationNw: cfg.DestinationNw,
+		NullRoute:     cfg.NullRoute,
 	}
 	nextHop := ribd.NextHopInfo{
 		NextHopIp:     cfg.NextHopIp,
@@ -199,6 +200,7 @@ func (mgr *FSRouteMgr) createRibdIPv6RouteCfg(cfg *config.RouteConfig, create bo
 		Protocol:      cfg.Protocol,
 		NetworkMask:   cfg.NetworkMask,
 		DestinationNw: cfg.DestinationNw,
+		NullRoute:     cfg.NullRoute,
 	}
 	nextHop := ribd.NextHopInfo{
 		NextHopIp:     cfg.NextHopIp,
@@ -231,6 +233,7 @@ func (mgr *FSRouteMgr) UpdateV4Route(cfg *config.RouteConfig, nhInfo []*ribd.Nex
 		Protocol:      cfg.Protocol,
 		NetworkMask:   cfg.NetworkMask,
 		DestinationNw: cfg.DestinationNw,
+		NullRoute:     cfg.NullRoute,
 	}
 	rCfg.NextHop = nhInfo
 	mgr.ribdClient.UpdateIPv4Route(&rCfg, &rCfg, nil, patch)
@@ -242,6 +245,7 @@ func (mgr *FSRouteMgr) UpdateV6Route(cfg *config.RouteConfig, nhInfo []*ribd.Nex
 		Protocol:      cfg.Protocol,
 		NetworkMask:   cfg.NetworkMask,
 		DestinationNw: cfg.DestinationNw,
+		NullRoute:     cfg.NullRoute,
 	}
 	rCfg.NextHop = nhInfo
 	mgr.ribdClient.UpdateIPv6Route(&rCfg, &rCfg, nil, patch)
