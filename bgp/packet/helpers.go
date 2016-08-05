@@ -456,7 +456,18 @@ func ConstructPathAttrForAggRoutes(pathAttrs []BGPPathAttr, generateASSet bool) 
 	return newPathAttrs
 }
 
-func ConstructPathAttrForConnRoutes(ip net.IP, as uint32) []BGPPathAttr {
+func ConstructMPReachNLRIForAggRoutes(protoFamily uint32) *BGPPathAttrMPReachNLRI {
+	nh := NewMPNextHopIP()
+	nh.SetNextHop(net.IPv6zero)
+	afi, safi := GetAfiSafi(protoFamily)
+	pa := NewBGPPathAttrMPReachNLRI()
+	pa.AFI = afi
+	pa.SAFI = safi
+	pa.SetNextHop(nh)
+	return pa
+}
+
+func ConstructPathAttrForConnRoutes(as uint32) []BGPPathAttr {
 	pathAttrs := make([]BGPPathAttr, 0)
 
 	origin := NewBGPPathAttrOrigin(BGPPathAttrOriginIncomplete)
@@ -466,7 +477,7 @@ func ConstructPathAttrForConnRoutes(ip net.IP, as uint32) []BGPPathAttr {
 	pathAttrs = append(pathAttrs, asPath)
 
 	nextHop := NewBGPPathAttrNextHop()
-	nextHop.Value = ip
+	nextHop.Value = net.IPv4zero
 	pathAttrs = append(pathAttrs, nextHop)
 
 	return pathAttrs

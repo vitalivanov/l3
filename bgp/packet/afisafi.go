@@ -46,15 +46,20 @@ const (
 )
 
 var ProtocolFamilyMap = map[string]uint32{
-	"ipv4-unicast":   GetProtocolFamily(AfiIP, SafiUnicast),
-	"ipv6-unicast":   GetProtocolFamily(AfiIP6, SafiUnicast),
-	"ipv4-multicast": GetProtocolFamily(AfiIP, SafiMulticast),
-	"ipv6-multicast": GetProtocolFamily(AfiIP6, SafiMulticast),
+	"ipv4-unicast": GetProtocolFamily(AfiIP, SafiUnicast),
+	"ipv6-unicast": GetProtocolFamily(AfiIP6, SafiUnicast),
+	//"ipv4-multicast": GetProtocolFamily(AfiIP, SafiMulticast),
+	//"ipv6-multicast": GetProtocolFamily(AfiIP6, SafiMulticast),
 }
 
 var AFINextHopLenMap = map[AFI]int{
 	AfiIP:  4,
 	AfiIP6: 16,
+}
+
+var AFINextHop = map[AFI]net.IP{
+	AfiIP:  net.IPv4zero,
+	AfiIP6: net.IPv6zero,
 }
 
 var RIBdAddressTypeToAFI = map[ribdCommonDefs.IPType]AFI{
@@ -98,6 +103,14 @@ func GetAddressLengthForFamily(protoFamily uint32) int {
 		return addrLen
 	}
 	return -1
+}
+
+func GetZeroNextHopForFamily(protoFamily uint32) net.IP {
+	afi, _ := GetAfiSafi(protoFamily)
+	if nh, ok := AFINextHop[afi]; ok {
+		return nh
+	}
+	return nil
 }
 
 func GetProtocolFromOpenMsg(openMsg *BGPOpen) map[uint32]bool {
