@@ -390,6 +390,35 @@ func (d *Destination) removeAndPrepend(pathsList *[][]*Path, item *Path) {
 	(*pathsList)[0] = paths
 }
 
+func (d *Destination) ConstructRouteConfig(path *Path, reachInfo *ReachabilityInfo, ipLength int) *config.RouteConfig {
+	protocol := "IBGP"
+	if path.IsExternal() {
+		protocol = "EBGP"
+	}
+	nullRoute := false
+	if path.IsAggregate() {
+		nullRoute = true
+	}
+	isIPv6 := false
+	if ipLength == 16 {
+		isIPv6 = true
+	}
+
+	cfg := config.RouteConfig{
+		Cost:              int32(reachInfo.Metric),
+		IntfType:          int32(reachInfo.NextHopIfType),
+		Protocol:          protocol,
+		NextHopIp:         reachInfo.NextHop,
+		NetworkMask:       d.constructNetmaskFromLen(int(d.NLRI.GetLength()), ipLength*8).String(),
+		DestinationNw:     d.NLRI.GetPrefix().String(),
+		OutgoingInterface: strconv.Itoa(int(reachInfo.NextHopIfIdx)),
+		IsIPv6:            isIPv6,
+		NullRoute:         nullRoute,
+	}
+
+	return &cfg
+}
+
 func (d *Destination) SelectRouteForLocRib(addPathCount int) (RouteAction, bool, []*Route, []*Route, []*Route) {
 	updatedPaths := make([]*Path, 0)
 	removedPaths := make([]*Path, 0)
@@ -401,10 +430,6 @@ func (d *Destination) SelectRouteForLocRib(addPathCount int) (RouteAction, bool,
 	locRibAction := RouteActionNone
 	addPathsUpdated := false
 	ipLength := packet.GetAddressLengthForFamily(d.protoFamily)
-	isIPv6 := false
-	if ipLength == 16 {
-		isIPv6 = true
-	}
 
 	d.logger.Infof("Destination - selecting best path for prefix %s", d.NLRI.GetPrefix())
 	if !d.recalculate {
@@ -527,7 +552,7 @@ func (d *Destination) SelectRouteForLocRib(addPathCount int) (RouteAction, bool,
 				newRoute.setAction(RouteActionAdd)
 				newRoute.SetMultiPath()
 
-				if paths[0].IsAggregate() || !paths[0].IsLocal() {
+				if !paths[0].IsLocal() || paths[0].IsAggregate() {
 					d.logger.Infof("Add route for ip=%s, mask=%s, next hop=%s", d.NLRI.GetPrefix(),
 						d.constructNetmaskFromLen(int(d.NLRI.GetLength()), ipLength*8),
 						paths[0].GetReachability(d.protoFamily).NextHop)
@@ -553,25 +578,12 @@ func (d *Destination) SelectRouteForLocRib(addPathCount int) (RouteAction, bool,
 				route.setAction(RouteActionDelete)
 				route.ResetMultiPath()
 				route.ResetBestPath()
-				if path.IsAggregate() || !path.IsLocal() {
+				if !path.IsLocal() || path.IsAggregate() {
 					reachInfo := path.GetReachability(d.protoFamily)
 					d.logger.Infof("Remove route for ip=%s nexthop=%s", d.NLRI.GetPrefix().String(),
 						reachInfo.NextHop)
-					protocol := "IBGP"
-					if path.IsExternal() {
-						protocol = "EBGP"
-					}
-					cfg := config.RouteConfig{
-						Cost:              int32(reachInfo.Metric),
-						Protocol:          protocol,
-						NextHopIp:         reachInfo.NextHop,
-						NetworkMask:       d.constructNetmaskFromLen(int(d.NLRI.GetLength()), ipLength*8).String(),
-						DestinationNw:     d.NLRI.GetPrefix().String(),
-						OutgoingInterface: strconv.Itoa(int(reachInfo.NextHopIfIdx)),
-						IsIPv6:            isIPv6,
-					}
-					//d.rib.routeMgr.DeleteRoute(&cfg)
-					d.rib.routeMgr.UpdateRoute(&cfg, "remove")
+					cfg := d.ConstructRouteConfig(path, reachInfo, ipLength)
+					d.rib.routeMgr.UpdateRoute(cfg, "remove")
 					d.logger.Infof("DeleteV4Route for ip=%s nexthop=%s DONE", d.NLRI.GetPrefix().String(),
 						reachInfo.NextHop)
 				}
@@ -583,25 +595,12 @@ func (d *Destination) SelectRouteForLocRib(addPathCount int) (RouteAction, bool,
 
 	for path, route := range d.ecmpPaths {
 		if route.action == RouteActionNone || route.action == RouteActionDelete {
-			if path.IsAggregate() || !path.IsLocal() {
+			if !path.IsLocal() || path.IsAggregate() {
 				reachInfo := path.GetReachability(d.protoFamily)
 				d.logger.Info("Remove route from ECMP paths, route =", route, "ip =",
 					d.NLRI.GetPrefix().String(), "next hop =", reachInfo.NextHop)
-				protocol := "IBGP"
-				if path.IsExternal() {
-					protocol = "EBGP"
-				}
-				cfg := config.RouteConfig{
-					Cost:              int32(reachInfo.Metric),
-					Protocol:          protocol,
-					NextHopIp:         reachInfo.NextHop,
-					NetworkMask:       d.constructNetmaskFromLen(int(d.NLRI.GetLength()), ipLength*8).String(),
-					DestinationNw:     d.NLRI.GetPrefix().String(),
-					OutgoingInterface: strconv.Itoa(int(reachInfo.NextHopIfIdx)),
-					IsIPv6:            isIPv6,
-				}
-				//d.rib.routeMgr.DeleteRoute(&cfg)
-				d.rib.routeMgr.UpdateRoute(&cfg, "remove")
+				cfg := d.ConstructRouteConfig(path, reachInfo, ipLength)
+				d.rib.routeMgr.UpdateRoute(cfg, "remove")
 				d.logger.Info("DeleteV4Route from ECMP paths, route =", route, "ip =",
 					d.NLRI.GetPrefix().String(), "next hop =", reachInfo.NextHop, "DONE")
 			}
@@ -618,25 +617,12 @@ func (d *Destination) SelectRouteForLocRib(addPathCount int) (RouteAction, bool,
 		reachInfo := path.GetReachability(d.protoFamily)
 		d.logger.Infof("Add route for ip=%s, mask=%s, next hop=%s", d.NLRI.GetPrefix().String(),
 			d.constructNetmaskFromLen(int(d.NLRI.GetLength()), ipLength*8).String(), reachInfo.NextHop)
-		protocol := "IBGP"
-		if path.IsExternal() {
-			protocol = "EBGP"
-		}
-		cfg := config.RouteConfig{
-			Cost:              int32(reachInfo.Metric),
-			IntfType:          int32(reachInfo.NextHopIfType),
-			Protocol:          protocol,
-			NextHopIp:         reachInfo.NextHop,
-			NetworkMask:       d.constructNetmaskFromLen(int(d.NLRI.GetLength()), ipLength*8).String(),
-			DestinationNw:     d.NLRI.GetPrefix().String(),
-			OutgoingInterface: strconv.Itoa(int(reachInfo.NextHopIfIdx)),
-			IsIPv6:            isIPv6,
-		}
+		cfg := d.ConstructRouteConfig(path, reachInfo, ipLength)
 		if firstRoute {
-			d.rib.routeMgr.CreateRoute(&cfg)
+			d.rib.routeMgr.CreateRoute(cfg)
 			firstRoute = false
 		} else {
-			d.rib.routeMgr.UpdateRoute(&cfg, "add")
+			d.rib.routeMgr.UpdateRoute(cfg, "add")
 		}
 	}
 	return locRibAction, addPathsUpdated, addedRoutes, updatedRoutes, deletedRoutes

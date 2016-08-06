@@ -157,7 +157,7 @@ func (i *MPNextHopIP6) Decode(pkt []byte) error {
 		return err
 	}
 
-	if i.Length == 16 || i.Length == 32 {
+	if i.Length == 32 {
 		ipLen := net.IPv6len
 		i.LinkLocal = make(net.IP, ipLen)
 		copy(i.LinkLocal, pkt[ipLen+1:])
