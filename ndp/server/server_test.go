@@ -135,9 +135,6 @@ func TestPopulateVlanIfIndexInfo(t *testing.T) {
 	if nbrInfo.VlanId != -1 {
 		t.Error("Vlan Id", nbrInfo.VlanId, "should not be present")
 	}
-	if nbrInfo.IfIndex != 1 {
-		t.Error("IfIndex is not copied properly need 1 but got", nbrInfo.IfIndex)
-	}
 	svr.DeInitGlobalDS()
 }
 
