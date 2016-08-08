@@ -39,7 +39,6 @@ import (
 func NDPNewServer(sPlugin asicdClient.AsicdClientIntf) *NDPServer {
 	svr := &NDPServer{}
 	svr.SwitchPlugin = sPlugin
-	svr.Packet = packet.Init()
 	return svr
 }
 
@@ -85,10 +84,12 @@ func (svr *NDPServer) InitGlobalDS() {
 	svr.IpStateCh = make(chan *config.StateNotification)
 	svr.VlanCh = make(chan *config.VlanNotification)
 	svr.RxPktCh = make(chan *RxPktInfo)
+	svr.PktDataCh = make(chan config.PacketData)
 	svr.SnapShotLen = 1024
 	svr.Promiscuous = false
 	svr.Timeout = 1 * time.Second
 	svr.NeigborEntryLock = &sync.RWMutex{}
+	svr.Packet = packet.Init(svr.PktDataCh)
 }
 
 func (svr *NDPServer) DeInitGlobalDS() {
@@ -149,6 +150,11 @@ func (svr *NDPServer) EventsListener() {
 				continue
 			}
 			svr.ProcessRxPkt(rxChInfo.ifIndex, rxChInfo.pkt)
+		case pktData, ok := <-svr.PktDataCh:
+			if !ok {
+				continue
+			}
+			svr.ProcessTimerExpiry(pktData)
 		}
 	}
 }

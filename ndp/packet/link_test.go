@@ -20,4 +20,43 @@
 // |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
 // |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
 //
-package tx
+package packet
+
+import (
+	"net"
+	"testing"
+)
+
+func dumpLinkInfo(t *testing.T) {
+	t.Log(testPktObj.LinkInfo)
+}
+
+func TestLinkFlushNeighbor(t *testing.T) {
+	initTestPacket()
+	ipAddr := "2002::1/64"
+	nbrIp := "2002::2"
+	testPktObj.InitLink(100, ipAddr, "00:e0:ec:26:a7:ee")
+	ip, _, _ := net.ParseCIDR(ipAddr)
+	addTestNbrEntry(ip.String(), nbrIp)
+	deleteEntries, err := testPktObj.FlushNeighbors(ipAddr)
+	if err != nil {
+		t.Error("Failed to flush neighbor cache from packet LinkInfo, error:", err)
+	}
+	if deleteEntries[0] != nbrIp {
+		t.Error("Invalid Delete Entry information", deleteEntries)
+	}
+	if len(testPktObj.LinkInfo) == 0 {
+		t.Error("When flushing neighbors packet linkInfo should not be deleted", testPktObj.LinkInfo)
+	}
+	testPktObj.DeleteLink(ipAddr)
+	if len(testPktObj.LinkInfo) > 0 {
+		t.Error("Failed to delete link")
+	}
+	deleteEntries, err = testPktObj.FlushNeighbors(ipAddr)
+	if err == nil {
+		t.Error("There is no entry in Neighbor Cache and we still didn't receive error message")
+	}
+	if len(deleteEntries) > 0 {
+		t.Error("There should be zero delete entries")
+	}
+}
