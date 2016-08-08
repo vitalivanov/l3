@@ -516,6 +516,31 @@ func ConstructIPPrefixFromCIDR(cidr string) (*IPPrefix, error) {
 	return NewIPPrefix(ipNet.IP, uint8(ones)), nil
 }
 
+func ConstructMPUnreachNLRI(protoFamily uint32, nlriList []NLRI) *BGPPathAttrMPUnreachNLRI {
+	afi, safi := GetAfiSafi(protoFamily)
+	mpUnreachNLRI := NewBGPPathAttrMPUnreachNLRI()
+	mpUnreachNLRI.AFI = afi
+	mpUnreachNLRI.SAFI = safi
+	mpUnreachNLRI.AddNLRIList(nlriList)
+	return mpUnreachNLRI
+}
+
+func ConstructIPv6MPReachNLRI(protoFamily uint32, nextHop, nextHopLinkLocal net.IP,
+	nlriList []NLRI) *BGPPathAttrMPReachNLRI {
+	afi, safi := GetAfiSafi(protoFamily)
+	mpReachNLRI := NewBGPPathAttrMPReachNLRI()
+	mpReachNLRI.AFI = afi
+	mpReachNLRI.SAFI = safi
+	mpNextHop := NewMPNextHopIP6()
+	mpNextHop.SetGlobalNextHop(nextHop)
+	if nextHopLinkLocal != nil && nextHopLinkLocal.To16() == nil {
+		mpNextHop.SetLinkLocalNextHop(nextHopLinkLocal)
+	}
+	mpReachNLRI.SetNextHop(mpNextHop)
+	mpReachNLRI.SetNLRIList(nlriList)
+	return mpReachNLRI
+}
+
 func AddOriginatorId(updateMsg *BGPMessage, id net.IP) bool {
 	body := updateMsg.Body.(*BGPUpdate)
 	var pa BGPPathAttr
