@@ -339,11 +339,11 @@ func BuildPolicyRouteFromribdIPv6Route(cfg *ribd.IPv6Route) (policyRoute ribdInt
 	}
 	return policyRoute
 }
-func findRouteWithNextHop(routeInfoList []RouteInfoRecord, nextHopIP string) (found bool, routeInfoRecord RouteInfoRecord, index int) {
-	logger.Info("findRouteWithNextHop ", nextHopIP)
+func findRouteWithNextHop(routeInfoList []RouteInfoRecord, nextHopIpType ribdCommonDefs.IPType, nextHopIP string) (found bool, routeInfoRecord RouteInfoRecord, index int) {
+	logger.Info("findRouteWithNextHop ", nextHopIP, " and type:", nextHopIpType)
 	index = -1
 	for i := 0; i < len(routeInfoList); i++ {
-		if routeInfoList[i].nextHopIp.String() == nextHopIP {
+		if routeInfoList[i].nextHopIp.String() == nextHopIP && routeInfoList[i].nextHopIpType == nextHopIpType {
 			//logger.Info("Next hop IP present")
 			found = true
 			routeInfoRecord = routeInfoList[i]
@@ -353,11 +353,11 @@ func findRouteWithNextHop(routeInfoList []RouteInfoRecord, nextHopIP string) (fo
 	}
 	return found, routeInfoRecord, index
 }
-func newNextHopIP(ip string, routeInfoList []RouteInfoRecord) (isNewNextHopIP bool) {
+func newNextHopIP(ipType ribdCommonDefs.IPType, ip string, routeInfoList []RouteInfoRecord) (isNewNextHopIP bool) {
 	logger.Info("newNextHopIP")
 	isNewNextHopIP = true
 	for i := 0; i < len(routeInfoList); i++ {
-		if routeInfoList[i].nextHopIp.String() == ip {
+		if routeInfoList[i].nextHopIp.String() == ip && routeInfoList[i].nextHopIpType == ipType {
 			logger.Info("Next hop IP already present")
 			isNewNextHopIP = false
 		}
@@ -366,7 +366,7 @@ func newNextHopIP(ip string, routeInfoList []RouteInfoRecord) (isNewNextHopIP bo
 }
 func isSameRoute(selectedRoute ribdInt.Routes, route ribdInt.Routes) (same bool) {
 	logger.Info("isSameRoute")
-	if selectedRoute.Ipaddr == route.Ipaddr && selectedRoute.Mask == route.Mask && selectedRoute.Prototype == route.Prototype {
+	if selectedRoute.IPAddrType == route.IPAddrType && selectedRoute.Ipaddr == route.Ipaddr && selectedRoute.Mask == route.Mask && selectedRoute.Prototype == route.Prototype {
 		same = true
 	}
 	return same

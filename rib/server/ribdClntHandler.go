@@ -317,7 +317,7 @@ func (ribdServiceHandler *RIBDServer) ConnectToClients(paramsFile string) {
 				logger.Info("connecting to asicd,arpdclnt.IsConnected:", arpdclnt.IsConnected)
 				asicdclnt.ClientHdl = asicdServices.NewASICDServicesClientFactory(asicdclnt.Transport, asicdclnt.PtrProtocolFactory)
 				asicdclnt.IsConnected = true
-				ribdServiceHandler.Clients["asicdBulkCount"] = &asicdclnt
+				ribdServiceHandler.Clients["asicd"] = &asicdclnt
 				if arpdclnt.IsConnected == true {
 					logger.Info(" Connected to all clients: call AcceptConfigActions")
 					ribdServiceHandler.AcceptConfigActions()
