@@ -526,7 +526,8 @@ func (p *Peer) SendUpdate(updated map[uint32]map[*bgprib.Path][]*bgprib.Destinat
 							if _, ok := newUpdated[path][protoFamily]; !ok {
 								newUpdated[path][protoFamily] = make([]packet.NLRI, 0)
 							}
-							newUpdated[path][protoFamily] = append(newUpdated[path][protoFamily], dest.NLRI)
+							newUpdated[path][protoFamily] = append(newUpdated[path][protoFamily],
+								dest.NLRI.GetIPPrefix())
 						}
 						p.ribOut[protoFamily][ip][pathId] = bgprib.NewAdjRIBRoute(dest.NLRI.GetIPPrefix(),
 							path, pathId)

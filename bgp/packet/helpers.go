@@ -694,14 +694,25 @@ func GetAddPathFamily(openMsg *BGPOpen) map[AFI]map[SAFI]uint8 {
 
 func IsAddPathsTxEnabledForIPv4(addPathFamily map[AFI]map[SAFI]uint8) bool {
 	enabled := false
-	if _, ok := addPathFamily[AfiIP]; ok {
-		for safi, flags := range addPathFamily[AfiIP] {
-			if (safi == SafiUnicast || safi == SafiMulticast) && (flags&BGPCapAddPathTx != 0) {
+	/*
+		if _, ok := addPathFamily[AfiIP]; ok {
+			for safi, flags := range addPathFamily[AfiIP] {
+				if (safi == SafiUnicast || safi == SafiMulticast) && (flags&BGPCapAddPathTx != 0) {
+					utils.Logger.Infof("isAddPathsTxEnabledForIPv4 - add path Tx enabled for IPv4")
+					enabled = true
+				}
+			}
+		}
+	*/
+	for afi, _ := range addPathFamily {
+		for _, flags := range addPathFamily[afi] {
+			if flags&BGPCapAddPathTx != 0 {
 				utils.Logger.Infof("isAddPathsTxEnabledForIPv4 - add path Tx enabled for IPv4")
 				enabled = true
 			}
 		}
 	}
+
 	return enabled
 }
 
