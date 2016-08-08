@@ -430,10 +430,22 @@ func (m RIBDServer) TrackReachabilityStatus(ipAddr string, protocol string, op s
 /*
    Returns the longest prefix match route to reach the destination network destNet
 */
-/*
+
 func (m RIBDServer) GetRouteReachabilityInfo(destNet string) (nextHopIntf *ribdInt.NextHopInfo, err error) {
 	//logger.Debug("GetRouteReachabilityInfo of ", destNet)
-	//t1 := time.Now()
+	nextHopIntf, err = RouteServiceHandler.GetV4RouteReachabilityInfo(ip)
+	if err != nil {
+		logger.Err("next hop ", ip, " not reachable via ipv4 network")
+
+		nextHopIntf, err = RouteServiceHandler.GetV6RouteReachabilityInfo(ip)
+		if err != nil {
+			logger.Err("next hop ", ip, " not reachable")
+		}
+	}
+	return nextHopIntf, err
+}
+
+/*	//t1 := time.Now()
 	var retnextHopIntf ribdInt.NextHopInfo
 	nextHopIntf = &retnextHopIntf
 	var found bool
@@ -592,12 +604,12 @@ func ResolveNextHop(ipAddr string) (nextHopIntf ribdInt.NextHopInfo, resolvedNex
 	}
 	ip := ipAddr
 	for {
-		intf, err := RouteServiceHandler.V4GetRouteReachabilityInfo(ip)
+		intf, err := RouteServiceHandler.GetV4RouteReachabilityInfo(ip)
 		if err != nil {
 			logger.Err("next hop ", ip, " not reachable via ipv4 network")
 			//return nextHopIntf, nextHopIntf, err
 		}
-		intf, err := RouteServiceHandler.V6GetRouteReachabilityInfo(ip)
+		intf, err = RouteServiceHandler.GetV6RouteReachabilityInfo(ip)
 		if err != nil {
 			logger.Err("next hop ", ip, " not reachable")
 			return nextHopIntf, nextHopIntf, err
@@ -952,7 +964,7 @@ func deleteRoute(destNetPrefix patriciaDB.Prefix, //route prefix of the route be
 	if delType == FIBAndRIB {
 		logger.Debug("Del type = FIBAndRIB, so delete the entry in RIB DB")
 		routeInfoList := routeInfoRecordList.routeInfoProtocolMap[ReverseRouteProtoTypeMapDB[int(routeInfoRecord.protocol)]]
-		found, _, index := findRouteWithNextHop(routeInfoList, routeInfoRecord.nextHopIp.String())
+		found, _, index := findRouteWithNextHop(routeInfoList, routeInfoRecord.nextHopIpType, routeInfoRecord.nextHopIp.String())
 		if !found || index == -1 {
 			logger.Debug("Invalid nextHopIP")
 			return
@@ -987,7 +999,11 @@ func deleteRoute(destNetPrefix patriciaDB.Prefix, //route prefix of the route be
 					nextHopIntf := ribdInt.NextHopInfo{}
 					routeReachabilityStatusInfo := RouteReachabilityStatusInfo{routeInfoRecord.networkAddr, "Down", ReverseRouteProtoTypeMapDB[int(routeInfoRecord.protocol)], nextHopIntf}
 					RouteReachabilityStatusUpdate(routeReachabilityStatusInfo.protocol, routeReachabilityStatusInfo)
-					RouteInfoMap.VisitAndUpdate(UpdateRouteReachabilityStatus, routeReachabilityStatusInfo)
+					if routeInfoRecord.ipType == ribdCommonDefs.IPv4 {
+						V4RouteInfoMap.VisitAndUpdate(UpdateV4RouteReachabilityStatus, routeReachabilityStatusInfo)
+					} else {
+						V6RouteInfoMap.VisitAndUpdate(UpdateV6RouteReachabilityStatus, routeReachabilityStatusInfo)
+					}
 				}
 				//get the network address associated with the nexthop and update its refcount
 				nhIntf, err := RouteServiceHandler.GetRouteReachabilityInfo(routeInfoRecord.nextHopIp.String())
@@ -1110,7 +1126,7 @@ func deleteRoutes(destNetPrefix patriciaDB.Prefix,
     This function is called whenever a route is added or deleted. In either of the cases,
 	this function selects the best route to be programmed in FIB.
 */
-func SelectV4Route(destNetPrefix patriciaDB.Prefix,
+func SelectRoute(destNetPrefix patriciaDB.Prefix,
 	routeInfoRecordList RouteInfoRecordList, //the current list of routes for this prefix
 	routeInfoRecord RouteInfoRecord, //the route to be added or deleted or invalidated or validated
 	op ribd.Int, //add or delete of the route
@@ -1158,18 +1174,18 @@ func updateBestRoute(destNetPrefix patriciaDB.Prefix, routeInfoRecordList RouteI
  - a user/routing protocol installs a new route. In that case, addType will be RIBAndFIB
  - when a operationally down link comes up. In this case, the addType will be FIBOnly because on a link down, the route is still preserved in the RIB database and only deleted from FIB (Asic)
 **/
-func createRoute(routeInfo RouteParams) (rc ribd.Int, err error) {
-	/*func createRoute(ipType ribdCommonDefs.IPType, destNetIp string,
-	networkMask string,
-	metric ribd.Int,
-	weight ribd.Int,
-	nextHopIp string,
-	nextHopIfIndex ribd.Int,
-	routeType ribd.Int,
-	addType ribd.Int,
-	policyStateChange int,
-	sliceIdx ribd.Int) (rc ribd.Int, err error) {)*/
-
+//func createRoute(routeInfo RouteParams) (rc ribd.Int, err error) {
+/*func createRoute(ipType ribdCommonDefs.IPType, destNetIp string,
+networkMask string,
+metric ribd.Int,
+weight ribd.Int,
+nextHopIp string,
+nextHopIfIndex ribd.Int,
+routeType ribd.Int,
+addType ribd.Int,
+policyStateChange int,
+sliceIdx ribd.Int) (rc ribd.Int, err error) {)*/
+/*
 	ipType := routeInfo.ipType
 	destNetIp := routeInfo.destNetIp
 	networkMask := routeInfo.networkMask
@@ -1237,7 +1253,8 @@ func createRoute(routeInfo RouteParams) (rc ribd.Int, err error) {
 	if routeInfoRecordListItem == nil {
 		/*
 		   no routes for this destination are currently configured
-		*/
+*/
+/*
 		if addType == FIBOnly {
 			logger.Debug("route record list not found in RIB")
 			err = errors.New("Unexpected: route record list not found in RIB")
@@ -1367,7 +1384,7 @@ func createRoute(routeInfo RouteParams) (rc ribd.Int, err error) {
 	return 0, err
 
 }
-
+*/
 /**
    This function is called when:
    -  a user/protocol deletes a route - delType = FIBAndRIB
