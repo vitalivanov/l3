@@ -86,10 +86,11 @@ type PolicyParams struct {
 type BGPServer struct {
 	logger           *logging.Writer
 	policyManager    *bgppolicy.BGPPolicyManager
-	locRibPE         *bgppolicy.LocRibPolicyEngine
+	locRibPE         map[uint32]*bgppolicy.LocRibPolicyEngine
 	ribInPE          *bgppolicy.AdjRibPPolicyEngine
 	ribOutPE         *bgppolicy.AdjRibPPolicyEngine
 	listener         *net.TCPListener
+	listenerIPv6     *net.TCPListener
 	ifaceMgr         *utils.InterfaceMgr
 	BgpConfig        config.Bgp
 	GlobalConfigCh   chan GlobalUpdate
@@ -98,7 +99,7 @@ type BGPServer struct {
 	AddPeerGroupCh   chan PeerGroupUpdate
 	RemPeerGroupCh   chan string
 	AddAggCh         chan AggUpdate
-	RemAggCh         chan string
+	RemAggCh         chan config.BGPAggregate
 	PeerFSMConnCh    chan fsm.PeerFSMConn
 	PeerConnEstCh    chan string
 	PeerConnBrokenCh chan string
@@ -118,7 +119,6 @@ type BGPServer struct {
 	ConnRoutesPath *bgprib.Path
 	IfacePeerMap   map[int32][]string
 	ifaceIP        net.IP
-	actionFuncMap  map[int]bgppolicy.PolicyActionFunc
 	AddPathCount   int
 	// all managers
 	IntfMgr    config.IntfStateMgrIntf
@@ -134,7 +134,6 @@ func NewBGPServer(logger *logging.Writer, policyManager *bgppolicy.BGPPolicyMana
 	bgpServer.logger = logger
 	bgpServer.policyManager = policyManager
 	bgpServer.ifaceMgr = utils.NewInterfaceMgr(logger)
-	bgpServer.BgpConfig = config.Bgp{}
 	bgpServer.GlobalCfgDone = false
 	bgpServer.GlobalConfigCh = make(chan GlobalUpdate)
 	bgpServer.AddPeerCh = make(chan PeerUpdate)
@@ -142,7 +141,7 @@ func NewBGPServer(logger *logging.Writer, policyManager *bgppolicy.BGPPolicyMana
 	bgpServer.AddPeerGroupCh = make(chan PeerGroupUpdate)
 	bgpServer.RemPeerGroupCh = make(chan string)
 	bgpServer.AddAggCh = make(chan AggUpdate)
-	bgpServer.RemAggCh = make(chan string)
+	bgpServer.RemAggCh = make(chan config.BGPAggregate)
 	bgpServer.PeerFSMConnCh = make(chan fsm.PeerFSMConn, 50)
 	bgpServer.PeerConnEstCh = make(chan string)
 	bgpServer.PeerConnBrokenCh = make(chan string)
@@ -163,29 +162,55 @@ func NewBGPServer(logger *logging.Writer, policyManager *bgppolicy.BGPPolicyMana
 	bgpServer.LocRib = bgprib.NewLocRib(logger, rMgr, sDBMgr, &bgpServer.BgpConfig.Global.Config)
 	bgpServer.IfacePeerMap = make(map[int32][]string)
 	bgpServer.ifaceIP = nil
-	bgpServer.actionFuncMap = make(map[int]bgppolicy.PolicyActionFunc)
 	bgpServer.AddPathCount = 0
-
-	var aggrActionFunc bgppolicy.PolicyActionFunc
-	aggrActionFunc.ApplyFunc = bgpServer.ApplyAggregateAction
-	aggrActionFunc.UndoFunc = bgpServer.UndoAggregateAction
-
-	bgpServer.actionFuncMap[policyCommonDefs.PolicyActionTypeAggregate] = aggrActionFunc
-
-	locRibPE := bgppolicy.NewLocRibPolicyEngine(logger)
-	bgpServer.logger.Infof("BGPServer: actionfuncmap=%v", bgpServer.actionFuncMap)
-	locRibPE.SetEntityUpdateFunc(bgpServer.UpdateRouteAndPolicyDB)
-	locRibPE.SetIsEntityPresentFunc(bgpServer.DoesRouteExist)
-	locRibPE.SetActionFuncs(bgpServer.actionFuncMap)
-	locRibPE.SetTraverseFuncs(bgpServer.TraverseAndApplyBGPRib, bgpServer.TraverseAndReverseBGPRib)
-	bgpServer.locRibPE = locRibPE
-	bgpServer.policyManager.AddPolicyEngine(bgpServer.locRibPE)
-
+	bgpServer.initGlobalConfig()
+	bgpServer.initPolicyEngines()
 	return bgpServer
 }
 
-func (s *BGPServer) createListener() (*net.TCPListener, error) {
-	proto := "tcp4"
+func (s *BGPServer) initGlobalConfig() {
+	s.BgpConfig = config.Bgp{}
+	s.BgpConfig.Afs = make(map[uint32]*config.AddressFamily)
+	for _, pfNumber := range packet.ProtocolFamilyMap {
+		s.BgpConfig.Afs[pfNumber] = &config.AddressFamily{}
+	}
+}
+
+func (s *BGPServer) initPolicyEngines() {
+	type TraverseFuncMap struct {
+		ApplyFunc   utilspolicy.EntityTraverseAndApplyPolicyfunc
+		ReverseFunc utilspolicy.EntityTraverseAndReversePolicyfunc
+	}
+	var traverseFuncMap = map[packet.AFI]TraverseFuncMap{
+		packet.AfiIP:  TraverseFuncMap{s.TraverseAndApplyBGPRib, s.TrAndRevAggForIPv4},
+		packet.AfiIP6: TraverseFuncMap{s.TraverseAndApplyBGPRib, s.TrAndRevAggForIPv6},
+	}
+	var aggrActionFunc bgppolicy.PolicyActionFunc
+	actionFuncMap := make(map[int]bgppolicy.PolicyActionFunc)
+	s.locRibPE = make(map[uint32]*bgppolicy.LocRibPolicyEngine)
+
+	aggrActionFunc.ApplyFunc = s.ApplyAggregateAction
+	aggrActionFunc.UndoFunc = s.UndoAggregateAction
+	actionFuncMap[policyCommonDefs.PolicyActionTypeAggregate] = aggrActionFunc
+	s.logger.Infof("BGPServer: actionfuncmap=%v", actionFuncMap)
+
+	for _, pfNumber := range packet.ProtocolFamilyMap {
+		locRibPE := bgppolicy.NewLocRibPolicyEngine(s.logger)
+		locRibPE.SetEntityUpdateFunc(s.UpdateRouteAndPolicyDB)
+		locRibPE.SetIsEntityPresentFunc(s.DoesRouteExist)
+		locRibPE.SetActionFuncs(actionFuncMap)
+		afi, _ := packet.GetAfiSafi(pfNumber)
+		traverseFuncs, ok := traverseFuncMap[afi]
+		if !ok {
+			s.logger.Crit("BGPServer: traverse funcs not found for address family", afi)
+		}
+		locRibPE.SetTraverseFuncs(traverseFuncs.ApplyFunc, traverseFuncs.ReverseFunc)
+		s.locRibPE[pfNumber] = locRibPE
+		s.policyManager.AddPolicyEngine(locRibPE)
+	}
+}
+
+func (s *BGPServer) createListener(proto string) (*net.TCPListener, error) {
 	addr := ":" + config.BGPPort
 	s.logger.Infof("Listening for incomig connections on %s", addr)
 	tcpAddr, err := net.ResolveTCPAddr(proto, addr)
@@ -378,6 +403,9 @@ func (s *BGPServer) setUpdatedWithAggPaths(policyParams *PolicyParams,
 		for aggPath, aggDestinations := range aggPathDestMap {
 			destMap := make(map[*bgprib.Destination]bool)
 			ppUpdated := *policyParams.updated
+			if _, ok := ppUpdated[aggFamily]; !ok {
+				ppUpdated[aggFamily] = make(map[*bgprib.Path][]*bgprib.Destination)
+			}
 			if _, ok := ppUpdated[aggFamily][aggPath]; !ok {
 				ppUpdated[aggFamily][aggPath] = make([]*bgprib.Destination, 0)
 			} else {
@@ -500,6 +528,18 @@ func (s *BGPServer) CheckForAggregation(updated map[uint32]map[*bgprib.Path][]*b
 			continue
 		}
 
+		protoFamily := dest.GetProtocolFamily()
+		if len(s.BgpConfig.Afs[protoFamily].BgpAggs) == 0 {
+			s.logger.Crit("BGPServer:checkForAggregate - withdrawn, aggs for family", protoFamily, "is not set")
+			continue
+		}
+
+		pe, ok := s.locRibPE[protoFamily]
+		if !ok {
+			s.logger.Err("BGPServer:checkForAggregate - Agg policy engine not found for family", protoFamily)
+			continue
+		}
+
 		route := dest.GetLocRibPathRoute()
 		if route == nil {
 			s.logger.Infof("BGPServer:checkForAggregate - route not found withdraw dest %s",
@@ -522,10 +562,21 @@ func (s *BGPServer) CheckForAggregation(updated map[uint32]map[*bgprib.Path][]*b
 			withdrawn:       &withdrawn,
 			updatedAddPaths: &updatedAddPaths,
 		}
-		s.locRibPE.PolicyEngine.PolicyEngineFilter(peEntity, policyCommonDefs.PolicyPath_Export, callbackInfo)
+		pe.PolicyEngine.PolicyEngineFilter(peEntity, policyCommonDefs.PolicyPath_Export, callbackInfo)
 	}
 
-	for _, pathDestMap := range updated {
+	for protoFamily, pathDestMap := range updated {
+		if len(s.BgpConfig.Afs[protoFamily].BgpAggs) == 0 {
+			s.logger.Crit("BGPServer:checkForAggregate - updated, aggs for family", protoFamily, "is not set")
+			continue
+		}
+
+		pe, ok := s.locRibPE[protoFamily]
+		if !ok {
+			s.logger.Err("BGPServer:checkForAggregate - Agg policy engine not found for family", protoFamily)
+			continue
+		}
+
 		for _, destinations := range pathDestMap {
 			s.logger.Infof("BGPServer:checkForAggregate - update destinations %+v", destinations)
 			for _, dest := range destinations {
@@ -551,7 +602,7 @@ func (s *BGPServer) CheckForAggregation(updated map[uint32]map[*bgprib.Path][]*b
 						withdrawn:       &withdrawn,
 						updatedAddPaths: &updatedAddPaths,
 					}
-					s.locRibPE.PolicyEngine.PolicyEngineFilter(peEntity, policyCommonDefs.PolicyPath_Export, callbackInfo)
+					pe.PolicyEngine.PolicyEngineFilter(peEntity, policyCommonDefs.PolicyPath_Export, callbackInfo)
 					s.logger.Infof("BGPServer:checkForAggregate - update dest %s policylist %v hit %v ",
 						"after applying create policy", dest.NLRI.GetPrefix().String(), route.PolicyList,
 						route.PolicyHitCounter)
@@ -565,8 +616,16 @@ func (s *BGPServer) CheckForAggregation(updated map[uint32]map[*bgprib.Path][]*b
 }
 
 func (s *BGPServer) UpdateRouteAndPolicyDB(policyDetails utilspolicy.PolicyDetails, params interface{}) {
-	policyParams := params.(PolicyParams)
 	var op int
+	policyParams := params.(PolicyParams)
+	dest := policyParams.dest
+	protoFamily := dest.GetProtocolFamily()
+	pe, ok := s.locRibPE[protoFamily]
+	if !ok {
+		s.logger.Err("UpdateRouteAndPolicyDB - Agg policy engine not found for family", protoFamily)
+		return
+	}
+
 	if policyParams.DeleteType != bgppolicy.Invalid {
 		op = bgppolicy.Del
 	} else {
@@ -577,7 +636,7 @@ func (s *BGPServer) UpdateRouteAndPolicyDB(policyDetails utilspolicy.PolicyDetai
 		}
 		policyParams.route.PolicyHitCounter++
 	}
-	s.locRibPE.UpdatePolicyRouteMap(policyParams.route, policyDetails.Policy, op)
+	pe.UpdatePolicyRouteMap(policyParams.route, policyDetails.Policy, op)
 }
 
 func (s *BGPServer) TraverseAndApplyBGPRib(data interface{}, updateFunc utilspolicy.PolicyApplyfunc) {
@@ -587,7 +646,11 @@ func (s *BGPServer) TraverseAndApplyBGPRib(data interface{}, updateFunc utilspol
 	withdrawn := make([]*bgprib.Destination, 0, 10)
 	updatedAddPaths := make([]*bgprib.Destination, 0)
 	locRib := s.LocRib.GetLocRib()
-	for _, pathDestMap := range locRib {
+	for protoFamily, pathDestMap := range locRib {
+		if _, ok := s.locRibPE[protoFamily]; !ok {
+			s.logger.Err("TraverseAndApplyBGPRib - Agg policy engine not found for family", protoFamily)
+			continue
+		}
 		for path, destinations := range pathDestMap {
 			for _, dest := range destinations {
 				if !path.IsAggregatePath() {
@@ -602,6 +665,8 @@ func (s *BGPServer) TraverseAndApplyBGPRib(data interface{}, updateFunc utilspol
 						PolicyList: route.PolicyList,
 					}
 					callbackInfo := PolicyParams{
+						CreateType:      utilspolicy.Invalid,
+						DeleteType:      utilspolicy.Invalid,
 						route:           route,
 						dest:            dest,
 						updated:         &updated,
@@ -618,7 +683,27 @@ func (s *BGPServer) TraverseAndApplyBGPRib(data interface{}, updateFunc utilspol
 	s.SendUpdate(updated, withdrawn, updatedAddPaths)
 }
 
-func (s *BGPServer) TraverseAndReverseBGPRib(policyData interface{}) {
+func (s *BGPServer) TrAndRevAggForIPv4(policyData interface{}) {
+	protoFamily := packet.GetProtocolFamily(packet.AfiIP, packet.SafiUnicast)
+	pe, ok := s.locRibPE[protoFamily]
+	if !ok {
+		s.logger.Err("TrAndRevAggForIPv4 - Agg policy engine not found for family", protoFamily)
+		return
+	}
+	s.TraverseAndReverseBGPRib(policyData, pe)
+}
+
+func (s *BGPServer) TrAndRevAggForIPv6(policyData interface{}) {
+	protoFamily := packet.GetProtocolFamily(packet.AfiIP6, packet.SafiUnicast)
+	pe, ok := s.locRibPE[protoFamily]
+	if !ok {
+		s.logger.Err("TrAndRevAggForIPv6 - Agg policy engine not found for family", protoFamily)
+		return
+	}
+	s.TraverseAndReverseBGPRib(policyData, pe)
+}
+
+func (s *BGPServer) TraverseAndReverseBGPRib(policyData interface{}, pe *bgppolicy.LocRibPolicyEngine) {
 	policy := policyData.(utilspolicy.Policy)
 	s.logger.Info("BGPServer:TraverseAndReverseBGPRib - policy", policy.Name)
 	policyExtensions := policy.Extensions.(bgppolicy.PolicyExtensions)
@@ -635,7 +720,10 @@ func (s *BGPServer) TraverseAndReverseBGPRib(policyData interface{}) {
 		route = policyExtensions.RouteInfoList[idx]
 		dest := s.LocRib.GetDestFromIPAndLen(route.Dest.GetProtocolFamily(), route.Dest.BGPRouteState.Network,
 			uint32(route.Dest.BGPRouteState.CIDRLen))
+
 		callbackInfo := PolicyParams{
+			CreateType:      utilspolicy.Invalid,
+			DeleteType:      utilspolicy.Invalid,
 			route:           route,
 			dest:            dest,
 			updated:         &updated,
@@ -653,9 +741,9 @@ func (s *BGPServer) TraverseAndReverseBGPRib(policyData interface{}) {
 			s.logger.Info("Invalid route ", ipPrefix)
 			continue
 		}
-		s.locRibPE.PolicyEngine.PolicyEngineUndoPolicyForEntity(peEntity, policy, callbackInfo)
-		s.locRibPE.DeleteRoutePolicyState(route, policy.Name)
-		s.locRibPE.PolicyEngine.DeletePolicyEntityMapEntry(peEntity, policy.Name)
+		pe.PolicyEngine.PolicyEngineUndoPolicyForEntity(peEntity, policy, callbackInfo)
+		pe.DeleteRoutePolicyState(route, policy.Name)
+		pe.PolicyEngine.DeletePolicyEntityMapEntry(peEntity, policy.Name)
 	}
 }
 
@@ -809,10 +897,16 @@ func (s *BGPServer) SetupRedistribution(gConf config.GlobalConfig) {
 	}
 }
 
-func (s *BGPServer) DeleteAgg(ipPrefix string) error {
-	s.locRibPE.DeletePolicyDefinition(ipPrefix)
-	s.locRibPE.DeletePolicyStmt(ipPrefix)
-	s.locRibPE.DeletePolicyCondition(ipPrefix)
+func (s *BGPServer) DeleteAgg(aggConf config.BGPAggregate) error {
+	pe, ok := s.locRibPE[aggConf.AddressFamily]
+	if ok {
+		pe.DeletePolicyDefinition(aggConf.IPPrefix)
+		pe.DeletePolicyStmt(aggConf.IPPrefix)
+		pe.DeletePolicyCondition(aggConf.IPPrefix)
+	}
+	if _, ok := s.BgpConfig.Afs[aggConf.AddressFamily]; ok {
+		delete(s.BgpConfig.Afs[aggConf.AddressFamily].BgpAggs, aggConf.IPPrefix)
+	}
 	return nil
 }
 
@@ -820,9 +914,24 @@ func (s *BGPServer) AddOrUpdateAgg(oldConf config.BGPAggregate, newConf config.B
 	s.logger.Info("AddOrUpdateAgg")
 	var err error
 
+	pe, ok := s.locRibPE[newConf.AddressFamily]
+	if !ok {
+		s.logger.Err("Aggregate policy engine not created for address family", newConf.AddressFamily)
+		return errors.New(fmt.Sprintf("Aggregate policy engine not created for address family", newConf.AddressFamily))
+	}
+
+	bytes := packet.GetAddressLengthForFamily(newConf.AddressFamily)
+	if bytes == -1 {
+		s.logger.Err("Could not find number of bytes for aggregate prefix family", newConf.AddressFamily)
+		return errors.New(fmt.Sprintf("Could not find number of bytes for aggregate prefix family",
+			newConf.AddressFamily))
+	}
+	strBits := strconv.Itoa(bytes * 8)
+	s.logger.Infof("AddOrUpdateAgg: agg = %s, bytes = %d, bits =%s", newConf.IPPrefix, bytes, strBits)
+
 	if oldConf.IPPrefix != "" {
 		// Delete the policy
-		s.DeleteAgg(oldConf.IPPrefix)
+		s.DeleteAgg(oldConf)
 	}
 
 	if newConf.IPPrefix != "" {
@@ -842,12 +951,12 @@ func (s *BGPServer) AddOrUpdateAgg(oldConf config.BGPAggregate, newConf config.B
 			MatchDstIpPrefixConditionInfo: utilspolicy.PolicyDstIpMatchPrefixSetCondition{
 				Prefix: utilspolicy.PolicyPrefix{
 					IpPrefix:        newConf.IPPrefix,
-					MasklengthRange: prefixLen + "-32",
+					MasklengthRange: prefixLen + "-" + strBits,
 				},
 			},
 		}
 
-		_, err = s.locRibPE.CreatePolicyCondition(cond)
+		_, err = pe.CreatePolicyCondition(cond)
 		if err != nil {
 			s.logger.Errf("Failed to create policy condition for aggregate %s with error %s", name, err)
 			return err
@@ -858,10 +967,10 @@ func (s *BGPServer) AddOrUpdateAgg(oldConf config.BGPAggregate, newConf config.B
 		stmt.Conditions[0] = name
 		stmt.Actions = make([]string, 1)
 		stmt.Actions[0] = "permit"
-		err = s.locRibPE.CreatePolicyStmt(stmt)
+		err = pe.CreatePolicyStmt(stmt)
 		if err != nil {
 			s.logger.Errf("Failed to create policy statement for aggregate %s with error %s", name, err)
-			s.locRibPE.DeletePolicyCondition(name)
+			pe.DeletePolicyCondition(name)
 			return err
 		}
 
@@ -873,15 +982,22 @@ func (s *BGPServer) AddOrUpdateAgg(oldConf config.BGPAggregate, newConf config.B
 		}
 		def.PolicyDefinitionStatements[0] = policyDefinitionStatement
 		def.Extensions = bgppolicy.PolicyExtensions{}
-		err = s.locRibPE.CreatePolicyDefinition(def)
+		err = pe.CreatePolicyDefinition(def)
 		if err != nil {
 			s.logger.Errf("Failed to create policy definition for aggregate %s with error %s", name, err)
-			s.locRibPE.DeletePolicyStmt(name)
-			s.locRibPE.DeletePolicyCondition(name)
+			pe.DeletePolicyStmt(name)
+			pe.DeletePolicyCondition(name)
 			return err
 		}
 
-		err = s.UpdateAggPolicy(name, s.locRibPE, newConf)
+		err = s.UpdateAggPolicy(name, pe, newConf)
+		if _, ok := s.BgpConfig.Afs[newConf.AddressFamily]; !ok {
+			s.BgpConfig.Afs[newConf.AddressFamily] = &config.AddressFamily{}
+		}
+		if s.BgpConfig.Afs[newConf.AddressFamily].BgpAggs == nil {
+			s.BgpConfig.Afs[newConf.AddressFamily].BgpAggs = make(map[string]*config.BGPAggregate)
+		}
+		s.BgpConfig.Afs[newConf.AddressFamily].BgpAggs[newConf.IPPrefix] = &newConf
 		return err
 	}
 	return err
@@ -1019,7 +1135,8 @@ func (s *BGPServer) listenChannelUpdates() {
 					s.logger.Info("Clean up peer", oldPeer.NeighborAddress.String())
 					peer.Cleanup()
 					s.ProcessRemoveNeighbor(oldPeer.NeighborAddress.String(), peer)
-					if peer.NeighborConf.RunningConf.AuthPassword != "" {
+					if peer.NeighborConf.RunningConf.NeighborAddress.To4() != nil &&
+						peer.NeighborConf.RunningConf.AuthPassword != "" {
 						err := netUtils.SetTCPListenerMD5(s.listener, oldPeer.NeighborAddress.String(), "")
 						if err != nil {
 							s.logger.Info("Failed to add MD5 authentication for old neighbor",
@@ -1054,7 +1171,8 @@ func (s *BGPServer) listenChannelUpdates() {
 				}
 				s.logger.Info("Add neighbor, ip:", newPeer.NeighborAddress.String())
 				peer = NewPeer(s, s.LocRib, &s.BgpConfig.Global.Config, groupConfig, newPeer)
-				if peer.NeighborConf.RunningConf.AuthPassword != "" {
+				if peer.NeighborConf.RunningConf.NeighborAddress.To4() != nil &&
+					peer.NeighborConf.RunningConf.AuthPassword != "" {
 					err := netUtils.SetTCPListenerMD5(s.listener, newPeer.NeighborAddress.String(),
 						peer.NeighborConf.RunningConf.AuthPassword)
 					if err != nil {
@@ -1121,8 +1239,8 @@ func (s *BGPServer) listenChannelUpdates() {
 				s.AddOrUpdateAgg(oldAgg, newAgg, aggUpdate.AttrSet)
 			}
 
-		case ipPrefix := <-s.RemAggCh:
-			s.DeleteAgg(ipPrefix)
+		case aggConf := <-s.RemAggCh:
+			s.DeleteAgg(aggConf)
 
 		case tcpConn := <-s.acceptCh:
 			s.logger.Info("Connected to", tcpConn.RemoteAddr().String())
@@ -1274,7 +1392,7 @@ func (s *BGPServer) InitBGPEvent() {
 		s.logger.Errf("DB connect failed with error %s. Exiting!!", err)
 		return
 	}
-	err = eventUtils.InitEvents("BGPD", s.eventDbHdl, s.logger, 1000)
+	err = eventUtils.InitEvents("BGPD", s.eventDbHdl, s.eventDbHdl, s.logger, 1000)
 	if err != nil {
 		s.logger.Err("Unable to initialize events", err)
 	}
@@ -1292,15 +1410,18 @@ func (s *BGPServer) StartServer() {
 	s.constructBGPGlobalState(&gConf)
 	s.BgpConfig.PeerGroups = make(map[string]*config.PeerGroup)
 
-	pathAttrs := packet.ConstructPathAttrForConnRoutes(gConf.RouterId, gConf.AS)
+	pathAttrs := packet.ConstructPathAttrForConnRoutes(gConf.AS)
 	s.ConnRoutesPath = bgprib.NewPath(s.LocRib, nil, pathAttrs, nil, bgprib.RouteTypeConnected)
 
 	s.logger.Info("Setting up Peer connections")
 	// channel for accepting connections
 	s.acceptCh = make(chan *net.TCPConn)
 
-	s.listener, _ = s.createListener()
+	s.listener, _ = s.createListener("tcp4")
 	go s.listenForPeers(s.listener, s.acceptCh)
+
+	s.listenerIPv6, _ = s.createListener("tcp6")
+	go s.listenForPeers(s.listenerIPv6, s.acceptCh)
 
 	s.logger.Info("Start all managers and initialize API Layer")
 	s.IntfMgr.Start()

@@ -60,6 +60,7 @@ install:
   - git clone git@github.com:SnapRoute/l2.git $HOME/gopath/src/snaproute/src/l2
   - git clone git@github.com:SnapRoute/models.git $HOME/gopath/src/snaproute/src/models
   - git clone git@github.com:SnapRoute/utils.git $HOME/gopath/src/snaproute/src/utils
+  - git clone git@github.com:SnapRoute/opticd.git $HOME/gopath/src/snaproute/src/opticd
   - git clone git@github.com:SnapRoute/reltools.git $HOME/gopath/src/reltools
   - git clone git@github.com:SnapRoute/thrift.git $HOME/gopath/src/external/src/git.apache.org/thrift.git
   - git clone git@github.com:SnapRoute/redigo.git $HOME/gopath/src/external/src/github.com/garyburd/redigo

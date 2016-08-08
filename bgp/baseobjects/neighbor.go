@@ -308,7 +308,7 @@ func (n *NeighborConf) SetPeerAttrs(bgpId net.IP, asSize uint8, holdTime uint32,
 	n.Neighbor.State.HoldTime = holdTime
 	n.Neighbor.State.KeepaliveTime = keepaliveTime
 	for afi, safiMap := range addPathFamily {
-		if afi == packet.AfiIP {
+		if afi == packet.AfiIP || afi == packet.AfiIP6 {
 			for _, val := range safiMap {
 				if (val & packet.BGPCapAddPathRx) != 0 {
 					n.logger.Infof("SetPeerAttrs - Neighbor %s set add paths maxtx to %d",

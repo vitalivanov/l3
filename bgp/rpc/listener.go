@@ -545,6 +545,14 @@ func (h *BGPHandler) isValidIP(ip string) bool {
 	return true
 }
 
+func (h *BGPHandler) isAuthPasswordValid(neighborAddress net.IP, authPassword string) error {
+	if neighborAddress.To4() != nil && authPassword != "" {
+		return errors.New(fmt.Sprint("Cannot create neighbor", neighborAddress,
+			"Auth password can be used only with IPv4 address"))
+	}
+	return nil
+}
+
 // Set BGP Default values.. This needs to move to API Layer once Northbound interfaces are implemented
 // for all the listeners
 func (h *BGPHandler) setDefault(pconf *config.NeighborConfig) {
@@ -573,6 +581,12 @@ func (h *BGPHandler) ValidateBGPNeighbor(bgpNeighbor *bgpd.BGPNeighbor) (pConf c
 
 	if !h.isValidIP(bgpNeighbor.UpdateSource) {
 		err = errors.New(fmt.Sprintf("Update source %s not a valid IP", bgpNeighbor.UpdateSource))
+		return pConf, err
+	}
+
+	if err = h.isAuthPasswordValid(ip, bgpNeighbor.AuthPassword); err != nil {
+		h.logger.Info("ValidateBGPNeighbor: isAuthPasswordValid failed for neighbor", bgpNeighbor.NeighborAddress,
+			"auth password", bgpNeighbor.AuthPassword, "with error:", err)
 		return pConf, err
 	}
 
@@ -1024,11 +1038,18 @@ func (h *BGPHandler) validateBGPAggregate(bgpAgg *bgpd.BGPAggregate) (aggConf co
 	if bgpAgg == nil {
 		return aggConf, err
 	}
+	var ip net.IP
 
-	_, _, err = net.ParseCIDR(bgpAgg.IpPrefix)
+	ip, _, err = net.ParseCIDR(bgpAgg.IpPrefix)
 	if err != nil {
 		err = errors.New(fmt.Sprintf("BGPAggregate: IP %s is not valid", bgpAgg.IpPrefix))
 		h.logger.Info("SendBGPAggregate: IP", bgpAgg.IpPrefix, "is not valid")
+		return aggConf, err
+	}
+
+	if ip.To4() == nil {
+		err = errors.New(fmt.Sprintf("BGPAggregate: IP %s is not a v4 address", bgpAgg.IpPrefix))
+		h.logger.Info("SendBGPAggregate: IP", bgpAgg.IpPrefix, "is not a v4 address")
 		return aggConf, err
 	}
 
@@ -1036,6 +1057,7 @@ func (h *BGPHandler) validateBGPAggregate(bgpAgg *bgpd.BGPAggregate) (aggConf co
 		IPPrefix:        bgpAgg.IpPrefix,
 		GenerateASSet:   bgpAgg.GenerateASSet,
 		SendSummaryOnly: bgpAgg.SendSummaryOnly,
+		AddressFamily:   packet.GetProtocolFamily(packet.AfiIP, packet.SafiUnicast),
 	}
 	return aggConf, nil
 }
@@ -1057,18 +1079,82 @@ func (h *BGPHandler) SendBGPAggregate(oldConfig *bgpd.BGPAggregate, newConfig *b
 }
 
 func (h *BGPHandler) CreateBGPAggregate(bgpAgg *bgpd.BGPAggregate) (bool, error) {
-	h.logger.Info("Create global config attrs:", bgpAgg)
+	h.logger.Info("Create aggregate attrs:", bgpAgg)
 	return h.SendBGPAggregate(nil, bgpAgg, make([]bool, 0))
 }
 
 func (h *BGPHandler) UpdateBGPAggregate(origA *bgpd.BGPAggregate, updatedA *bgpd.BGPAggregate, attrSet []bool,
 	op []*bgpd.PatchOpInfo) (bool, error) {
-	h.logger.Info("Update global config attrs:", updatedA, "old config:", origA)
+	h.logger.Info("Update aggregate attrs:", updatedA, "old config:", origA)
 	return h.SendBGPAggregate(origA, updatedA, attrSet)
 }
 
 func (h *BGPHandler) DeleteBGPAggregate(bgpAgg *bgpd.BGPAggregate) (bool, error) {
-	h.logger.Info("Delete global config attrs:", bgpAgg)
-	h.server.RemAggCh <- bgpAgg.IpPrefix
+	h.logger.Info("Delete aggregate attrs:", bgpAgg)
+	agg, _ := h.validateBGPAggregate(bgpAgg)
+	h.server.RemAggCh <- agg
+	return true, nil
+}
+
+func (h *BGPHandler) validateBGPIPv6Aggregate(bgpAgg *bgpd.BGPIPv6Aggregate) (aggConf config.BGPAggregate,
+	err error) {
+	if bgpAgg == nil {
+		return aggConf, err
+	}
+
+	var ip net.IP
+	ip, _, err = net.ParseCIDR(bgpAgg.IpPrefix)
+	if err != nil {
+		err = errors.New(fmt.Sprintf("BGPAggregate: IP %s is not valid", bgpAgg.IpPrefix))
+		h.logger.Info("SendBGPAggregate: IP", bgpAgg.IpPrefix, "is not valid")
+		return aggConf, err
+	}
+
+	if ip.To4() != nil {
+		err = errors.New(fmt.Sprintf("BGPAggregate: IP %s is not a v6 address", bgpAgg.IpPrefix))
+		h.logger.Info("SendBGPAggregate: IP", bgpAgg.IpPrefix, "is not a v6 address")
+		return aggConf, err
+	}
+
+	aggConf = config.BGPAggregate{
+		IPPrefix:        bgpAgg.IpPrefix,
+		GenerateASSet:   bgpAgg.GenerateASSet,
+		SendSummaryOnly: bgpAgg.SendSummaryOnly,
+		AddressFamily:   packet.GetProtocolFamily(packet.AfiIP6, packet.SafiUnicast),
+	}
+	return aggConf, nil
+}
+
+func (h *BGPHandler) SendBGPIPv6Aggregate(oldConfig *bgpd.BGPIPv6Aggregate, newConfig *bgpd.BGPIPv6Aggregate,
+	attrSet []bool) (bool, error) {
+	oldAgg, err := h.validateBGPIPv6Aggregate(oldConfig)
+	if err != nil {
+		return false, err
+	}
+
+	newAgg, err := h.validateBGPIPv6Aggregate(newConfig)
+	if err != nil {
+		return false, err
+	}
+
+	h.server.AddAggCh <- server.AggUpdate{oldAgg, newAgg, attrSet}
+	return true, err
+}
+
+func (h *BGPHandler) CreateBGPIPv6Aggregate(bgpAgg *bgpd.BGPIPv6Aggregate) (bool, error) {
+	h.logger.Info("Create IPv6 aggregate attrs:", bgpAgg)
+	return h.SendBGPIPv6Aggregate(nil, bgpAgg, make([]bool, 0))
+}
+
+func (h *BGPHandler) UpdateBGPIPv6Aggregate(origA *bgpd.BGPIPv6Aggregate, updatedA *bgpd.BGPIPv6Aggregate, attrSet []bool,
+	op []*bgpd.PatchOpInfo) (bool, error) {
+	h.logger.Info("Update IPv6 aggregate attrs:", updatedA, "old config:", origA)
+	return h.SendBGPIPv6Aggregate(origA, updatedA, attrSet)
+}
+
+func (h *BGPHandler) DeleteBGPIPv6Aggregate(bgpAgg *bgpd.BGPIPv6Aggregate) (bool, error) {
+	h.logger.Info("Delete IPv6 aggregate attrs:", bgpAgg)
+	agg, _ := h.validateBGPIPv6Aggregate(bgpAgg)
+	h.server.RemAggCh <- agg
 	return true, nil
 }

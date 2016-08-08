@@ -64,6 +64,8 @@ type NDPServer struct {
 	VlanCh chan *config.VlanNotification
 	//Received Pkt Channel
 	RxPktCh chan *RxPktInfo
+	//Package packet informs server over PktDataCh saying that send this packet..
+	PktDataCh chan config.PacketData
 
 	ndpIntfStateSlice     []int32
 	ndpUpIntfStateSlice   []int32
@@ -77,6 +79,9 @@ type NDPServer struct {
 
 	// Neighbor Cache Information
 	Packet *packet.Packet
+
+	// @HACK: Need to find better way of getting Switch Mac Address
+	SwitchMac string
 }
 
 const (
