@@ -411,33 +411,35 @@ func (m RIBDServer) UpdateApplyPolicy(info ApplyPolicyInfo, apply bool, db *poli
 		return
 	}
 	node := nodeGet.(policy.Policy)
-	conditions := make([]ribdInt.ConditionInfo, 0)
-	for i := 0; i < len(info.Conditions); i++ {
-		conditions = append(conditions, *info.Conditions[i])
-	}
-	logger.Debug("RIB handler UpdateApplyPolicy source:", source, " policy:", policyName, " action:", action, " apply:", apply, "conditions: ")
-	for j := 0; j < len(conditions); j++ {
-		logger.Debug("ConditionType =  :", conditions[j].ConditionType)
-		switch conditions[j].ConditionType {
-		case "MatchProtocol":
-			logger.Debug(conditions[j].Protocol)
-			conditionName = "Match" + conditions[j].Protocol
-			ok := policyConditionsDB.Match(patriciaDB.Prefix(conditionName))
-			if !ok {
-				logger.Debug("Define condition ", conditionName)
-				policyCondition := ribd.PolicyCondition{Name: conditionName, ConditionType: conditions[j].ConditionType, Protocol: conditions[j].Protocol}
-				_, err = m.ProcessPolicyConditionConfigCreate(&policyCondition, db)
-			}
-		case "MatchDstIpPrefix":
-		case "MatchSrcIpPrefix":
-			logger.Debug("IpPrefix:", conditions[j].IpPrefix, "MasklengthRange:", conditions[j].MasklengthRange)
-		default:
-			logger.Err("Invalid condition type:", conditions[j].ConditionType)
-			return
+	if apply {
+		conditions := make([]ribdInt.ConditionInfo, 0)
+		for i := 0; i < len(info.Conditions); i++ {
+			conditions = append(conditions, *info.Conditions[i])
 		}
-		if err == nil {
-			logger.Debug("Adding condition ", conditionName, " to conditionNameList")
-			conditionNameList = append(conditionNameList, conditionName)
+		logger.Debug("RIB handler UpdateApplyPolicy source:", source, " policy:", policyName, " action:", action, " apply:", apply, "conditions: ")
+		for j := 0; j < len(conditions); j++ {
+			logger.Debug("ConditionType =  :", conditions[j].ConditionType)
+			switch conditions[j].ConditionType {
+			case "MatchProtocol":
+				logger.Debug(conditions[j].Protocol)
+				conditionName = "Match" + conditions[j].Protocol
+				ok := policyConditionsDB.Match(patriciaDB.Prefix(conditionName))
+				if !ok {
+					logger.Debug("Define condition ", conditionName)
+					policyCondition := ribd.PolicyCondition{Name: conditionName, ConditionType: conditions[j].ConditionType, Protocol: conditions[j].Protocol}
+					_, err = m.ProcessPolicyConditionConfigCreate(&policyCondition, db)
+				}
+			case "MatchDstIpPrefix":
+			case "MatchSrcIpPrefix":
+				logger.Debug("IpPrefix:", conditions[j].IpPrefix, "MasklengthRange:", conditions[j].MasklengthRange)
+			default:
+				logger.Err("Invalid condition type:", conditions[j].ConditionType)
+				return
+			}
+			if err == nil {
+				logger.Debug("Adding condition ", conditionName, " to conditionNameList")
+				conditionNameList = append(conditionNameList, conditionName)
+			}
 		}
 	}
 	//define Action
