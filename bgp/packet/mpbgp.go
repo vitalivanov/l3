@@ -349,7 +349,7 @@ func (r *BGPPathAttrMPReachNLRI) Decode(pkt []byte, data interface{}) error {
 
 	r.NLRI = make([]NLRI, 0)
 	length := uint32(r.BGPPathAttrBase.Length) - 4 - uint32(r.NextHop.Len())
-	_, err = decodeNLRI(pkt[idx:], &r.NLRI, length, r.AFI, data)
+	_, err = decodeNLRI(pkt[idx:], &r.NLRI, length, r.AFI, r.SAFI, data)
 	return err
 }
 
@@ -440,7 +440,7 @@ func (u *BGPPathAttrMPUnreachNLRI) Decode(pkt []byte, data interface{}) error {
 
 	u.NLRI = make([]NLRI, 0)
 	length := uint32(u.BGPPathAttrBase.Length) - 3
-	_, err = decodeNLRI(pkt[idx:], &u.NLRI, length, u.AFI, data)
+	_, err = decodeNLRI(pkt[idx:], &u.NLRI, length, u.AFI, u.SAFI, data)
 	return err
 }
 

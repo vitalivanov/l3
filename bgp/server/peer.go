@@ -526,7 +526,8 @@ func (p *Peer) SendUpdate(updated map[uint32]map[*bgprib.Path][]*bgprib.Destinat
 							if _, ok := newUpdated[path][protoFamily]; !ok {
 								newUpdated[path][protoFamily] = make([]packet.NLRI, 0)
 							}
-							newUpdated[path][protoFamily] = append(newUpdated[path][protoFamily], dest.NLRI)
+							newUpdated[path][protoFamily] = append(newUpdated[path][protoFamily],
+								dest.NLRI.GetIPPrefix())
 						}
 						p.ribOut[protoFamily][ip][pathId] = bgprib.NewAdjRIBRoute(dest.NLRI.GetIPPrefix(),
 							path, pathId)
@@ -555,11 +556,7 @@ func (p *Peer) SendUpdate(updated map[uint32]map[*bgprib.Path][]*bgprib.Destinat
 		}
 		for protoFamily, nlriList := range withdrawList {
 			if len(nlriList) > 0 {
-				afi, safi := packet.GetAfiSafi(protoFamily)
-				mpUnreachNLRI := packet.NewBGPPathAttrMPUnreachNLRI()
-				mpUnreachNLRI.AFI = afi
-				mpUnreachNLRI.SAFI = safi
-				mpUnreachNLRI.AddNLRIList(nlriList)
+				mpUnreachNLRI := packet.ConstructMPUnreachNLRI(protoFamily, nlriList)
 				pathAtts := make([]packet.BGPPathAttr, 0)
 				pathAtts = append(pathAtts, mpUnreachNLRI)
 				updateMsg = packet.NewBGPUpdateMessage(ipv4List, pathAtts, nil)
@@ -573,6 +570,7 @@ func (p *Peer) SendUpdate(updated map[uint32]map[*bgprib.Path][]*bgprib.Destinat
 		}
 	}
 
+	localAddress := p.NeighborConf.Neighbor.Transport.Config.LocalAddress
 	p.logger.Infof("Neighbor %s: new updated routes:%+v", p.NeighborConf.Neighbor.NeighborAddress, newUpdated)
 	for path, pfNLRIMap := range newUpdated {
 		var updateMsg *packet.BGPMessage
@@ -587,15 +585,8 @@ func (p *Peer) SendUpdate(updated map[uint32]map[*bgprib.Path][]*bgprib.Destinat
 
 		for protoFamily, nlriList := range pfNLRIMap {
 			if len(nlriList) > 0 {
-				afi, safi := packet.GetAfiSafi(protoFamily)
+				mpReachNLRI := packet.ConstructIPv6MPReachNLRI(protoFamily, localAddress, nil, nlriList)
 				pa := packet.CopyPathAttrs(path.PathAttrs)
-				mpReachNLRI := packet.NewBGPPathAttrMPReachNLRI()
-				mpReachNLRI.AFI = afi
-				mpReachNLRI.SAFI = safi
-				mpNextHop := packet.NewMPNextHopIP()
-				mpNextHop.SetNextHop(p.NeighborConf.Neighbor.Transport.Config.LocalAddress)
-				mpReachNLRI.SetNextHop(mpNextHop)
-				mpReachNLRI.SetNLRIList(nlriList)
 				pa = packet.AddMPReachNLRIToPathAttrs(pa, mpReachNLRI)
 				updateMsg = packet.NewBGPUpdateMessage(nil, pa, ipv4List)
 				p.logger.Infof("Neighbor %s: Send update message valid routes:%+v, path attrs:%+v",
