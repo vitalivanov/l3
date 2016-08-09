@@ -295,7 +295,7 @@ func (n *NeighborConf) PublishEvents(stateId uint32) {
 		AdditionalInfo: additionalInfo,
 		AdditionalData: nil,
 	}
-	err := eventUtils.PublishEvents(txEvt)
+	err := eventUtils.PublishEvents(&txEvt)
 	if err != nil {
 		n.logger.Err("Error publish new events for BGPNeighborStateChange")
 	}

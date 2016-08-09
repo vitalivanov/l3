@@ -264,7 +264,7 @@ func (server *ARPServer) processArpEntryMacMoveMsg(msg commonDefs.IPv4NbrMacMove
 			AdditionalInfo: "",
 			AdditionalData: nil,
 		}
-		err := eventUtils.PublishEvents(txEvent)
+		err := eventUtils.PublishEvents(&txEvent)
 		if err != nil {
 			server.logger.Err("Error in publishing ArpEntryUpdated Event")
 		}
@@ -371,7 +371,7 @@ func (server *ARPServer) processArpEntryUpdateMsg(msg UpdateArpEntryMsg) {
 			AdditionalInfo: "",
 			AdditionalData: nil,
 		}
-		err = eventUtils.PublishEvents(txEvent)
+		err = eventUtils.PublishEvents(&txEvent)
 		if err != nil {
 			server.logger.Err("Error in publishing ArpEntryLearned Event")
 		}
@@ -427,7 +427,7 @@ func (server *ARPServer) processArpCounterUpdateMsg() {
 						AdditionalInfo: "",
 						AdditionalData: nil,
 					}
-					err = eventUtils.PublishEvents(txEvent)
+					err = eventUtils.PublishEvents(&txEvent)
 					if err != nil {
 						server.logger.Err("Error in publishing ArpEntryDeleted Event")
 					}
