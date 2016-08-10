@@ -289,7 +289,13 @@ func (n *NeighborConf) PublishEvents(stateId uint32) {
 		IfIndex:         n.Neighbor.Config.IfIndex,
 	}
 	additionalInfo := fmt.Sprintf("State change from %s to %s", oldState, newState)
-	err := eventUtils.PublishEvents(events.BGPNeighborStateChange, evtKey, additionalInfo)
+	txEvt := eventUtils.TxEvent{
+		EventId:        events.BGPNeighborStateChange,
+		Key:            evtKey,
+		AdditionalInfo: additionalInfo,
+		AdditionalData: nil,
+	}
+	err := eventUtils.PublishEvents(&txEvt)
 	if err != nil {
 		n.logger.Err("Error publish new events for BGPNeighborStateChange")
 	}

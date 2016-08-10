@@ -258,7 +258,13 @@ func (server *ARPServer) processArpEntryMacMoveMsg(msg commonDefs.IPv4NbrMacMove
 		evtKey := events.ArpEntryKey{
 			IpAddr: msg.IpAddr,
 		}
-		err := eventUtils.PublishEvents(events.ArpEntryUpdated, evtKey, "")
+		txEvent := eventUtils.TxEvent{
+			EventId:        events.ArpEntryUpdated,
+			Key:            evtKey,
+			AdditionalInfo: "",
+			AdditionalData: nil,
+		}
+		err := eventUtils.PublishEvents(&txEvent)
 		if err != nil {
 			server.logger.Err("Error in publishing ArpEntryUpdated Event")
 		}
@@ -359,7 +365,13 @@ func (server *ARPServer) processArpEntryUpdateMsg(msg UpdateArpEntryMsg) {
 		evtKey := events.ArpEntryKey{
 			IpAddr: msg.IpAddr,
 		}
-		err = eventUtils.PublishEvents(events.ArpEntryLearned, evtKey, "")
+		txEvent := eventUtils.TxEvent{
+			EventId:        events.ArpEntryLearned,
+			Key:            evtKey,
+			AdditionalInfo: "",
+			AdditionalData: nil,
+		}
+		err = eventUtils.PublishEvents(&txEvent)
 		if err != nil {
 			server.logger.Err("Error in publishing ArpEntryLearned Event")
 		}
@@ -409,7 +421,13 @@ func (server *ARPServer) processArpCounterUpdateMsg() {
 					evtKey := events.ArpEntryKey{
 						IpAddr: ip,
 					}
-					err = eventUtils.PublishEvents(events.ArpEntryDeleted, evtKey, "")
+					txEvent := eventUtils.TxEvent{
+						EventId:        events.ArpEntryDeleted,
+						Key:            evtKey,
+						AdditionalInfo: "",
+						AdditionalData: nil,
+					}
+					err = eventUtils.PublishEvents(&txEvent)
 					if err != nil {
 						server.logger.Err("Error in publishing ArpEntryDeleted Event")
 					}

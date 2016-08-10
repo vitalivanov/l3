@@ -324,7 +324,7 @@ func (ribdServiceHandler *RIBDServer) ConnectToClients(paramsFile string) {
 				}
 			} else {
 				//go ribdServiceHandler.connectToClient(client.Name)
-				go arpdclnt.ConnectToClient()
+				go asicdclnt.ConnectToClient()
 			}
 		}
 		if client.Name == "arpd" {
@@ -342,7 +342,7 @@ func (ribdServiceHandler *RIBDServer) ConnectToClients(paramsFile string) {
 				}
 			} else {
 				//go ribdServiceHandler.connectToClient(client.Name)
-				go asicdclnt.ConnectToClient()
+				go arpdclnt.ConnectToClient()
 			}
 		}
 	}
