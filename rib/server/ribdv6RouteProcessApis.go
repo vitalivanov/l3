@@ -2,6 +2,7 @@
 package server
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -132,14 +133,14 @@ func UpdateV6RouteReachabilityStatus(prefix patriciaDB.Prefix, //prefix of the n
 					}
 					//RouteServiceHandler.WriteIPv4RouteStateEntryToDB(RouteDBInfo{v[i], rmapInfoRecordList})
 					//logger.Debug("Bringing down route : ip: ", v[i].networkAddr)
-					RouteReachabilityStatusUpdate(k, RouteReachabilityStatusInfo{v[i].networkAddr, "Down", k, nextHopIntf})
+					RouteReachabilityStatusUpdate(k, RouteReachabilityStatusInfo{v[i].networkAddr, v[i].ipType, "Down", k, nextHopIntf})
 					/*
 					   The reachability status for this network has been updated, now check if there are routes dependent on
 					   this prefix and call reachability status
 					*/
 					if RouteServiceHandler.NextHopInfoMap[NextHopInfoKey{string(prefix)}].refCount > 0 {
 						//logger.Debug("There are dependent routes for this ip ", v[i].networkAddr)
-						V6RouteInfoMap.VisitAndUpdate(UpdateRouteReachabilityStatus, RouteReachabilityStatusInfo{v[i].networkAddr, "Down", k, nextHopIntf})
+						V6RouteInfoMap.VisitAndUpdate(UpdateV6RouteReachabilityStatus, RouteReachabilityStatusInfo{v[i].networkAddr, v[i].ipType, "Down", k, nextHopIntf})
 					}
 				} else if routeReachabilityStatusInfo.status == "Up" && v[i].resolvedNextHopIpIntf.IsReachable == false {
 					//logger.Debug("Bringing up route : ip: ", v[i].networkAddr)
@@ -152,14 +153,14 @@ func UpdateV6RouteReachabilityStatus(prefix patriciaDB.Prefix, //prefix of the n
 						Op:               "add",
 					}
 					//RouteServiceHandler.WriteIPv4RouteStateEntryToDB(RouteDBInfo{v[i], rmapInfoRecordList})
-					RouteReachabilityStatusUpdate(k, RouteReachabilityStatusInfo{v[i].networkAddr, "Up", k, nextHopIntf})
+					RouteReachabilityStatusUpdate(k, RouteReachabilityStatusInfo{v[i].networkAddr, v[i].ipType, "Up", k, nextHopIntf})
 					/*
 					   The reachability status for this network has been updated, now check if there are routes dependent on
 					   this prefix and call reachability status
 					*/
 					if RouteServiceHandler.NextHopInfoMap[NextHopInfoKey{string(prefix)}].refCount > 0 {
 						//logger.Debug("There are dependent routes for this ip ", v[i].networkAddr)
-						V6RouteInfoMap.VisitAndUpdate(UpdateRouteReachabilityStatus, RouteReachabilityStatusInfo{v[i].networkAddr, "Up", k, nextHopIntf})
+						V6RouteInfoMap.VisitAndUpdate(UpdateV6RouteReachabilityStatus, RouteReachabilityStatusInfo{v[i].networkAddr, v[i].ipType, "Up", k, nextHopIntf})
 					}
 				}
 			}
@@ -490,7 +491,7 @@ func (m RIBDServer) Getv6Route(destNetIp string) (route *ribdInt.IPv6RouteState,
 	if err != nil {
 		return route, errors.New("Invalid destination ip/network Mask")
 	}
-	routeInfoRecordListItem := RouteInfoMap.Get(destNet)
+	routeInfoRecordListItem := V6RouteInfoMap.Get(destNet)
 	if routeInfoRecordListItem == nil {
 		logger.Debug("No such route")
 		err = errors.New("Route does not exist")
@@ -534,6 +535,7 @@ func (m RIBDServer) Getv6Route(destNetIp string) (route *ribdInt.IPv6RouteState,
  - a user/routing protocol installs a new route. In that case, addType will be RIBAndFIB
  - when a operationally down link comes up. In this case, the addType will be FIBOnly because on a link down, the route is still preserved in the RIB database and only deleted from FIB (Asic)
 **/
+/*
 func createV6Route(routeInfo RouteParams) (rc ribd.Int, err error) {
 
 	ipType := routeInfo.ipType
@@ -604,7 +606,8 @@ func createV6Route(routeInfo RouteParams) (rc ribd.Int, err error) {
 	if routeInfoRecordListItem == nil {
 		/*
 		   no routes for this destination are currently configured
-		*/
+*/
+/*
 		if addType == FIBOnly {
 			logger.Debug("route record list not found in RIB")
 			err = errors.New("Unexpected: route record list not found in RIB")
@@ -729,7 +732,7 @@ func createV6Route(routeInfo RouteParams) (rc ribd.Int, err error) {
 	return 0, err
 
 }
-
+*/
 func (m RIBDServer) ProcessV6RouteCreateConfig(cfg *ribd.IPv6Route) (val bool, err error) {
 	logger.Debug(fmt.Sprintln("ProcessV6RouteCreate: Received create route request for ip: ", cfg.DestinationNw, " mask ", cfg.NetworkMask, " number of next hops: ", len(cfg.NextHop)))
 	newCfg := ribd.IPv6Route{
@@ -755,7 +758,7 @@ func (m RIBDServer) ProcessV6RouteCreateConfig(cfg *ribd.IPv6Route) (val bool, e
 
 	logger.Debug(fmt.Sprintln("createType = ", params.createType, "deleteType = ", params.deleteType))
 	//	PolicyEngineFilter(policyRoute, policyCommonDefs.PolicyPath_Import, params)
-	_, err = createV6Route(params)
+	_, err = createRoute(params)
 
 	return true, err
 }
@@ -768,7 +771,7 @@ func (m RIBDServer) ProcessV6RouteDeleteConfig(cfg *ribd.IPv6Route) (val bool, e
 	}
 	for i := 0; i < len(cfg.NextHop); i++ {
 		logger.Debug(fmt.Sprintln("nexthop info: ip: ", cfg.NextHop[i].NextHopIp, " intref: ", cfg.NextHop[i].NextHopIntRef))
-		_, err = deleteIPRoute(cfg.DestinationNw, cfg.NetworkMask, cfg.Protocol, cfg.NextHop[i].NextHopIp, FIBAndRIB, ribdCommonDefs.RoutePolicyStateChangetoInValid)
+		_, err = deleteIPRoute(cfg.DestinationNw, ribdCommonDefs.IPv6, cfg.NetworkMask, cfg.Protocol, cfg.NextHop[i].NextHopIp, FIBAndRIB, ribdCommonDefs.RoutePolicyStateChangetoInValid)
 	}
 	return true, err
 }
@@ -784,7 +787,7 @@ func (m RIBDServer) Processv6RoutePatchUpdateConfig(origconfig *ribd.IPv6Route, 
 		logger.Debug(fmt.Sprintln(" getNetowrkPrefixFromStrings returned err ", err))
 		return ret, err
 	}
-	ok := RouteInfoMap.Match(destNet)
+	ok := V6RouteInfoMap.Match(destNet)
 	if !ok {
 		err = errors.New("No route found")
 		return ret, err
@@ -856,12 +859,12 @@ func (m RIBDServer) Processv6RouteUpdateConfig(origconfig *ribd.IPv6Route, newco
 		logger.Debug(fmt.Sprintln(" getNetowrkPrefixFromStrings returned err ", err))
 		return val, err
 	}
-	ok := RouteInfoMap.Match(destNet)
+	ok := V6RouteInfoMap.Match(destNet)
 	if !ok {
 		err = errors.New(fmt.Sprintln("No route found for ip ", destNet))
 		return val, err
 	}
-	routeInfoRecordListItem := RouteInfoMap.Get(destNet)
+	routeInfoRecordListItem := V6RouteInfoMap.Get(destNet)
 	if routeInfoRecordListItem == nil {
 		logger.Debug(fmt.Sprintln("No route for destination network", destNet))
 		return val, err
@@ -869,7 +872,7 @@ func (m RIBDServer) Processv6RouteUpdateConfig(origconfig *ribd.IPv6Route, newco
 	routeInfoRecordList := routeInfoRecordListItem.(RouteInfoRecordList)
 	callUpdate := true
 	if attrset != nil {
-		found, routeInfoRecord, index := findRouteWithNextHop(routeInfoRecordList.routeInfoProtocolMap[origconfig.Protocol], origconfig.NextHop[0].NextHopIp)
+		found, routeInfoRecord, index := findRouteWithNextHop(routeInfoRecordList.routeInfoProtocolMap[origconfig.Protocol], ribdCommonDefs.IPv6, origconfig.NextHop[0].NextHopIp)
 		if !found || index == -1 {
 			logger.Debug("Invalid nextHopIP")
 			return val, err
@@ -909,7 +912,7 @@ func (m RIBDServer) Processv6RouteUpdateConfig(origconfig *ribd.IPv6Route, newco
 			}
 		}
 		routeInfoRecordList.routeInfoProtocolMap[origconfig.Protocol][index] = routeInfoRecord
-		RouteInfoMap.Set(destNet, routeInfoRecordList)
+		V6RouteInfoMap.Set(destNet, routeInfoRecordList)
 		logger.Debug("Adding to DBRouteCh from processRouteUpdateConfig")
 		RouteServiceHandler.DBRouteCh <- RIBdServerConfig{
 			OrigConfigObject: RouteDBInfo{routeInfoRecord, routeInfoRecordList},

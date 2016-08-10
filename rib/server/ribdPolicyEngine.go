@@ -355,7 +355,8 @@ func policyEngineUpdateRoute(prefix patriciaDB.Prefix, item patriciaDB.Item, han
 }
 func policyEngineTraverseAndUpdate() {
 	logger.Info("policyEngineTraverseAndUpdate")
-	RouteInfoMap.VisitAndUpdate(policyEngineUpdateRoute, nil)
+	V4RouteInfoMap.VisitAndUpdate(policyEngineUpdateRoute, nil)
+	V6RouteInfoMap.VisitAndUpdate(policyEngineUpdateRoute, nil)
 }
 func policyEngineActionAcceptRoute(params interface{}) {
 	routeInfo := params.(RouteParams)
@@ -536,7 +537,7 @@ func DoesRouteExist(params interface{}) (exists bool) {
 		logger.Info("Error when getting ipPrefix, err= ", err)
 		return
 	}
-	routeInfoRecordList := RouteInfoMap.Get(ipPrefix)
+	routeInfoRecordList := RouteInfoMapGet(routeInfo.ipType, ipPrefix)
 	if routeInfoRecordList == nil {
 		logger.Info("Route for this prefix no longer exists")
 		routeDeleted = true
@@ -637,7 +638,8 @@ func policyEngineApplyForRoute(prefix patriciaDB.Prefix, item patriciaDB.Item, t
 func policyEngineTraverseAndApply(data interface{}, updatefunc policy.PolicyApplyfunc) {
 	logger.Info("PolicyEngineTraverseAndApply - traverse routing table and apply policy ")
 	traverseAndApplyPolicyData := TraverseAndApplyPolicyData{data: data, updatefunc: updatefunc}
-	RouteInfoMap.VisitAndUpdate(policyEngineApplyForRoute, traverseAndApplyPolicyData)
+	V4RouteInfoMap.VisitAndUpdate(policyEngineApplyForRoute, traverseAndApplyPolicyData)
+	V6RouteInfoMap.VisitAndUpdate(policyEngineApplyForRoute, traverseAndApplyPolicyData)
 }
 func policyEngineTraverseAndReverse(policyItem interface{}) {
 	policy := policyItem.(policy.Policy)
@@ -663,7 +665,7 @@ func policyEngineTraverseAndReverse(policyItem interface{}) {
 			return
 		}
 		PolicyEngineDB.PolicyEngineUndoPolicyForEntity(entity, policy, params)
-		deleteRoutePolicyState(ipPrefix, policy.Name)
+		deleteRoutePolicyState(params.ipType, ipPrefix, policy.Name)
 		PolicyEngineDB.DeletePolicyEntityMapEntry(entity, policy.Name)
 	}
 }

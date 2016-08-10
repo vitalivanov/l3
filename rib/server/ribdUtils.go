@@ -463,7 +463,7 @@ func deleteRoutePolicyStateAll(route ribdInt.Routes) {
 		return
 	}
 
-	routeInfoRecordListItem := RouteInfoMap.Get(destNet)
+	routeInfoRecordListItem := RouteInfoMapGet(ribdCommonDefs.IPType(route.IPAddrType), destNet)
 	if routeInfoRecordListItem == nil {
 		logger.Info(" entry not found for prefix %v", destNet)
 		return
@@ -471,7 +471,7 @@ func deleteRoutePolicyStateAll(route ribdInt.Routes) {
 	routeInfoRecordList := routeInfoRecordListItem.(RouteInfoRecordList)
 	routeInfoRecordList.policyHitCounter = ribd.Int(route.PolicyHitCounter)
 	routeInfoRecordList.policyList = nil //append(routeInfoRecordList.policyList[:0])
-	RouteInfoMap.Set(destNet, routeInfoRecordList)
+	RouteInfoMapSet(ribdCommonDefs.IPType(route.IPAddrType), destNet, routeInfoRecordList)
 	return
 }
 func addRoutePolicyState(route ribdInt.Routes, policy string, policyStmt string) {
@@ -481,7 +481,7 @@ func addRoutePolicyState(route ribdInt.Routes, policy string, policyStmt string)
 		return
 	}
 
-	routeInfoRecordListItem := RouteInfoMap.Get(destNet)
+	routeInfoRecordListItem := RouteInfoMapGet(ribdCommonDefs.IPType(route.IPAddrType), destNet)
 	if routeInfoRecordListItem == nil {
 		logger.Info("Unexpected - entry not found for prefix %v", destNet)
 		return
@@ -511,7 +511,7 @@ func addRoutePolicyState(route ribdInt.Routes, policy string, policyStmt string)
 		policyStmtList = append(policyStmtList,policyStmt)
 	    routeInfoRecordList.policyList[policy] = policyStmtList*/
 	routeInfoRecordList.policyList = append(routeInfoRecordList.policyList, policy)
-	RouteInfoMap.Set(destNet, routeInfoRecordList)
+	RouteInfoMapSet(ribdCommonDefs.IPType(route.IPAddrType), destNet, routeInfoRecordList)
 	logger.Debug("Adding to DBRouteCh from addRoutePolicyState")
 	RouteServiceHandler.DBRouteCh <- RIBdServerConfig{
 		OrigConfigObject: RouteDBInfo{routeInfoRecordList.routeInfoProtocolMap[routeInfoRecordList.selectedRouteProtocol][0], routeInfoRecordList},
@@ -520,11 +520,11 @@ func addRoutePolicyState(route ribdInt.Routes, policy string, policyStmt string)
 	//RouteServiceHandler.WriteIPv4RouteStateEntryToDB(RouteDBInfo{routeInfoRecordList.routeInfoProtocolMap[routeInfoRecordList.selectedRouteProtocol][0], routeInfoRecordList})
 	return
 }
-func deleteRoutePolicyState(ipPrefix patriciaDB.Prefix, policyName string) {
+func deleteRoutePolicyState(ipType ribdCommonDefs.IPType, ipPrefix patriciaDB.Prefix, policyName string) {
 	logger.Info("deleteRoutePolicyState")
 	found := false
 	idx := 0
-	routeInfoRecordListItem := RouteInfoMap.Get(ipPrefix)
+	routeInfoRecordListItem := RouteInfoMapGet(ipType, ipPrefix)
 	if routeInfoRecordListItem == nil {
 		logger.Info("routeInfoRecordListItem nil for prefix ", ipPrefix)
 		return
@@ -549,7 +549,7 @@ func deleteRoutePolicyState(ipPrefix patriciaDB.Prefix, policyName string) {
 	} else {
 		routeInfoRecordList.policyList = append(routeInfoRecordList.policyList[:idx], routeInfoRecordList.policyList[idx+1:]...)
 	}
-	RouteInfoMap.Set(ipPrefix, routeInfoRecordList)
+	RouteInfoMapSet(ipType, ipPrefix, routeInfoRecordList)
 }
 
 func updateRoutePolicyState(route ribdInt.Routes, op int, policy string, policyStmt string) {
