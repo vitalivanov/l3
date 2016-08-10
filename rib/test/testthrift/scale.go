@@ -31,19 +31,24 @@ import (
 	"time"
 )
 
-func handleClient(client *ribd.RIBDServicesClient, maxCount int) (err error) {
+func handleClient(client *ribd.RIBDServicesClient, maxCount int64) (err error) {
 	fmt.Println("handleClient")
-	var count int = 0
+	var count int64 = 0
 	//var maxCount int = 30000
 	intByt2 := 1
 	intByt3 := 1
-	byte1 := "22"
+	intByt1 := 22
 	byte4 := "0"
 	start := time.Now()
 	var route ribd.IPv4Route
 	routeCount, _ := client.GetTotalv4RouteCount()
 	fmt.Println("Route count before scale test start:", routeCount)
 	for {
+		if intByt2 > 253 && intByt3 > 254 {
+			intByt1++
+			intByt2 = 1
+			intByt3 = 1
+		}
 		if intByt3 > 254 {
 			intByt3 = 1
 			intByt2++
@@ -57,6 +62,7 @@ func handleClient(client *ribd.RIBDServicesClient, maxCount int) (err error) {
 		//}
 
 		route = ribd.IPv4Route{}
+		byte1 := strconv.Itoa(intByt1)
 		byte2 := strconv.Itoa(intByt2)
 		byte3 := strconv.Itoa(intByt3)
 		rtNet := byte1 + "." + byte2 + "." + byte3 + "." + byte4
@@ -82,7 +88,7 @@ func handleClient(client *ribd.RIBDServicesClient, maxCount int) (err error) {
 			return nil
 		}
 		if maxCount == count {
-			//			fmt.Println("Done. Total calls executed", count)
+			fmt.Println("Done. Total calls executed", count)
 			break
 		}
 
@@ -91,9 +97,9 @@ func handleClient(client *ribd.RIBDServicesClient, maxCount int) (err error) {
 	//	fmt.Println(" ## Elapsed time is ", elapsed)
 	return nil
 }
-func handleBulkClient(client *ribd.RIBDServicesClient, maxCount int) (err error) {
+func handleBulkClient(client *ribd.RIBDServicesClient, maxCount int64) (err error) {
 	fmt.Println("handleBulkClient")
-	var count int = 0
+	var count int64 = 0
 	//timeFmt := "2006-01-02 15:04:05.999999999 +0000 UTC"
 	//	var maxCount int = 30000
 	intByt2 := 1
@@ -176,12 +182,12 @@ func handleBulkClient(client *ribd.RIBDServicesClient, maxCount int) (err error)
 }
 
 //func main() {
-func Scale(ribdClient *ribd.RIBDServicesClient, number int) {
+func Scale(ribdClient *ribd.RIBDServicesClient, number int64) {
 	/*ribdClient := testutils.GetRIBdClient()
 	if ribdClient == nil {
 		fmt.Println("RIBd client nil")
 		return
 	}*/
-	//handleClient(ribdClient, number) //ribd.NewRIBDServicesClientFactory(transport, protocolFactory))
-	handleBulkClient(ribdClient, number) //(ribd.NewRIBDServicesClientFactory(transport, protocolFactory))
+	handleClient(ribdClient, number) //ribd.NewRIBDServicesClientFactory(transport, protocolFactory))
+	//handleBulkClient(ribdClient, number) //(ribd.NewRIBDServicesClientFactory(transport, protocolFactory))
 }

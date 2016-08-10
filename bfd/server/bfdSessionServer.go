@@ -99,7 +99,7 @@ func (server *BFDServer) DispatchReceivedBfdPacket(ipAddr string, bfdPacket *Bfd
 }
 
 func (server *BFDServer) StartBfdSesionServer() error {
-	destAddr := ":" + strconv.Itoa(DEST_PORT)
+	destAddr := net.JoinHostPort("", strconv.Itoa(DEST_PORT))
 	ServerAddr, err := net.ResolveUDPAddr("udp", destAddr)
 	if err != nil {
 		server.logger.Info(fmt.Sprintln("Failed ResolveUDPAddr ", destAddr, err))

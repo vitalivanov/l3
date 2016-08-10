@@ -23,7 +23,7 @@
 package server
 
 import (
-	"fmt"
+	_ "fmt"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"l3/ndp/config"
@@ -38,7 +38,7 @@ import (
 func (svr *NDPServer) ReceivedNdpPkts(ifIndex int32) {
 	ipPort, _ := svr.L3Port[ifIndex]
 	if ipPort.PcapBase.PcapHandle == nil {
-		debug.Logger.Err(fmt.Sprintln("pcap handler for port:", ipPort.IntfRef, "is not valid. ABORT!!!!"))
+		debug.Logger.Err("pcap handler for port:", ipPort.IntfRef, "is not valid. ABORT!!!!")
 		return
 	}
 	src := gopacket.NewPacketSource(ipPort.PcapBase.PcapHandle, layers.LayerTypeEthernet)
@@ -51,12 +51,11 @@ func (svr *NDPServer) ReceivedNdpPkts(ifIndex int32) {
 			}
 			svr.RxPktCh <- &RxPktInfo{pkt, ipPort.IfIndex}
 		case <-ipPort.PcapBase.PcapCtrl:
-			svr.DeletePcapHandler(&ipPort.PcapBase.PcapHandle)
-			svr.L3Port[ifIndex] = ipPort
 			ipPort.PcapBase.PcapCtrl <- true
 			return
 		}
 	}
+	return
 }
 
 /*
@@ -70,11 +69,10 @@ func (svr *NDPServer) StartRxTx(ifIndex int32) {
 	if !exists {
 		// This will copy msg (intRef, ifIndex, ipAddr) into ipPort
 		// And also create an entry into the ndpL3IntfStateSlice
-		debug.Logger.Err(fmt.Sprintln("Failed starting RX/TX for interface which was not created, ifIndex:",
-			ifIndex, "is not allowed"))
+		debug.Logger.Err("Failed starting RX/TX for interface which was not created, ifIndex:",
+			ifIndex, "is not allowed")
 		return
 	}
-	svr.L3Port[ifIndex] = ipPort
 	// create pcap handler if there is none created right now
 	if ipPort.PcapBase.PcapHandle == nil {
 		var err error
@@ -82,14 +80,19 @@ func (svr *NDPServer) StartRxTx(ifIndex int32) {
 		if err != nil {
 			return
 		}
-		svr.L3Port[ifIndex] = ipPort
 	}
-	debug.Logger.Info(fmt.Sprintln("Start rx/tx for port:", ipPort.IntfRef, "ifIndex:", ipPort.IfIndex,
-		"ip address", ipPort.IpAddr))
+	// create pcap ctrl channel if not created
+	if ipPort.PcapBase.PcapCtrl == nil {
+		ipPort.PcapBase.PcapCtrl = make(chan bool)
+	}
+	svr.L3Port[ifIndex] = ipPort
+	debug.Logger.Info("Start rx/tx for port:", ipPort.IntfRef, "ifIndex:", ipPort.IfIndex, "ip address", ipPort.IpAddr)
 
 	// Spawn go routines for rx & tx
 	go svr.ReceivedNdpPkts(ipPort.IfIndex)
 	svr.ndpUpL3IntfStateSlice = append(svr.ndpUpL3IntfStateSlice, ifIndex)
+	// @TODO:When port comes up are we suppose to send out Neigbor Solicitation or Router Solicitation??
+	//svr.Packet.SendNSMsgIfRequired(ipPort.IpAddr, ipPort.PcapBase.PcapHandle)
 }
 
 /*
@@ -101,14 +104,22 @@ func (svr *NDPServer) StartRxTx(ifIndex int32) {
 func (svr *NDPServer) StopRxTx(ifIndex int32) {
 	ipPort, exists := svr.L3Port[ifIndex]
 	if !exists {
-		debug.Logger.Err(fmt.Sprintln("No entry found for ifIndex:", ifIndex))
+		debug.Logger.Err("No entry found for ifIndex:", ifIndex)
 		return
 	}
-	// Blocking call until Pcap is deleted
+	// Inform go routine spawned for ipPort to exit..
 	ipPort.PcapBase.PcapCtrl <- true
 	<-ipPort.PcapBase.PcapCtrl
-	debug.Logger.Info(fmt.Sprintln("Stop rx/tx for port:", ipPort.IntfRef, "ifIndex:", ipPort.IfIndex,
-		"ip address", ipPort.IpAddr, "is done"))
+
+	// once go routine is exited, delete pcap handler
+	svr.DeletePcapHandler(&ipPort.PcapBase.PcapHandle)
+
+	// deleted ctrl channel to avoid any memory usage
+	ipPort.PcapBase.PcapCtrl = nil
+	svr.L3Port[ifIndex] = ipPort
+
+	debug.Logger.Info("Stop rx/tx for port:", ipPort.IntfRef, "ifIndex:", ipPort.IfIndex,
+		"ip address", ipPort.IpAddr, "is done")
 	// Delete Entry from Slice
 	svr.DeleteL3IntfFromUpState(ipPort.IfIndex)
 }
@@ -123,6 +134,9 @@ func (svr *NDPServer) CheckSrcMac(macAddr string) bool {
 	return exists
 }
 
+/*
+ *	insertNeighborInfo: Helper API to update list of neighbor keys that are created by ndp
+ */
 func (svr *NDPServer) insertNeigborInfo(nbrInfo *config.NeighborInfo) {
 	svr.NeigborEntryLock.Lock()
 	svr.NeighborInfo[nbrInfo.IpAddr] = *nbrInfo
@@ -131,23 +145,68 @@ func (svr *NDPServer) insertNeigborInfo(nbrInfo *config.NeighborInfo) {
 }
 
 /*
- *	CheckCallUpdateNeighborInfo
+ *	deleteNeighborInfo: Helper API to update list of neighbor keys that are deleted by ndp
+ *	@NOTE: caller is responsible for acquiring the lock to access slice
+ *	//@TODO: need optimazation here...
+ */
+func (svr *NDPServer) deleteNeighborInfo(nbrIp string) {
+	for idx, _ := range svr.neighborKey {
+		if svr.neighborKey[idx] == nbrIp {
+			svr.neighborKey = append(svr.neighborKey[:idx],
+				svr.neighborKey[idx+1:]...)
+			break
+		}
+	}
+}
+
+/*
+ *	 CreateNeighborInfo
  *			a) It will first check whether a neighbor exists in the neighbor cache
  *			b) If it doesn't exists then we create neighbor in the platform
  *		        a) It will update ndp server neighbor info cache with the latest information
  */
-func (svr *NDPServer) CheckCallUpdateNeighborInfo(nbrInfo *config.NeighborInfo) {
+func (svr *NDPServer) CreateNeighborInfo(nbrInfo *config.NeighborInfo) {
 	_, exists := svr.NeighborInfo[nbrInfo.IpAddr]
 	if exists {
 		return
 	}
-	debug.Logger.Info(fmt.Sprintln("Calling create ipv6 neighgor for global nbrinfo is", nbrInfo))
-	// ipaddr, macAddr, vlanId, ifIndex --- Global IPv6 Address
-	_, err := svr.SwitchPlugin.CreateIPv6Neighbor(nbrInfo.IpAddr, nbrInfo.MacAddr, nbrInfo.VlanId, nbrInfo.IfIndex)
+	debug.Logger.Debug("Calling create ipv6 neighgor for global nbrinfo is", nbrInfo.IpAddr, nbrInfo.MacAddr,
+		nbrInfo.VlanId, nbrInfo.IfIndex)
+	_, err := svr.SwitchPlugin.CreateIPv6Neighbor(nbrInfo.IpAddr, nbrInfo.MacAddr,
+		nbrInfo.VlanId, nbrInfo.IfIndex)
 	if err != nil {
-		debug.Logger.Err(fmt.Sprintln("create ipv6 global neigbor failed for", nbrInfo, "error is", err))
+		debug.Logger.Err("create ipv6 global neigbor failed for", nbrInfo, "error is", err)
+		// do not enter that neighbor in our neigbor map
+		return
 	}
 	svr.insertNeigborInfo(nbrInfo)
+}
+
+/*
+ *	 DeleteNeighborInfo
+ *			a) It will first check whether a neighbor exists in the neighbor cache
+ *			b) If it doesn't exists then we will move on to next neighbor
+ *		        c) If exists then we will call DeleteIPV6Neighbor for that entry and remove
+ *			   the entry from our runtime information
+ */
+func (svr *NDPServer) DeleteNeighborInfo(deleteEntries []string) {
+	svr.NeigborEntryLock.Lock()
+	for _, nbrIp := range deleteEntries {
+		nbrEntry, exists := svr.NeighborInfo[nbrIp]
+		if !exists {
+			debug.Logger.Debug("Neighbor Info for:", nbrIp, "doesn't exists:")
+			continue
+		}
+		debug.Logger.Debug("Calling delete ipv6 neighbor for nbrIp:", nbrEntry.IpAddr)
+		_, err := svr.SwitchPlugin.DeleteIPv6Neighbor(nbrEntry.IpAddr)
+		if err != nil {
+			debug.Logger.Err("delete ipv6 neigbor failed for", nbrEntry, "error is", err)
+		}
+		svr.deleteNeighborInfo(nbrIp)
+		// delete the entry from neighbor map
+		delete(svr.NeighborInfo, nbrIp)
+	}
+	svr.NeigborEntryLock.Unlock()
 }
 
 /*
@@ -166,26 +225,39 @@ func (svr *NDPServer) ProcessRxPkt(ifIndex int32, pkt gopacket.Packet) {
 	nbrInfo := &config.NeighborInfo{}
 	err := svr.Packet.ValidateAndParse(nbrInfo, pkt)
 	if err != nil {
-		debug.Logger.Err(fmt.Sprintln("Validating and parsing Pkt Failed:", err))
+		debug.Logger.Err("Validating and parsing Pkt Failed:", err)
 		return
 	}
+	// @ALERT: always overwrite ifIndex when creating neighbor, if ifIndex has reverse map entry for
+	//	   vlanID then that will be overwritten again with vlan ifIndex
+	nbrInfo.IfIndex = ifIndex
 	if nbrInfo.PktOperation == byte(packet.PACKET_DROP) {
-		debug.Logger.Err(fmt.Sprintln("Dropping Neighbor Solicitation message for", nbrInfo.IpAddr))
+		debug.Logger.Err("Dropping message as PktOperation is PACKET_DROP for", nbrInfo.IpAddr)
 		return
 	} else if nbrInfo.State == packet.INCOMPLETE {
-		debug.Logger.Err(fmt.Sprintln("Received Neighbor Solicitation message for", nbrInfo.IpAddr))
+		debug.Logger.Err("Received message but packet state is INCOMPLETE hence not calling create ipv6 neighbor for ",
+			nbrInfo.IpAddr)
 		return
 	} else if nbrInfo.State == packet.REACHABLE {
 		switchMac := svr.CheckSrcMac(nbrInfo.MacAddr)
 		if switchMac {
-			debug.Logger.Info(fmt.Sprintln(
-				"Received Packet from same port and hence ignoring the packet:", nbrInfo))
+			debug.Logger.Info("Received Packet from same port and hence ignoring the packet:",
+				nbrInfo)
 			return
 		}
 		svr.PopulateVlanInfo(nbrInfo, ifIndex)
-		svr.CheckCallUpdateNeighborInfo(nbrInfo)
+		svr.CreateNeighborInfo(nbrInfo)
 	} else {
-		debug.Logger.Alert(fmt.Sprintln("Handle state", nbrInfo.State, "after packet validation & parsing"))
+		debug.Logger.Alert("Handle state", nbrInfo.State, "after packet validation & parsing")
 	}
 	return
+}
+
+func (svr *NDPServer) ProcessTimerExpiry(pktData config.PacketData) {
+	l3Port, exists := svr.L3Port[pktData.IfIndex]
+	if !exists {
+		return
+	}
+	// use pktData.IpAddr because that will be your src ip without CIDR format, same goes for NeighborIP
+	svr.Packet.SendUnicastNeighborSolicitation(pktData.IpAddr, pktData.NeighborIp, l3Port.PcapBase.PcapHandle)
 }

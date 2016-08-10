@@ -25,7 +25,7 @@
 package packet
 
 import (
-	"net"
+	_ "net"
 	"testing"
 )
 
@@ -63,7 +63,7 @@ func TestBGPUpdateMessageWithdrawnRoutesLenMoreThanMaxAllowed(t *testing.T) {
 }
 
 func TestBGPUpdateMessageNLRILenMoreThanMaxAllowed(t *testing.T) {
-	pathAttrs := ConstructPathAttrForConnRoutes(net.ParseIP("10.1.10.10"), 12345)
+	pathAttrs := ConstructPathAttrForConnRoutes(12345)
 	bgpMsg := NewBGPUpdateMessage(nil, pathAttrs, nil)
 	PrependAS(bgpMsg, 12345, 4)
 	updateMsg := bgpMsg.Body.(*BGPUpdate)
@@ -102,8 +102,7 @@ func TestBGPUpdateMessageNLRILenMoreThanMaxAllowed(t *testing.T) {
 }
 
 func TestBGPUpdateForConnectedRoutes(t *testing.T) {
-	ip := net.ParseIP("10.1.10.1")
-	pa := ConstructPathAttrForConnRoutes(ip, 1234)
+	pa := ConstructPathAttrForConnRoutes(1234)
 	nlri := make([]NLRI, 0)
 	dest := ConstructIPPrefix("20.1.20.0", "255.255.255.0")
 	nlri = append(nlri, dest)

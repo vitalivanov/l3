@@ -68,6 +68,12 @@ type DeleteArpEntryMsg struct {
 	PortNum int
 }
 
+type EventData struct {
+	IpAddr  string
+	MacAddr string
+	IfName  string
+}
+
 func (server *ARPServer) updateArpCache() {
 	for {
 		select {
@@ -258,7 +264,18 @@ func (server *ARPServer) processArpEntryMacMoveMsg(msg commonDefs.IPv4NbrMacMove
 		evtKey := events.ArpEntryKey{
 			IpAddr: msg.IpAddr,
 		}
-		err := eventUtils.PublishEvents(events.ArpEntryUpdated, evtKey, "")
+		evtData := EventData{
+			IpAddr:  msg.IpAddr,
+			MacAddr: entry.MacAddr,
+			IfName:  entry.IfName,
+		}
+		txEvent := eventUtils.TxEvent{
+			EventId:        events.ArpEntryUpdated,
+			Key:            evtKey,
+			AdditionalInfo: "",
+			AdditionalData: evtData,
+		}
+		err := eventUtils.PublishEvents(&txEvent)
 		if err != nil {
 			server.logger.Err("Error in publishing ArpEntryUpdated Event")
 		}
@@ -359,7 +376,18 @@ func (server *ARPServer) processArpEntryUpdateMsg(msg UpdateArpEntryMsg) {
 		evtKey := events.ArpEntryKey{
 			IpAddr: msg.IpAddr,
 		}
-		err = eventUtils.PublishEvents(events.ArpEntryLearned, evtKey, "")
+		evtData := EventData{
+			IpAddr:  msg.IpAddr,
+			MacAddr: msg.MacAddr,
+			IfName:  portEnt.IfName,
+		}
+		txEvent := eventUtils.TxEvent{
+			EventId:        events.ArpEntryLearned,
+			Key:            evtKey,
+			AdditionalInfo: "",
+			AdditionalData: evtData,
+		}
+		err = eventUtils.PublishEvents(&txEvent)
 		if err != nil {
 			server.logger.Err("Error in publishing ArpEntryLearned Event")
 		}
@@ -409,7 +437,18 @@ func (server *ARPServer) processArpCounterUpdateMsg() {
 					evtKey := events.ArpEntryKey{
 						IpAddr: ip,
 					}
-					err = eventUtils.PublishEvents(events.ArpEntryDeleted, evtKey, "")
+					evtData := EventData{
+						IpAddr:  ip,
+						MacAddr: arpEnt.MacAddr,
+						IfName:  arpEnt.IfName,
+					}
+					txEvent := eventUtils.TxEvent{
+						EventId:        events.ArpEntryDeleted,
+						Key:            evtKey,
+						AdditionalInfo: "",
+						AdditionalData: evtData,
+					}
+					err = eventUtils.PublishEvents(&txEvent)
 					if err != nil {
 						server.logger.Err("Error in publishing ArpEntryDeleted Event")
 					}

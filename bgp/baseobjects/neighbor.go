@@ -289,7 +289,13 @@ func (n *NeighborConf) PublishEvents(stateId uint32) {
 		IfIndex:         n.Neighbor.Config.IfIndex,
 	}
 	additionalInfo := fmt.Sprintf("State change from %s to %s", oldState, newState)
-	err := eventUtils.PublishEvents(events.BGPNeighborStateChange, evtKey, additionalInfo)
+	txEvt := eventUtils.TxEvent{
+		EventId:        events.BGPNeighborStateChange,
+		Key:            evtKey,
+		AdditionalInfo: additionalInfo,
+		AdditionalData: nil,
+	}
+	err := eventUtils.PublishEvents(&txEvt)
 	if err != nil {
 		n.logger.Err("Error publish new events for BGPNeighborStateChange")
 	}
@@ -308,15 +314,15 @@ func (n *NeighborConf) SetPeerAttrs(bgpId net.IP, asSize uint8, holdTime uint32,
 	n.Neighbor.State.HoldTime = holdTime
 	n.Neighbor.State.KeepaliveTime = keepaliveTime
 	for afi, safiMap := range addPathFamily {
-		if afi == packet.AfiIP {
+		if afi == packet.AfiIP || afi == packet.AfiIP6 {
 			for _, val := range safiMap {
 				if (val & packet.BGPCapAddPathRx) != 0 {
-					n.logger.Infof("SetPeerAttrs - Neighbor %s set add paths maxtx to %d\n",
+					n.logger.Infof("SetPeerAttrs - Neighbor %s set add paths maxtx to %d",
 						n.Neighbor.NeighborAddress, n.RunningConf.AddPathsMaxTx)
 					n.Neighbor.State.AddPathsMaxTx = n.RunningConf.AddPathsMaxTx
 				}
 				if (val & packet.BGPCapAddPathTx) != 0 {
-					n.logger.Infof("SetPeerAttrs - Neighbor %s set add paths rx to %s\n",
+					n.logger.Infof("SetPeerAttrs - Neighbor %s set add paths rx to %s",
 						n.Neighbor.NeighborAddress, n.RunningConf.AddPathsRx)
 					n.Neighbor.State.AddPathsRx = true
 				}

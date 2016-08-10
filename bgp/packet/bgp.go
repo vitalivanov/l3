@@ -513,7 +513,8 @@ func (msg *BGPCapAddPath) Decode(pkt []byte) error {
 		msg.Value = append(msg.Value, addPathAFISAFI)
 		offset += uint16(addPathAFISAFI.Len())
 	}
-	if offset > uint16(msg.Len) {
+	if offset > uint16(msg.Len+2) {
+		utils.Logger.Infof("BGPCapAddPath:Decode, offset=%d > msg.Len=%d", offset, msg.Len)
 		return BGPMessageError{BGPOpenMsgError, BGPUnspecific, nil, "Not enough data to decode add path capability"}
 	}
 	return nil
@@ -528,7 +529,7 @@ func NewBGPCapAddPath() *BGPCapAddPath {
 	return &BGPCapAddPath{
 		BGPCapabilityBase: BGPCapabilityBase{
 			Type: BGPCapTypeAddPath,
-			Len:  2,
+			Len:  0,
 		},
 		Value: make([]AddPathAFISAFI, 0),
 	}
@@ -2287,7 +2288,7 @@ func (msg *BGPUpdate) Encode() ([]byte, error) {
 	return pkt, nil
 }
 
-func decodeNLRI(pkt []byte, ipPrefix *[]NLRI, length uint32, afi AFI, data interface{}) (uint32, error) {
+func decodeNLRI(pkt []byte, ipPrefix *[]NLRI, length uint32, afi AFI, safi SAFI, data interface{}) (uint32, error) {
 	ptr := uint32(0)
 
 	if length > uint32(len(pkt)) {
@@ -2352,7 +2353,7 @@ func (msg *BGPUpdate) Decode(header *BGPHeader, pkt []byte, data interface{}) er
 	}
 
 	msg.WithdrawnRoutes = make([]NLRI, 0)
-	ipLen, err = decodeNLRI(pkt[ptr:], &msg.WithdrawnRoutes, uint32(length), AfiIP, data)
+	ipLen, err = decodeNLRI(pkt[ptr:], &msg.WithdrawnRoutes, uint32(length), AfiIP, SafiUnicast, data)
 	if err != nil {
 		return BGPMessageError{BGPUpdateMsgError, BGPMalformedAttrList, nil, "Malformed Attributes"}
 	}
@@ -2384,7 +2385,7 @@ func (msg *BGPUpdate) Decode(header *BGPHeader, pkt []byte, data interface{}) er
 
 	msg.NLRI = make([]NLRI, 0)
 	length = int(header.Len()) - 23 - int(msg.WithdrawnRoutesLen) - int(msg.TotalPathAttrLen)
-	ipLen, err = decodeNLRI(pkt[ptr:], &msg.NLRI, uint32(length), AfiIP, data)
+	ipLen, err = decodeNLRI(pkt[ptr:], &msg.NLRI, uint32(length), AfiIP, SafiUnicast, data)
 	if err != nil {
 		return err
 	}

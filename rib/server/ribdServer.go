@@ -24,38 +24,25 @@
 package server
 
 import (
-	"arpd"
 	"asicd/asicdCommonDefs"
 	"asicdServices"
 	//	"database/sql"
-	"encoding/json"
 	"fmt"
-	"git.apache.org/thrift.git/lib/go/thrift"
 	"github.com/op/go-nanomsg"
-	"io/ioutil"
 	"l3/rib/ribdCommonDefs"
 	"net"
-	"os"
-	"os/signal"
+	//	"os"
+	//	"os/signal"
 	"ribd"
 	"ribdInt"
-	"strconv"
-	"syscall"
-	"time"
+	//	"syscall"
 	"utils/dbutils"
-	"utils/ipcutils"
 	"utils/logging"
 	"utils/patriciaDB"
 	"utils/policy"
 	"utils/policy/policyCommonDefs"
 )
 
-type RouteConfigInfo struct {
-	OrigRoute *ribd.IPv4Route
-	NewRoute  *ribd.IPv4Route
-	Attrset   []bool
-	Op        string //"add"/"del"/"update"
-}
 type RIBdServerConfig struct {
 	OrigConfigObject          interface{}
 	NewConfigObject           interface{}
@@ -72,23 +59,6 @@ type RIBdServerConfig struct {
 	NewRoute  *ribd.IPv4Route
 	Op        []*ribd.PatchOpInfo
 }*/
-type TrackReachabilityInfo struct {
-	IpAddr   string
-	Protocol string
-	Op       string
-}
-type NextHopInfoKey struct {
-	nextHopIp string
-}
-type NextHopInfo struct {
-	refCount int //number of routes using this as a next hop
-}
-type ApplyPolicyInfo struct {
-	Source     string //source application/protocol
-	Policy     string
-	Action     string
-	Conditions []*ribdInt.ConditionInfo
-}
 type RIBDServer struct {
 	Logger                 *logging.Writer
 	PolicyEngineDB         *policy.PolicyEngineDB
@@ -110,24 +80,8 @@ type RIBDServer struct {
 	ServerUpCh             chan bool
 	DBReadDone             chan bool
 	DbHdl                  *dbutils.DBUtil
+	Clients                map[string]ClientIf
 	//RouteInstallCh                 chan RouteParams
-}
-
-type RIBClientBase struct {
-	Address            string
-	Transport          thrift.TTransport
-	PtrProtocolFactory *thrift.TBinaryProtocolFactory
-	IsConnected        bool
-}
-
-type AsicdClient struct {
-	RIBClientBase
-	ClientHdl *asicdServices.ASICDServicesClient
-}
-
-type ArpdClient struct {
-	RIBClientBase
-	ClientHdl *arpd.ARPDServicesClient
 }
 
 const (
@@ -155,11 +109,6 @@ const (
 	SUB_ASICD = 0
 )
 
-type ClientJson struct {
-	Name string `json:Name`
-	Port int    `json:Port`
-}
-
 type localDB struct {
 	prefix     patriciaDB.Prefix
 	isValid    bool
@@ -170,8 +119,6 @@ type IntfEntry struct {
 	name string
 }
 
-var asicdclnt AsicdClient
-var arpdclnt ArpdClient
 var count int
 var ConnectedRoutes []*ribdInt.Routes
 var logger *logging.Writer
@@ -363,8 +310,8 @@ func (ribdServiceHandler *RIBDServer) AcceptConfigActions() {
 	logger.Info("AcceptConfigActions: Setting AcceptConfig to true")
 	RouteServiceHandler.AcceptConfig = true
 	getIntfInfo()
-	getConnectedRoutes()
-	//ribdServiceHandler.UpdateRoutesFromDB()
+	getV4ConnectedRoutes()
+	getV6ConnectedRoutes()
 	//update dbRouteCh to fetch route data
 	ribdServiceHandler.DBRouteCh <- RIBdServerConfig{Op: "fetch"}
 	dbRead := <-ribdServiceHandler.DBReadDone
@@ -375,97 +322,6 @@ func (ribdServiceHandler *RIBDServer) AcceptConfigActions() {
 	go ribdServiceHandler.SetupEventHandler(AsicdSub, asicdCommonDefs.PUB_SOCKET_ADDR, SUB_ASICD)
 	logger.Info("All set to signal start the RIBd server")
 	ribdServiceHandler.ServerUpCh <- true
-}
-func (ribdServiceHandler *RIBDServer) connectToClient(client ClientJson) {
-	var timer *time.Timer
-	logger.Info("in go routine ConnectToClient for connecting to %s\n", client.Name)
-	for {
-		timer = time.NewTimer(time.Second * 10)
-		<-timer.C
-		if client.Name == "asicd" {
-			logger.Info("found asicd at port ", client.Port)
-			asicdclnt.Address = "localhost:" + strconv.Itoa(client.Port)
-			asicdclnt.Transport, asicdclnt.PtrProtocolFactory, _ = ipcutils.CreateIPCHandles(asicdclnt.Address)
-			if asicdclnt.Transport != nil && asicdclnt.PtrProtocolFactory != nil {
-				logger.Info("connecting to asicd,arpdclnt.IsConnected:", arpdclnt.IsConnected)
-				asicdclnt.ClientHdl = asicdServices.NewASICDServicesClientFactory(asicdclnt.Transport, asicdclnt.PtrProtocolFactory)
-				asicdclnt.IsConnected = true
-				if arpdclnt.IsConnected == true {
-					logger.Info(" Connected to all clients: call AcceptConfigActions")
-					ribdServiceHandler.AcceptConfigActions()
-				}
-				timer.Stop()
-				return
-			}
-		}
-		if client.Name == "arpd" {
-			logger.Info("found arpd at port ", client.Port)
-			arpdclnt.Address = "localhost:" + strconv.Itoa(client.Port)
-			arpdclnt.Transport, arpdclnt.PtrProtocolFactory, _ = ipcutils.CreateIPCHandles(arpdclnt.Address)
-			if arpdclnt.Transport != nil && arpdclnt.PtrProtocolFactory != nil {
-				logger.Info("connecting to arpd,asicdclnt.IsConnected:", asicdclnt.IsConnected)
-				arpdclnt.ClientHdl = arpd.NewARPDServicesClientFactory(arpdclnt.Transport, arpdclnt.PtrProtocolFactory)
-				arpdclnt.IsConnected = true
-				if asicdclnt.IsConnected == true {
-					logger.Info(" Connected to all clients: call AcceptConfigActions")
-					ribdServiceHandler.AcceptConfigActions()
-				}
-				timer.Stop()
-				return
-			}
-		}
-	}
-}
-func (ribdServiceHandler *RIBDServer) ConnectToClients(paramsFile string) {
-	var clientsList []ClientJson
-
-	bytes, err := ioutil.ReadFile(paramsFile)
-	if err != nil {
-		logger.Err("Error in reading configuration file")
-		return
-	}
-
-	err = json.Unmarshal(bytes, &clientsList)
-	if err != nil {
-		logger.Err("Error in Unmarshalling Json")
-		return
-	}
-
-	for _, client := range clientsList {
-		logger.Info("#### Client name is ", client.Name)
-		if client.Name == "asicd" {
-			logger.Info("found asicd at port ", client.Port)
-			asicdclnt.Address = "localhost:" + strconv.Itoa(client.Port)
-			asicdclnt.Transport, asicdclnt.PtrProtocolFactory, _ = ipcutils.CreateIPCHandles(asicdclnt.Address)
-			if asicdclnt.Transport != nil && asicdclnt.PtrProtocolFactory != nil {
-				logger.Info("connecting to asicd,arpdclnt.IsConnected:", arpdclnt.IsConnected)
-				asicdclnt.ClientHdl = asicdServices.NewASICDServicesClientFactory(asicdclnt.Transport, asicdclnt.PtrProtocolFactory)
-				asicdclnt.IsConnected = true
-				if arpdclnt.IsConnected == true {
-					logger.Info(" Connected to all clients: call AcceptConfigActions")
-					ribdServiceHandler.AcceptConfigActions()
-				}
-			} else {
-				go ribdServiceHandler.connectToClient(client)
-			}
-		}
-		if client.Name == "arpd" {
-			logger.Info("found arpd at port ", client.Port)
-			arpdclnt.Address = "localhost:" + strconv.Itoa(client.Port)
-			arpdclnt.Transport, arpdclnt.PtrProtocolFactory, _ = ipcutils.CreateIPCHandles(arpdclnt.Address)
-			if arpdclnt.Transport != nil && arpdclnt.PtrProtocolFactory != nil {
-				logger.Info("connecting to arpd,asicdclnt.IsConnected:", asicdclnt.IsConnected)
-				arpdclnt.ClientHdl = arpd.NewARPDServicesClientFactory(arpdclnt.Transport, arpdclnt.PtrProtocolFactory)
-				arpdclnt.IsConnected = true
-				if asicdclnt.IsConnected == true {
-					logger.Info(" Connected to all clients: call AcceptConfigActions")
-					ribdServiceHandler.AcceptConfigActions()
-				}
-			} else {
-				go ribdServiceHandler.connectToClient(client)
-			}
-		}
-	}
 }
 
 func (ribdServiceHandler *RIBDServer) InitializeGlobalPolicyDB() *policy.PolicyEngineDB {
@@ -514,6 +370,7 @@ func NewRIBDServicesHandler(dbHdl *dbutils.DBUtil, loggerC *logging.Writer) *RIB
 	logger = loggerC
 	localRouteEventsDB = make([]RouteEventInfo, 0)
 	RedistributeRouteMap = make(map[string][]RedistributeRouteInfo)
+	ribdServicesHandler.Clients = make(map[string]ClientIf)
 	TrackReachabilityMap = make(map[string][]string)
 	v4routeCreatedTimeMap = make(map[int]string)
 	v6routeCreatedTimeMap = make(map[int]string)
@@ -523,8 +380,8 @@ func NewRIBDServicesHandler(dbHdl *dbutils.DBUtil, loggerC *logging.Writer) *RIB
 	PublisherInfoMap = make(map[string]PublisherMapInfo)
 	ribdServicesHandler.NextHopInfoMap = make(map[NextHopInfoKey]NextHopInfo)
 	ribdServicesHandler.TrackReachabilityCh = make(chan TrackReachabilityInfo, 1000)
-	ribdServicesHandler.RouteConfCh = make(chan RIBdServerConfig, 30000)
-	ribdServicesHandler.AsicdRouteCh = make(chan RIBdServerConfig, 30000)
+	ribdServicesHandler.RouteConfCh = make(chan RIBdServerConfig, 100000)
+	ribdServicesHandler.AsicdRouteCh = make(chan RIBdServerConfig, 100000)
 	ribdServicesHandler.ArpdRouteCh = make(chan RIBdServerConfig, 5000)
 	ribdServicesHandler.NotificationChannel = make(chan NotificationMsg, 5000)
 	ribdServicesHandler.PolicyConditionConfCh = make(chan RIBdServerConfig, 5000)
@@ -533,7 +390,7 @@ func NewRIBDServicesHandler(dbHdl *dbutils.DBUtil, loggerC *logging.Writer) *RIB
 	ribdServicesHandler.PolicyDefinitionConfCh = make(chan RIBdServerConfig, 5000)
 	ribdServicesHandler.PolicyApplyCh = make(chan ApplyPolicyInfo, 100)
 	ribdServicesHandler.PolicyUpdateApplyCh = make(chan ApplyPolicyInfo, 100)
-	ribdServicesHandler.DBRouteCh = make(chan RIBdServerConfig, 30000)
+	ribdServicesHandler.DBRouteCh = make(chan RIBdServerConfig, 100000)
 	ribdServicesHandler.ServerUpCh = make(chan bool)
 	ribdServicesHandler.DBReadDone = make(chan bool)
 	ribdServicesHandler.DbHdl = dbHdl
@@ -547,10 +404,11 @@ func NewRIBDServicesHandler(dbHdl *dbutils.DBUtil, loggerC *logging.Writer) *RIB
 	return ribdServicesHandler
 }
 func (s *RIBDServer) InitServer() {
-	sigChan := make(chan os.Signal, 1)
-	signalList := []os.Signal{syscall.SIGHUP}
-	signal.Notify(sigChan, signalList...)
-	go s.SigHandler(sigChan)
+	/*	sigChan := make(chan os.Signal, 1)
+		signalList := []os.Signal{syscall.SIGHUP}
+		signal.Notify(sigChan, signalList...)*/
+	go s.ListenToClientStateChanges()
+	//go s.SigHandler(sigChan)
 	go s.StartRouteProcessServer()
 	go s.StartDBServer()
 	go s.StartPolicyServer()
@@ -590,19 +448,10 @@ func (ribdServiceHandler *RIBDServer) StartServer(paramsDir string) {
 		}
 	}
 }
-
-func (ribdServiceHandler *RIBDServer) SigHandler(sigChan <-chan os.Signal) {
-	//logger.Debug("Inside sigHandler....")
-	signal := <-sigChan
-	switch signal {
-	case syscall.SIGHUP:
-		//logger.Debug("Received SIGHUP signal")
-		//logger.Debug("Closing DB handler")
-		if ribdServiceHandler.DbHdl != nil {
-			ribdServiceHandler.DbHdl.Disconnect()
-		}
-		os.Exit(0)
-	default:
-		//logger.Err(fmt.Sprintln("Unhandled signal : ", signal))
-	}
+func (s *RIBDServer) StopServer() {
+	logger.Debug("StopServer")
+	//clean up IPv4RouteState* from DB
+	s.DbHdl.DeleteObjectWithKeyFromDb("IPv4RouteState*")
+	//clean up IPv6RouteState* from DB
+	s.DbHdl.DeleteObjectWithKeyFromDb("IPv6RouteState*")
 }
