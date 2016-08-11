@@ -473,11 +473,10 @@ func (m RIBDServer) TrackReachabilityStatus(ipAddr string, protocol string, op s
 */
 
 func (m RIBDServer) GetRouteReachabilityInfo(destNet string) (nextHopIntf *ribdInt.NextHopInfo, err error) {
-	//logger.Debug("GetRouteReachabilityInfo of ", destNet)
+	logger.Debug("GetRouteReachabilityInfo of ", destNet)
 	nextHopIntf, err = RouteServiceHandler.GetV4RouteReachabilityInfo(destNet)
 	if err != nil {
 		logger.Err("next hop ", destNet, " not reachable via ipv4 network")
-
 		nextHopIntf, err = RouteServiceHandler.GetV6RouteReachabilityInfo(destNet)
 		if err != nil {
 			logger.Err("next hop ", destNet, " not reachable")
@@ -1255,6 +1254,7 @@ func createRoute(routeInfo RouteParams) (rc ribd.Int, err error) {
 	if nextHopIpNet == nil {
 		nextHopIpType = ribdCommonDefs.IPv6
 	}
+	//logger.Debug("nextHopIP:", nextHopIp, " nextHopIpAddr:", nextHopIpAddr.String(), " nextHopIpType:", nextHopIpType)
 	destNet, nwAddr, err := getNetworkPrefix(destNetIpAddr, networkMaskAddr)
 	if err != nil {
 		return -1, err
