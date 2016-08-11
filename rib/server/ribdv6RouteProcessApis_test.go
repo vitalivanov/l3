@@ -35,11 +35,11 @@ var ipv6RouteList []*ribd.IPv6Route
 
 func InitIpv6AddrInfoList() {
 	ipv6AddrList = make([]testIpInfo, 0)
-	ipv6AddrList = append(ipv6AddrList, testIpInfo{ipAddr: "2002::1.2.10.2"})
-	ipv6AddrList = append(ipv6AddrList, testIpInfo{ipAddr: "2002::10.1.2.10.2"})
-	ipv6AddrList = append(ipv6AddrList, testIpInfo{ipAddr: "2003::1.2.10.2"})
-	ipv6AddrList = append(ipv6AddrList, testIpInfo{ipAddr: "2004::1.2.10.2"})
-	ipv6AddrList = append(ipv6AddrList, testIpInfo{ipAddr: "20013::1.2.10.2"})
+	ipv6AddrList = append(ipv6AddrList, testIpInfo{ipAddr: "2002::1.2.10.2", cidr: "2002::/64"})
+	ipv6AddrList = append(ipv6AddrList, testIpInfo{ipAddr: "2002::10.1.2.10.2", cidr: "2002::/64"})
+	ipv6AddrList = append(ipv6AddrList, testIpInfo{ipAddr: "2003::1.2.10.2", cidr: "2003::/64"})
+	ipv6AddrList = append(ipv6AddrList, testIpInfo{ipAddr: "2004::1.2.10.2", cidr: "2003::/64"})
+	ipv6AddrList = append(ipv6AddrList, testIpInfo{ipAddr: "20013::1.2.10.2", cidr: "20013::/64"})
 
 }
 func InitIpv6RouteList() {
@@ -83,7 +83,7 @@ func TestProcessV6RouteCreateConfig(t *testing.T) {
 	TestGetRouteReachability(t)
 	TestResolveNextHop(t)
 	TestGetRoute(t)
-	TestProcessL3IntfStateChangeEvents(t)
+	TestProcessIPv6IntfStateChangeEvents(t)
 	fmt.Println("************************************")
 }
 func TestProcessv6RoutePatchUpdateConfig(t *testing.T) {
