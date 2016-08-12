@@ -81,8 +81,61 @@ var arpdclnt ArpdClient
 var bgpdclnt BGPdClient
 var ospfdclnt OSPFdClient
 
-func DeleteRoutesOfType(protocol string) {
+func deleteV4RoutesOfType(protocol string, destNet string) {
 	var testroutes []RouteInfoRecord
+	testroutes = make([]RouteInfoRecord, 0)
+
+	routeInfoRecordListItem := V4RouteInfoMap.Get(patriciaDB.Prefix(destNet))
+	if routeInfoRecordListItem == nil {
+		logger.Info("Unexpected: no route for destNet:", destNet, " found in routeMap")
+		return
+	}
+	routeInfoRecordList := routeInfoRecordListItem.(RouteInfoRecordList)
+	protocolRouteList, ok := routeInfoRecordList.routeInfoProtocolMap[protocol]
+	if !ok || len(protocolRouteList) == 0 {
+		logger.Info("Unexpected: no route for destNet:", destNet, " found in routeMap of type:", protocol)
+		return
+	}
+	for _, testroute := range protocolRouteList {
+		//logger.Info("will call delete for route with ip:", testroute.destNetIp.String(), " nexthop:", testroute.nextHopIp.String())
+		testroutes = append(testroutes, testroute)
+	}
+	//logger.Info("found ", len(testroutes), " number of ", protocol, " routes in routemap:", testroutes)
+	for _, protoroute := range testroutes { //protocolRouteList {
+		//logger.Info(len(testroutes), " number of ", protocol, " routes in routemap:", testroutes, " remaining")
+		//logger.Info("protoroute:", protoroute, " nexthop:", protoroute.nextHopIp.String())
+		_, err := deleteIPRoute(protoroute.destNetIp.String(), ribdCommonDefs.IPv4, protoroute.networkMask.String(), protocol, protoroute.nextHopIp.String(), FIBAndRIB, ribdCommonDefs.RoutePolicyStateChangetoInValid)
+		logger.Info("err :", err, " while deleting ", protocol, " route with destNet:", protoroute.destNetIp.String(), " nexthopIP:", protoroute.nextHopIp.String())
+	}
+}
+func deleteV6RoutesOfType(protocol string, destNet string) {
+	var testroutes []RouteInfoRecord
+	testroutes = make([]RouteInfoRecord, 0)
+
+	routeInfoRecordListItem := V6RouteInfoMap.Get(patriciaDB.Prefix(destNet))
+	if routeInfoRecordListItem == nil {
+		logger.Info("Unexpected: no route for destNet:", destNet, " found in routeMap")
+		return
+	}
+	routeInfoRecordList := routeInfoRecordListItem.(RouteInfoRecordList)
+	protocolRouteList, ok := routeInfoRecordList.routeInfoProtocolMap[protocol]
+	if !ok || len(protocolRouteList) == 0 {
+		logger.Info("Unexpected: no route for destNet:", destNet, " found in routeMap of type:", protocol)
+		return
+	}
+	for _, testroute := range protocolRouteList {
+		//logger.Info("will call delete for route with ip:", testroute.destNetIp.String(), " nexthop:", testroute.nextHopIp.String())
+		testroutes = append(testroutes, testroute)
+	}
+	//logger.Info("found ", len(testroutes), " number of ", protocol, " routes in routemap:", testroutes)
+	for _, protoroute := range testroutes { //protocolRouteList {
+		//logger.Info(len(testroutes), " number of ", protocol, " routes in routemap:", testroutes, " remaining")
+		//logger.Info("protoroute:", protoroute, " nexthop:", protoroute.nextHopIp.String())
+		_, err := deleteIPRoute(protoroute.destNetIp.String(), ribdCommonDefs.IPv6, protoroute.networkMask.String(), protocol, protoroute.nextHopIp.String(), FIBAndRIB, ribdCommonDefs.RoutePolicyStateChangetoInValid)
+		logger.Info("err :", err, " while deleting ", protocol, " route with destNet:", protoroute.destNetIp.String(), " nexthopIP:", protoroute.nextHopIp.String())
+	}
+}
+func DeleteRoutesOfType(protocol string) {
 	protocolRouteMap, ok := ProtocolRouteMap[protocol]
 	if !ok {
 		logger.Info("No routes of ", protocol, " type configured")
@@ -90,33 +143,11 @@ func DeleteRoutesOfType(protocol string) {
 	}
 	for destNet, count := range protocolRouteMap {
 		if count > 0 {
-			testroutes = make([]RouteInfoRecord, 0)
 			//logger.Info(count, " number of routes for destNet IP:", string(destNet))
-			routeInfoRecordListItem := RouteInfoMap.Get(patriciaDB.Prefix(destNet))
-			if routeInfoRecordListItem == nil {
-				logger.Info("Unexpected: no route for destNet:", destNet, " found in routeMap")
-				continue
-			}
-			routeInfoRecordList := routeInfoRecordListItem.(RouteInfoRecordList)
-			protocolRouteList, ok := routeInfoRecordList.routeInfoProtocolMap[protocol]
-			if !ok || len(protocolRouteList) == 0 {
-				logger.Info("Unexpected: no route for destNet:", destNet, " found in routeMap of type:", protocol)
-				continue
-			}
-			for _, testroute := range protocolRouteList {
-				//logger.Info("will call delete for route with ip:", testroute.destNetIp.String(), " nexthop:", testroute.nextHopIp.String())
-				testroutes = append(testroutes, testroute)
-			}
-			//logger.Info("found ", len(testroutes), " number of ", protocol, " routes in routemap:", testroutes)
-			for _, protoroute := range testroutes { //protocolRouteList {
-				//logger.Info(len(testroutes), " number of ", protocol, " routes in routemap:", testroutes, " remaining")
-				//logger.Info("protoroute:", protoroute, " nexthop:", protoroute.nextHopIp.String())
-				_, err := deleteIPRoute(protoroute.destNetIp.String(), protoroute.networkMask.String(), protocol, protoroute.nextHopIp.String(), FIBAndRIB, ribdCommonDefs.RoutePolicyStateChangetoInValid)
-				logger.Info("err :", err, " while deleting ", protocol, " route with destNet:", protoroute.destNetIp.String(), " nexthopIP:", protoroute.nextHopIp.String())
-			}
+			deleteV4RoutesOfType(protocol, destNet)
+			deleteV6RoutesOfType(protocol, destNet)
 			protocolRouteMap[destNet] = 0
 			ProtocolRouteMap[protocol] = protocolRouteMap
-			testroutes = nil
 		}
 	}
 }

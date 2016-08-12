@@ -36,6 +36,7 @@ import (
 type testIpInfo struct {
 	ipAddr string
 	mask   string
+	cidr   string
 }
 
 var ipv4AddrList []testIpInfo
@@ -44,17 +45,17 @@ var patchOpList []*ribd.PatchOpInfo
 
 func InitIpv4AddrInfoList() {
 	ipv4AddrList = make([]testIpInfo, 0)
-	ipv4AddrList = append(ipv4AddrList, testIpInfo{"11.1.10.2", "255.255.255.0"})
-	ipv4AddrList = append(ipv4AddrList, testIpInfo{"12.1.10.2/24", "255.255.255.0"})
-	ipv4AddrList = append(ipv4AddrList, testIpInfo{"12.1.10.20/24", "255.255.255.0"})
-	ipv4AddrList = append(ipv4AddrList, testIpInfo{"13.1.10.2", "255.255.255.0"})
-	ipv4AddrList = append(ipv4AddrList, testIpInfo{"22.1.10.2", "255.255.255.0"})
-	ipv4AddrList = append(ipv4AddrList, testIpInfo{"33.1.10.2", "255.255.255.0"})
-	ipv4AddrList = append(ipv4AddrList, testIpInfo{"40.0.1.2", "255.255.255.0"})
-	ipv4AddrList = append(ipv4AddrList, testIpInfo{"40.1.10.2", "255.255.255.0"})
-	ipv4AddrList = append(ipv4AddrList, testIpInfo{"50.1.10.2", "255.255.255.0"})
-	ipv4AddrList = append(ipv4AddrList, testIpInfo{"41.1.10.2", "255.255.255.0"})
-	ipv4AddrList = append(ipv4AddrList, testIpInfo{"60.1.10.2", "255.255.255.0"})
+	ipv4AddrList = append(ipv4AddrList, testIpInfo{"11.1.10.2", "255.255.255.0", "11.1.10.0/24"})
+	ipv4AddrList = append(ipv4AddrList, testIpInfo{"12.1.10.2/24", "255.255.255.0", "12.1.10.2/24"})
+	ipv4AddrList = append(ipv4AddrList, testIpInfo{"12.1.10.20/24", "255.255.255.0", "12.1.10.20/24"})
+	ipv4AddrList = append(ipv4AddrList, testIpInfo{"13.1.10.2", "255.255.255.0", "13.1.10.0/24"})
+	ipv4AddrList = append(ipv4AddrList, testIpInfo{"22.1.10.2", "255.255.255.0", "22.1.10.0/24"})
+	ipv4AddrList = append(ipv4AddrList, testIpInfo{"33.1.10.2", "255.255.255.0", "33.1.10.0/24"})
+	ipv4AddrList = append(ipv4AddrList, testIpInfo{"40.0.1.2", "255.255.255.0", "40.0.1.0/24"})
+	ipv4AddrList = append(ipv4AddrList, testIpInfo{"40.1.10.2", "255.255.255.0", "40.1.10.0/24"})
+	ipv4AddrList = append(ipv4AddrList, testIpInfo{"50.1.10.2", "255.255.255.0", "50.1.10.0/24"})
+	ipv4AddrList = append(ipv4AddrList, testIpInfo{"41.1.10.2", "255.255.255.0", "41.1.10.0/24"})
+	ipv4AddrList = append(ipv4AddrList, testIpInfo{"60.1.10.2", "255.255.255.0", "60.1.10.0/24"})
 
 }
 func InitIpv4RouteList() {
@@ -193,17 +194,17 @@ func TestResolveNextHop(t *testing.T) {
 func TestGetRoute(t *testing.T) {
 	fmt.Println("**** TestGetRoute****")
 	for _, ipInfo := range ipv4AddrList {
-		rt, err := server.Getv4Route(ipInfo.ipAddr)
+		rt, err := server.Getv4Route(ipInfo.cidr)
 		if err != nil {
-			fmt.Println("error getting ip info for ip:", ipInfo.ipAddr)
+			fmt.Println("error getting ip info for ip:", ipInfo.cidr, " err:", err)
 			continue
 		}
 		fmt.Println("rt info:", rt)
 	}
 	for _, ipInfo := range ipv6AddrList {
-		rt, err := server.Getv6Route(ipInfo.ipAddr)
+		rt, err := server.Getv6Route(ipInfo.cidr)
 		if err != nil {
-			fmt.Println("error getting ip info for ip:", ipInfo.ipAddr)
+			fmt.Println("error getting ip info for ip:", ipInfo.cidr, "err:", err)
 			continue
 		}
 		fmt.Println("rt info:", rt)
@@ -226,7 +227,7 @@ func TestProcessV4RouteCreateConfig(t *testing.T) {
 	TestGetRouteReachability(t)
 	TestResolveNextHop(t)
 	TestGetRoute(t)
-	TestProcessL3IntfStateChangeEvents(t)
+	TestProcessIPv4IntfStateChangeEvents(t)
 	fmt.Println("************************************")
 }
 func TestScaleRouteCreate(t *testing.T) {
