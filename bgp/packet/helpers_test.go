@@ -25,8 +25,10 @@
 package packet
 
 import (
+	"l3/bgp/utils"
 	_ "net"
 	"testing"
+	"utils/logging"
 )
 
 func TestBGPUpdateMessageWithdrawnRoutesLenMoreThanMaxAllowed(t *testing.T) {
@@ -112,4 +114,70 @@ func TestBGPUpdateForConnectedRoutes(t *testing.T) {
 	}
 	nlri = append(nlri, dest)
 	NewBGPUpdateMessage(make([]NLRI, 0), pa, nlri)
+}
+
+func TestBGPAggregateASPaths(t *testing.T) {
+	logger, err := logging.NewLogger("bgpd", "BGP", true)
+	if err != nil {
+		t.Fatal("Failed to start the logger. Exiting!!")
+	}
+	utils.SetLogger(logger)
+
+	type ASPath struct {
+		asType BGPASPathSegmentType
+		asNums []uint32
+	}
+
+	path1 := []ASPath{
+		ASPath{BGPASPathSegmentSequence, []uint32{1, 2}},
+		ASPath{BGPASPathSegmentSet, []uint32{11, 12, 13}},
+		ASPath{BGPASPathSegmentSequence, []uint32{3, 4}},
+	}
+	path2 := []ASPath{
+		ASPath{BGPASPathSegmentSequence, []uint32{1, 2}},
+		ASPath{BGPASPathSegmentSet, []uint32{10, 14, 13}},
+		ASPath{BGPASPathSegmentSequence, []uint32{5, 6}},
+	}
+	path3 := []ASPath{
+		ASPath{BGPASPathSegmentSequence, []uint32{1, 2}},
+		ASPath{BGPASPathSegmentSet, []uint32{10, 11, 12, 13, 14}},
+		ASPath{BGPASPathSegmentSequence, []uint32{3, 4, 5, 6}},
+	}
+
+	asPaths := make([][]ASPath, 0)
+	asPaths = append(asPaths, path1, path2)
+	asPathList := make([]*BGPPathAttrASPath, 0)
+	for _, path := range asPaths {
+		asPath := NewBGPPathAttrASPath()
+		for _, seg := range path {
+			asPathSeg := NewBGPAS4PathSegment(seg.asType)
+			for _, num := range seg.asNums {
+				asPathSeg.AppendAS(num)
+			}
+			asPath.AppendASPathSegment(asPathSeg)
+		}
+		t.Logf("AS path %s", asPath)
+		asPathList = append(asPathList, asPath)
+	}
+
+	aggPath := path3
+	newAggPath := AggregateASPaths(asPathList)
+	t.Logf("Agg AS path list %s", newAggPath)
+	for idx, val := range newAggPath.Value {
+		newAggSeg := val.(*BGPAS4PathSegment)
+		aggSeg := aggPath[idx]
+		if newAggSeg.GetType() != aggSeg.asType {
+			t.Fatal("Wrong AS segment type, expected:", aggSeg.asType, "got:", newAggSeg.GetType(), "AS path:", newAggPath)
+		} else {
+			t.Log("AS segment type", aggSeg.asType, "match")
+		}
+
+		for j, asNum := range newAggSeg.AS {
+			if asNum != aggSeg.asNums[j] {
+				t.Fatal("Wrong AS num, expected:", aggSeg.asNums[j], "got:", asNum, "AS path:", newAggPath)
+			} else {
+				t.Log("AS num", asNum, "match")
+			}
+		}
+	}
 }

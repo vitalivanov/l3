@@ -110,11 +110,18 @@ func (i *MPNextHopIP) GetNextHop() net.IP {
 
 func (i *MPNextHopIP) SetNextHop(ip net.IP) error {
 	if len(ip) != 4 && len(ip) != 16 {
-		return errors.New(fmt.Sprintf("Next hop IP address is not 4 bytes or 16 bytes, length =%d", len(ip)))
+		return errors.New(fmt.Sprintf("Next hop IP address is not 4 bytes or 16 bytes, length=%d", len(ip)))
+	}
+
+	if ip.To4() == nil && ip.To16() == nil {
+		return errors.New(fmt.Sprintf("Next hop IP address is NOT IPv4 or IPv6 address, ip=%s", ip))
 	}
 
 	i.Value = ip
-	i.Length = uint8(len(ip))
+	i.Length = uint8(net.IPv6len)
+	if ip.To4() != nil {
+		i.Length = uint8(net.IPv4len)
+	}
 	return nil
 }
 
