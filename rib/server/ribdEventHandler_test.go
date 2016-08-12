@@ -26,6 +26,7 @@ package server
 import (
 	"asicd/asicdCommonDefs"
 	"fmt"
+	"l3/rib/ribdCommonDefs"
 	"testing"
 )
 
@@ -155,15 +156,28 @@ func TestIPv6IntfCreateEvent(t *testing.T) {
 	}
 	fmt.Println("***************************************")
 }
-func TestProcessL3IntfStateChangeEvents(t *testing.T) {
+func TestProcessIPv4IntfStateChangeEvents(t *testing.T) {
 	fmt.Println("****TestProcessL3IntfStateChangeEvents()****")
 	TestGetRouteReachability(t)
 	for _, ipInfo := range ipv4AddrList {
-		server.ProcessL3IntfDownEvent(ipInfo.ipAddr)
+		server.ProcessL3IntfDownEvent(ipInfo.ipAddr, int(ribdCommonDefs.IPv4))
 	}
 	TestGetRouteReachability(t)
 	for _, ipInfo := range ipv4AddrList {
-		server.ProcessL3IntfUpEvent(ipInfo.ipAddr)
+		server.ProcessL3IntfUpEvent(ipInfo.ipAddr, int(ribdCommonDefs.IPv4))
+	}
+	TestGetRouteReachability(t)
+	fmt.Println("********************************************")
+}
+func TestProcessIPv6IntfStateChangeEvents(t *testing.T) {
+	fmt.Println("****TestProcessL3IntfStateChangeEvents()****")
+	TestGetRouteReachability(t)
+	for _, ipInfo := range ipv6AddrList {
+		server.ProcessL3IntfDownEvent(ipInfo.ipAddr, int(ribdCommonDefs.IPv6))
+	}
+	TestGetRouteReachability(t)
+	for _, ipInfo := range ipv6AddrList {
+		server.ProcessL3IntfUpEvent(ipInfo.ipAddr, int(ribdCommonDefs.IPv6))
 	}
 	TestGetRouteReachability(t)
 	fmt.Println("********************************************")
