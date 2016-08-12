@@ -331,6 +331,16 @@ func (m RIBDServer) GetBulkRouteDistanceState(fromIndex ribd.Int, rcount ribd.In
 	routeDistanceStates.Count = validCount
 	return routeDistanceStates, err
 }
+func (m RIBDServer) GetPerProtocolRouteCountList() (retList []*ribd.PerProtocolRouteCount) {
+	retList = make([]*ribd.PerProtocolRouteCount, 0)
+	for k, v := range ProtocolRouteMap {
+		retList = append(retList, &ribd.PerProtocolRouteCount{
+			Protocol:   k,
+			RouteCount: v.count,
+		})
+	}
+	return retList
+}
 
 /*
    Application daemons like BGPD/OSPFD can call this API to get list of routes that
@@ -1419,6 +1429,15 @@ func deleteIPRoute(destNetIp string,
 			updateConnectedRoutes(destNetIp, networkMask, "", 0, del, 0)
 		}
 	}
+	/*
+		if ipType == ribdCommonDefs.IPv4 {
+			v4rtCount--
+			v4routeCreatedTimeMap[v4rtCount] = ""
+		} else if ipType == ribdCommonDefs.IPv6 {
+			v6rtCount--
+			v6routeCreatedTimeMap[v6rtCount] = ""
+		}
+	*/
 	return 0, err
 }
 

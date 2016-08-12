@@ -338,13 +338,13 @@ func (m RIBDServer) RouteConfigValidationCheck(cfg *ribd.IPv4Route, op string) (
 	return nil
 }
 
-func (m RIBDServer) GetBulkIPv4EventState(fromIndex ribd.Int, rcount ribd.Int) (events *ribd.IPv4EventStateGetInfo, err error) {
-	//logger.Debug("GetBulkIPv4EventState")
+func (m RIBDServer) GetBulkRIBEventState(fromIndex ribd.Int, rcount ribd.Int) (events *ribd.RIBEventStateGetInfo, err error) {
+	//logger.Debug("GetBulkRIBEventState")
 	var i, validCount, toIndex ribd.Int
-	var tempNode []ribd.IPv4EventState = make([]ribd.IPv4EventState, rcount)
-	var nextNode *ribd.IPv4EventState
-	var returnNodes []*ribd.IPv4EventState
-	var returnGetInfo ribd.IPv4EventStateGetInfo
+	var tempNode []ribd.RIBEventState = make([]ribd.RIBEventState, rcount)
+	var nextNode *ribd.RIBEventState
+	var returnNodes []*ribd.RIBEventState
+	var returnGetInfo ribd.RIBEventStateGetInfo
 	i = 0
 	events = &returnGetInfo
 	more := true
@@ -368,13 +368,12 @@ func (m RIBDServer) GetBulkIPv4EventState(fromIndex ribd.Int, rcount ribd.Int) (
 		nextNode.EventInfo = localRouteEventsDB[i+fromIndex].eventInfo
 		toIndex = ribd.Int(i + fromIndex)
 		if len(returnNodes) == 0 {
-			returnNodes = make([]*ribd.IPv4EventState, 0)
+			returnNodes = make([]*ribd.RIBEventState, 0)
 		}
 		returnNodes = append(returnNodes, nextNode)
 		validCount++
 	}
-	//logger.Debug(fmt.Sprintf("Returning ", validCount, " list of events"))
-	events.IPv4EventStateList = returnNodes
+	events.RIBEventStateList = returnNodes
 	events.StartIdx = fromIndex
 	events.EndIdx = toIndex + 1
 	events.More = more

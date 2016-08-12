@@ -45,27 +45,32 @@ type NextHopInfoKey struct {
 type NextHopInfo struct {
 	refCount int //number of routes using this as a next hop
 }
+type PerProtocolRouteInfo struct {
+	routeMap   map[string]int
+	totalcount int
+}
 
-var ProtocolRouteMap map[string]map[string]int
+var ProtocolRouteMap map[string]PerProtocolRouteInfo //map[string]int
 
 func UpdateProtocolRouteMap(protocol string, op string, value string) {
 	if ProtocolRouteMap == nil {
 		if op == "del" {
 			return
 		}
-		ProtocolRouteMap = make(map[string]map[string]int)
+		ProtocolRouteMap = make(map[string]PerProtocolRouteInfo) //map[string]int)
 	}
-	_, ok := ProtocolRouteMap[protocol]
+	val, ok := ProtocolRouteMap[protocol]
 	if !ok {
 		if op == "del" {
 			return
 		}
-		ProtocolRouteMap[protocol] = make(map[string]int)
+		ProtocolRouteMap[protocol].routeMap = make(map[string]int)
 	}
-	protocolroutemap, ok := ProtocolRouteMap[protocol]
+	protocolroutemap, ok := ProtocolRouteMap[protocol].routeMap
 	if !ok {
 		return
 	}
+	totalcount := val.totalcount
 	count, ok := protocolroutemap[value]
 	if !ok {
 		if op == "del" {
@@ -74,11 +79,14 @@ func UpdateProtocolRouteMap(protocol string, op string, value string) {
 	}
 	if op == "add" {
 		count++
+		totalcount++
 	} else if op == "del" {
 		count--
+		totalcount--
 	}
 	protocolroutemap[value] = count
-	ProtocolRouteMap[protocol] = protocolroutemap
+	ProtocolRouteMap[protocol].routeMap = protocolroutemap
+	ProtocolRouteMap[protocol].totalcount = totalcount
 
 }
 func (ribdServiceHandler *RIBDServer) StartRouteProcessServer() {

@@ -372,15 +372,47 @@ func (m RIBDServicesHandler) GetBulkIPv6RouteState(fromIndex ribd.Int, rcount ri
 	}
 	return routes, err
 }
+func (m RIBDServicesHandler) GetBulkRouteStatsPerProtocol(fromIndex ribd.Int, count ribd.Int)(stats *ribd.RouteStatsPerProtocolGetInfo ,err error) {
+	return nil,nil
+}
+func (m RIBDServicesHandler) GetRouteStatsPerProtocol(1: string Protocol) (stats *ribd.RouteStatsPerProtocol,err error) {
+	stats := ribd.NewRouteStatsPerProtocol()
+	return stats,err
+}
 
-func (m RIBDServicesHandler) GetIPv4EventState(index int32) (*ribd.IPv4EventState, error) {
-	logger.Info("Get state for IPv4EventState")
-	route := ribd.NewIPv4EventState()
+func (m RIBDServicesHandler) GetBulkRouteStats(fromIndex ribd.Int, count ribd.Int) (stats *ribd.RouteStatsGetInfo, err error) {
+	if fromIndex != 0 {
+		err := errors.New("Invalid range")
+		return nil, err
+	}
+	stats = make([]ribd.RouteStatsGetInfo, 1)
+	v4Count, _ := m.GetTotalv4RouteCount()
+	v6Count, _ := m.GetTotalv6RouteCount()
+	stats[0].TotalRouteCount = v4Count + v6Count
+	stats[0].PerProtocolRouteCountList = m.server.GetPerProtocolRouteCountList()
+	stats[0].StartIdx = fromIndex
+	stats[0].EndIdx = fromIndex
+	stats[0].Count = 1
+	stats[0].More = false
+	return stats, err
+}
+func (m RIBDServicesHandler) GetRouteStats(vrf string) (*ribd.RouteStats, error) {
+	stat := ribd.NewRouteStats()
+	v4Count, _ := m.GetTotalv4RouteCount()
+	v6Count, _ := m.GetTotalv6RouteCount()
+	stat.TotalRouteCount = v4Count + v6Count
+	stat.PerProtocolRouteCountList = m.server.GetPerProtocolRouteCountList()
+	return stat, nil
+}
+
+func (m RIBDServicesHandler) GetRIBEventState(index int32) (*ribd.RIBEventState, error) {
+	logger.Info("Get state for RIBEventState")
+	route := ribd.NewRIBEventState()
 	return route, nil
 }
 
-func (m RIBDServicesHandler) GetBulkIPv4EventState(fromIndex ribd.Int, rcount ribd.Int) (routes *ribd.IPv4EventStateGetInfo, err error) {
-	ret, err := m.server.GetBulkIPv4EventState(fromIndex, rcount)
+func (m RIBDServicesHandler) GetBulkRIBEventState(fromIndex ribd.Int, rcount ribd.Int) (routes *ribd.RIBEventStateGetInfo, err error) {
+	ret, err := m.server.GetBulkRIBEventState(fromIndex, rcount)
 	return ret, err
 }
 
