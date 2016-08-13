@@ -572,25 +572,12 @@ func (d *Destination) SelectRouteForLocRib(addPathCount int) (RouteAction, bool,
 		d.logger.Infof("Destination %s loc rib path %v route %v, d.ecmpPaths %v ecmpPaths %v",
 			d.NLRI.GetPrefix(), d.LocRibPath, d.LocRibPathRoute, d.ecmpPaths, ecmpPaths)
 	} else {
-		if d.LocRibPath != nil {
-			// Remove route
-			for path, route := range d.ecmpPaths {
-				route.setAction(RouteActionDelete)
-				route.ResetMultiPath()
-				route.ResetBestPath()
-				if !path.IsLocal() || path.IsAggregate() {
-					reachInfo := path.GetReachability(d.protoFamily)
-					d.logger.Infof("Remove route for ip=%s nexthop=%s", d.NLRI.GetPrefix().String(),
-						reachInfo.NextHop)
-					cfg := d.ConstructRouteConfig(path, reachInfo, ipLength)
-					d.rib.routeMgr.UpdateRoute(cfg, "remove")
-					d.logger.Infof("DeleteV4Route for ip=%s nexthop=%s DONE", d.NLRI.GetPrefix().String(),
-						reachInfo.NextHop)
-				}
-			}
-			locRibAction = RouteActionDelete
-			d.LocRibPath = nil
+		// Remove route
+		for _, route := range d.ecmpPaths {
+			route.setAction(RouteActionDelete)
 		}
+		locRibAction = RouteActionDelete
+		d.LocRibPath = nil
 	}
 
 	for path, route := range d.ecmpPaths {
