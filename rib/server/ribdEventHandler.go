@@ -177,6 +177,20 @@ func (ribdServiceHandler *RIBDServer) ProcessIPv6IntfDeleteEvent(msg asicdCommon
 		Op:               "delv6",
 	}
 }
+func (ribdServiceHandler *RIBDServer) ProcessL3IntfUpEvent(ipAddr string, ipType int) {
+	if ipType == asicdCommonDefs.IP_TYPE_IPV4 {
+		ribdServiceHandler.ProcessIPv4IntfUpEvent(ipAddr)
+	} else {
+		ribdServiceHandler.ProcessIPv6IntfUpEvent(ipAddr)
+	}
+}
+func (ribdServiceHandler *RIBDServer) ProcessL3IntfDownEvent(ipAddr string, ipType int) {
+	if ipType == asicdCommonDefs.IP_TYPE_IPV4 {
+		ribdServiceHandler.ProcessIPv4IntfDownEvent(ipAddr)
+	} else {
+		ribdServiceHandler.ProcessIPv6IntfDownEvent(ipAddr)
+	}
+}
 func (ribdServiceHandler *RIBDServer) ProcessAsicdEvents(sub *nanomsg.SubSocket) {
 
 	ribdServiceHandler.Logger.Info("in process Asicd events")
@@ -226,10 +240,10 @@ func (ribdServiceHandler *RIBDServer) ProcessAsicdEvents(sub *nanomsg.SubSocket)
 			ribdServiceHandler.Logger.Info("Msg linkstatus = %d msg ifType = %d ifId = %d\n", msg.IfState, msg.IfIndex)
 			if msg.IfState == asicdCommonDefs.INTF_STATE_DOWN {
 				//processLinkDownEvent(ribd.Int(msg.IfType), ribd.Int(msg.IfId))
-				ribdServiceHandler.ProcessL3IntfDownEvent(msg.IpAddr)
+				ribdServiceHandler.ProcessL3IntfDownEvent(msg.IpAddr, msg.IpType)
 			} else {
 				//processLinkUpEvent(ribd.Int(msg.IfType), ribd.Int(msg.IfId))
-				ribdServiceHandler.ProcessL3IntfUpEvent(msg.IpAddr)
+				ribdServiceHandler.ProcessL3IntfUpEvent(msg.IpAddr, msg.IpType)
 			}
 			break
 		case asicdCommonDefs.NOTIFY_IPV4INTF_CREATE:
