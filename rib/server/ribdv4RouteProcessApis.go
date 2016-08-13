@@ -490,48 +490,50 @@ func (m RIBDServer) RouteConfigValidationCheck(cfg *ribd.IPv4Route, op string) (
 	}
 	return nil
 }
-
-func (m RIBDServer) GetBulkRIBEventState(fromIndex ribd.Int, rcount ribd.Int) (events *ribd.RIBEventStateGetInfo, err error) {
-	//logger.Debug("GetBulkRIBEventState")
-	var i, validCount, toIndex ribd.Int
-	var tempNode []ribd.RIBEventState = make([]ribd.RIBEventState, rcount)
-	var nextNode *ribd.RIBEventState
-	var returnNodes []*ribd.RIBEventState
-	var returnGetInfo ribd.RIBEventStateGetInfo
-	i = 0
-	events = &returnGetInfo
-	more := true
-	if localRouteEventsDB == nil {
-		//logger.Debug("localRouteEventsDB not initialized")
-		return events, err
+func Getv4RoutesPerProtocol(protocol string) []*ribd.RouteInfoSummary {
+	routes := make([]*ribd.RouteInfoSummary, 0)
+	routemapInfo := ProtocolRouteMap[protocol]
+	if routemapInfo.v4routeMap == nil {
+		return routes
 	}
-	for ; ; i++ {
-		if i+fromIndex >= ribd.Int(len(localRouteEventsDB)) {
-			//logger.Debug("All the events fetched")
-			more = false
-			break
+	for destNetIp, _ := range routemapInfo.v4routeMap {
+		v4Item := V4RouteInfoMap.Get(patriciaDB.Prefix(destNetIp))
+		if v4Item == nil {
+			continue
 		}
-		if validCount == rcount {
-			//logger.Debug("Enough events fetched")
-			break
+		v4routeInfoRecordList := v4Item.(RouteInfoRecordList)
+		v4protocolRouteList, ok := v4routeInfoRecordList.routeInfoProtocolMap[protocol]
+		if !ok || len(v4protocolRouteList) == 0 {
+			logger.Info("Unexpected: no route for destNet:", destNetIp, " found in routeMap of type:", protocol)
+			continue
 		}
-		//logger.Debug("Fetching event record for index ", i+fromIndex)
-		nextNode = &tempNode[validCount]
-		nextNode.TimeStamp = localRouteEventsDB[i+fromIndex].timeStamp
-		nextNode.EventInfo = localRouteEventsDB[i+fromIndex].eventInfo
-		toIndex = ribd.Int(i + fromIndex)
-		if len(returnNodes) == 0 {
-			returnNodes = make([]*ribd.RIBEventState, 0)
+		fmt.Println("MADHAVI!!:Now add v4routes for protocol ", protocol, " and ip:", destNetIp)
+		isInstalledinHw := true
+		if v4routeInfoRecordList.selectedRouteProtocol != protocol {
+			isInstalledinHw = false
 		}
-		returnNodes = append(returnNodes, nextNode)
-		validCount++
+		destNet := ""
+		nextHopList := make([]*ribd.NextHopInfo, 0)
+		nextHopInfo := make([]ribd.NextHopInfo, len(v4protocolRouteList))
+		i := 0
+		for sel := 0; sel < len(v4protocolRouteList); sel++ {
+			destNet = v4protocolRouteList[sel].networkAddr
+			nextHopInfo[i].NextHopIp = v4protocolRouteList[sel].nextHopIp.String()
+			nextHopInfo[i].NextHopIntRef = strconv.Itoa(int(v4protocolRouteList[sel].nextHopIfIndex))
+			intfEntry, ok := IntfIdNameMap[int32(v4protocolRouteList[sel].nextHopIfIndex)]
+			if ok {
+				nextHopInfo[i].NextHopIntRef = intfEntry.name
+			}
+			nextHopInfo[i].Weight = int32(v4protocolRouteList[sel].weight)
+			nextHopList = append(nextHopList, &nextHopInfo[i])
+		}
+		routes = append(routes, &ribd.RouteInfoSummary{
+			DestinationNw:   destNet,
+			IsInstalledInHw: isInstalledinHw,
+			NextHopList:     nextHopList,
+		})
 	}
-	events.RIBEventStateList = returnNodes
-	events.StartIdx = fromIndex
-	events.EndIdx = toIndex + 1
-	events.More = more
-	events.Count = validCount
-	return events, err
+	return routes
 }
 
 func (m RIBDServer) GetBulkIPv4RouteState(fromIndex ribd.Int, rcount ribd.Int) (routes *ribd.IPv4RouteStateGetInfo, err error) { //(routes []*ribdInt.Routes, err error) {

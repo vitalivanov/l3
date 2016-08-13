@@ -25,6 +25,8 @@
 package server
 
 import (
+	"fmt"
+	"l3/rib/ribdCommonDefs"
 	"ribd"
 )
 
@@ -45,32 +47,40 @@ type NextHopInfoKey struct {
 type NextHopInfo struct {
 	refCount int //number of routes using this as a next hop
 }
-type PerProtocolRouteInfo struct {
-	routeMap   map[string]int
+type RouteCountInfo struct {
 	totalcount int
+	ecmpcount  int
+}
+type PerProtocolRouteInfo struct {
+	v4routeMap map[string]RouteCountInfo
+	v6routeMap map[string]RouteCountInfo
+	totalcount RouteCountInfo
 }
 
 var ProtocolRouteMap map[string]PerProtocolRouteInfo //map[string]int
+func UpdateV4ProtocolRouteMap(protocol string, op string, value string, ecmp bool) {
+	var info PerProtocolRouteInfo
 
-func UpdateProtocolRouteMap(protocol string, op string, value string) {
 	if ProtocolRouteMap == nil {
 		if op == "del" {
 			return
 		}
 		ProtocolRouteMap = make(map[string]PerProtocolRouteInfo) //map[string]int)
 	}
-	val, ok := ProtocolRouteMap[protocol]
-	if !ok {
+	info, ok := ProtocolRouteMap[protocol]
+	if !ok || info.v4routeMap == nil {
 		if op == "del" {
 			return
 		}
-		ProtocolRouteMap[protocol].routeMap = make(map[string]int)
+		if info.v4routeMap == nil {
+			info.v4routeMap = make(map[string]RouteCountInfo)
+		}
 	}
-	protocolroutemap, ok := ProtocolRouteMap[protocol].routeMap
-	if !ok {
+	protocolroutemap := info.v4routeMap
+	if protocolroutemap == nil {
 		return
 	}
-	totalcount := val.totalcount
+	totalcount := info.totalcount
 	count, ok := protocolroutemap[value]
 	if !ok {
 		if op == "del" {
@@ -78,20 +88,104 @@ func UpdateProtocolRouteMap(protocol string, op string, value string) {
 		}
 	}
 	if op == "add" {
-		count++
-		totalcount++
+		count.totalcount++
+		totalcount.totalcount++
+		if ecmp {
+			if count.ecmpcount == 0 {
+				//first time ecmp route is added, add an additional count
+				count.ecmpcount++
+				totalcount.ecmpcount++
+			}
+			count.ecmpcount++
+			totalcount.ecmpcount++
+		}
 	} else if op == "del" {
-		count--
-		totalcount--
+		count.totalcount--
+		totalcount.totalcount--
+		if ecmp {
+			count.ecmpcount--
+			totalcount.ecmpcount--
+			if count.totalcount <= 1 {
+				count.ecmpcount--
+				totalcount.ecmpcount--
+			}
+		}
 	}
 	protocolroutemap[value] = count
-	ProtocolRouteMap[protocol].routeMap = protocolroutemap
-	ProtocolRouteMap[protocol].totalcount = totalcount
+	info.v4routeMap = protocolroutemap
+	info.totalcount = totalcount
+	ProtocolRouteMap[protocol] = info
+}
+func UpdateV6ProtocolRouteMap(protocol string, op string, value string, ecmp bool) {
+	var info PerProtocolRouteInfo
+
+	if ProtocolRouteMap == nil {
+		if op == "del" {
+			return
+		}
+		ProtocolRouteMap = make(map[string]PerProtocolRouteInfo) //map[string]int)
+	}
+	info, ok := ProtocolRouteMap[protocol]
+	if !ok || info.v6routeMap == nil {
+		if op == "del" {
+			return
+		}
+		if info.v6routeMap == nil {
+			info.v6routeMap = make(map[string]RouteCountInfo)
+		}
+	}
+	protocolroutemap := info.v6routeMap
+	if protocolroutemap == nil {
+		return
+	}
+	totalcount := info.totalcount
+	count, ok := protocolroutemap[value]
+	if !ok {
+		if op == "del" {
+			return
+		}
+	}
+	if op == "add" {
+		count.totalcount++
+		totalcount.totalcount++
+		if ecmp {
+			if count.ecmpcount == 0 {
+				//first time ecmp route is added, add an additional count
+				count.ecmpcount++
+				totalcount.ecmpcount++
+			}
+			count.ecmpcount++
+			totalcount.ecmpcount++
+		}
+	} else if op == "del" {
+		count.totalcount--
+		totalcount.totalcount--
+		if ecmp {
+			count.ecmpcount--
+			totalcount.ecmpcount--
+			if count.totalcount <= 1 {
+				count.ecmpcount--
+				totalcount.ecmpcount--
+			}
+		}
+	}
+	protocolroutemap[value] = count
+	info.v6routeMap = protocolroutemap
+	info.totalcount = totalcount
+	ProtocolRouteMap[protocol] = info
+}
+func UpdateProtocolRouteMap(protocol string, op string, ipType ribdCommonDefs.IPType, value string, ecmp bool) {
+	fmt.Println("Madhavi!!:UpdateProtocolRouteMap,protocol:", protocol, " iptype:", ipType)
+	if ipType == ribdCommonDefs.IPv4 {
+		UpdateV4ProtocolRouteMap(protocol, op, value, ecmp)
+	} else {
+		UpdateV6ProtocolRouteMap(protocol, op, value, ecmp)
+	}
 
 }
 func (ribdServiceHandler *RIBDServer) StartRouteProcessServer() {
 	logger.Info("Starting the routeserver loop")
-	ProtocolRouteMap = make(map[string]map[string]int)
+	ProtocolRouteMap = make(map[string]PerProtocolRouteInfo) //map[string]int)
 	for {
 		select {
 		case routeConf := <-ribdServiceHandler.RouteConfCh:

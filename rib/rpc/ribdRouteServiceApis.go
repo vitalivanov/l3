@@ -372,36 +372,51 @@ func (m RIBDServicesHandler) GetBulkIPv6RouteState(fromIndex ribd.Int, rcount ri
 	}
 	return routes, err
 }
-func (m RIBDServicesHandler) GetBulkRouteStatsPerProtocol(fromIndex ribd.Int, count ribd.Int)(stats *ribd.RouteStatsPerProtocolGetInfo ,err error) {
-	return nil,nil
+func (m RIBDServicesHandler) GetBulkRouteStatsPerProtocolState(fromIndex ribd.Int, count ribd.Int) (stats *ribd.RouteStatsPerProtocolStateGetInfo, err error) {
+	ret, err := m.server.GetBulkRouteStatsPerProtocolState(fromIndex, count)
+	return ret, err
 }
-func (m RIBDServicesHandler) GetRouteStatsPerProtocol(1: string Protocol) (stats *ribd.RouteStatsPerProtocol,err error) {
-	stats := ribd.NewRouteStatsPerProtocol()
-	return stats,err
+func (m RIBDServicesHandler) GetRouteStatsPerProtocolState(Protocol string) (stats *ribd.RouteStatsPerProtocolState, err error) {
+	stats = ribd.NewRouteStatsPerProtocolState()
+	return stats, err
 }
 
-func (m RIBDServicesHandler) GetBulkRouteStats(fromIndex ribd.Int, count ribd.Int) (stats *ribd.RouteStatsGetInfo, err error) {
+func (m RIBDServicesHandler) GetBulkRouteStatState(fromIndex ribd.Int, count ribd.Int) (stats *ribd.RouteStatStateGetInfo, err error) {
 	if fromIndex != 0 {
 		err := errors.New("Invalid range")
 		return nil, err
 	}
-	stats = make([]ribd.RouteStatsGetInfo, 1)
+	tempstats := make([]*ribd.RouteStatState, 1)
+	var ret_stats ribd.RouteStatStateGetInfo
+	stats = &ret_stats
+	tempstats[0] = &ribd.RouteStatState{}
+	tempstats[0].PerProtocolRouteCountList = m.server.GetPerProtocolRouteCountList()
+	for _, v := range tempstats[0].PerProtocolRouteCountList {
+		tempstats[0].TotalRouteCount = tempstats[0].TotalRouteCount + v.RouteCount
+		tempstats[0].ECMPRouteCount = tempstats[0].ECMPRouteCount + v.EcmpCount
+	}
 	v4Count, _ := m.GetTotalv4RouteCount()
+	tempstats[0].V4RouteCount = int32(v4Count)
 	v6Count, _ := m.GetTotalv6RouteCount()
-	stats[0].TotalRouteCount = v4Count + v6Count
-	stats[0].PerProtocolRouteCountList = m.server.GetPerProtocolRouteCountList()
-	stats[0].StartIdx = fromIndex
-	stats[0].EndIdx = fromIndex
-	stats[0].Count = 1
-	stats[0].More = false
+	tempstats[0].V6RouteCount = int32(v6Count)
+	stats.RouteStatStateList = tempstats
+	stats.StartIdx = fromIndex
+	stats.EndIdx = fromIndex
+	stats.Count = 1
+	stats.More = false
 	return stats, err
 }
-func (m RIBDServicesHandler) GetRouteStats(vrf string) (*ribd.RouteStats, error) {
-	stat := ribd.NewRouteStats()
+func (m RIBDServicesHandler) GetRouteStatState(vrf string) (*ribd.RouteStatState, error) {
+	stat := ribd.NewRouteStatState()
 	v4Count, _ := m.GetTotalv4RouteCount()
 	v6Count, _ := m.GetTotalv6RouteCount()
-	stat.TotalRouteCount = v4Count + v6Count
 	stat.PerProtocolRouteCountList = m.server.GetPerProtocolRouteCountList()
+	for _, v := range stat.PerProtocolRouteCountList {
+		stat.TotalRouteCount = stat.TotalRouteCount + v.RouteCount
+		stat.ECMPRouteCount = stat.ECMPRouteCount + v.EcmpCount
+	}
+	stat.V4RouteCount = int32(v4Count)
+	stat.V6RouteCount = int32(v6Count)
 	return stat, nil
 }
 
@@ -440,6 +455,10 @@ func (m RIBDServicesHandler) GetRouteReachabilityInfo(destNet string) (nextHopIn
 }
 func (m RIBDServicesHandler) GetTotalv4RouteCount() (number ribdInt.Int, err error) {
 	num, err := m.server.GetTotalv4RouteCount()
+	return ribdInt.Int(num), err
+}
+func (m RIBDServicesHandler) GetTotalv6RouteCount() (number ribdInt.Int, err error) {
+	num, err := m.server.GetTotalv6RouteCount()
 	return ribdInt.Int(num), err
 }
 func (m RIBDServicesHandler) Getv4RouteCreatedTime(number ribdInt.Int) (time string, err error) {

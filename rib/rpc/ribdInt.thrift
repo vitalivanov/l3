@@ -153,6 +153,7 @@ service RIBDINTServices
 	IPv4RouteState getv4Route(1: string destNetIp);
 	IPv6RouteState getv6Route(1: string destNetIp);
 	int GetTotalv4RouteCount();
+	int GetTotalv6RouteCount();
 	string Getv4RouteCreatedTime(1:int number);
 	oneway void OnewayCreateBulkIPv4Route(1: list<IPv4RouteConfig> config);
 	bool CreatePolicyAction(1: PolicyAction config);

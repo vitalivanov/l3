@@ -99,6 +99,26 @@ func (m RIBDServer) WriteIPv4RouteStateEntryToDB(dbInfo RouteDBInfo) error {
 			obj.PolicyList = append(obj.PolicyList, routePolicyListInfo)
 		}
 	}
+	obj.NextBestRoute = &ribd.NextBestRouteInfo{}
+	obj.NextBestRoute.Protocol = SelectNextBestRoute(routeList, routeList.selectedRouteProtocol)
+	nextbestrouteInfoList := routeList.routeInfoProtocolMap[obj.NextBestRoute.Protocol]
+	//logger.Info("len of routeInfoList - ", len(routeInfoList), "selected route protocol = ", routeList.selectedRouteProtocol, " route Protocol: ", entry.protocol, " route nwAddr: ", entry.networkAddr)
+	nextBestRouteNextHopInfo := make([]ribd.NextHopInfo, len(nextbestrouteInfoList))
+	i1 := 0
+	for sel1 := 0; sel1 < len(nextbestrouteInfoList); sel1++ {
+		//logger.Info("nextHop ", sel, " weight = ", routeInfoList[sel].weight, " ip ", routeInfoList[sel].nextHopIp, " intref ", routeInfoList[sel].nextHopIfIndex)
+		nextBestRouteNextHopInfo[i1].NextHopIp = nextbestrouteInfoList[sel1].nextHopIp.String()
+		nextBestRouteNextHopInfo[i1].NextHopIntRef = strconv.Itoa(int(nextbestrouteInfoList[sel1].nextHopIfIndex))
+		intfEntry, ok := IntfIdNameMap[int32(nextbestrouteInfoList[sel1].nextHopIfIndex)]
+		if ok {
+			//logger.Debug("Map foud for ifndex : ", routeInfoList[sel].nextHopIfIndex, "Name = ", intfEntry.name)
+			nextBestRouteNextHopInfo[i1].NextHopIntRef = intfEntry.name
+		}
+		//logger.Debug("IntfRef = ", nextHopInfo[i].NextHopIntRef)
+		nextBestRouteNextHopInfo[i1].Weight = int32(nextbestrouteInfoList[sel1].weight)
+		obj.NextBestRoute.NextHopList = append(obj.NextBestRoute.NextHopList, &nextBestRouteNextHopInfo[i1])
+		i1++
+	}
 	objects.ConvertThriftToribdIPv4RouteStateObj(obj, &dbObj)
 	err := dbObj.StoreObjectInDb(m.DbHdl)
 	if err != nil {
@@ -168,6 +188,26 @@ func (m RIBDServer) WriteIPv6RouteStateEntryToDB(dbInfo RouteDBInfo) error {
 			obj.PolicyList = append(obj.PolicyList, routePolicyListInfo)
 		}
 	}
+	obj.NextBestRoute = &ribd.NextBestRouteInfo{}
+	obj.NextBestRoute.Protocol = SelectNextBestRoute(routeList, routeList.selectedRouteProtocol)
+	nextbestrouteInfoList := routeList.routeInfoProtocolMap[obj.NextBestRoute.Protocol]
+	//logger.Info("len of routeInfoList - ", len(routeInfoList), "selected route protocol = ", routeList.selectedRouteProtocol, " route Protocol: ", entry.protocol, " route nwAddr: ", entry.networkAddr)
+	nextBestRouteNextHopInfo := make([]ribd.NextHopInfo, len(nextbestrouteInfoList))
+	i1 := 0
+	for sel1 := 0; sel1 < len(nextbestrouteInfoList); sel1++ {
+		//logger.Info("nextHop ", sel, " weight = ", routeInfoList[sel].weight, " ip ", routeInfoList[sel].nextHopIp, " intref ", routeInfoList[sel].nextHopIfIndex)
+		nextBestRouteNextHopInfo[i1].NextHopIp = nextbestrouteInfoList[sel1].nextHopIp.String()
+		nextBestRouteNextHopInfo[i1].NextHopIntRef = strconv.Itoa(int(nextbestrouteInfoList[sel1].nextHopIfIndex))
+		intfEntry, ok := IntfIdNameMap[int32(nextbestrouteInfoList[sel1].nextHopIfIndex)]
+		if ok {
+			//logger.Debug("Map foud for ifndex : ", routeInfoList[sel].nextHopIfIndex, "Name = ", intfEntry.name)
+			nextBestRouteNextHopInfo[i1].NextHopIntRef = intfEntry.name
+		}
+		//logger.Debug("IntfRef = ", nextHopInfo[i].NextHopIntRef)
+		nextBestRouteNextHopInfo[i1].Weight = int32(nextbestrouteInfoList[sel1].weight)
+		obj.NextBestRoute.NextHopList = append(obj.NextBestRoute.NextHopList, &nextBestRouteNextHopInfo[i1])
+		i1++
+	}
 	objects.ConvertThriftToribdIPv6RouteStateObj(obj, &dbObj)
 	err := dbObj.StoreObjectInDb(m.DbHdl)
 	if err != nil {
@@ -184,6 +224,7 @@ func (m RIBDServer) DelIPv4RouteStateEntryFromDB(dbInfo RouteDBInfo) error {
 	var dbObj objects.IPv4RouteState
 	obj := ribd.NewIPv4RouteState()
 	obj.DestinationNw = entry.networkAddr
+	obj.NextBestRoute = &ribd.NextBestRouteInfo{}
 	objects.ConvertThriftToribdIPv4RouteStateObj(obj, &dbObj)
 	err := dbObj.DeleteObjectFromDb(m.DbHdl)
 	if err != nil {
@@ -198,6 +239,7 @@ func (m RIBDServer) DelIPv6RouteStateEntryFromDB(dbInfo RouteDBInfo) error {
 	var dbObj objects.IPv6RouteState
 	obj := ribd.NewIPv6RouteState()
 	obj.DestinationNw = entry.networkAddr
+	obj.NextBestRoute = &ribd.NextBestRouteInfo{}
 	objects.ConvertThriftToribdIPv6RouteStateObj(obj, &dbObj)
 	err := dbObj.DeleteObjectFromDb(m.DbHdl)
 	if err != nil {
