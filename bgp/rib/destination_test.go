@@ -41,8 +41,14 @@ func (r *RouteMgr) Start() {
 	r.t.Log("RouteMgr:Start")
 }
 
-func (r *RouteMgr) GetNextHopInfo(ipAddr string) (nh *config.NextHopInfo, err error) {
-	return nh, err
+func (r *RouteMgr) GetNextHopInfo(ipAddr string) (*config.NextHopInfo, error) {
+	nh := config.NextHopInfo{}
+	nh.Metric = 0
+	nh.NextHopIp = "30.1.1.1"
+	nh.IsReachable = true
+	nh.NextHopIfType = 1
+	nh.NextHopIfIndex = 1
+	return &nh, nil
 }
 
 func (r *RouteMgr) CreateRoute(route *config.RouteConfig) {
