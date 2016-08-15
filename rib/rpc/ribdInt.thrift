@@ -89,6 +89,10 @@ struct PolicyDstIpMatchPrefixSetCondition{
 	1 : string 	PrefixSet
 	2 : PolicyPrefix Prefix
 }
+struct NextBestRouteInfo {
+	1 : string Protocol
+	2 : list<RouteNextHopInfo> NextHopList
+}
 struct IPv4RouteConfig {
 	1 : string DestinationNw
 	2 : string NetworkMask
@@ -131,6 +135,7 @@ struct IPv4RouteState {
 	5 : string RouteUpdatedTime
 	6 : list<RouteNextHopInfo> NextHopList
 	7 : list<string> PolicyList
+	8 : NextBestRouteInfo NextBestRoute
 }
 struct IPv6RouteState {
 	1 : string DestinationNw
@@ -140,6 +145,7 @@ struct IPv6RouteState {
 	5 : string RouteUpdatedTime
 	6 : list<RouteNextHopInfo> NextHopList
 	7 : list<string> PolicyList
+	8 : NextBestRouteInfo NextBestRoute
 }
 
 service RIBDINTServices 

@@ -318,7 +318,7 @@ func (ribdServiceHandler *RIBDServer) StartDBServer() {
 					}
 				}
 			} else if info.Op == "del" {
-				//logger.Debug("MADHAVI!! del case")
+				//logger.Debug("del case")
 				dbInfo := info.OrigConfigObject.(RouteDBInfo)
 				entry := dbInfo.entry
 				//logger.Debug("del case iptype = ", entry.ipType)

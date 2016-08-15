@@ -507,7 +507,6 @@ func Getv4RoutesPerProtocol(protocol string) []*ribd.RouteInfoSummary {
 			logger.Info("Unexpected: no route for destNet:", destNetIp, " found in routeMap of type:", protocol)
 			continue
 		}
-		fmt.Println("MADHAVI!!:Now add v4routes for protocol ", protocol, " and ip:", destNetIp)
 		isInstalledinHw := true
 		if v4routeInfoRecordList.selectedRouteProtocol != protocol {
 			isInstalledinHw = false
@@ -687,6 +686,26 @@ func (m RIBDServer) Getv4Route(destNetIp string) (route *ribdInt.IPv4RouteState,
 	route.Protocol = routeInfoRecordList.selectedRouteProtocol
 	route.RouteCreatedTime = routeInfoRecord.routeCreatedTime
 	route.RouteUpdatedTime = routeInfoRecord.routeUpdatedTime
+	route.NextBestRoute = &ribdInt.NextBestRouteInfo{}
+	route.NextBestRoute.Protocol = SelectNextBestRoute(routeInfoRecordList, routeInfoRecordList.selectedRouteProtocol)
+	nextbestrouteInfoList := routeInfoRecordList.routeInfoProtocolMap[route.NextBestRoute.Protocol]
+	//logger.Info("len of routeInfoList - ", len(routeInfoList), "selected route protocol = ", routeList.selectedRouteProtocol, " route Protocol: ", entry.protocol, " route nwAddr: ", entry.networkAddr)
+	nextBestRouteNextHopInfo := make([]ribdInt.RouteNextHopInfo, len(nextbestrouteInfoList))
+	i1 := 0
+	for sel1 := 0; sel1 < len(nextbestrouteInfoList); sel1++ {
+		//logger.Info("nextHop ", sel, " weight = ", routeInfoList[sel].weight, " ip ", routeInfoList[sel].nextHopIp, " intref ", routeInfoList[sel].nextHopIfIndex)
+		nextBestRouteNextHopInfo[i1].NextHopIp = nextbestrouteInfoList[sel1].nextHopIp.String()
+		nextBestRouteNextHopInfo[i1].NextHopIntRef = strconv.Itoa(int(nextbestrouteInfoList[sel1].nextHopIfIndex))
+		intfEntry, ok := IntfIdNameMap[int32(nextbestrouteInfoList[sel1].nextHopIfIndex)]
+		if ok {
+			//logger.Debug("Map foud for ifndex : ", routeInfoList[sel].nextHopIfIndex, "Name = ", intfEntry.name)
+			nextBestRouteNextHopInfo[i1].NextHopIntRef = intfEntry.name
+		}
+		//logger.Debug("IntfRef = ", nextHopInfo[i].NextHopIntRef)
+		nextBestRouteNextHopInfo[i1].Weight = int32(nextbestrouteInfoList[sel1].weight)
+		route.NextBestRoute.NextHopList = append(route.NextBestRoute.NextHopList, &nextBestRouteNextHopInfo[i1])
+		i1++
+	}
 	return route, err
 }
 func (m RIBDServer) GetTotalv4RouteCount() (number int, err error) {

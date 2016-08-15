@@ -483,14 +483,11 @@ func (m RIBDServer) GetBulkRouteStatsPerProtocolState(fromIndex ribd.Int, count 
 	stats = &returnInfo
 	count = 0
 	var tempNode []*ribd.RouteStatsPerProtocolState = make([]*ribd.RouteStatsPerProtocolState, 0)
-	fmt.Println("MADHAVI!! beginning count:", count)
 	for protocol, _ := range ProtocolRouteMap {
 		routes := Getv4RoutesPerProtocol(protocol)
-		fmt.Println("MADHAVI!!:Now add v6routes for protocol ", protocol)
 		v6routes := Getv6RoutesPerProtocol(protocol)
 		/*		for destNet, _ := range routemapInfo.routeMap {
 				routes = Getv4RoutesPerProtocol(destNet, protocol)
-				fmt.Println("MADHAVI!!:Now add v6routes for protocol ", protocol, " and destNet ", destNet)
 				v6routes = Getv6RoutesPerProtocol(destNet, protocol)
 			}*/
 		tempNode = append(tempNode, &ribd.RouteStatsPerProtocolState{
@@ -500,10 +497,20 @@ func (m RIBDServer) GetBulkRouteStatsPerProtocolState(fromIndex ribd.Int, count 
 		})
 		count++
 	}
-	fmt.Println("Madhavi!!:return count:", stats.Count, " count:", count)
 	stats.Count = count
 	stats.More = false
 	stats.RouteStatsPerProtocolStateList = tempNode
+	return stats, err
+}
+func (m RIBDServer) GetRouteStatsPerProtocolState(protocol string) (stats *ribd.RouteStatsPerProtocolState, err error) {
+
+	routes := Getv4RoutesPerProtocol(protocol)
+	v6routes := Getv6RoutesPerProtocol(protocol)
+	stats = &ribd.RouteStatsPerProtocolState{
+		Protocol: protocol,
+		V4Routes: routes,
+		V6Routes: v6routes,
+	}
 	return stats, err
 }
 func (m RIBDServer) GetBulkRIBEventState(fromIndex ribd.Int, rcount ribd.Int) (events *ribd.RIBEventStateGetInfo, err error) {

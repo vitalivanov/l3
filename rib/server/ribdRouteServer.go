@@ -25,7 +25,6 @@
 package server
 
 import (
-	"fmt"
 	"l3/rib/ribdCommonDefs"
 	"ribd"
 )
@@ -175,7 +174,7 @@ func UpdateV6ProtocolRouteMap(protocol string, op string, value string, ecmp boo
 	ProtocolRouteMap[protocol] = info
 }
 func UpdateProtocolRouteMap(protocol string, op string, ipType ribdCommonDefs.IPType, value string, ecmp bool) {
-	fmt.Println("Madhavi!!:UpdateProtocolRouteMap,protocol:", protocol, " iptype:", ipType)
+	//logger.Debug("UpdateProtocolRouteMap,protocol:", protocol, " iptype:", ipType)
 	if ipType == ribdCommonDefs.IPv4 {
 		UpdateV4ProtocolRouteMap(protocol, op, value, ecmp)
 	} else {

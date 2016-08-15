@@ -333,6 +333,17 @@ func (m RIBDServicesHandler) GetBulkIPv4RouteState(fromIndex ribd.Int, rcount ri
 func (m RIBDServicesHandler) GetIPv6RouteState(destNw string) (*ribd.IPv6RouteState, error) {
 	logger.Info("Get state for IPv6Route")
 	route := ribd.NewIPv6RouteState()
+	if m.server.DbHdl == nil {
+		logger.Err("DbHdl not initialized")
+		return route, errors.New("DBHdl not initialized")
+	}
+	var routeObj objects.IPv6RouteState
+	var routeObjtemp objects.IPv6RouteState
+	obj, err := m.server.DbHdl.GetObjectFromDb(routeObj, destNw)
+	if err == nil {
+		routeObjtemp = obj.(objects.IPv6RouteState)
+		objects.ConvertribdIPv6RouteStateObjToThrift(&routeObjtemp, route)
+	}
 	return route, nil
 }
 
@@ -378,6 +389,7 @@ func (m RIBDServicesHandler) GetBulkRouteStatsPerProtocolState(fromIndex ribd.In
 }
 func (m RIBDServicesHandler) GetRouteStatsPerProtocolState(Protocol string) (stats *ribd.RouteStatsPerProtocolState, err error) {
 	stats = ribd.NewRouteStatsPerProtocolState()
+	stats, err = GetRouteStatsPerProtocolState(Protocol)
 	return stats, err
 }
 
