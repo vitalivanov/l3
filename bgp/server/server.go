@@ -585,7 +585,7 @@ func (s *BGPServer) CheckForAggregation(updated map[uint32]map[*bgprib.Path][]*b
 					continue
 				}
 				route := dest.GetLocRibPathRoute()
-				s.logger.Infof("BGPServer:checkForAggregate - update dest %s policylist %v hit %v before ",
+				s.logger.Infof("BGPServer:checkForAggregate - update dest %s policylist %v hit %v before "+
 					"applying create policy", dest.NLRI.GetPrefix().String(), route.PolicyList, route.PolicyHitCounter)
 				if route != nil {
 					peEntity := utilspolicy.PolicyEngineFilterEntityParams{
@@ -603,7 +603,7 @@ func (s *BGPServer) CheckForAggregation(updated map[uint32]map[*bgprib.Path][]*b
 						updatedAddPaths: &updatedAddPaths,
 					}
 					pe.PolicyEngine.PolicyEngineFilter(peEntity, policyCommonDefs.PolicyPath_Export, callbackInfo)
-					s.logger.Infof("BGPServer:checkForAggregate - update dest %s policylist %v hit %v ",
+					s.logger.Infof("BGPServer:checkForAggregate - update dest %s policylist %v hit %v "+
 						"after applying create policy", dest.NLRI.GetPrefix().String(), route.PolicyList,
 						route.PolicyHitCounter)
 				}
@@ -756,8 +756,8 @@ func (s *BGPServer) ProcessUpdate(pktInfo *packet.BGPPktSrc) {
 
 	atomic.AddUint32(&peer.NeighborConf.Neighbor.State.Queues.Input, ^uint32(0))
 	peer.NeighborConf.Neighbor.State.Messages.Received.Update++
-	updated, withdrawn, updatedAddPaths, addedAllPrefixes := s.LocRib.ProcessUpdate(
-		peer.NeighborConf, pktInfo, s.AddPathCount)
+	updated, withdrawn, updatedAddPaths, addedAllPrefixes := s.LocRib.ProcessUpdate(peer.NeighborConf, pktInfo,
+		s.AddPathCount)
 	if !addedAllPrefixes {
 		peer.MaxPrefixesExceeded()
 	}
@@ -900,6 +900,17 @@ func (s *BGPServer) SetupRedistribution(gConf config.GlobalConfig) {
 func (s *BGPServer) DeleteAgg(aggConf config.BGPAggregate) error {
 	pe, ok := s.locRibPE[aggConf.AddressFamily]
 	if ok {
+		policyEngine := pe.GetPolicyEngine()
+		policyDB := policyEngine.PolicyDB
+
+		nodeGet := policyDB.Get(patriciaDB.Prefix(aggConf.IPPrefix))
+		if nodeGet == nil {
+			s.logger.Err("Policy ", aggConf, " not created yet")
+			return errors.New(fmt.Sprintf("Policy %s not found in policy engine", aggConf.IPPrefix))
+		}
+		node := nodeGet.(utilspolicy.Policy)
+
+		pe.ReleaseId(uint32(node.Precedence))
 		pe.DeletePolicyDefinition(aggConf.IPPrefix)
 		pe.DeletePolicyStmt(aggConf.IPPrefix)
 		pe.DeletePolicyCondition(aggConf.IPPrefix)
@@ -939,7 +950,7 @@ func (s *BGPServer) AddOrUpdateAgg(oldConf config.BGPAggregate, newConf config.B
 		name := newConf.IPPrefix
 		tokens := strings.Split(newConf.IPPrefix, "/")
 		prefixLen := tokens[1]
-		prefixLenInt, err := strconv.Atoi(prefixLen)
+		_, err := strconv.Atoi(prefixLen)
 		if err != nil {
 			s.logger.Errf("Failed to convert prefex len %s to int with error %s", prefixLen, err)
 			return err
@@ -974,7 +985,8 @@ func (s *BGPServer) AddOrUpdateAgg(oldConf config.BGPAggregate, newConf config.B
 			return err
 		}
 
-		def := utilspolicy.PolicyDefinitionConfig{Name: name, Precedence: prefixLenInt, MatchType: "all"}
+		precedence := pe.GetNextId()
+		def := utilspolicy.PolicyDefinitionConfig{Name: name, Precedence: int(precedence), MatchType: "any"}
 		def.PolicyDefinitionStatements = make([]utilspolicy.PolicyDefinitionStmtPrecedence, 1)
 		policyDefinitionStatement := utilspolicy.PolicyDefinitionStmtPrecedence{
 			Precedence: 1,
@@ -985,6 +997,7 @@ func (s *BGPServer) AddOrUpdateAgg(oldConf config.BGPAggregate, newConf config.B
 		err = pe.CreatePolicyDefinition(def)
 		if err != nil {
 			s.logger.Errf("Failed to create policy definition for aggregate %s with error %s", name, err)
+			pe.ReleaseId(precedence)
 			pe.DeletePolicyStmt(name)
 			pe.DeletePolicyCondition(name)
 			return err
@@ -1003,7 +1016,8 @@ func (s *BGPServer) AddOrUpdateAgg(oldConf config.BGPAggregate, newConf config.B
 	return err
 }
 
-func (s *BGPServer) UpdateAggPolicy(policyName string, pe bgppolicy.BGPPolicyEngine, aggConf config.BGPAggregate) error {
+func (s *BGPServer) UpdateAggPolicy(policyName string, pe *bgppolicy.LocRibPolicyEngine,
+	aggConf config.BGPAggregate) error {
 	s.logger.Debug("UpdateApplyPolicy")
 	var err error
 	var policyAction utilspolicy.PolicyAction
