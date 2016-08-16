@@ -27,6 +27,7 @@ package server
 import (
 	"l3/rib/ribdCommonDefs"
 	"ribd"
+	"strconv"
 )
 
 type RouteConfigInfo struct {
@@ -56,7 +57,9 @@ type PerProtocolRouteInfo struct {
 	totalcount RouteCountInfo
 }
 
-var ProtocolRouteMap map[string]PerProtocolRouteInfo //map[string]int
+var ProtocolRouteMap map[string]PerProtocolRouteInfo  //map[string]int
+var InterfaceRouteMap map[string]PerProtocolRouteInfo //map[string]int
+
 func UpdateV4ProtocolRouteMap(protocol string, op string, value string, ecmp bool) {
 	var info PerProtocolRouteInfo
 
@@ -179,6 +182,137 @@ func UpdateProtocolRouteMap(protocol string, op string, ipType ribdCommonDefs.IP
 		UpdateV4ProtocolRouteMap(protocol, op, value, ecmp)
 	} else {
 		UpdateV6ProtocolRouteMap(protocol, op, value, ecmp)
+	}
+
+}
+
+func UpdateV4InterfaceRouteMap(intfref string, op string, value string, ecmp bool) {
+	var info PerProtocolRouteInfo
+
+	if InterfaceRouteMap == nil {
+		if op == "del" {
+			return
+		}
+		InterfaceRouteMap = make(map[string]PerProtocolRouteInfo) //map[string]int)
+	}
+	info, ok := InterfaceRouteMap[intfref]
+	if !ok || info.v4routeMap == nil {
+		if op == "del" {
+			return
+		}
+		if info.v4routeMap == nil {
+			info.v4routeMap = make(map[string]RouteCountInfo)
+		}
+	}
+	interfaceroutemap := info.v4routeMap
+	if interfaceroutemap == nil {
+		return
+	}
+	totalcount := info.totalcount
+	count, ok := interfaceroutemap[value]
+	if !ok {
+		if op == "del" {
+			return
+		}
+	}
+	if op == "add" {
+		count.totalcount++
+		totalcount.totalcount++
+		if ecmp {
+			if count.ecmpcount == 0 {
+				//first time ecmp route is added, add an additional count
+				count.ecmpcount++
+				totalcount.ecmpcount++
+			}
+			count.ecmpcount++
+			totalcount.ecmpcount++
+		}
+	} else if op == "del" {
+		count.totalcount--
+		totalcount.totalcount--
+		if ecmp {
+			count.ecmpcount--
+			totalcount.ecmpcount--
+			if count.totalcount <= 1 {
+				count.ecmpcount--
+				totalcount.ecmpcount--
+			}
+		}
+	}
+	interfaceroutemap[value] = count
+	info.v4routeMap = interfaceroutemap
+	info.totalcount = totalcount
+	InterfaceRouteMap[intfref] = info
+}
+func UpdateV6InterfaceRouteMap(intfref string, op string, value string, ecmp bool) {
+	var info PerProtocolRouteInfo
+
+	if InterfaceRouteMap == nil {
+		if op == "del" {
+			return
+		}
+		InterfaceRouteMap = make(map[string]PerProtocolRouteInfo) //map[string]int)
+	}
+	info, ok := InterfaceRouteMap[intfref]
+	if !ok || info.v6routeMap == nil {
+		if op == "del" {
+			return
+		}
+		if info.v6routeMap == nil {
+			info.v6routeMap = make(map[string]RouteCountInfo)
+		}
+	}
+	interfaceroutemap := info.v6routeMap
+	if interfaceroutemap == nil {
+		return
+	}
+	totalcount := info.totalcount
+	count, ok := interfaceroutemap[value]
+	if !ok {
+		if op == "del" {
+			return
+		}
+	}
+	if op == "add" {
+		count.totalcount++
+		totalcount.totalcount++
+		if ecmp {
+			if count.ecmpcount == 0 {
+				//first time ecmp route is added, add an additional count
+				count.ecmpcount++
+				totalcount.ecmpcount++
+			}
+			count.ecmpcount++
+			totalcount.ecmpcount++
+		}
+	} else if op == "del" {
+		count.totalcount--
+		totalcount.totalcount--
+		if ecmp {
+			count.ecmpcount--
+			totalcount.ecmpcount--
+			if count.totalcount <= 1 {
+				count.ecmpcount--
+				totalcount.ecmpcount--
+			}
+		}
+	}
+	interfaceroutemap[value] = count
+	info.v6routeMap = interfaceroutemap
+	info.totalcount = totalcount
+	InterfaceRouteMap[intfref] = info
+}
+func UpdateInterfaceRouteMap(intf int, op string, ipType ribdCommonDefs.IPType, value string, ecmp bool) {
+	intfref := strconv.Itoa(int(intf))
+	intfEntry, ok := IntfIdNameMap[int32(intf)]
+	if ok {
+		//logger.Debug("Map foud for ifndex : ", routeInfoList[sel].nextHopIfIndex, "Name = ", intfEntry.name)
+		intfref = intfEntry.name
+	}
+	if ipType == ribdCommonDefs.IPv4 {
+		UpdateV4InterfaceRouteMap(intfref, op, value, ecmp)
+	} else {
+		UpdateV6InterfaceRouteMap(intfref, op, value, ecmp)
 	}
 
 }

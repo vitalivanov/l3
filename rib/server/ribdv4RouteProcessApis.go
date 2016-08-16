@@ -496,7 +496,10 @@ func Getv4RoutesPerProtocol(protocol string) []*ribd.RouteInfoSummary {
 	if routemapInfo.v4routeMap == nil {
 		return routes
 	}
-	for destNetIp, _ := range routemapInfo.v4routeMap {
+	for destNetIp, val := range routemapInfo.v4routeMap {
+		if val.totalcount == 0 {
+			continue
+		}
 		v4Item := V4RouteInfoMap.Get(patriciaDB.Prefix(destNetIp))
 		if v4Item == nil {
 			continue
@@ -516,6 +519,7 @@ func Getv4RoutesPerProtocol(protocol string) []*ribd.RouteInfoSummary {
 		nextHopInfo := make([]ribd.NextHopInfo, len(v4protocolRouteList))
 		i := 0
 		for sel := 0; sel < len(v4protocolRouteList); sel++ {
+			fmt.Println("Madhavi!! protocol:", protocol, " sel:", sel, " v4protocolRouteList[sel].nextHopIp.String():", v4protocolRouteList[sel].nextHopIp.String(), " v4protocolRouteList[sel].nextHopIfIndex:", v4protocolRouteList[sel].nextHopIfIndex)
 			destNet = v4protocolRouteList[sel].networkAddr
 			nextHopInfo[i].NextHopIp = v4protocolRouteList[sel].nextHopIp.String()
 			nextHopInfo[i].NextHopIntRef = strconv.Itoa(int(v4protocolRouteList[sel].nextHopIfIndex))
@@ -525,12 +529,60 @@ func Getv4RoutesPerProtocol(protocol string) []*ribd.RouteInfoSummary {
 			}
 			nextHopInfo[i].Weight = int32(v4protocolRouteList[sel].weight)
 			nextHopList = append(nextHopList, &nextHopInfo[i])
+			i++
 		}
+		fmt.Println("Appending routes for protocol ", protocol)
 		routes = append(routes, &ribd.RouteInfoSummary{
 			DestinationNw:   destNet,
 			IsInstalledInHw: isInstalledinHw,
 			NextHopList:     nextHopList,
 		})
+	}
+	return routes
+}
+func Getv4RoutesPerInterface(intfref string) []string { //*ribd.RouteInfoSummary {
+	routes := make([]string, 0) //[]*ribd.RouteInfoSummary, 0)
+	routemapInfo := InterfaceRouteMap[intfref]
+	if routemapInfo.v4routeMap == nil {
+		return routes
+	}
+	for destNetIp, val := range routemapInfo.v4routeMap {
+		if val.totalcount == 0 {
+			continue
+		}
+		v4Item := V4RouteInfoMap.Get(patriciaDB.Prefix(destNetIp))
+		if v4Item == nil {
+			continue
+		}
+		v4routeInfoRecordList := v4Item.(RouteInfoRecordList)
+		v4protocolRouteList, ok := v4routeInfoRecordList.routeInfoProtocolMap[v4routeInfoRecordList.selectedRouteProtocol]
+		if !ok || len(v4protocolRouteList) == 0 {
+			logger.Info("Unexpected: no route for destNet:", destNetIp, " found in routeMap of type:", intfref)
+			continue
+		}
+		//		isInstalledinHw := true
+		destNet := ""
+		//	nextHopList := make([]*ribd.NextHopInfo, 0)
+		//	nextHopInfo := make([]ribd.NextHopInfo, len(v4protocolRouteList))
+		//	i := 0
+		for sel := 0; sel < len(v4protocolRouteList); sel++ {
+			destNet = v4protocolRouteList[sel].networkAddr
+			/*			nextHopInfo[i].NextHopIp = v4protocolRouteList[sel].nextHopIp.String()
+						nextHopInfo[i].NextHopIntRef = strconv.Itoa(int(v4protocolRouteList[sel].nextHopIfIndex))
+						intfEntry, ok := IntfIdNameMap[int32(v4protocolRouteList[sel].nextHopIfIndex)]
+						if ok {
+							nextHopInfo[i].NextHopIntRef = intfEntry.name
+						}
+						nextHopInfo[i].Weight = int32(v4protocolRouteList[sel].weight)
+						nextHopList = append(nextHopList, &nextHopInfo[i])
+						i++*/
+		}
+		/*		routes = append(routes, &ribd.RouteInfoSummary{
+				DestinationNw:   destNet,
+				IsInstalledInHw: isInstalledinHw,
+				NextHopList:     nextHopList,
+			})*/
+		routes = append(routes, destNet)
 	}
 	return routes
 }

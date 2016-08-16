@@ -389,7 +389,16 @@ func (m RIBDServicesHandler) GetBulkRouteStatsPerProtocolState(fromIndex ribd.In
 }
 func (m RIBDServicesHandler) GetRouteStatsPerProtocolState(Protocol string) (stats *ribd.RouteStatsPerProtocolState, err error) {
 	stats = ribd.NewRouteStatsPerProtocolState()
-	stats, err = GetRouteStatsPerProtocolState(Protocol)
+	stats, err = m.server.GetRouteStatsPerProtocolState(Protocol)
+	return stats, err
+}
+func (m RIBDServicesHandler) GetBulkRouteStatsPerInterfaceState(fromIndex ribd.Int, count ribd.Int) (stats *ribd.RouteStatsPerInterfaceStateGetInfo, err error) {
+	ret, err := m.server.GetBulkRouteStatsPerInterfaceState(fromIndex, count)
+	return ret, err
+}
+func (m RIBDServicesHandler) GetRouteStatsPerInterfaceState(Intfref string) (stats *ribd.RouteStatsPerInterfaceState, err error) {
+	stats = ribd.NewRouteStatsPerInterfaceState()
+	stats, err = m.server.GetRouteStatsPerInterfaceState(Intfref)
 	return stats, err
 }
 

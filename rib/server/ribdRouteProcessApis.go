@@ -513,6 +513,38 @@ func (m RIBDServer) GetRouteStatsPerProtocolState(protocol string) (stats *ribd.
 	}
 	return stats, err
 }
+func (m RIBDServer) GetBulkRouteStatsPerInterfaceState(fromIndex ribd.Int, count ribd.Int) (stats *ribd.RouteStatsPerInterfaceStateGetInfo, err error) {
+	var returnInfo ribd.RouteStatsPerInterfaceStateGetInfo
+	stats = &returnInfo
+	count = 0
+	var tempNode []*ribd.RouteStatsPerInterfaceState = make([]*ribd.RouteStatsPerInterfaceState, 0)
+	for intfref, _ := range InterfaceRouteMap {
+		routes := Getv4RoutesPerInterface(intfref)
+		v6routes := Getv6RoutesPerInterface(intfref)
+		tempNode = append(tempNode, &ribd.RouteStatsPerInterfaceState{
+			Intfref:  intfref,
+			V4Routes: routes,
+			V6Routes: v6routes,
+		})
+		count++
+	}
+	stats.Count = count
+	stats.More = false
+	stats.RouteStatsPerInterfaceStateList = tempNode
+	return stats, err
+}
+func (m RIBDServer) GetRouteStatsPerInterfaceState(intfref string) (stats *ribd.RouteStatsPerInterfaceState, err error) {
+
+	routes := Getv4RoutesPerInterface(intfref)
+	v6routes := Getv6RoutesPerInterface(intfref)
+	stats = &ribd.RouteStatsPerInterfaceState{
+		Intfref:  intfref,
+		V4Routes: routes,
+		V6Routes: v6routes,
+	}
+	return stats, err
+}
+
 func (m RIBDServer) GetBulkRIBEventState(fromIndex ribd.Int, rcount ribd.Int) (events *ribd.RIBEventStateGetInfo, err error) {
 	//logger.Debug("GetBulkRIBEventState")
 	var i, validCount, toIndex ribd.Int
@@ -1018,6 +1050,7 @@ func addNewRoute(destNetPrefix patriciaDB.Prefix,
 		ecmp = true
 	}
 	UpdateProtocolRouteMap(ReverseRouteProtoTypeMapDB[int(routeInfoRecord.protocol)], "add", routeInfoRecord.ipType, string(destNetPrefix), ecmp)
+	UpdateInterfaceRouteMap(int(routeInfoRecord.nextHopIfIndex), "add", routeInfoRecord.ipType, string(destNetPrefix), ecmp)
 
 	if ReverseRouteProtoTypeMapDB[int(routeInfoRecord.protocol)] != routeInfoRecordList.selectedRouteProtocol {
 		logger.Debug("This is not a selected route, so nothing more to do here")
@@ -1115,7 +1148,7 @@ func deleteRoute(destNetPrefix patriciaDB.Prefix, //route prefix of the route be
 	delType int, //FIBOnly/RIBAndFIB
 ) {
 
-	//logger.Debug(" deleteRoute")
+	logger.Debug(" deleteRoute")
 	deleteNode := true
 	nodeDeleted := false
 	if destNetSlice == nil || int(routeInfoRecord.sliceIdx) >= len(destNetSlice) {
@@ -1181,6 +1214,7 @@ func deleteRoute(destNetPrefix patriciaDB.Prefix, //route prefix of the route be
 				}
 				RouteInfoMapDelete(routeInfoRecord.ipType, destNetPrefix)
 				UpdateProtocolRouteMap(ReverseRouteProtoTypeMapDB[int(routeInfoRecord.protocol)], "del", routeInfoRecord.ipType, string(destNetPrefix), false)
+				UpdateInterfaceRouteMap(int(routeInfoRecord.nextHopIfIndex), "del", routeInfoRecord.ipType, string(destNetPrefix), false)
 				nodeDeleted = true
 			}
 		}
@@ -1191,6 +1225,7 @@ func deleteRoute(destNetPrefix patriciaDB.Prefix, //route prefix of the route be
 			}
 			RouteInfoMapSet(routeInfoRecord.ipType, destNetPrefix, routeInfoRecordList)
 			UpdateProtocolRouteMap(ReverseRouteProtoTypeMapDB[int(routeInfoRecord.protocol)], "del", routeInfoRecord.ipType, string(destNetPrefix), true)
+			UpdateInterfaceRouteMap(int(routeInfoRecord.nextHopIfIndex), "del", routeInfoRecord.ipType, string(destNetPrefix), true)
 		}
 	} else if delType == FIBOnly {
 		/*
@@ -1442,6 +1477,7 @@ func createRoute(routeInfo RouteParams) (rc ribd.Int, err error) {
 			return 0, err
 		}
 		UpdateProtocolRouteMap(ReverseRouteProtoTypeMapDB[int(routeType)], "add", ipType, string(destNet), false)
+		UpdateInterfaceRouteMap(int(routeInfoRecord.nextHopIfIndex), "add", routeInfoRecord.ipType, string(destNet), false)
 		localDBRecord := localDB{prefix: destNet, isValid: true, nextHopIp: nextHopIp}
 		if destNetSlice == nil {
 			destNetSlice = make([]localDB, 0)

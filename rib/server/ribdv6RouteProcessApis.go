@@ -490,7 +490,10 @@ func Getv6RoutesPerProtocol(protocol string) []*ribd.RouteInfoSummary {
 	if routemapInfo.v6routeMap == nil {
 		return v6routes
 	}
-	for destNetIp, _ := range routemapInfo.v6routeMap {
+	for destNetIp, val := range routemapInfo.v6routeMap {
+		if val.totalcount == 0 {
+			continue
+		}
 		v6Item := V6RouteInfoMap.Get(patriciaDB.Prefix(destNetIp))
 		if v6Item == nil {
 			continue
@@ -519,12 +522,59 @@ func Getv6RoutesPerProtocol(protocol string) []*ribd.RouteInfoSummary {
 			}
 			v6nextHopInfo[j].Weight = int32(v6protocolRouteList[sel1].weight)
 			v6nextHopList = append(v6nextHopList, &v6nextHopInfo[j])
+			j++
 		}
 		v6routes = append(v6routes, &ribd.RouteInfoSummary{
 			DestinationNw:   v6destNet,
 			IsInstalledInHw: v6isInstalledinHw,
 			NextHopList:     v6nextHopList,
 		})
+	}
+	return v6routes
+}
+func Getv6RoutesPerInterface(intfref string) []string { //*ribd.RouteInfoSummary {
+	v6routes := make([]string, 0) //make([]*ribd.RouteInfoSummary, 0)
+	routemapInfo := InterfaceRouteMap[intfref]
+	if routemapInfo.v6routeMap == nil {
+		return v6routes
+	}
+	for destNetIp, val := range routemapInfo.v6routeMap {
+		if val.totalcount == 0 {
+			continue
+		}
+		v6Item := V6RouteInfoMap.Get(patriciaDB.Prefix(destNetIp))
+		if v6Item == nil {
+			continue
+		}
+		v6routeInfoRecordList := v6Item.(RouteInfoRecordList)
+		v6protocolRouteList, ok := v6routeInfoRecordList.routeInfoProtocolMap[v6routeInfoRecordList.selectedRouteProtocol]
+		if !ok || len(v6protocolRouteList) == 0 {
+			logger.Info("Unexpected: no route for destNet:", destNetIp, " found in routeMap of type:", intfref)
+			continue
+		}
+		//		v6isInstalledinHw := true
+		v6destNet := ""
+		//		v6nextHopList := make([]*ribd.NextHopInfo, 0)
+		//		v6nextHopInfo := make([]ribd.NextHopInfo, len(v6protocolRouteList))
+		//		j := 0
+		for sel1 := 0; sel1 < len(v6protocolRouteList); sel1++ {
+			v6destNet = v6protocolRouteList[sel1].networkAddr
+			/*		v6nextHopInfo[j].NextHopIp = v6protocolRouteList[sel1].nextHopIp.String()
+					v6nextHopInfo[j].NextHopIntRef = strconv.Itoa(int(v6protocolRouteList[sel1].nextHopIfIndex))
+					intfEntry, ok := IntfIdNameMap[int32(v6protocolRouteList[sel1].nextHopIfIndex)]
+					if ok {
+						v6nextHopInfo[j].NextHopIntRef = intfEntry.name
+					}
+					v6nextHopInfo[j].Weight = int32(v6protocolRouteList[sel1].weight)
+					v6nextHopList = append(v6nextHopList, &v6nextHopInfo[j])
+					j++*/
+		}
+		/*		v6routes = append(v6routes, &ribd.RouteInfoSummary{
+				DestinationNw: v6destNet,
+				IsInstalledInHw: v6isInstalledinHw,
+				NextHopList:     v6nextHopList,
+			})*/
+		v6routes = append(v6routes, v6destNet)
 	}
 	return v6routes
 }
@@ -598,7 +648,7 @@ func (m RIBDServer) Getv6Route(destNetIp string) (route *ribdInt.IPv6RouteState,
 }
 
 func (m RIBDServer) ProcessV6RouteCreateConfig(cfg *ribd.IPv6Route) (val bool, err error) {
-	logger.Debug(fmt.Sprintln("ProcessV6RouteCreate: Received create route request for ip: ", cfg.DestinationNw, " mask ", cfg.NetworkMask, " number of next hops: ", len(cfg.NextHop)))
+	logger.Debug("ProcessV6RouteCreate: Received create route request for ip: ", cfg.DestinationNw, " mask ", cfg.NetworkMask, " number of next hops: ", len(cfg.NextHop))
 	newCfg := ribd.IPv6Route{
 		DestinationNw: cfg.DestinationNw,
 		NetworkMask:   cfg.NetworkMask,
@@ -607,7 +657,7 @@ func (m RIBDServer) ProcessV6RouteCreateConfig(cfg *ribd.IPv6Route) (val bool, e
 		NullRoute:     cfg.NullRoute,
 	}
 	for i := 0; i < len(cfg.NextHop); i++ {
-		logger.Debug(fmt.Sprintln("nexthop info: ip: ", cfg.NextHop[i].NextHopIp, " intref: ", cfg.NextHop[i].NextHopIntRef))
+		logger.Debug("nexthop info: ip: ", cfg.NextHop[i].NextHopIp, " intref: ", cfg.NextHop[i].NextHopIntRef)
 		nh := ribd.NextHopInfo{
 			NextHopIp:     cfg.NextHop[i].NextHopIp,
 			NextHopIntRef: cfg.NextHop[i].NextHopIntRef,
@@ -620,7 +670,7 @@ func (m RIBDServer) ProcessV6RouteCreateConfig(cfg *ribd.IPv6Route) (val bool, e
 	//	policyRoute := BuildPolicyRouteFromribdIPv6Route(&newCfg)
 	params := BuildRouteParamsFromribdIPv6Route(&newCfg, FIBAndRIB, Invalid, len(destNetSlice))
 
-	logger.Debug(fmt.Sprintln("createType = ", params.createType, "deleteType = ", params.deleteType))
+	logger.Debug("createType = ", params.createType, "deleteType = ", params.deleteType)
 	//	PolicyEngineFilter(policyRoute, policyCommonDefs.PolicyPath_Import, params)
 	_, err = createRoute(params)
 
@@ -628,27 +678,27 @@ func (m RIBDServer) ProcessV6RouteCreateConfig(cfg *ribd.IPv6Route) (val bool, e
 }
 
 func (m RIBDServer) ProcessV6RouteDeleteConfig(cfg *ribd.IPv6Route) (val bool, err error) {
-	logger.Debug(fmt.Sprintln("ProcessRoutev6DeleteConfig:Received Route Delete request for ", cfg.DestinationNw, ":", cfg.NetworkMask, "number of nextHops:", len(cfg.NextHop), "Protocol ", cfg.Protocol))
+	logger.Debug("ProcessRoutev6DeleteConfig:Received Route Delete request for ", cfg.DestinationNw, ":", cfg.NetworkMask, "number of nextHops:", len(cfg.NextHop), "Protocol ", cfg.Protocol)
 	if !RouteServiceHandler.AcceptConfig {
 		logger.Debug("Not ready to accept config")
 		//return 0,err
 	}
 	for i := 0; i < len(cfg.NextHop); i++ {
-		logger.Debug(fmt.Sprintln("nexthop info: ip: ", cfg.NextHop[i].NextHopIp, " intref: ", cfg.NextHop[i].NextHopIntRef))
+		logger.Debug("nexthop info: ip: ", cfg.NextHop[i].NextHopIp, " intref: ", cfg.NextHop[i].NextHopIntRef)
 		_, err = deleteIPRoute(cfg.DestinationNw, ribdCommonDefs.IPv6, cfg.NetworkMask, cfg.Protocol, cfg.NextHop[i].NextHopIp, FIBAndRIB, ribdCommonDefs.RoutePolicyStateChangetoInValid)
 	}
 	return true, err
 }
 
 func (m RIBDServer) Processv6RoutePatchUpdateConfig(origconfig *ribd.IPv6Route, newconfig *ribd.IPv6Route, op []*ribd.PatchOpInfo) (ret bool, err error) {
-	logger.Debug(fmt.Sprintln("Processv6RoutePatchUpdateConfig:Received update route request with number of patch ops: ", len(op)))
+	logger.Debug("Processv6RoutePatchUpdateConfig:Received update route request with number of patch ops: ", len(op))
 	if !RouteServiceHandler.AcceptConfig {
 		logger.Debug("Not ready to accept config")
 		//return err
 	}
 	destNet, err := getNetowrkPrefixFromStrings(origconfig.DestinationNw, origconfig.NetworkMask)
 	if err != nil {
-		logger.Debug(fmt.Sprintln(" getNetowrkPrefixFromStrings returned err ", err))
+		logger.Debug(" getNetowrkPrefixFromStrings returned err ", err)
 		return ret, err
 	}
 	ok := V6RouteInfoMap.Match(destNet)
@@ -662,34 +712,34 @@ func (m RIBDServer) Processv6RoutePatchUpdateConfig(origconfig *ribd.IPv6Route, 
 			logger.Debug("Patch update for next hop")
 			/*newconfig should only have the next hops that have to be added or deleted*/
 			newconfig.NextHop = make([]*ribd.NextHopInfo, 0)
-			logger.Debug(fmt.Sprintln("value = ", op[idx].Value))
+			logger.Debug("value = ", op[idx].Value)
 			valueObjArr := []ribd.NextHopInfo{}
 			err = json.Unmarshal([]byte(op[idx].Value), &valueObjArr)
 			if err != nil {
 				logger.Debug(fmt.Sprintln("error unmarshaling value:", err))
 				return ret, errors.New(fmt.Sprintln("error unmarshaling value:", err))
 			}
-			logger.Debug(fmt.Sprintln("Number of nextHops:", len(valueObjArr)))
+			logger.Debug("Number of nextHops:", len(valueObjArr))
 			for _, val := range valueObjArr {
-				logger.Debug(fmt.Sprintln("nextHop info: ip - ", val.NextHopIp, " intf: ", val.NextHopIntRef, " wt:", val.Weight))
+				logger.Debug("nextHop info: ip - ", val.NextHopIp, " intf: ", val.NextHopIntRef, " wt:", val.Weight)
 				//wt,_ := strconv.Atoi((op[idx].Value[j]["Weight"]))
-				logger.Debug(fmt.Sprintln("IntRef before : ", val.NextHopIntRef))
+				logger.Debug("IntRef before : ", val.NextHopIntRef)
 				if val.NextHopIntRef == "" {
-					logger.Info(fmt.Sprintln("NextHopIntRef not set"))
+					logger.Info("NextHopIntRef not set")
 					nhIntf, err := RouteServiceHandler.GetRouteReachabilityInfo(val.NextHopIp)
 					if err != nil {
-						logger.Err(fmt.Sprintln("next hop ip ", val.NextHopIp, " not reachable"))
+						logger.Err("next hop ip ", val.NextHopIp, " not reachable")
 						return ret, errors.New(fmt.Sprintln("next hop ip ", val.NextHopIp, " not reachable"))
 					}
 					val.NextHopIntRef = strconv.Itoa(int(nhIntf.NextHopIfIndex))
 				} else {
 					val.NextHopIntRef, err = m.ConvertIntfStrToIfIndexStr(val.NextHopIntRef)
 					if err != nil {
-						logger.Err(fmt.Sprintln("Invalid NextHop IntRef ", val.NextHopIntRef))
+						logger.Err("Invalid NextHop IntRef ", val.NextHopIntRef)
 						return ret, err
 					}
 				}
-				logger.Debug(fmt.Sprintln("IntRef after : ", val.NextHopIntRef))
+				logger.Debug("IntRef after : ", val.NextHopIntRef)
 				nh := ribd.NextHopInfo{
 					NextHopIp:     val.NextHopIp,
 					NextHopIntRef: val.NextHopIntRef,
@@ -703,10 +753,10 @@ func (m RIBDServer) Processv6RoutePatchUpdateConfig(origconfig *ribd.IPv6Route, 
 			case "remove":
 				m.ProcessV6RouteDeleteConfig(newconfig)
 			default:
-				logger.Err(fmt.Sprintln("Operation ", op[idx].Op, " not supported"))
+				logger.Err("Operation ", op[idx].Op, " not supported")
 			}
 		default:
-			logger.Err(fmt.Sprintln("Patch update for attribute:", op[idx].Path, " not supported"))
+			logger.Err("Patch update for attribute:", op[idx].Path, " not supported")
 		}
 	}
 	return ret, err
