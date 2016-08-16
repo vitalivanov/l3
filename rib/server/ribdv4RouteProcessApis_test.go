@@ -209,7 +209,10 @@ func TestGetRoute(t *testing.T) {
 		}
 		fmt.Println("rt info:", rt)
 	}
-	fmt.Println("**********************")
+	fmt.Println("Routes per protocol**************")
+	stats, _ := server.GetBulkRouteStatsPerProtocolState(0, 10)
+	fmt.Println(stats)
+	fmt.Println("*********************************")
 }
 func TestProcessV4RouteCreateConfig(t *testing.T) {
 	fmt.Println("****TestProcessRouteCreateConfig****")
