@@ -89,6 +89,7 @@ func (p *Packet) InitLink(ifIndex int32, ip, mac string) {
 func (p *Packet) FlushNeighbors(ip string) ([]string, error) {
 	debug.Logger.Debug("Deleting all neighbor entries for link", ip)
 	deleteEntries := make([]string, 0)
+	// during link local down we will have CIDR format ip
 	localIp, _, err := net.ParseCIDR(ip)
 	if err != nil {
 		debug.Logger.Err("Parsing ip", ip, "failed with err:", err)
@@ -110,6 +111,31 @@ func (p *Packet) FlushNeighbors(ip string) ([]string, error) {
 	p.SetLink(localIp.String(), link)
 	// do not delete link information here... only if IP interface is deleted then we need to delete
 	// link information
+	return deleteEntries, nil
+}
+
+/*
+ *  On timer expires and max unicast solicitation we will delete a specific neighbor from link neighbor cache
+ */
+func (p *Packet) DeleteNeighbor(ip string, nbrIP string) (deleteEntries []string, err error) {
+	// Input is absolute ip address
+	link, exists := p.GetLink(ip)
+	if !exists {
+		return deleteEntries, errors.New(fmt.Sprintln("Cannot delete neighbors for", ip,
+			"as there is no such link entry"))
+	}
+
+	for _, cache := range link.NbrCache {
+		if nbrIP == cache.IpAddr {
+			deleteEntries = append(deleteEntries, nbrIP)
+			debug.Logger.Debug("Deleting Neighbor", cache.IpAddr)
+			cache.DeInitCache()
+			delete(link.NbrCache, nbrIP)
+			break
+		}
+	}
+	p.SetLink(ip, link)
+
 	return deleteEntries, nil
 }
 

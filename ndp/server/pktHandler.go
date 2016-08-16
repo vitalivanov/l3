@@ -258,6 +258,16 @@ func (svr *NDPServer) ProcessTimerExpiry(pktData config.PacketData) {
 	if !exists {
 		return
 	}
+	retry := svr.Packet.RetryUnicastSolicitation(pktData.IpAddr, pktData.NeighborIp, l3Port.PcapBase.PcapHandle)
+	//if retry {
 	// use pktData.IpAddr because that will be your src ip without CIDR format, same goes for NeighborIP
-	svr.Packet.SendUnicastNeighborSolicitation(pktData.IpAddr, pktData.NeighborIp, l3Port.PcapBase.PcapHandle)
+	//	svr.Packet.SendUnicastNeighborSolicitation(pktData.IpAddr, pktData.NeighborIp, l3Port.PcapBase.PcapHandle)
+	//} else {
+	if !retry {
+		// delete single Neighbor entry from Neighbor Cache
+		deleteEntries, err := svr.Packet.DeleteNeighbor(pktData.IpAddr, pktData.NeighborIp)
+		if len(deleteEntries) > 0 && err == nil {
+			svr.DeleteNeighborInfo(deleteEntries)
+		}
+	}
 }
