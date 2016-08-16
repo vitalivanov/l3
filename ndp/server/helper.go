@@ -288,26 +288,17 @@ func (svr *NDPServer) HandleStateNotification(msg *config.StateNotification) {
 	debug.Logger.Info("Received State:", msg.State, "for ifIndex:", msg.IfIndex, "ipAddr:", msg.IpAddr)
 	switch msg.State {
 	case config.STATE_UP:
-		if svr.IsIPv6Addr(msg.IpAddr) {
-			if !svr.IsLinkLocal(msg.IpAddr) {
-				debug.Logger.Info("Create pkt handler for", msg.IfIndex, "IpAddr:", msg.IpAddr)
-				svr.StartRxTx(msg.IfIndex)
-			}
-		}
+		debug.Logger.Info("Create pkt handler for", msg.IfIndex, "IpAddr:", msg.IpAddr)
+		svr.StartRxTx(msg.IfIndex)
 	case config.STATE_DOWN:
-		if svr.IsIPv6Addr(msg.IpAddr) {
-			if !svr.IsLinkLocal(msg.IpAddr) {
-				debug.Logger.Info("Delete pkt handler for", msg.IfIndex, "IpAddr:", msg.IpAddr)
-				// stop pcap handler
-				svr.StopRxTx(msg.IfIndex)
-				// @TODO: what about link local??
-				// delete neighbor entries first for the link
-				// stop the timer
-				deleteEntries, err := svr.Packet.FlushNeighbors(msg.IpAddr)
-				if len(deleteEntries) > 0 && err == nil {
-					svr.DeleteNeighborInfo(deleteEntries)
-				}
-			}
+		debug.Logger.Info("Delete pkt handler for", msg.IfIndex, "IpAddr:", msg.IpAddr)
+		// stop pcap handler
+		svr.StopRxTx(msg.IfIndex)
+		// delete neighbor entries first for the link
+		// stop the timer
+		deleteEntries, err := svr.Packet.FlushNeighbors(msg.IpAddr)
+		if len(deleteEntries) > 0 && err == nil {
+			svr.DeleteNeighborInfo(deleteEntries)
 		}
 	}
 }
