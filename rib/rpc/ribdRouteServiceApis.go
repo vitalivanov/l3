@@ -333,6 +333,17 @@ func (m RIBDServicesHandler) GetBulkIPv4RouteState(fromIndex ribd.Int, rcount ri
 func (m RIBDServicesHandler) GetIPv6RouteState(destNw string) (*ribd.IPv6RouteState, error) {
 	logger.Info("Get state for IPv6Route")
 	route := ribd.NewIPv6RouteState()
+	if m.server.DbHdl == nil {
+		logger.Err("DbHdl not initialized")
+		return route, errors.New("DBHdl not initialized")
+	}
+	var routeObj objects.IPv6RouteState
+	var routeObjtemp objects.IPv6RouteState
+	obj, err := m.server.DbHdl.GetObjectFromDb(routeObj, destNw)
+	if err == nil {
+		routeObjtemp = obj.(objects.IPv6RouteState)
+		objects.ConvertribdIPv6RouteStateObjToThrift(&routeObjtemp, route)
+	}
 	return route, nil
 }
 
@@ -372,15 +383,72 @@ func (m RIBDServicesHandler) GetBulkIPv6RouteState(fromIndex ribd.Int, rcount ri
 	}
 	return routes, err
 }
+func (m RIBDServicesHandler) GetBulkRouteStatsPerProtocolState(fromIndex ribd.Int, count ribd.Int) (stats *ribd.RouteStatsPerProtocolStateGetInfo, err error) {
+	ret, err := m.server.GetBulkRouteStatsPerProtocolState(fromIndex, count)
+	return ret, err
+}
+func (m RIBDServicesHandler) GetRouteStatsPerProtocolState(Protocol string) (stats *ribd.RouteStatsPerProtocolState, err error) {
+	stats = ribd.NewRouteStatsPerProtocolState()
+	stats, err = m.server.GetRouteStatsPerProtocolState(Protocol)
+	return stats, err
+}
+func (m RIBDServicesHandler) GetBulkRouteStatsPerInterfaceState(fromIndex ribd.Int, count ribd.Int) (stats *ribd.RouteStatsPerInterfaceStateGetInfo, err error) {
+	ret, err := m.server.GetBulkRouteStatsPerInterfaceState(fromIndex, count)
+	return ret, err
+}
+func (m RIBDServicesHandler) GetRouteStatsPerInterfaceState(Intfref string) (stats *ribd.RouteStatsPerInterfaceState, err error) {
+	stats = ribd.NewRouteStatsPerInterfaceState()
+	stats, err = m.server.GetRouteStatsPerInterfaceState(Intfref)
+	return stats, err
+}
 
-func (m RIBDServicesHandler) GetIPv4EventState(index int32) (*ribd.IPv4EventState, error) {
-	logger.Info("Get state for IPv4EventState")
-	route := ribd.NewIPv4EventState()
+func (m RIBDServicesHandler) GetBulkRouteStatState(fromIndex ribd.Int, count ribd.Int) (stats *ribd.RouteStatStateGetInfo, err error) {
+	if fromIndex != 0 {
+		err := errors.New("Invalid range")
+		return nil, err
+	}
+	tempstats := make([]*ribd.RouteStatState, 1)
+	var ret_stats ribd.RouteStatStateGetInfo
+	stats = &ret_stats
+	tempstats[0] = &ribd.RouteStatState{}
+	tempstats[0].PerProtocolRouteCountList = m.server.GetPerProtocolRouteCountList()
+	for _, v := range tempstats[0].PerProtocolRouteCountList {
+		tempstats[0].TotalRouteCount = tempstats[0].TotalRouteCount + v.RouteCount
+		tempstats[0].ECMPRouteCount = tempstats[0].ECMPRouteCount + v.EcmpCount
+	}
+	v4Count, _ := m.GetTotalv4RouteCount()
+	tempstats[0].V4RouteCount = int32(v4Count)
+	v6Count, _ := m.GetTotalv6RouteCount()
+	tempstats[0].V6RouteCount = int32(v6Count)
+	stats.RouteStatStateList = tempstats
+	stats.StartIdx = fromIndex
+	stats.EndIdx = fromIndex
+	stats.Count = 1
+	stats.More = false
+	return stats, err
+}
+func (m RIBDServicesHandler) GetRouteStatState(vrf string) (*ribd.RouteStatState, error) {
+	stat := ribd.NewRouteStatState()
+	v4Count, _ := m.GetTotalv4RouteCount()
+	v6Count, _ := m.GetTotalv6RouteCount()
+	stat.PerProtocolRouteCountList = m.server.GetPerProtocolRouteCountList()
+	for _, v := range stat.PerProtocolRouteCountList {
+		stat.TotalRouteCount = stat.TotalRouteCount + v.RouteCount
+		stat.ECMPRouteCount = stat.ECMPRouteCount + v.EcmpCount
+	}
+	stat.V4RouteCount = int32(v4Count)
+	stat.V6RouteCount = int32(v6Count)
+	return stat, nil
+}
+
+func (m RIBDServicesHandler) GetRIBEventState(index int32) (*ribd.RIBEventState, error) {
+	logger.Info("Get state for RIBEventState")
+	route := ribd.NewRIBEventState()
 	return route, nil
 }
 
-func (m RIBDServicesHandler) GetBulkIPv4EventState(fromIndex ribd.Int, rcount ribd.Int) (routes *ribd.IPv4EventStateGetInfo, err error) {
-	ret, err := m.server.GetBulkIPv4EventState(fromIndex, rcount)
+func (m RIBDServicesHandler) GetBulkRIBEventState(fromIndex ribd.Int, rcount ribd.Int) (routes *ribd.RIBEventStateGetInfo, err error) {
+	ret, err := m.server.GetBulkRIBEventState(fromIndex, rcount)
 	return ret, err
 }
 
@@ -408,6 +476,10 @@ func (m RIBDServicesHandler) GetRouteReachabilityInfo(destNet string) (nextHopIn
 }
 func (m RIBDServicesHandler) GetTotalv4RouteCount() (number ribdInt.Int, err error) {
 	num, err := m.server.GetTotalv4RouteCount()
+	return ribdInt.Int(num), err
+}
+func (m RIBDServicesHandler) GetTotalv6RouteCount() (number ribdInt.Int, err error) {
+	num, err := m.server.GetTotalv6RouteCount()
 	return ribdInt.Int(num), err
 }
 func (m RIBDServicesHandler) Getv4RouteCreatedTime(number ribdInt.Int) (time string, err error) {

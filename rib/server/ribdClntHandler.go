@@ -141,12 +141,33 @@ func DeleteRoutesOfType(protocol string) {
 		logger.Info("No routes of ", protocol, " type configured")
 		return
 	}
-	for destNet, count := range protocolRouteMap {
-		if count > 0 {
+	for destNet, count := range protocolRouteMap.v4routeMap {
+		if count.totalcount > 0 {
 			//logger.Info(count, " number of routes for destNet IP:", string(destNet))
 			deleteV4RoutesOfType(protocol, destNet)
+			//deleteV6RoutesOfType(protocol, destNet)
+			protocolRouteMap.totalcount.totalcount = protocolRouteMap.totalcount.totalcount - count.totalcount
+			protocolRouteMap.totalcount.ecmpcount = protocolRouteMap.totalcount.ecmpcount - count.ecmpcount
+			totalCount := protocolRouteMap.v4routeMap[destNet]
+			totalCount.totalcount = 0
+			totalCount.ecmpcount = 0
+			protocolRouteMap.v4routeMap[destNet] = totalCount
+			//			protocolRouteMap.routeMap[destNet].ecmpcount = 0
+			ProtocolRouteMap[protocol] = protocolRouteMap
+		}
+	}
+	for destNet, count := range protocolRouteMap.v6routeMap {
+		if count.totalcount > 0 {
+			//logger.Info(count, " number of routes for destNet IP:", string(destNet))
+			//deleteV4RoutesOfType(protocol, destNet)
 			deleteV6RoutesOfType(protocol, destNet)
-			protocolRouteMap[destNet] = 0
+			protocolRouteMap.totalcount.totalcount = protocolRouteMap.totalcount.totalcount - count.totalcount
+			protocolRouteMap.totalcount.ecmpcount = protocolRouteMap.totalcount.ecmpcount - count.ecmpcount
+			totalCount := protocolRouteMap.v6routeMap[destNet]
+			totalCount.totalcount = 0
+			totalCount.ecmpcount = 0
+			protocolRouteMap.v6routeMap[destNet] = totalCount
+			//			protocolRouteMap.routeMap[destNet].ecmpcount = 0
 			ProtocolRouteMap[protocol] = protocolRouteMap
 		}
 	}
