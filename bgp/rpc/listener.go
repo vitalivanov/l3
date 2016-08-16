@@ -34,6 +34,7 @@ import (
 	"l3/bgp/server"
 	"models/objects"
 	"net"
+	"strconv"
 	"strings"
 	"utils/dbutils"
 	"utils/logging"
@@ -167,10 +168,10 @@ func (h *BGPHandler) handlePeerGroup() error {
 func (h *BGPHandler) convertModelToBGPNeighbor(obj objects.BGPNeighbor) (neighbor config.NeighborConfig, err error) {
 	var ip net.IP
 	var ifIndex int32
-	ip, ifIndex, err = h.getIPAndIfIndexForNeighbor(obj.NeighborAddress, obj.IfIndex)
+	ip, ifIndex, err = h.getIPAndIfIndexForNeighbor(obj.NeighborAddress, obj.IntfRef)
 	if err != nil {
 		h.logger.Info("convertModelToBGPNeighbor: getIPAndIfIndexForNeighbor",
-			"failed for neighbor address", obj.NeighborAddress, "and ifIndex", obj.IfIndex)
+			"failed for neighbor address", obj.NeighborAddress, "and ifIndex", obj.IntfRef)
 		return neighbor, err
 	}
 
@@ -488,7 +489,7 @@ func (h *BGPHandler) DeleteBGPGlobal(bgpGlobal *bgpd.BGPGlobal) (bool, error) {
 }
 
 func (h *BGPHandler) getIPAndIfIndexForNeighbor(neighborIP string,
-	neighborIfIndex int32) (ip net.IP, ifIndex int32,
+	neighborIntfRef string) (ip net.IP, ifIndex int32,
 	err error) {
 	if strings.TrimSpace(neighborIP) != "" {
 		ip = net.ParseIP(strings.TrimSpace(neighborIP))
@@ -496,8 +497,15 @@ func (h *BGPHandler) getIPAndIfIndexForNeighbor(neighborIP string,
 		if ip == nil {
 			err = errors.New(fmt.Sprintf("Neighbor address %s not valid", neighborIP))
 		}
-	} else if neighborIfIndex != 0 {
-		//neighbor address is a ifIndex
+	} else if neighborIntfRef != "" {
+		//neighbor address is a intfRef
+		ifIndexStr, err := h.server.ConvertIntfStrToIfIndexStr(neighborIntfRef)
+		if err != nil {
+			h.logger.Err("Invalid intfref:", neighborIntfRef)
+			return ip, ifIndex, err
+		}
+		ifIndexInt, _ := strconv.Atoi(ifIndexStr)
+		neighborIfIndex := int32(ifIndexInt)
 		var ipv4Intf string
 		// @TODO: this needs to be interface once we decide to move listener
 		ipv4Intf, err = h.server.IntfMgr.GetIPv4Information(neighborIfIndex)
@@ -572,10 +580,10 @@ func (h *BGPHandler) ValidateBGPNeighbor(bgpNeighbor *bgpd.BGPNeighbor) (pConf c
 
 	var ip net.IP
 	var ifIndex int32
-	ip, ifIndex, err = h.getIPAndIfIndexForNeighbor(bgpNeighbor.NeighborAddress, bgpNeighbor.IfIndex)
+	ip, ifIndex, err = h.getIPAndIfIndexForNeighbor(bgpNeighbor.NeighborAddress, bgpNeighbor.IntfRef)
 	if err != nil {
 		h.logger.Info("ValidateBGPNeighbor: getIPAndIfIndexForNeighbor", "failed for neighbor address",
-			bgpNeighbor.NeighborAddress, "and ifIndex", bgpNeighbor.IfIndex)
+			bgpNeighbor.NeighborAddress, "and ifIndex", bgpNeighbor.IntfRef)
 		return pConf, err
 	}
 
@@ -651,7 +659,13 @@ func (h *BGPHandler) CreateBGPNeighbor(bgpNeighbor *bgpd.BGPNeighbor) (bool, err
 func (h *BGPHandler) convertToThriftNeighbor(neighborState *config.NeighborState) *bgpd.BGPNeighborState {
 	bgpNeighborResponse := bgpd.NewBGPNeighborState()
 	bgpNeighborResponse.NeighborAddress = neighborState.NeighborAddress.String()
-	bgpNeighborResponse.IfIndex = neighborState.IfIndex
+	//bgpNeighborResponse.IfIndex = neighborState.IfIndex
+	bgpNeighborResponse.IntfRef = strconv.Itoa(int(neighborState.IfIndex))
+	intfEntry, ok := h.server.IntfIdNameMap[int32(neighborState.IfIndex)]
+	if ok {
+		h.logger.Info("Map foud for ifndex : ", neighborState.IfIndex, "Name = ", intfEntry.Name)
+		bgpNeighborResponse.IntfRef = intfEntry.Name
+	}
 	bgpNeighborResponse.PeerAS = int32(neighborState.PeerAS)
 	bgpNeighborResponse.LocalAS = int32(neighborState.LocalAS)
 	bgpNeighborResponse.UpdateSource = neighborState.UpdateSource
@@ -697,11 +711,11 @@ func (h *BGPHandler) convertToThriftNeighbor(neighborState *config.NeighborState
 }
 
 func (h *BGPHandler) GetBGPNeighborState(neighborAddr string,
-	ifIndex int32) (*bgpd.BGPNeighborState, error) {
-	ip, _, err := h.getIPAndIfIndexForNeighbor(neighborAddr, ifIndex)
+	intfref string) (*bgpd.BGPNeighborState, error) {
+	ip, _, err := h.getIPAndIfIndexForNeighbor(neighborAddr, intfref)
 	if err != nil {
 		h.logger.Info("GetBGPNeighborState: getIPAndIfIndexForNeighbor failed for neighbor address", neighborAddr,
-			"and ifIndex", ifIndex)
+			"and ifIndex", intfref)
 		return bgpd.NewBGPNeighborState(), err
 	}
 

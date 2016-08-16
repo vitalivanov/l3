@@ -82,7 +82,9 @@ type PolicyParams struct {
 	withdrawn       *([]*bgprib.Destination)
 	updatedAddPaths *([]*bgprib.Destination)
 }
-
+type IntfEntry struct {
+	Name string
+}
 type BGPServer struct {
 	logger           *logging.Writer
 	policyManager    *bgppolicy.BGPPolicyManager
@@ -108,18 +110,21 @@ type BGPServer struct {
 	BGPPktSrcCh      chan *packet.BGPPktSrc
 	BfdCh            chan config.BfdInfo
 	IntfCh           chan config.IntfStateInfo
+	IntfMapCh        chan config.IntfMapInfo
 	RoutesCh         chan *config.RouteCh
 	acceptCh         chan *net.TCPConn
 	GlobalCfgDone    bool
 
-	NeighborMutex  sync.RWMutex
-	PeerMap        map[string]*Peer
-	Neighbors      []*Peer
-	LocRib         *bgprib.LocRib
-	ConnRoutesPath *bgprib.Path
-	IfacePeerMap   map[int32][]string
-	ifaceIP        net.IP
-	AddPathCount   int
+	NeighborMutex   sync.RWMutex
+	PeerMap         map[string]*Peer
+	Neighbors       []*Peer
+	LocRib          *bgprib.LocRib
+	ConnRoutesPath  *bgprib.Path
+	IfacePeerMap    map[int32][]string
+	IntfIdNameMap   map[int32]IntfEntry
+	IfNameToIfIndex map[string]int32
+	ifaceIP         net.IP
+	AddPathCount    int
 	// all managers
 	IntfMgr    config.IntfStateMgrIntf
 	routeMgr   config.RouteMgrIntf
@@ -150,6 +155,7 @@ func NewBGPServer(logger *logging.Writer, policyManager *bgppolicy.BGPPolicyMana
 	bgpServer.BGPPktSrcCh = make(chan *packet.BGPPktSrc)
 	bgpServer.BfdCh = make(chan config.BfdInfo)
 	bgpServer.IntfCh = make(chan config.IntfStateInfo)
+	bgpServer.IntfMapCh = make(chan config.IntfMapInfo)
 	bgpServer.RoutesCh = make(chan *config.RouteCh)
 
 	bgpServer.NeighborMutex = sync.RWMutex{}
@@ -160,6 +166,8 @@ func NewBGPServer(logger *logging.Writer, policyManager *bgppolicy.BGPPolicyMana
 	bgpServer.bfdMgr = bMgr
 	bgpServer.stateDBMgr = sDBMgr
 	bgpServer.LocRib = bgprib.NewLocRib(logger, rMgr, sDBMgr, &bgpServer.BgpConfig.Global.Config)
+	bgpServer.IfNameToIfIndex = make(map[string]int32)
+	bgpServer.IntfIdNameMap = make(map[int32]IntfEntry)
 	bgpServer.IfacePeerMap = make(map[int32][]string)
 	bgpServer.ifaceIP = nil
 	bgpServer.AddPathCount = 0
@@ -1377,13 +1385,29 @@ func (s *BGPServer) listenChannelUpdates() {
 			} else if ifState.State == config.INTF_DELETED {
 				s.ifaceMgr.RemoveIface(ifState.Idx, ifState.IPAddr)
 			}
+		case ifMap := <-s.IntfMapCh:
+			s.ProcessIntfMapUpdates([]config.IntfMapInfo{config.IntfMapInfo{Idx: ifMap.Idx, IfName: ifMap.IfName}})
+
 		case routeInfo := <-s.RoutesCh:
 			s.ProcessConnectedRoutes(routeInfo.Add, routeInfo.Remove)
 		}
 	}
 
 }
+func (s *BGPServer) ProcessIntfMapUpdates(cfg []config.IntfMapInfo) {
+	if s.IntfIdNameMap == nil {
+		s.IntfIdNameMap = make(map[int32]IntfEntry)
+	}
+	if s.IfNameToIfIndex == nil {
+		s.IfNameToIfIndex = make(map[string]int32)
+	}
+	for _, ifMap := range cfg {
+		intfEntry := IntfEntry{Name: ifMap.IfName}
+		s.IntfIdNameMap[int32(ifMap.Idx)] = intfEntry
+		s.IfNameToIfIndex[ifMap.IfName] = ifMap.Idx
 
+	}
+}
 func (s *BGPServer) InitBGPEvent() {
 	// Start DB Util
 	s.eventDbHdl = dbutils.NewDBUtil(s.logger)
@@ -1442,6 +1466,13 @@ func (s *BGPServer) StartServer() {
 	intfs := s.IntfMgr.GetIPv4Intfs()
 	s.ProcessIntfStates(intfs)
 
+	portIntfMap := s.IntfMgr.GetPortInfo()
+	s.ProcessIntfMapUpdates(portIntfMap)
+	vlanIntfMap := s.IntfMgr.GetVlanInfo()
+	s.ProcessIntfMapUpdates(vlanIntfMap)
+	logicalIntfMap := s.IntfMgr.GetLogicalIntfInfo()
+	s.ProcessIntfMapUpdates(logicalIntfMap)
+
 	s.listenChannelUpdates()
 }
 
@@ -1480,4 +1511,24 @@ func (s *BGPServer) BulkGetBGPNeighbors(index int, count int) (int, int, []*conf
 
 func (s *BGPServer) VerifyBgpGlobalConfig() bool {
 	return s.GlobalCfgDone
+}
+
+func (s *BGPServer) ConvertIntfStrToIfIndexStr(intfString string) (ifIndex string, err error) {
+	if val, err := strconv.Atoi(intfString); err == nil {
+		//Verify ifIndex is valid
+		s.logger.Info("IfIndex = ", val)
+		_, ok := s.IntfIdNameMap[int32(val)]
+		if !ok {
+			s.logger.Err("Cannot create ip route on a unknown L3 interface")
+			return ifIndex, errors.New("Cannot create ip route on a unknown L3 interface")
+		}
+		ifIndex = intfString
+	} else {
+		//Verify ifName is valid
+		if _, ok := s.IfNameToIfIndex[intfString]; !ok {
+			return ifIndex, errors.New("Invalid ifName value")
+		}
+		ifIndex = strconv.Itoa(int(s.IfNameToIfIndex[intfString]))
+	}
+	return ifIndex, nil
 }

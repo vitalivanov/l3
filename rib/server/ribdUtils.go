@@ -167,7 +167,7 @@ func BuildProtocolAdminDistanceSlice() {
 func (m RIBDServer) ConvertIntfStrToIfIndexStr(intfString string) (ifIndex string, err error) {
 	if val, err := strconv.Atoi(intfString); err == nil {
 		//Verify ifIndex is valid
-		logger.Info("IfIndex = ", val)
+		//logger.Info("IfIndex = ", val)
 		_, ok := IntfIdNameMap[int32(val)]
 		if !ok {
 			logger.Err("Cannot create ip route on a unknown L3 interface")

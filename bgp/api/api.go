@@ -73,6 +73,15 @@ func SendIntfNotification(ifIndex int32, ipAddr string, state config.Operation) 
 	}
 }
 
+/*  Send interface map notification to server
+ */
+func SendIntfMapNotification(ifIndex int32, ifName string) {
+	bgpapi.server.IntfMapCh <- config.IntfMapInfo{
+		Idx:    ifIndex,
+		IfName: ifName,
+	}
+}
+
 /*  Send Routes information to server
  */
 func SendRouteNotification(add []*config.RouteInfo, remove []*config.RouteInfo) {
