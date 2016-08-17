@@ -112,6 +112,7 @@ type BGPServer struct {
 	IntfMapCh        chan config.IntfMapInfo
 	RoutesCh         chan *config.RouteCh
 	acceptCh         chan *net.TCPConn
+	ServerUpCh       chan bool
 	GlobalCfgDone    bool
 
 	NeighborMutex   sync.RWMutex
@@ -156,6 +157,7 @@ func NewBGPServer(logger *logging.Writer, policyManager *bgppolicy.BGPPolicyMana
 	bgpServer.IntfCh = make(chan config.IntfStateInfo)
 	bgpServer.IntfMapCh = make(chan config.IntfMapInfo)
 	bgpServer.RoutesCh = make(chan *config.RouteCh)
+	bgpServer.ServerUpCh = make(chan bool)
 
 	bgpServer.NeighborMutex = sync.RWMutex{}
 	bgpServer.PeerMap = make(map[string]*Peer)
@@ -1428,10 +1430,36 @@ func (s *BGPServer) InitBGPEvent() {
 		s.logger.Err("Unable to initialize events", err)
 	}
 }
+func (s *BGPServer) GetIntfObjects() {
+
+	intfs := s.IntfMgr.GetIPv4Intfs()
+	s.ProcessIntfStates(intfs)
+	s.logger.Info("After ProcessIntfStates for intfs")
+
+	v6intfs := s.IntfMgr.GetIPv6Intfs()
+	s.ProcessIntfStates(v6intfs)
+	s.logger.Info("After ProcessIntfStates for v6Intfs")
+
+	portIntfMap := s.IntfMgr.GetPortInfo()
+	s.ProcessIntfMapUpdates(portIntfMap)
+	s.logger.Info("After ProcessIntfStates for ports")
+
+	vlanIntfMap := s.IntfMgr.GetVlanInfo()
+	s.ProcessIntfMapUpdates(vlanIntfMap)
+	s.logger.Info("After ProcessIntfStates for vlans")
+
+	logicalIntfMap := s.IntfMgr.GetLogicalIntfInfo()
+	s.ProcessIntfMapUpdates(logicalIntfMap)
+	s.logger.Info("After ProcessIntfStates for logicalIntfs")
+}
 
 func (s *BGPServer) StartServer() {
 	// Initialize Event Handler
 	s.InitBGPEvent()
+	//read the intfMgr objects before the global conf - this is the case during restart
+	s.GetIntfObjects()
+	s.ServerUpCh <- true
+	s.logger.Info("Setting serverup to true")
 
 	globalUpdate := <-s.GlobalConfigCh
 	gConf := globalUpdate.NewConfig
@@ -1469,17 +1497,7 @@ func (s *BGPServer) StartServer() {
 	if add != nil && remove != nil {
 		s.ProcessConnectedRoutes(add, remove)
 	}
-
-	intfs := s.IntfMgr.GetIPv4Intfs()
-	s.ProcessIntfStates(intfs)
-
-	portIntfMap := s.IntfMgr.GetPortInfo()
-	s.ProcessIntfMapUpdates(portIntfMap)
-	vlanIntfMap := s.IntfMgr.GetVlanInfo()
-	s.ProcessIntfMapUpdates(vlanIntfMap)
-	logicalIntfMap := s.IntfMgr.GetLogicalIntfInfo()
-	s.ProcessIntfMapUpdates(logicalIntfMap)
-
+	s.GetIntfObjects()
 	s.listenChannelUpdates()
 }
 

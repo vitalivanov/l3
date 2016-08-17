@@ -45,7 +45,14 @@ func (mgr *OvsIntfMgr) GetIPv4Intfs() []*config.IntfStateInfo {
 	return make([]*config.IntfStateInfo, 0)
 }
 
+func (mgr *OvsIntfMgr) GetIPv6Intfs() []*config.IntfStateInfo {
+	return make([]*config.IntfStateInfo, 0)
+}
+
 func (mgr *OvsIntfMgr) GetIPv4Information(ifIndex int32) (string, error) {
+	return "", nil
+}
+func (mgr *OvsIntfMgr) GetIPv6Information(ifIndex int32) (string, error) {
 	return "", nil
 }
 

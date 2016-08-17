@@ -29,10 +29,12 @@ type IntfStateMgrIntf interface {
 	Start()
 	PortStateChange()
 	GetIPv4Intfs() []*IntfStateInfo
+	GetIPv6Intfs() []*IntfStateInfo
 	GetPortInfo() []IntfMapInfo
 	GetVlanInfo() []IntfMapInfo
 	GetLogicalIntfInfo() []IntfMapInfo
 	GetIPv4Information(ifIndex int32) (string, error)
+	GetIPv6Information(ifIndex int32) (string, error)
 	GetIfIndex(int, int) int32
 }
 

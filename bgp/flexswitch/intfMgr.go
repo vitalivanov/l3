@@ -202,12 +202,51 @@ func (mgr *FSIntfMgr) GetIPv4Intfs() []*config.IntfStateInfo {
 	return intfs
 }
 
+func (mgr *FSIntfMgr) GetIPv6Intfs() []*config.IntfStateInfo {
+	var currMarker asicdServices.Int
+	var count asicdServices.Int
+	intfs := make([]*config.IntfStateInfo, 0)
+	count = 100
+	for {
+		mgr.logger.Info("Getting ", count, "IPv6IntfState objects from currMarker", currMarker)
+		getBulkInfo, err := mgr.AsicdClient.GetBulkIPv6IntfState(currMarker, count)
+		if err != nil {
+			mgr.logger.Info("GetBulkIPv6IntfState failed with error", err)
+			break
+		}
+		if getBulkInfo.Count == 0 {
+			mgr.logger.Info("0 objects returned from GetBulkIPv6IntfState")
+			break
+		}
+		mgr.logger.Info("len(getBulkInfo.IPv6IntfStateList)  =", len(getBulkInfo.IPv6IntfStateList),
+			"num objects returned =", getBulkInfo.Count)
+		for _, intfState := range getBulkInfo.IPv6IntfStateList {
+			intf := config.NewIntfStateInfo(intfState.IfIndex, intfState.IpAddr, config.INTF_CREATED)
+			intfs = append(intfs, intf)
+		}
+		if getBulkInfo.More == false {
+			mgr.logger.Info("more returned as false, so no more get bulks")
+			break
+		}
+		currMarker = getBulkInfo.EndIdx
+	}
+
+	return intfs
+}
+
 func (mgr *FSIntfMgr) GetIPv4Information(ifIndex int32) (string, error) {
 	ipv4IntfState, err := mgr.AsicdClient.GetIPv4IntfState(strconv.Itoa(int(ifIndex)))
 	if err != nil {
 		return "", nil
 	}
 	return ipv4IntfState.IpAddr, err
+}
+func (mgr *FSIntfMgr) GetIPv6Information(ifIndex int32) (string, error) {
+	ipv6IntfState, err := mgr.AsicdClient.GetIPv6IntfState(strconv.Itoa(int(ifIndex)))
+	if err != nil {
+		return "", nil
+	}
+	return ipv6IntfState.IpAddr, err
 }
 
 func (mgr *FSIntfMgr) GetIfIndex(ifIndex, ifType int) int32 {
