@@ -335,7 +335,7 @@ func (m *FSIntfMgr) GetPortInfo() []config.IntfMapInfo {
 		m.logger.Info("len(bulkInfo.PortStateList)  = ", len(bulkInfo.PortStateList), " num objects returned = ", bulkInfo.Count)
 		for i := 0; i < int(bulkInfo.Count); i++ {
 			ifId := bulkInfo.PortStateList[i].IfIndex
-			m.logger.Info("MADHAV!! ifId = ", ifId)
+			m.logger.Info("ifId = ", ifId)
 			intfMap := config.IntfMapInfo{Idx: ifId, IfName: bulkInfo.PortStateList[i].Name}
 			intfMaps = append(intfMaps, intfMap)
 		}
