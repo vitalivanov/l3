@@ -760,6 +760,7 @@ func (s *BGPServer) ProcessUpdate(pktInfo *packet.BGPPktSrc) {
 
 func (s *BGPServer) convertDestIPToIPPrefix(routes []*config.RouteInfo) map[uint32][]packet.NLRI {
 	pfNLRI := make(map[uint32][]packet.NLRI)
+	var protoFamily uint32
 	for _, r := range routes {
 		ip := net.ParseIP(r.IPAddr)
 		if ip == nil {
@@ -767,7 +768,6 @@ func (s *BGPServer) convertDestIPToIPPrefix(routes []*config.RouteInfo) map[uint
 			continue
 		}
 
-		var protoFamily uint32
 		if ip.To4() != nil {
 			protoFamily = packet.GetProtocolFamily(packet.AfiIP, packet.SafiUnicast)
 		} else {
@@ -1418,7 +1418,9 @@ func (s *BGPServer) StartServer() {
 	s.BgpConfig.PeerGroups = make(map[string]*config.PeerGroup)
 
 	pathAttrs := packet.ConstructPathAttrForConnRoutes(gConf.AS)
-	s.ConnRoutesPath = bgprib.NewPath(s.LocRib, nil, pathAttrs, nil, bgprib.RouteTypeConnected)
+	protoFamily := packet.GetProtocolFamily(packet.AfiIP6, packet.SafiUnicast)
+	ipv6MPReach := packet.ConstructIPv6MPReachNLRIForConnRoutes(protoFamily)
+	s.ConnRoutesPath = bgprib.NewPath(s.LocRib, nil, pathAttrs, ipv6MPReach, bgprib.RouteTypeConnected)
 
 	s.logger.Info("Setting up Peer connections")
 	// channel for accepting connections
