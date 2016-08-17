@@ -519,7 +519,7 @@ func Getv4RoutesPerProtocol(protocol string) []*ribd.RouteInfoSummary {
 		nextHopInfo := make([]ribd.NextHopInfo, len(v4protocolRouteList))
 		i := 0
 		for sel := 0; sel < len(v4protocolRouteList); sel++ {
-			fmt.Println("Madhavi!! protocol:", protocol, " sel:", sel, " v4protocolRouteList[sel].nextHopIp.String():", v4protocolRouteList[sel].nextHopIp.String(), " v4protocolRouteList[sel].nextHopIfIndex:", v4protocolRouteList[sel].nextHopIfIndex)
+			//logger.Info("protocol:", protocol, " sel:", sel, " v4protocolRouteList[sel].nextHopIp.String():", v4protocolRouteList[sel].nextHopIp.String(), " v4protocolRouteList[sel].nextHopIfIndex:", v4protocolRouteList[sel].nextHopIfIndex)
 			destNet = v4protocolRouteList[sel].networkAddr
 			nextHopInfo[i].NextHopIp = v4protocolRouteList[sel].nextHopIp.String()
 			nextHopInfo[i].NextHopIntRef = strconv.Itoa(int(v4protocolRouteList[sel].nextHopIfIndex))
