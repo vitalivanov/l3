@@ -28,8 +28,14 @@ type PrefixInfo struct {
 	InvalidationTimer *time.Timer
 }
 
-type PrefixList struct {
+type PrefixLink struct {
 	GlobalIp    string
 	LinkLocalIp string
-	Prefix      []PrefixInfo
+	PrefixList  []PrefixInfo
+}
+
+func (prefix *PrefixInfo) InitPrefix(ip string, lifeTime uint16) {
+	prefix.IpAddr = ip
+	// @TODO need to start the timer during init
+	//prefix.InvalidationTimer = time.Duration(lifeTime) * time.Second
 }

@@ -35,7 +35,7 @@ type Packet struct {
 
 	// Prefix List Information
 	// This is map of ifIndex (port where packet is received). Each key has PrefixList of its own
-	LinkPrefixInfo map[int32]PrefixList
+	LinkPrefixInfo map[int32]PrefixLink
 }
 
 func Init(pktCh chan config.PacketData) *Packet {
@@ -43,7 +43,7 @@ func Init(pktCh chan config.PacketData) *Packet {
 		PktCh: pktCh,
 	}
 	pkt.LinkInfo = make(map[string]Link, 100)
-	pkt.LinkPrefixInfo = make(map[int32]PrefixList, 100)
+	pkt.LinkPrefixInfo = make(map[int32]PrefixLink, 100)
 	return pkt
 }
 
@@ -87,6 +87,22 @@ func (p *Packet) initLinkInfo(ifIndex int32, ip, mac string) {
 	link.ReachableTime = 30000
 	p.SetLink(localIP.String(), link)
 	debug.Logger.Debug("New Packet LinkInfo is", link)
+}
+
+/*
+ * for a given ifIndex it will return mylink where prefixes are learned
+ */
+func (p *Packet) GetLinkPrefix(ifIndex int32) (PrefixLink, bool) {
+	debug.Logger.Debug("GetLinkPrefix called for", ifIndex)
+	prefixLink, exists := p.LinkPrefixInfo[ifIndex]
+	return prefixLink, exists
+}
+
+/*
+ * Prefix Link has been modified and hence updating the map
+ */
+func (p *Packet) SetLinkPrefix(ifIndex int32, prefixLink PrefixLink) {
+	p.LinkPrefixInfo[ifIndex] = prefixLink
 }
 
 /*

@@ -92,7 +92,7 @@ func validateIPv6Hdr(hdr *layers.IPv6, layerType uint8) error {
 	return nil
 }
 
-func (p *Packet) decodeICMPv6Hdr(hdr *layers.ICMPv6, srcIP net.IP, dstIP net.IP) (*NDInfo, error) {
+func (p *Packet) decodeICMPv6Hdr(hdr *layers.ICMPv6, srcIP net.IP, dstIP net.IP, ifIndex int32) (*NDInfo, error) {
 	ndInfo := &NDInfo{}
 	var err error
 	// Validating checksum received, if success then only start parsing icmp payload
@@ -118,7 +118,7 @@ func (p *Packet) decodeICMPv6Hdr(hdr *layers.ICMPv6, srcIP net.IP, dstIP net.IP)
 
 	case layers.ICMPv6TypeRouterAdvertisement:
 		debug.Logger.Debug("Router Advertisement Received from", srcIP, "---->", dstIP)
-		ndInfo, err = p.HandleRAMsg(hdr, srcIP, dstIP)
+		ndInfo, err = p.HandleRAMsg(hdr, srcIP, dstIP, ifIndex)
 	default:
 		return nil, errors.New(fmt.Sprintln("Not Supported ICMPv6 Type:", typeCode.Type()))
 	}
@@ -170,7 +170,7 @@ func (p *Packet) populateNeighborInfo(nbrInfo *config.NeighborInfo, eth *layers.
  *  - If the IP source address is the unspecified address, there is no
  *    source link-layer address option in the message. <- @TODO: need to be done later
  */
-func (p *Packet) ValidateAndParse(nbrInfo *config.NeighborInfo, pkt gopacket.Packet) error {
+func (p *Packet) ValidateAndParse(nbrInfo *config.NeighborInfo, pkt gopacket.Packet, ifIndex int32) error {
 	// first decode all the layers
 	icmpv6Hdr := &layers.ICMPv6{}
 	ipv6Hdr := &layers.IPv6{}
@@ -196,7 +196,7 @@ func (p *Packet) ValidateAndParse(nbrInfo *config.NeighborInfo, pkt gopacket.Pac
 	}
 
 	// Validating icmpv6 header
-	ndInfo, err := p.decodeICMPv6Hdr(icmpv6Hdr, ipv6Hdr.SrcIP, ipv6Hdr.DstIP)
+	ndInfo, err := p.decodeICMPv6Hdr(icmpv6Hdr, ipv6Hdr.SrcIP, ipv6Hdr.DstIP, ifIndex)
 	if err != nil {
 		return err
 	}

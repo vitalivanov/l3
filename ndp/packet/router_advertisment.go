@@ -28,7 +28,7 @@ import (
 	"fmt"
 	"github.com/google/gopacket/layers"
 	"l3/ndp/config"
-	"l3/ndp/debug"
+	_ "l3/ndp/debug"
 	"net"
 )
 
@@ -66,51 +66,42 @@ func (nd *NDInfo) ValidateRAInfo() error {
  * When we get router advertisement packet we need to update the mac address of peer and move the state to
  * REACHABLE
  *
- * @TODO: need to handle case if srcIP is my own IP
- *
- * If srcIP is peer ip then we need to use dst ip to get link information and then update cache entry to be
- * reachable and also update peer mac address into the cache
+ * Based on ifIndex we will get a prefixLink which contains all the prefixes for that link
  *
  * fill the NDInfo and then return it back to caller
  */
-func (p *Packet) HandleRAMsg(hdr *layers.ICMPv6, srcIP, dstIP net.IP) (*NDInfo, error) {
+func (p *Packet) HandleRAMsg(hdr *layers.ICMPv6, srcIP, dstIP net.IP, ifIndex int32) (*NDInfo, error) {
+	prefixFound := false
 	ndInfo := &NDInfo{}
 	ndInfo.DecodeRAInfo(hdr.TypeBytes, hdr.LayerPayload())
 	err := ndInfo.ValidateRAInfo()
 	if err != nil {
 		return ndInfo, err
 	}
-
-	_, exists := p.GetLink(srcIP.String())
-	if exists {
-		return ndInfo, errors.New("RA for my own IP is not yet supported")
-	} else {
-		link, found := p.GetLink(dstIP.String())
-		if !found {
-			return nil, errors.New("No link found for:" + dstIP.String())
-		}
-		cache, exists := link.NbrCache[srcIP.String()]
-		if !exists {
-			debug.Logger.Err("No Neigbor Entry found for:", srcIP.String(), "link IP:", dstIP.String())
-			return nil, errors.New("No Neigbor Entry found for:" + srcIP.String() +
-				" link IP:" + dstIP.String())
-		}
-		cache.State = REACHABLE
-		cache.UpdateProbe()
-		cache.RchTimer()
-		if len(ndInfo.Options) > 0 {
-			for _, option := range ndInfo.Options {
-				if option.Type == NDOptionTypeSourceLinkLayerAddress {
-					mac := net.HardwareAddr(option.Value)
-					cache.LinkLayerAddress = mac.String()
-				}
-			}
-		}
-		debug.Logger.Debug("PEERRA: nbrCach (key, value) ---> (", srcIP.String(), ",", cache, ")")
-		link.NbrCache[srcIP.String()] = cache
-		p.SetLink(dstIP.String(), link)
+	prefixLink, exists := p.GetLinkPrefix(ifIndex)
+	if !exists {
+		return nil, errors.New(fmt.Sprintln("No Prefix found for ifIndex:", ifIndex))
 	}
 
+	// iterate over prefix list and update the information
+	for _, prefix := range prefixLink.PrefixList {
+		// check if this is the prefix I am looking for or not
+		if prefix.IpAddr == srcIP.String() {
+			prefixFound = true
+			// @TODO: jgheewala add this support
+			// update timer value with received Router Lifetime
+		}
+	}
+
+	// if Prefix is found then we will return from here
+	if prefixFound {
+		return ndInfo, nil
+	}
+
+	// if no prefix is found then lets create a new entry
+	prefix := PrefixInfo{}
+	prefix.InitPrefix(srcIP.String(), ndInfo.RouterLifetime)
+	prefixLink.PrefixList = append(prefixLink.PrefixList, prefix)
 	return ndInfo, nil
 }
 

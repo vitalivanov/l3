@@ -44,6 +44,10 @@ var raTestPkt = []byte{
 	0x00, 0x00, 0x00, 0x00, 0x05, 0xdc,
 }
 
+const (
+	testIfIndex int32 = 100
+)
+
 func constructBaseNDInfo() *NDInfo {
 	wantBaseNDInfo := &NDInfo{
 		CurHopLimit:    64,
@@ -145,31 +149,80 @@ func createGoPacketForRATesting() gopacket.Packet {
 	return p
 }
 
-func createLinkForTestRAPkt() {
-	t := &testing.T{}
-	nbrIp := "fe80::8a1d:fcff:fecf:15fc"
-	myIp := "ff02::1"
+func createPrefixLinkTest() {
+	//nbrIp := "fe80::8a1d:fcff:fecf:15fc"
+	myIp := "2003::1"
 	myMac := "33:33:00:00:00:01"
 	initTestPacket()
 	// Init Link needs CIDR Format
-	testPktObj.InitLink(100, myIp+"/64", myMac)
-	cache := NeighborCache{
-		IpAddr: nbrIp,
-	}
-	link, exists := testPktObj.GetLink(myIp)
-	if !exists {
-		t.Error("ERROR: link should exists", myIp, "peerIP:", nbrIp)
-		return
-	}
-	// Init cache will set the STATE to be In-complete
-	cache.InitCache(link.ReachableTime, link.RetransTimer, cache.IpAddr, myIp, link.PortIfIndex, testPktDataCh)
-	link.NbrCache[nbrIp] = cache
-	testPktObj.SetLink(myIp, link)
+	testPktObj.InitLink(testIfIndex, myIp+"/64", myMac)
+	/*
+			cache := NeighborCache{
+				IpAddr: nbrIp,
+			}
+			link, exists := testPktObj.GetLink(myIp)
+			if !exists {
+				t.Error("ERROR: link should exists", myIp, "peerIP:", nbrIp)
+				return
+			}
+			// Init cache will set the STATE to be In-complete
+			cache.InitCache(link.ReachableTime, link.RetransTimer, cache.IpAddr, myIp, link.PortIfIndex, testPktDataCh)
+			link.NbrCache[nbrIp] = cache
+			testPktObj.SetLink(myIp, link)
+
+		prefixLink, exists := testPktObj.GetLinkPrefix(testIfIndex)
+		if !exists {
+			t.Error("Prefix link Init failed for testIfIndex:", prefixLink)
+			return
+		}
+
+		prefixLink.GlobalIp = "2003::1"
+		prefix = PrefixInfo{}
+		prefix.InitPrefix(nbrIp)
+	*/
 }
 
-func TestHandleRAMsgForDstIpAsMyLink(t *testing.T) {
+func TestCreatePrefixLink(t *testing.T) {
+	nbrIp := "fe80::8a1d:fcff:fecf:15fc"
+	routerLifeTime := uint16(1800)
+	prefix := PrefixInfo{}
+	prefix.InitPrefix(nbrIp, routerLifeTime)
+	if prefix.IpAddr != nbrIp {
+		t.Error("Prefix Init failed")
+		return
+	}
+}
+
+func validatePrefix(ifIndex int32) {
+	t := &testing.T{}
+	wantIp := "fe80::8a1d:fcff:fecf:15fc"
+	wantPrefix := PrefixInfo{
+		IpAddr: wantIp,
+	}
+	prefixLink, exists := testPktObj.GetLinkPrefix(ifIndex)
+	if !exists {
+		t.Error("Creating Prefix Link failed for IfIndex:", ifIndex)
+		return
+	}
+	if len(prefixLink.PrefixList) == 0 {
+		t.Error("No prefix is created when a prefix with entry", wantPrefix, "is expected")
+		return
+	}
+	for _, prefix := range prefixLink.PrefixList {
+		if wantPrefix.IpAddr == prefix.IpAddr {
+			if !reflect.DeepEqual(prefix, wantPrefix) {
+				t.Error("Populating Prefix Link Information failed, wantPrefix:", wantPrefix,
+					"rcvd Prefix", prefix)
+				return
+			}
+		}
+	}
+
+}
+
+func TestHandleRAMsg(t *testing.T) {
 	var err error
-	createLinkForTestRAPkt()
+	createPrefixLinkTest()
 	pkt := createGoPacketForRATesting()
 	if pkt == nil {
 		t.Error("Failed to create gopacket and hence aborting test case")
@@ -182,26 +235,28 @@ func TestHandleRAMsgForDstIpAsMyLink(t *testing.T) {
 		t.Error("Decoding ipv6 and icmpv6 header failed", err)
 	}
 
-	_, err1 := testPktObj.HandleRAMsg(icmpv6Hdr, ipv6Hdr.SrcIP, ipv6Hdr.DstIP)
+	_, err1 := testPktObj.HandleRAMsg(icmpv6Hdr, ipv6Hdr.SrcIP, ipv6Hdr.DstIP, testIfIndex)
 
 	if err1 != nil {
 		t.Error("Failed to HandleRAMsg, error:", err1)
 		return
 	}
 
-	link, exists := testPktObj.GetLink(ipv6Hdr.DstIP.String())
-	if !exists {
-		t.Error("after updating cache link information seems lost for", ipv6Hdr.DstIP.String())
-		return
-	}
+	/*
+		link, exists := testPktObj.GetLink(ipv6Hdr.DstIP.String())
+		if !exists {
+			t.Error("after updating cache link information seems lost for", ipv6Hdr.DstIP.String())
+			return
+		}
 
-	cache, exists := link.NbrCache[ipv6Hdr.SrcIP.String()]
-	if !exists {
-		t.Error("after updating cache nbr info seems lost for", ipv6Hdr.SrcIP.String())
-		return
-	}
-	if cache.LinkLayerAddress != "88:1d:fc:cf:15:fc" {
-		t.Error("Cache mac address is not updated correctly", cache.LinkLayerAddress)
-		return
-	}
+		cache, exists := link.NbrCache[ipv6Hdr.SrcIP.String()]
+		if !exists {
+			t.Error("after updating cache nbr info seems lost for", ipv6Hdr.SrcIP.String())
+			return
+		}
+		if cache.LinkLayerAddress != "88:1d:fc:cf:15:fc" {
+			t.Error("Cache mac address is not updated correctly", cache.LinkLayerAddress)
+			return
+		}
+	*/
 }
