@@ -208,6 +208,7 @@ func (svr *NDPServer) CreateNeighborInfo(nbrInfo *config.NeighborInfo) {
 		// do not enter that neighbor in our neigbor map
 		return
 	}
+	svr.SendIPv6CreateNotification(nbrInfo.IpAddr, nbrInfo.IfIndex)
 	svr.insertNeigborInfo(nbrInfo)
 }
 

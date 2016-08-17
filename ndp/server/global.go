@@ -82,6 +82,9 @@ type NDPServer struct {
 
 	// @HACK: Need to find better way of getting Switch Mac Address
 	SwitchMac string
+
+	// Notification Channel for Publisher
+	notifyChan chan<- []byte
 }
 
 const (

@@ -23,11 +23,13 @@
 package server
 
 import (
+	"encoding/json"
 	_ "errors"
 	"github.com/google/gopacket/pcap"
 	"l3/ndp/config"
 	"l3/ndp/debug"
 	"net"
+	"utils/commonDefs"
 )
 
 /*
@@ -331,4 +333,67 @@ func (svr *NDPServer) PopulateVlanInfo(nbrInfo *config.NeighborInfo, ifIndex int
 		// in this case use system reserved Vlan id which is -1
 		nbrInfo.VlanId = -1
 	}
+}
+
+/*
+ * helper function to create notification msg
+ */
+func createNotificationMsg(ipAddr string, ifIndex int32) ([]byte, error) {
+	msg := commonDefs.Ipv6NeighborNotification{
+		IpAddr:  ipAddr,
+		IfIndex: ifIndex,
+	}
+	msgBuf, err := json.Marshal(msg)
+	if err != nil {
+		debug.Logger.Err("Failed to marshal IPv6 Neighbor Notification message", msg, "error:", err)
+		return msgBuf, err
+	}
+
+	return msgBuf, nil
+}
+
+/*
+ * helper function to marshal notification and push it on to the channel
+ */
+func (svr *NDPServer) pushNotification(notification commonDefs.NdpNotification) {
+	notifyBuf, err := json.Marshal(notification)
+	if err != nil {
+		debug.Logger.Err("Failed to marshal ipv6 notification before pushing it on channel error:", err)
+		return
+	}
+	svr.notifyChan <- notifyBuf
+}
+
+/*
+ *    API: send ipv6 neighbor create notification
+ */
+func (svr *NDPServer) SendIPv6CreateNotification(ipAddr string, ifIndex int32) {
+	msgBuf, err := createNotificationMsg(ipAddr, ifIndex)
+	if err != nil {
+		return
+	}
+
+	notification := commonDefs.NdpNotification{
+		MsgType: commonDefs.NOTIFY_IPV6_NEIGHBOR_CREATE,
+		Msg:     msgBuf,
+	}
+	debug.Logger.Debug("Sending Create notification for ip address:", ipAddr, "and ifIndex:", ifIndex)
+	svr.pushNotification(notification)
+}
+
+/*
+ *    API: send ipv6 neighbor delete notification
+ */
+func (svr *NDPServer) SendIPv6DeleteNotification(ipAddr string, ifIndex int32) {
+	msgBuf, err := createNotificationMsg(ipAddr, ifIndex)
+	if err != nil {
+		return
+	}
+
+	notification := commonDefs.NdpNotification{
+		MsgType: commonDefs.NOTIFY_IPV6_NEIGHBOR_DELETE,
+		Msg:     msgBuf,
+	}
+	debug.Logger.Debug("Sending Delete notification for ip address:", ipAddr, "and ifIndex:", ifIndex)
+	svr.pushNotification(notification)
 }
