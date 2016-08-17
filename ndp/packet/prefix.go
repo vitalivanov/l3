@@ -24,6 +24,7 @@ import (
 )
 
 type PrefixInfo struct {
+	MacAddr           string
 	IpAddr            string
 	InvalidationTimer *time.Timer
 }
@@ -34,8 +35,9 @@ type PrefixLink struct {
 	PrefixList  []PrefixInfo
 }
 
-func (prefix *PrefixInfo) InitPrefix(ip string, lifeTime uint16) {
+func (prefix *PrefixInfo) InitPrefix(ip, mac string, lifeTime uint16) {
 	prefix.IpAddr = ip
+	prefix.MacAddr = mac
 	// @TODO need to start the timer during init
 	//prefix.InvalidationTimer = time.Duration(lifeTime) * time.Second
 }

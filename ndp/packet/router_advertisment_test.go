@@ -26,6 +26,7 @@ import (
 	_ "fmt"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
+	"l3/ndp/config"
 	"reflect"
 	"testing"
 )
@@ -43,6 +44,8 @@ var raTestPkt = []byte{
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x01, 0x88, 0x1d, 0xfc, 0xcf, 0x15, 0xfc, 0x05, 0x01,
 	0x00, 0x00, 0x00, 0x00, 0x05, 0xdc,
 }
+var nbrIp = "fe80::8a1d:fcff:fecf:15fc"
+var macAddr = "88:1d:fc:cf:15:fc"
 
 const (
 	testIfIndex int32 = 100
@@ -150,54 +153,33 @@ func createGoPacketForRATesting() gopacket.Packet {
 }
 
 func createPrefixLinkTest() {
-	//nbrIp := "fe80::8a1d:fcff:fecf:15fc"
 	myIp := "2003::1"
 	myMac := "33:33:00:00:00:01"
 	initTestPacket()
 	// Init Link needs CIDR Format
 	testPktObj.InitLink(testIfIndex, myIp+"/64", myMac)
-	/*
-			cache := NeighborCache{
-				IpAddr: nbrIp,
-			}
-			link, exists := testPktObj.GetLink(myIp)
-			if !exists {
-				t.Error("ERROR: link should exists", myIp, "peerIP:", nbrIp)
-				return
-			}
-			// Init cache will set the STATE to be In-complete
-			cache.InitCache(link.ReachableTime, link.RetransTimer, cache.IpAddr, myIp, link.PortIfIndex, testPktDataCh)
-			link.NbrCache[nbrIp] = cache
-			testPktObj.SetLink(myIp, link)
-
-		prefixLink, exists := testPktObj.GetLinkPrefix(testIfIndex)
-		if !exists {
-			t.Error("Prefix link Init failed for testIfIndex:", prefixLink)
-			return
-		}
-
-		prefixLink.GlobalIp = "2003::1"
-		prefix = PrefixInfo{}
-		prefix.InitPrefix(nbrIp)
-	*/
 }
 
 func TestCreatePrefixLink(t *testing.T) {
-	nbrIp := "fe80::8a1d:fcff:fecf:15fc"
 	routerLifeTime := uint16(1800)
 	prefix := PrefixInfo{}
-	prefix.InitPrefix(nbrIp, routerLifeTime)
+	prefix.InitPrefix(nbrIp, macAddr, routerLifeTime)
 	if prefix.IpAddr != nbrIp {
-		t.Error("Prefix Init failed")
+		t.Error("Prefix Init failed for ip address")
+		return
+	}
+
+	if prefix.MacAddr != macAddr {
+		t.Error("Prefex Init failed for mac address")
 		return
 	}
 }
 
 func validatePrefix(ifIndex int32) {
 	t := &testing.T{}
-	wantIp := "fe80::8a1d:fcff:fecf:15fc"
 	wantPrefix := PrefixInfo{
-		IpAddr: wantIp,
+		IpAddr:  nbrIp,
+		MacAddr: macAddr,
 	}
 	prefixLink, exists := testPktObj.GetLinkPrefix(ifIndex)
 	if !exists {
@@ -217,7 +199,20 @@ func validatePrefix(ifIndex int32) {
 			}
 		}
 	}
+}
 
+func validateNbrInfo(nbrInfo config.NeighborInfo) {
+	t := &testing.T{}
+	wantNbrInfo := config.NeighborInfo{
+		IpAddr:  nbrIp,
+		MacAddr: macAddr,
+		State:   REACHABLE,
+	}
+
+	if !reflect.DeepEqual(wantNbrInfo, nbrInfo) {
+		t.Error("Mismatch in nbr info, wantNbrInfo:", wantNbrInfo, "rcvd NbrInfo:", nbrInfo)
+		return
+	}
 }
 
 func TestHandleRAMsg(t *testing.T) {
@@ -230,33 +225,24 @@ func TestHandleRAMsg(t *testing.T) {
 	}
 	icmpv6Hdr := &layers.ICMPv6{}
 	ipv6Hdr := &layers.IPv6{}
+	eth := &layers.Ethernet{}
+	err = getEthLayer(pkt, eth)
+	if err != nil {
+		t.Error("Failed to get ethernet layer during, error:", err)
+		return
+	}
 	err = getIpAndICMPv6Hdr(pkt, ipv6Hdr, icmpv6Hdr)
 	if err != nil {
 		t.Error("Decoding ipv6 and icmpv6 header failed", err)
 	}
 
-	_, err1 := testPktObj.HandleRAMsg(icmpv6Hdr, ipv6Hdr.SrcIP, ipv6Hdr.DstIP, testIfIndex)
-
+	ndInfo, err1 := testPktObj.HandleRAMsg(icmpv6Hdr, ipv6Hdr.SrcIP, ipv6Hdr.DstIP, testIfIndex)
 	if err1 != nil {
 		t.Error("Failed to HandleRAMsg, error:", err1)
 		return
 	}
 
-	/*
-		link, exists := testPktObj.GetLink(ipv6Hdr.DstIP.String())
-		if !exists {
-			t.Error("after updating cache link information seems lost for", ipv6Hdr.DstIP.String())
-			return
-		}
+	nbrInfo := testPktObj.GetNbrInfoUsingRAPkt(eth, ipv6Hdr, ndInfo)
 
-		cache, exists := link.NbrCache[ipv6Hdr.SrcIP.String()]
-		if !exists {
-			t.Error("after updating cache nbr info seems lost for", ipv6Hdr.SrcIP.String())
-			return
-		}
-		if cache.LinkLayerAddress != "88:1d:fc:cf:15:fc" {
-			t.Error("Cache mac address is not updated correctly", cache.LinkLayerAddress)
-			return
-		}
-	*/
+	validateNbrInfo(nbrInfo)
 }

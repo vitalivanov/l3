@@ -100,7 +100,15 @@ func (p *Packet) HandleRAMsg(hdr *layers.ICMPv6, srcIP, dstIP net.IP, ifIndex in
 
 	// if no prefix is found then lets create a new entry
 	prefix := PrefixInfo{}
-	prefix.InitPrefix(srcIP.String(), ndInfo.RouterLifetime)
+	var mac string
+	for _, option := range ndInfo.Options {
+		if option.Type == NDOptionTypeSourceLinkLayerAddress {
+			macAddr := net.HardwareAddr(option.Value)
+			mac = macAddr.String()
+			break
+		}
+	}
+	prefix.InitPrefix(srcIP.String(), mac, ndInfo.RouterLifetime)
 	prefixLink.PrefixList = append(prefixLink.PrefixList, prefix)
 	return ndInfo, nil
 }
@@ -110,5 +118,15 @@ func (p *Packet) HandleRAMsg(hdr *layers.ICMPv6, srcIP, dstIP net.IP, ifIndex in
  */
 func (p *Packet) GetNbrInfoUsingRAPkt(eth *layers.Ethernet, v6hdr *layers.IPv6,
 	ndInfo *NDInfo) (nbrInfo config.NeighborInfo) {
+
+	if ndInfo.RouterLifetime == 0 {
+		// @TODO: mark this entry for delete
+	}
+	// by default all RA Pkt are marked as reachable, is this correct??
+	nbrInfo.State = REACHABLE
+	// @TODO: can we use eth layer for mac Address ???
+	nbrInfo.MacAddr = eth.SrcMAC.String()
+	nbrInfo.IpAddr = v6hdr.SrcIP.String()
+
 	return nbrInfo
 }
