@@ -102,6 +102,7 @@ func (nd *NDInfo) DecodeNDInfo(payload []byte) {
  *  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
  *  |   Options ...
  *  +-+-+-+-+-+-+-+-+-+-+-+-
+ *  @TODO: Handle Prefix Information Option Type
  */
 func (nd *NDInfo) DecodeRAInfo(typeByte, payload []byte) {
 	nd.CurHopLimit = typeByte[0]

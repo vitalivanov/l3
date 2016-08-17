@@ -32,14 +32,6 @@ import (
 	"net"
 )
 
-func Init(pktCh chan config.PacketData) *Packet {
-	pkt := &Packet{
-		PktCh: pktCh,
-	}
-	pkt.LinkInfo = make(map[string]Link, 100)
-	return pkt
-}
-
 func getEthLayer(pkt gopacket.Packet, eth *layers.Ethernet) error {
 	ethLayer := pkt.Layer(layers.LayerTypeEthernet)
 	if ethLayer == nil {
@@ -149,6 +141,8 @@ func (p *Packet) populateNeighborInfo(nbrInfo *config.NeighborInfo, eth *layers.
 		*nbrInfo = p.GetNbrInfoUsingNSPkt(eth, ipv6Hdr, ndInfo)
 	case layers.ICMPv6TypeNeighborAdvertisement:
 		*nbrInfo = p.GetNbrInfoUsingNAPkt(eth, ipv6Hdr, ndInfo)
+	case layers.ICMPv6TypeRouterAdvertisement:
+		*nbrInfo = p.GetNbrInfoUsingRAPkt(eth, ipv6Hdr, ndInfo)
 	}
 	debug.Logger.Debug("Neighbor Populated:", *nbrInfo)
 }

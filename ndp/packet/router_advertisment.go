@@ -27,7 +27,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/google/gopacket/layers"
-	_ "l3/ndp/config"
+	"l3/ndp/config"
 	"l3/ndp/debug"
 	"net"
 )
@@ -112,4 +112,12 @@ func (p *Packet) HandleRAMsg(hdr *layers.ICMPv6, srcIP, dstIP net.IP) (*NDInfo, 
 	}
 
 	return ndInfo, nil
+}
+
+/*
+ * From eth, ipv6 and ndInfo populate neighbor information for programming chip
+ */
+func (p *Packet) GetNbrInfoUsingRAPkt(eth *layers.Ethernet, v6hdr *layers.IPv6,
+	ndInfo *NDInfo) (nbrInfo config.NeighborInfo) {
+	return nbrInfo
 }

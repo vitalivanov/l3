@@ -22,11 +22,6 @@
 //
 package packet
 
-import (
-	"l3/ndp/config"
-	"time"
-)
-
 type PACKET_OPERATION byte
 
 const (
@@ -55,44 +50,6 @@ const (
 	NDOptionTypeRedirectHeader         NDOptionType = 4
 	NDOptionTypeMTU                    NDOptionType = 5
 )
-
-type ParentLinkInfo struct {
-	IfIndex  int32
-	IpAddr   string
-	ReturnCh chan config.PacketData
-}
-
-type NeighborCache struct {
-	BaseReachableTimer   float32
-	RetransTimerConfig   uint32
-	ReachableTimeConfig  uint32
-	RecomputeBaseTimer   *time.Timer
-	ReachableTimer       *time.Timer
-	RetransTimer         *time.Timer
-	DelayFirstProbeTimer *time.Timer
-	ProbesSent           uint8
-	State                int
-	LinkLayerAddress     string // this is our neighbor port mac address
-	IpAddr               string
-	MyLinkInfo           *ParentLinkInfo
-}
-
-type Link struct {
-	NbrCache         map[string]NeighborCache
-	PortIfIndex      int32
-	LinkLocalAddress string // This is our link local mac address
-	RetransTimer     uint32 // User should enter the value in mili-seconds
-	ReachableTime    uint32 // @TODO for future
-}
-
-type Packet struct {
-	PktCh chan config.PacketData
-	// Neighbor Cache Information
-	// This is map of string to link with (map of string to NeighborCache). Each key of the outer map is the our own
-	// IP Address with its own Neigbor's map. Each inner map key is a Neighbor IP Address. Each inner map
-	// expression retrieve the information pertaining to that neighbor
-	LinkInfo map[string]Link
-}
 
 const (
 	HOP_LIMIT                              = 255
