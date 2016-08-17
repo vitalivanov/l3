@@ -45,7 +45,7 @@ const (
 type UUID string
 
 type BGPFlexSwitch struct {
-	neighbor bgpd.BGPNeighbor
+	neighbor bgpd.BGPv4Neighbor
 	global   bgpd.BGPGlobal
 }
 
@@ -191,7 +191,7 @@ func (ovsHdl *BGPOvsdbHandler) DumpBgpNeighborInfo(addrs []net.IP, uuids []UUID,
 				newNeighborAddr := addrs[idx].String()
 				// @TODO: remove this neighbor config thrift call once interface for
 				// listener side is already implemented
-				neighborCfg := &bgpd.BGPNeighbor{
+				neighborCfg := &bgpd.BGPv4Neighbor{
 					PeerAS:          int32(newPeerAS),
 					LocalAS:         int32(ovsHdl.routerInfo.asn),
 					NeighborAddress: newNeighborAddr,
@@ -248,7 +248,7 @@ func (ovsHdl *BGPOvsdbHandler) DumpBgpNeighborInfo(addrs []net.IP, uuids []UUID,
 						MaxPrefixesRestartTimer uint8
 					}
 				*/
-				ovsHdl.rpcHdl.CreateBGPNeighbor(neighborCfg)
+				ovsHdl.rpcHdl.CreateBGPv4Neighbor(neighborCfg)
 			}
 		}
 	}
