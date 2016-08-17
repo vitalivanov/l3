@@ -38,7 +38,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"utils/dbutils"
 	"utils/eventUtils"
 	"utils/logging"
@@ -754,13 +753,7 @@ func (s *BGPServer) ProcessUpdate(pktInfo *packet.BGPPktSrc) {
 		return
 	}
 
-	atomic.AddUint32(&peer.NeighborConf.Neighbor.State.Queues.Input, ^uint32(0))
-	peer.NeighborConf.Neighbor.State.Messages.Received.Update++
-	updated, withdrawn, updatedAddPaths, addedAllPrefixes := s.LocRib.ProcessUpdate(peer.NeighborConf, pktInfo,
-		s.AddPathCount)
-	if !addedAllPrefixes {
-		peer.MaxPrefixesExceeded()
-	}
+	updated, withdrawn, updatedAddPaths := peer.ReceiveUpdate(pktInfo)
 	updated, withdrawn, updatedAddPaths = s.CheckForAggregation(updated, withdrawn, updatedAddPaths)
 	s.SendUpdate(updated, withdrawn, updatedAddPaths)
 }

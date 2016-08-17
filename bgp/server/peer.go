@@ -119,6 +119,7 @@ func (p *Peer) MaxPrefixesExceeded() {
 		p.Command(int(fsm.BGPEventAutoStop), fsm.BGPCmdReasonMaxPrefixExceeded)
 	}
 }
+
 func (p *Peer) setIfIdx(ifIdx int32) {
 	p.ifIdx = ifIdx
 }
@@ -207,18 +208,10 @@ func (p *Peer) PeerConnBroken(fsmCleanup bool) {
 	p.clearRibOut()
 }
 
-func (p *Peer) ReceiveUpdate(msg *packet.BGPMessage) {
+func (p *Peer) processWithdraws(protoFamily uint32, nlris []packet.NLRI) {
 	var pathIdRouteMap map[uint32]*bgprib.AdjRIBRoute
 	var ok bool
-
-	update := msg.Body.(*packet.BGPUpdate)
-	if packet.HasASLoop(update.PathAttributes, p.NeighborConf.RunningConf.LocalAS) {
-		p.logger.Infof("Neighbor %s: Recived Update message has AS loop", p.NeighborConf.Neighbor.NeighborAddress)
-		return
-	}
-
-	protoFamily := packet.GetProtocolFamily(packet.AfiIP, packet.SafiUnicast)
-	for _, nlri := range update.WithdrawnRoutes {
+	for _, nlri := range nlris {
 		ip := nlri.GetPrefix().String()
 		if pathIdRouteMap, ok = p.ribIn[protoFamily][ip]; !ok {
 			p.logger.Errf("Neighbor %s: Withdraw Prefix %s not found in RIB-In",
@@ -237,17 +230,55 @@ func (p *Peer) ReceiveUpdate(msg *packet.BGPMessage) {
 			delete(p.ribIn[protoFamily], ip)
 		}
 	}
+}
 
-	if len(update.NLRI) > 0 {
-		path := bgprib.NewPath(p.locRib, p.NeighborConf, update.PathAttributes, nil, bgprib.RouteTypeEGP)
-		for _, nlri := range update.NLRI {
-			ip := nlri.GetPrefix().String()
-			if _, ok = p.ribIn[protoFamily][ip]; !ok {
-				p.ribIn[protoFamily][ip] = make(map[uint32]*bgprib.AdjRIBRoute)
-			}
-			p.ribIn[protoFamily][ip][nlri.GetPathId()] = bgprib.NewAdjRIBRoute(nlri, path, nlri.GetPathId())
+func (p *Peer) processUpdates(protoFamily uint32, nlris []packet.NLRI, path *bgprib.Path) {
+	var ok bool
+	for _, nlri := range nlris {
+		ip := nlri.GetPrefix().String()
+		if _, ok = p.ribIn[protoFamily][ip]; !ok {
+			p.ribIn[protoFamily][ip] = make(map[uint32]*bgprib.AdjRIBRoute)
 		}
+		p.ribIn[protoFamily][ip][nlri.GetPathId()] = bgprib.NewAdjRIBRoute(nlri, path, nlri.GetPathId())
 	}
+}
+
+func (p *Peer) ReceiveUpdate(pktInfo *packet.BGPPktSrc) (map[uint32]map[*bgprib.Path][]*bgprib.Destination,
+	[]*bgprib.Destination, []*bgprib.Destination) {
+	updated := make(map[uint32]map[*bgprib.Path][]*bgprib.Destination)
+	withdrawn := make([]*bgprib.Destination, 0)
+	updatedAddPaths := make([]*bgprib.Destination, 0)
+	addedAllPrefixes := true
+
+	updateMsg := pktInfo.Msg.Body.(*packet.BGPUpdate)
+	if packet.HasASLoop(updateMsg.PathAttributes, p.NeighborConf.RunningConf.LocalAS) {
+		p.logger.Infof("Neighbor %s: Recived Update message has AS loop", p.NeighborConf.Neighbor.NeighborAddress)
+		return updated, withdrawn, updatedAddPaths
+	}
+
+	protoFamily := packet.GetProtocolFamily(packet.AfiIP, packet.SafiUnicast)
+	mpReach, mpUnreach := packet.GetMPAttrs(updateMsg.PathAttributes)
+	path := bgprib.NewPath(p.locRib, p.NeighborConf, updateMsg.PathAttributes, mpReach, bgprib.RouteTypeEGP)
+	p.processWithdraws(protoFamily, updateMsg.WithdrawnRoutes)
+	p.processUpdates(protoFamily, updateMsg.NLRI, path)
+	if mpUnreach != nil {
+		protoFamily = packet.GetProtocolFamily(mpUnreach.AFI, mpUnreach.SAFI)
+		p.processWithdraws(protoFamily, mpUnreach.NLRI)
+	}
+	if mpReach != nil {
+		protoFamily = packet.GetProtocolFamily(mpReach.AFI, mpReach.SAFI)
+		p.processUpdates(protoFamily, mpReach.NLRI, path)
+	}
+
+	atomic.AddUint32(&p.NeighborConf.Neighbor.State.Queues.Input, ^uint32(0))
+	p.NeighborConf.Neighbor.State.Messages.Received.Update++
+	updated, withdrawn, updatedAddPaths, addedAllPrefixes = p.locRib.ProcessUpdate(p.NeighborConf, pktInfo,
+		p.server.AddPathCount)
+	if !addedAllPrefixes {
+		p.MaxPrefixesExceeded()
+	}
+
+	return updated, withdrawn, updatedAddPaths
 }
 
 func (p *Peer) updatePathAttrs(bgpMsg *packet.BGPMessage, path *bgprib.Path) bool {
