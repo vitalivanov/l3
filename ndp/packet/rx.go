@@ -92,6 +92,10 @@ func validateIPv6Hdr(hdr *layers.IPv6, layerType uint8) error {
 		if hdr.Length < ICMPV6_MIN_LENGTH {
 			return errors.New(fmt.Sprintf("Invalid ICMP length %d", hdr.Length))
 		}
+	case layers.ICMPv6TypeRouterAdvertisement:
+		if hdr.Length < ICMPV6_MIN_LENGTH_RA {
+			return errors.New(fmt.Sprintf("Invalid ICMP length %d", hdr.Length))
+		}
 	}
 	return nil
 }
@@ -114,14 +118,15 @@ func (p *Packet) decodeICMPv6Hdr(hdr *layers.ICMPv6, srcIP net.IP, dstIP net.IP)
 		ndInfo, err = p.HandleNSMsg(hdr, srcIP, dstIP)
 
 	case layers.ICMPv6TypeNeighborAdvertisement:
-		debug.Logger.Debug("Neigbor Advertisemnt  Received from", srcIP, "---->", dstIP)
+		debug.Logger.Debug("Neigbor Advertisemnt Received from", srcIP, "---->", dstIP)
 		ndInfo, err = p.HandleNAMsg(hdr, srcIP, dstIP)
 
 	case layers.ICMPv6TypeRouterSolicitation:
 		return nil, errors.New("Router Solicitation is not yet supported")
 
 	case layers.ICMPv6TypeRouterAdvertisement:
-		return nil, errors.New("Router Advertisement is not yet supported")
+		debug.Logger.Debug("Router Advertisement Received from", srcIP, "---->", dstIP)
+		ndInfo, err = p.HandleRAMsg(hdr, srcIP, dstIP)
 	default:
 		return nil, errors.New(fmt.Sprintln("Not Supported ICMPv6 Type:", typeCode.Type()))
 	}

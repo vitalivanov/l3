@@ -116,4 +116,8 @@ const (
 	MIN_RANDOM_FACTOR                      = 0.5
 	MAX_RANDOM_FACTOR                      = 1.5
 	RECOMPUTE_BASE_REACHABLE_TIMER         = 1 // this is in hour
+
+	// Router Advertisement Specific Constants
+	ICMPV6_MIN_LENGTH_RA         uint16 = 16
+	ICMPV6_MIN_PAYLOAD_LENGTH_RA        = 12
 )

@@ -13,13 +13,13 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 package vrrpServer
 
@@ -72,8 +72,7 @@ func (svr *VrrpServer) VrrpDecodeHeader(data []byte) *VrrpPktHeader {
 	vrrpPkt.CheckSum = binary.BigEndian.Uint16(data[6:8])
 	baseIpByte := 8
 	for i := 0; i < int(vrrpPkt.CountIPv4Addr); i++ {
-		vrrpPkt.IPv4Addr = append(vrrpPkt.IPv4Addr,
-			data[baseIpByte:(baseIpByte+4)])
+		vrrpPkt.IPv4Addr = append(vrrpPkt.IPv4Addr, data[baseIpByte:(baseIpByte+4)])
 		baseIpByte += 4
 	}
 	return &vrrpPkt
