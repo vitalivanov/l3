@@ -83,12 +83,15 @@ func getIpAndICMPv6Hdr(pkt gopacket.Packet, ipv6Hdr *layers.IPv6, icmpv6Hdr *lay
 	return nil
 }
 
-func validateIPv6Hdr(hdr *layers.IPv6) error {
+func validateIPv6Hdr(hdr *layers.IPv6, layerType uint8) error {
 	if hdr.HopLimit != HOP_LIMIT {
 		return errors.New(fmt.Sprintln("Invalid Hop Limit", hdr.HopLimit))
 	}
-	if hdr.Length < ICMPV6_MIN_LENGTH {
-		return errors.New(fmt.Sprintln("Invalid ICMP length", hdr.Length))
+	switch layerType {
+	case layers.ICMPv6TypeNeighborSolicitation, layers.ICMPv6TypeNeighborAdvertisement:
+		if hdr.Length < ICMPV6_MIN_LENGTH {
+			return errors.New(fmt.Sprintf("Invalid ICMP length %d", hdr.Length))
+		}
 	}
 	return nil
 }
@@ -116,6 +119,9 @@ func (p *Packet) decodeICMPv6Hdr(hdr *layers.ICMPv6, srcIP net.IP, dstIP net.IP)
 
 	case layers.ICMPv6TypeRouterSolicitation:
 		return nil, errors.New("Router Solicitation is not yet supported")
+
+	case layers.ICMPv6TypeRouterAdvertisement:
+		return nil, errors.New("Router Advertisement is not yet supported")
 	default:
 		return nil, errors.New(fmt.Sprintln("Not Supported ICMPv6 Type:", typeCode.Type()))
 	}
@@ -185,7 +191,7 @@ func (p *Packet) ValidateAndParse(nbrInfo *config.NeighborInfo, pkt gopacket.Pac
 	}
 
 	// Validating ipv6 header
-	err = validateIPv6Hdr(ipv6Hdr)
+	err = validateIPv6Hdr(ipv6Hdr, icmpv6Hdr.TypeCode.Type())
 	if err != nil {
 		return err
 	}

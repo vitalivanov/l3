@@ -114,11 +114,13 @@ func (h *BGPHandler) handleGlobalConfig() error {
 	return nil
 }
 
-func (h *BGPHandler) convertModelToBGPPeerGroup(obj objects.BGPPeerGroup) (group config.PeerGroupConfig, err error) {
+func (h *BGPHandler) convertModelToBGPv4PeerGroup(obj objects.BGPv4PeerGroup) (group config.PeerGroupConfig,
+	err error) {
 	group = config.PeerGroupConfig{
 		BaseConfig: config.BaseConfig{
 			PeerAS:                  uint32(obj.PeerAS),
 			LocalAS:                 uint32(obj.LocalAS),
+			PeerAddressType:         config.PeerAddressV4,
 			UpdateSource:            obj.UpdateSource,
 			AuthPassword:            obj.AuthPassword,
 			Description:             obj.Description,
@@ -141,18 +143,18 @@ func (h *BGPHandler) convertModelToBGPPeerGroup(obj objects.BGPPeerGroup) (group
 	return group, err
 }
 
-func (h *BGPHandler) handlePeerGroup() error {
-	var obj objects.BGPPeerGroup
+func (h *BGPHandler) handleV4PeerGroup() error {
+	var obj objects.BGPv4PeerGroup
 	objList, err := h.dbUtil.GetAllObjFromDb(obj)
 	if err != nil {
-		h.logger.Errf("GetAllObjFromDb for BGPPeerGroup failed with error %s", err)
+		h.logger.Errf("GetAllObjFromDb for BGPv4PeerGroup failed with error %s", err)
 		return err
 	}
 
 	for _, confObj := range objList {
-		obj = confObj.(objects.BGPPeerGroup)
+		obj = confObj.(objects.BGPv4PeerGroup)
 
-		group, err := h.convertModelToBGPPeerGroup(obj)
+		group, err := h.convertModelToBGPv4PeerGroup(obj)
 		if err != nil {
 			h.logger.Err("handlePeerGroup - Failed to convert Model object to BGP Peer group, error:", err)
 			return err
@@ -164,12 +166,64 @@ func (h *BGPHandler) handlePeerGroup() error {
 	return nil
 }
 
-func (h *BGPHandler) convertModelToBGPNeighbor(obj objects.BGPNeighbor) (neighbor config.NeighborConfig, err error) {
+func (h *BGPHandler) convertModelToBGPv6PeerGroup(obj objects.BGPv6PeerGroup) (group config.PeerGroupConfig,
+	err error) {
+	group = config.PeerGroupConfig{
+		BaseConfig: config.BaseConfig{
+			PeerAS:                  uint32(obj.PeerAS),
+			LocalAS:                 uint32(obj.LocalAS),
+			PeerAddressType:         config.PeerAddressV6,
+			UpdateSource:            obj.UpdateSource,
+			Description:             obj.Description,
+			RouteReflectorClusterId: uint32(obj.RouteReflectorClusterId),
+			RouteReflectorClient:    obj.RouteReflectorClient,
+			MultiHopEnable:          obj.MultiHopEnable,
+			MultiHopTTL:             uint8(obj.MultiHopTTL),
+			ConnectRetryTime:        uint32(obj.ConnectRetryTime),
+			HoldTime:                uint32(obj.HoldTime),
+			KeepaliveTime:           uint32(obj.KeepaliveTime),
+			AddPathsRx:              obj.AddPathsRx,
+			AddPathsMaxTx:           uint8(obj.AddPathsMaxTx),
+			MaxPrefixes:             uint32(obj.MaxPrefixes),
+			MaxPrefixesThresholdPct: uint8(obj.MaxPrefixesThresholdPct),
+			MaxPrefixesDisconnect:   obj.MaxPrefixesDisconnect,
+			MaxPrefixesRestartTimer: uint8(obj.MaxPrefixesRestartTimer),
+		},
+		Name: obj.Name,
+	}
+	return group, err
+}
+
+func (h *BGPHandler) handleV6PeerGroup() error {
+	var obj objects.BGPv6PeerGroup
+	objList, err := h.dbUtil.GetAllObjFromDb(obj)
+	if err != nil {
+		h.logger.Errf("GetAllObjFromDb for BGPv6PeerGroup failed with error %s", err)
+		return err
+	}
+
+	for _, confObj := range objList {
+		obj = confObj.(objects.BGPv6PeerGroup)
+
+		group, err := h.convertModelToBGPv6PeerGroup(obj)
+		if err != nil {
+			h.logger.Err("handlePeerGroup - Failed to convert Model object to BGP Peer group, error:", err)
+			return err
+		}
+
+		h.server.AddPeerGroupCh <- server.PeerGroupUpdate{config.PeerGroupConfig{}, group, make([]bool, 0)}
+	}
+
+	return nil
+}
+
+func (h *BGPHandler) convertModelToBGPv4Neighbor(obj objects.BGPv4Neighbor) (neighbor config.NeighborConfig,
+	err error) {
 	var ip net.IP
 	var ifIndex int32
-	ip, ifIndex, err = h.getIPAndIfIndexForNeighbor(obj.NeighborAddress, obj.IfIndex)
+	ip, ifIndex, err = h.getIPAndIfIndexForV4Neighbor(obj.NeighborAddress, obj.IfIndex)
 	if err != nil {
-		h.logger.Info("convertModelToBGPNeighbor: getIPAndIfIndexForNeighbor",
+		h.logger.Info("convertModelToBGPv4Neighbor: getIPAndIfIndexForV4Neighbor",
 			"failed for neighbor address", obj.NeighborAddress, "and ifIndex", obj.IfIndex)
 		return neighbor, err
 	}
@@ -178,6 +232,7 @@ func (h *BGPHandler) convertModelToBGPNeighbor(obj objects.BGPNeighbor) (neighbo
 		BaseConfig: config.BaseConfig{
 			PeerAS:                  uint32(obj.PeerAS),
 			LocalAS:                 uint32(obj.LocalAS),
+			PeerAddressType:         config.PeerAddressV4,
 			UpdateSource:            obj.UpdateSource,
 			AuthPassword:            obj.AuthPassword,
 			Description:             obj.Description,
@@ -204,8 +259,8 @@ func (h *BGPHandler) convertModelToBGPNeighbor(obj objects.BGPNeighbor) (neighbo
 	return neighbor, err
 }
 
-func (h *BGPHandler) handleNeighborConfig() error {
-	var obj objects.BGPNeighbor
+func (h *BGPHandler) handleV4NeighborConfig() error {
+	var obj objects.BGPv4Neighbor
 	objList, err := h.dbUtil.GetAllObjFromDb(obj)
 	if err != nil {
 		h.logger.Errf("GetAllObjFromDb for BGPNeighbor failed with error %s", err)
@@ -213,11 +268,75 @@ func (h *BGPHandler) handleNeighborConfig() error {
 	}
 
 	for _, confObj := range objList {
-		obj = confObj.(objects.BGPNeighbor)
+		obj = confObj.(objects.BGPv4Neighbor)
 
-		neighbor, err := h.convertModelToBGPNeighbor(obj)
+		neighbor, err := h.convertModelToBGPv4Neighbor(obj)
 		if err != nil {
-			h.logger.Err("handleNeighborConfig - Failed to convert Model object to BGP neighbor, error:", err)
+			h.logger.Err("handleV4NeighborConfig - Failed to convert Model object to BGP neighbor, error:", err)
+			return err
+		}
+
+		h.server.AddPeerCh <- server.PeerUpdate{config.NeighborConfig{}, neighbor, make([]bool, 0)}
+	}
+
+	return nil
+}
+
+func (h *BGPHandler) convertModelToBGPv6Neighbor(obj objects.BGPv6Neighbor) (neighbor config.NeighborConfig,
+	err error) {
+	var ip net.IP
+	var ifIndex int32
+	ip, ifIndex, err = h.getIPAndIfIndexForV6Neighbor(obj.NeighborAddress, obj.IfIndex)
+	if err != nil {
+		h.logger.Info("convertModelToBGPv6Neighbor: getIPAndIfIndexForV6Neighbor",
+			"failed for neighbor address", obj.NeighborAddress, "and ifIndex", obj.IfIndex)
+		return neighbor, err
+	}
+
+	neighbor = config.NeighborConfig{
+		BaseConfig: config.BaseConfig{
+			PeerAS:                  uint32(obj.PeerAS),
+			LocalAS:                 uint32(obj.LocalAS),
+			PeerAddressType:         config.PeerAddressV6,
+			UpdateSource:            obj.UpdateSource,
+			Description:             obj.Description,
+			RouteReflectorClusterId: uint32(obj.RouteReflectorClusterId),
+			RouteReflectorClient:    obj.RouteReflectorClient,
+			MultiHopEnable:          obj.MultiHopEnable,
+			MultiHopTTL:             uint8(obj.MultiHopTTL),
+			ConnectRetryTime:        uint32(obj.ConnectRetryTime),
+			HoldTime:                uint32(obj.HoldTime),
+			KeepaliveTime:           uint32(obj.KeepaliveTime),
+			BfdEnable:               obj.BfdEnable,
+			BfdSessionParam:         obj.BfdSessionParam,
+			AddPathsRx:              obj.AddPathsRx,
+			AddPathsMaxTx:           uint8(obj.AddPathsMaxTx),
+			MaxPrefixes:             uint32(obj.MaxPrefixes),
+			MaxPrefixesThresholdPct: uint8(obj.MaxPrefixesThresholdPct),
+			MaxPrefixesDisconnect:   obj.MaxPrefixesDisconnect,
+			MaxPrefixesRestartTimer: uint8(obj.MaxPrefixesRestartTimer),
+		},
+		NeighborAddress: ip,
+		IfIndex:         ifIndex,
+		PeerGroup:       obj.PeerGroup,
+	}
+	return neighbor, err
+}
+
+func (h *BGPHandler) handleV6NeighborConfig() error {
+	var obj objects.BGPv6Neighbor
+	objList, err := h.dbUtil.GetAllObjFromDb(obj)
+	if err != nil {
+		h.logger.Errf("GetAllObjFromDb for BGPNeighbor failed with error %s", err)
+		return err
+	}
+
+	for _, confObj := range objList {
+		obj = confObj.(objects.BGPv6Neighbor)
+
+		neighbor, err := h.convertModelToBGPv6Neighbor(obj)
+		if err != nil {
+			h.logger.Err("handleV6NeighborConfig - Failed to convert Model object to BGP neighbor, error:", err)
 			return err
 		}
 
@@ -374,13 +493,22 @@ func (h *BGPHandler) readConfigFromDB(filePath string) error {
 		return err
 	}
 
-	if err = h.handlePeerGroup(); err != nil {
+	if err = h.handleV4PeerGroup(); err != nil {
 		return err
 	}
 
-	if err = h.handleNeighborConfig(); err != nil {
+	if err = h.handleV4NeighborConfig(); err != nil {
 		return err
 	}
+
+	if err = h.handleV6PeerGroup(); err != nil {
+		return err
+	}
+
+	if err = h.handleV6NeighborConfig(); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -487,8 +615,7 @@ func (h *BGPHandler) DeleteBGPGlobal(bgpGlobal *bgpd.BGPGlobal) (bool, error) {
 	return true, nil
 }
 
-func (h *BGPHandler) getIPAndIfIndexForNeighbor(neighborIP string,
-	neighborIfIndex int32) (ip net.IP, ifIndex int32,
+func (h *BGPHandler) getIPAndIfIndexForV4Neighbor(neighborIP string, neighborIfIndex int32) (ip net.IP, ifIndex int32,
 	err error) {
 	if strings.TrimSpace(neighborIP) != "" {
 		ip = net.ParseIP(strings.TrimSpace(neighborIP))
@@ -502,33 +629,28 @@ func (h *BGPHandler) getIPAndIfIndexForNeighbor(neighborIP string,
 		// @TODO: this needs to be interface once we decide to move listener
 		ipv4Intf, err = h.server.IntfMgr.GetIPv4Information(neighborIfIndex)
 		if err == nil {
-			h.logger.Info("getIPAndIfIndexForNeighbor - Call ASICd to get ip address for interface with ifIndex:",
-				neighborIfIndex)
+			h.logger.Info("Call ASICd to get IPv4 address for interface with ifIndex:", neighborIfIndex)
 			ifIP, ipMask, err := net.ParseCIDR(ipv4Intf)
 			if err != nil {
-				h.logger.Err("getIPAndIfIndexForNeighbor - IpAddr", ipv4Intf, "of the interface", neighborIfIndex,
-					"is not valid, error:", err)
-				err = errors.New(fmt.Sprintf("IpAddr %s of the interface %d is not",
-					"valid, error: %s", ipv4Intf, neighborIfIndex, err))
+				h.logger.Err("IPv4Addr", ipv4Intf, "of the interface", neighborIfIndex, "is not valid, error:", err)
+				err = errors.New(fmt.Sprintf("IPv4Addr %s of the interface %d is not valid, error: %s", ipv4Intf,
+					neighborIfIndex, err))
 				return ip, ifIndex, err
 			}
 			if ipMask.Mask[len(ipMask.Mask)-1] < 252 {
-				h.logger.Err("getIPAndIfIndexForNeighbor - IpAddr", ipv4Intf, "of the interface", neighborIfIndex,
-					"is not /30 or /31 address")
-				err = errors.New(fmt.Sprintln("getIPAndIfIndexForNeighbor - IpAddr %s",
-					"of the interface %s is not /30 or /31 address",
-					ipv4Intf, neighborIfIndex))
+				h.logger.Err("IPv4Addr", ipv4Intf, "of the interface", neighborIfIndex, "is not /30 or /31 address")
+				err = errors.New(fmt.Sprintln("IPv4Addr", ipv4Intf, "of the interface", neighborIfIndex,
+					"is not /30 or /31 address"))
 				return ip, ifIndex, err
 			}
-			h.logger.Info("getIPAndIfIndexForNeighbor - IpAddr", ifIP, "of the interface", neighborIfIndex)
+			h.logger.Info("IPv4Addr of the v4Neighbor local interface", neighborIfIndex, "is", ifIP)
 			ifIP[len(ifIP)-1] = ifIP[len(ifIP)-1] ^ (^ipMask.Mask[len(ipMask.Mask)-1])
-			h.logger.Info("getIPAndIfIndexForNeighbor - IpAddr", ifIP, "of the neighbor interface")
+			h.logger.Info("IPv4Addr of the v4Neighbor remote interface is", ifIP)
 			ip = ifIP
 			ifIndex = neighborIfIndex
-			h.logger.Info("getIPAndIfIndexForNeighbor - Neighbor IP:", ip.String())
+			h.logger.Info("v4Neighbor IP address:", ip.String())
 		} else {
-			h.logger.Err("getIPAndIfIndexForNeighbor - Neighbor IP", neighborIP, "or interface", neighborIfIndex,
-				"not configured ")
+			h.logger.Err("v4Neighbor IP", neighborIP, "or interface", neighborIfIndex, "not configured ")
 		}
 	}
 	return ip, ifIndex, err
@@ -545,14 +667,6 @@ func (h *BGPHandler) isValidIP(ip string) bool {
 	return true
 }
 
-func (h *BGPHandler) isAuthPasswordValid(neighborAddress net.IP, authPassword string) error {
-	if neighborAddress.To4() != nil && authPassword != "" {
-		return errors.New(fmt.Sprint("Cannot create neighbor", neighborAddress,
-			"Auth password can be used only with IPv4 address"))
-	}
-	return nil
-}
-
 // Set BGP Default values.. This needs to move to API Layer once Northbound interfaces are implemented
 // for all the listeners
 func (h *BGPHandler) setDefault(pconf *config.NeighborConfig) {
@@ -564,17 +678,16 @@ func (h *BGPHandler) setDefault(pconf *config.NeighborConfig) {
 	}
 }
 
-func (h *BGPHandler) ValidateBGPNeighbor(bgpNeighbor *bgpd.BGPNeighbor) (pConf config.NeighborConfig,
-	err error) {
+func (h *BGPHandler) ValidateV4Neighbor(bgpNeighbor *bgpd.BGPv4Neighbor) (pConf config.NeighborConfig, err error) {
 	if bgpNeighbor == nil {
 		return pConf, err
 	}
 
 	var ip net.IP
 	var ifIndex int32
-	ip, ifIndex, err = h.getIPAndIfIndexForNeighbor(bgpNeighbor.NeighborAddress, bgpNeighbor.IfIndex)
+	ip, ifIndex, err = h.getIPAndIfIndexForV4Neighbor(bgpNeighbor.NeighborAddress, bgpNeighbor.IfIndex)
 	if err != nil {
-		h.logger.Info("ValidateBGPNeighbor: getIPAndIfIndexForNeighbor", "failed for neighbor address",
+		h.logger.Info("ValidateBGPNeighbor: getIPAndIfIndexForNeighbor failed for neighbor address",
 			bgpNeighbor.NeighborAddress, "and ifIndex", bgpNeighbor.IfIndex)
 		return pConf, err
 	}
@@ -584,16 +697,11 @@ func (h *BGPHandler) ValidateBGPNeighbor(bgpNeighbor *bgpd.BGPNeighbor) (pConf c
 		return pConf, err
 	}
 
-	if err = h.isAuthPasswordValid(ip, bgpNeighbor.AuthPassword); err != nil {
-		h.logger.Info("ValidateBGPNeighbor: isAuthPasswordValid failed for neighbor", bgpNeighbor.NeighborAddress,
-			"auth password", bgpNeighbor.AuthPassword, "with error:", err)
-		return pConf, err
-	}
-
 	pConf = config.NeighborConfig{
 		BaseConfig: config.BaseConfig{
 			PeerAS:                  uint32(bgpNeighbor.PeerAS),
 			LocalAS:                 uint32(bgpNeighbor.LocalAS),
+			PeerAddressType:         config.PeerAddressV4,
 			UpdateSource:            bgpNeighbor.UpdateSource,
 			AuthPassword:            bgpNeighbor.AuthPassword,
 			Description:             bgpNeighbor.Description,
@@ -621,20 +729,19 @@ func (h *BGPHandler) ValidateBGPNeighbor(bgpNeighbor *bgpd.BGPNeighbor) (pConf c
 	return pConf, err
 }
 
-func (h *BGPHandler) SendBGPNeighbor(oldNeighbor *bgpd.BGPNeighbor,
-	newNeighbor *bgpd.BGPNeighbor, attrSet []bool) (bool, error) {
+func (h *BGPHandler) SendBGPv4Neighbor(oldNeigh *bgpd.BGPv4Neighbor, newNeigh *bgpd.BGPv4Neighbor, attrSet []bool) (
+	bool, error) {
 	created := h.server.VerifyBgpGlobalConfig()
 	if !created {
-		return created,
-			errors.New("Create BGP Local AS and router id before configuring Neighbor")
+		return created, errors.New("BGP Global object not created yet")
 	}
 
-	oldNeighConf, err := h.ValidateBGPNeighbor(oldNeighbor)
+	oldNeighConf, err := h.ValidateV4Neighbor(oldNeigh)
 	if err != nil {
 		return false, err
 	}
 
-	newNeighConf, err := h.ValidateBGPNeighbor(newNeighbor)
+	newNeighConf, err := h.ValidateV4Neighbor(newNeigh)
 	if err != nil {
 		return false, err
 	}
@@ -643,13 +750,13 @@ func (h *BGPHandler) SendBGPNeighbor(oldNeighbor *bgpd.BGPNeighbor,
 	return true, nil
 }
 
-func (h *BGPHandler) CreateBGPNeighbor(bgpNeighbor *bgpd.BGPNeighbor) (bool, error) {
+func (h *BGPHandler) CreateBGPv4Neighbor(bgpNeighbor *bgpd.BGPv4Neighbor) (bool, error) {
 	h.logger.Info("Create BGP neighbor attrs:", bgpNeighbor)
-	return h.SendBGPNeighbor(nil, bgpNeighbor, make([]bool, 0))
+	return h.SendBGPv4Neighbor(nil, bgpNeighbor, make([]bool, 0))
 }
 
-func (h *BGPHandler) convertToThriftNeighbor(neighborState *config.NeighborState) *bgpd.BGPNeighborState {
-	bgpNeighborResponse := bgpd.NewBGPNeighborState()
+func (h *BGPHandler) convertToThriftV4Neighbor(neighborState *config.NeighborState) *bgpd.BGPv4NeighborState {
+	bgpNeighborResponse := bgpd.NewBGPv4NeighborState()
 	bgpNeighborResponse.NeighborAddress = neighborState.NeighborAddress.String()
 	bgpNeighborResponse.IfIndex = neighborState.IfIndex
 	bgpNeighborResponse.PeerAS = int32(neighborState.PeerAS)
@@ -696,54 +803,270 @@ func (h *BGPHandler) convertToThriftNeighbor(neighborState *config.NeighborState
 	return bgpNeighborResponse
 }
 
-func (h *BGPHandler) GetBGPNeighborState(neighborAddr string,
-	ifIndex int32) (*bgpd.BGPNeighborState, error) {
-	ip, _, err := h.getIPAndIfIndexForNeighbor(neighborAddr, ifIndex)
+func (h *BGPHandler) GetBGPv4NeighborState(neighborAddr string, ifIndex int32) (*bgpd.BGPv4NeighborState, error) {
+	ip, _, err := h.getIPAndIfIndexForV4Neighbor(neighborAddr, ifIndex)
 	if err != nil {
-		h.logger.Info("GetBGPNeighborState: getIPAndIfIndexForNeighbor failed for neighbor address", neighborAddr,
+		h.logger.Info("GetBGPv4NeighborState: getIPAndIfIndexForV4Neighbor failed for neighbor address", neighborAddr,
 			"and ifIndex", ifIndex)
-		return bgpd.NewBGPNeighborState(), err
+		return bgpd.NewBGPv4NeighborState(), err
 	}
 
 	bgpNeighborState := h.server.GetBGPNeighborState(ip.String())
 	if bgpNeighborState == nil {
-		return bgpd.NewBGPNeighborState(), errors.New(fmt.Sprintf("GetBGPNeighborState: Neighbor %s not configured", ip))
+		return bgpd.NewBGPv4NeighborState(), errors.New(fmt.Sprintf("GetBGPNeighborState: Neighbor %s not configured", ip))
 	}
-	bgpNeighborResponse := h.convertToThriftNeighbor(bgpNeighborState)
+	bgpNeighborResponse := h.convertToThriftV4Neighbor(bgpNeighborState)
 	return bgpNeighborResponse, nil
 }
 
-func (h *BGPHandler) GetBulkBGPNeighborState(index bgpd.Int,
-	count bgpd.Int) (*bgpd.BGPNeighborStateGetInfo, error) {
-	nextIdx, currCount, bgpNeighbors := h.server.BulkGetBGPNeighbors(int(index), int(count))
-	bgpNeighborsResponse := make([]*bgpd.BGPNeighborState, len(bgpNeighbors))
+func (h *BGPHandler) GetBulkBGPv4NeighborState(index bgpd.Int, count bgpd.Int) (*bgpd.BGPv4NeighborStateGetInfo, error) {
+	nextIdx, currCount, bgpNeighbors := h.server.BulkGetBGPv4Neighbors(int(index), int(count))
+	bgpNeighborsResponse := make([]*bgpd.BGPv4NeighborState, len(bgpNeighbors))
 	for idx, item := range bgpNeighbors {
-		bgpNeighborsResponse[idx] = h.convertToThriftNeighbor(item)
+		bgpNeighborsResponse[idx] = h.convertToThriftV4Neighbor(item)
 	}
 
-	bgpNeighborStateBulk := bgpd.NewBGPNeighborStateGetInfo()
+	bgpNeighborStateBulk := bgpd.NewBGPv4NeighborStateGetInfo()
 	bgpNeighborStateBulk.EndIdx = bgpd.Int(nextIdx)
 	bgpNeighborStateBulk.Count = bgpd.Int(currCount)
 	bgpNeighborStateBulk.More = (nextIdx != 0)
-	bgpNeighborStateBulk.BGPNeighborStateList = bgpNeighborsResponse
+	bgpNeighborStateBulk.BGPv4NeighborStateList = bgpNeighborsResponse
 
 	return bgpNeighborStateBulk, nil
 }
 
-func (h *BGPHandler) UpdateBGPNeighbor(origN *bgpd.BGPNeighbor, updatedN *bgpd.BGPNeighbor,
-	attrSet []bool, op []*bgpd.PatchOpInfo) (bool, error) {
+func (h *BGPHandler) UpdateBGPv4Neighbor(origN *bgpd.BGPv4Neighbor, updatedN *bgpd.BGPv4Neighbor, attrSet []bool,
+	op []*bgpd.PatchOpInfo) (bool, error) {
 	h.logger.Info("Update peer attrs:", updatedN)
-	return h.SendBGPNeighbor(origN, updatedN, attrSet)
+	return h.SendBGPv4Neighbor(origN, updatedN, attrSet)
 }
 
-func (h *BGPHandler) DeleteBGPNeighbor(bgpNeighbor *bgpd.BGPNeighbor) (bool, error) {
+func (h *BGPHandler) DeleteBGPv4Neighbor(bgpNeighbor *bgpd.BGPv4Neighbor) (bool, error) {
 	h.logger.Info("Delete BGP neighbor:", bgpNeighbor.NeighborAddress)
-	ip := net.ParseIP(bgpNeighbor.NeighborAddress)
-	if ip == nil {
-		h.logger.Infof("Can't delete BGP neighbor - IP[%s] not valid", bgpNeighbor.NeighborAddress)
-		return false, errors.New(fmt.Sprintf("Neighbor Address %s not valid", bgpNeighbor.NeighborAddress))
+	ip, _, err := h.getIPAndIfIndexForV4Neighbor(bgpNeighbor.NeighborAddress, bgpNeighbor.IfIndex)
+	if err != nil {
+		h.logger.Info("DeleteBGPv4Neighbor: getIPAndIfIndexForV4Neighbor failed for neighbor address",
+			bgpNeighbor.NeighborAddress, "and ifIndex", bgpNeighbor.IfIndex)
+		return false, err
 	}
-	h.server.RemPeerCh <- bgpNeighbor.NeighborAddress
+
+	h.server.RemPeerCh <- ip.String()
+	return true, nil
+}
+
+func (h *BGPHandler) getIPAndIfIndexForV6Neighbor(neighborIP string, neighborIfIndex int32) (ip net.IP, ifIndex int32,
+	err error) {
+	if strings.TrimSpace(neighborIP) != "" {
+		ip = net.ParseIP(strings.TrimSpace(neighborIP))
+		ifIndex = 0
+		if ip == nil {
+			err = errors.New(fmt.Sprintf("v6Neighbor address %s not valid", neighborIP))
+		}
+	} else if neighborIfIndex != 0 {
+		//neighbor address is a ifIndex
+		var ipv4Intf string
+		// @TODO: this needs to be interface once we decide to move listener
+		ipv4Intf, err = h.server.IntfMgr.GetIPv4Information(neighborIfIndex)
+		if err == nil {
+			h.logger.Info("Call ASICd to get IPv6 address for interface with ifIndex:", neighborIfIndex)
+			ifIP, ipMask, err := net.ParseCIDR(ipv4Intf)
+			if err != nil {
+				h.logger.Err("IPv6Addr", ipv4Intf, "of the interface", neighborIfIndex, "is not valid, error:", err)
+				err = errors.New(fmt.Sprintf("IPv6Addr %s of the interface %d is not valid, error: %s", ipv4Intf,
+					neighborIfIndex, err))
+				return ip, ifIndex, err
+			}
+			if ipMask.Mask[len(ipMask.Mask)-1] < 252 {
+				h.logger.Err("IPv6Addr", ipv4Intf, "of the interface", neighborIfIndex, "is not /30 or /31 address")
+				err = errors.New(fmt.Sprintln("IPv6Addr", ipv4Intf, "of the interface", neighborIfIndex,
+					"is not /30 or /31 address"))
+				return ip, ifIndex, err
+			}
+			h.logger.Info("IPv6Addr of the v6Neighbor local interface", neighborIfIndex, "is", ifIP)
+			ifIP[len(ifIP)-1] = ifIP[len(ifIP)-1] ^ (^ipMask.Mask[len(ipMask.Mask)-1])
+			h.logger.Info("IPv6Addr of the v6Neighbor remote interface is", ifIP)
+			ip = ifIP
+			ifIndex = neighborIfIndex
+			h.logger.Info("v6Neighbor IP address:", ip.String())
+		} else {
+			h.logger.Err("v6Neighbor IP", neighborIP, "or interface", neighborIfIndex, "not configured ")
+		}
+	}
+	return ip, ifIndex, err
+}
+
+func (h *BGPHandler) ValidateV6Neighbor(bgpNeighbor *bgpd.BGPv6Neighbor) (pConf config.NeighborConfig, err error) {
+	if bgpNeighbor == nil {
+		return pConf, err
+	}
+
+	var ip net.IP
+	var ifIndex int32
+	ip, ifIndex, err = h.getIPAndIfIndexForV6Neighbor(bgpNeighbor.NeighborAddress, bgpNeighbor.IfIndex)
+	if err != nil {
+		h.logger.Info("ValidateV6Neighbor: getIPAndIfIndexForNeighbor failed for neighbor address",
+			bgpNeighbor.NeighborAddress, "and ifIndex", bgpNeighbor.IfIndex)
+		return pConf, err
+	}
+
+	if !h.isValidIP(bgpNeighbor.UpdateSource) {
+		err = errors.New(fmt.Sprintf("Update source %s not a valid IP", bgpNeighbor.UpdateSource))
+		return pConf, err
+	}
+
+	pConf = config.NeighborConfig{
+		BaseConfig: config.BaseConfig{
+			PeerAS:                  uint32(bgpNeighbor.PeerAS),
+			LocalAS:                 uint32(bgpNeighbor.LocalAS),
+			PeerAddressType:         config.PeerAddressV6,
+			UpdateSource:            bgpNeighbor.UpdateSource,
+			Description:             bgpNeighbor.Description,
+			RouteReflectorClusterId: uint32(bgpNeighbor.RouteReflectorClusterId),
+			RouteReflectorClient:    bgpNeighbor.RouteReflectorClient,
+			MultiHopEnable:          bgpNeighbor.MultiHopEnable,
+			MultiHopTTL:             uint8(bgpNeighbor.MultiHopTTL),
+			ConnectRetryTime:        uint32(bgpNeighbor.ConnectRetryTime),
+			HoldTime:                uint32(bgpNeighbor.HoldTime),
+			KeepaliveTime:           uint32(bgpNeighbor.KeepaliveTime),
+			BfdEnable:               bgpNeighbor.BfdEnable,
+			BfdSessionParam:         bgpNeighbor.BfdSessionParam,
+			AddPathsRx:              bgpNeighbor.AddPathsRx,
+			AddPathsMaxTx:           uint8(bgpNeighbor.AddPathsMaxTx),
+			MaxPrefixes:             uint32(bgpNeighbor.MaxPrefixes),
+			MaxPrefixesThresholdPct: uint8(bgpNeighbor.MaxPrefixesThresholdPct),
+			MaxPrefixesDisconnect:   bgpNeighbor.MaxPrefixesDisconnect,
+			MaxPrefixesRestartTimer: uint8(bgpNeighbor.MaxPrefixesRestartTimer),
+		},
+		NeighborAddress: ip,
+		IfIndex:         ifIndex,
+		PeerGroup:       bgpNeighbor.PeerGroup,
+	}
+	h.setDefault(&pConf)
+	return pConf, err
+}
+
+func (h *BGPHandler) SendBGPv6Neighbor(oldNeigh *bgpd.BGPv6Neighbor, newNeigh *bgpd.BGPv6Neighbor, attrSet []bool) (
+	bool, error) {
+	created := h.server.VerifyBgpGlobalConfig()
+	if !created {
+		return created, errors.New("BGP Global object not created yet")
+	}
+
+	oldNeighConf, err := h.ValidateV6Neighbor(oldNeigh)
+	if err != nil {
+		return false, err
+	}
+
+	newNeighConf, err := h.ValidateV6Neighbor(newNeigh)
+	if err != nil {
+		return false, err
+	}
+
+	h.server.AddPeerCh <- server.PeerUpdate{oldNeighConf, newNeighConf, attrSet}
+	return true, nil
+}
+
+func (h *BGPHandler) CreateBGPv6Neighbor(bgpNeighbor *bgpd.BGPv6Neighbor) (bool, error) {
+	h.logger.Info("Create BGP neighbor attrs:", bgpNeighbor)
+	return h.SendBGPv6Neighbor(nil, bgpNeighbor, make([]bool, 0))
+}
+
+func (h *BGPHandler) convertToThriftV6Neighbor(neighborState *config.NeighborState) *bgpd.BGPv6NeighborState {
+	bgpNeighborResponse := bgpd.NewBGPv6NeighborState()
+	bgpNeighborResponse.NeighborAddress = neighborState.NeighborAddress.String()
+	bgpNeighborResponse.IfIndex = neighborState.IfIndex
+	bgpNeighborResponse.PeerAS = int32(neighborState.PeerAS)
+	bgpNeighborResponse.LocalAS = int32(neighborState.LocalAS)
+	bgpNeighborResponse.UpdateSource = neighborState.UpdateSource
+	bgpNeighborResponse.PeerType = int8(neighborState.PeerType)
+	bgpNeighborResponse.Description = neighborState.Description
+	bgpNeighborResponse.SessionState = int32(neighborState.SessionState)
+	bgpNeighborResponse.RouteReflectorClusterId = int32(neighborState.RouteReflectorClusterId)
+	bgpNeighborResponse.RouteReflectorClient = neighborState.RouteReflectorClient
+	bgpNeighborResponse.MultiHopEnable = neighborState.MultiHopEnable
+	bgpNeighborResponse.MultiHopTTL = int8(neighborState.MultiHopTTL)
+	bgpNeighborResponse.ConnectRetryTime = int32(neighborState.ConnectRetryTime)
+	bgpNeighborResponse.HoldTime = int32(neighborState.HoldTime)
+	bgpNeighborResponse.KeepaliveTime = int32(neighborState.KeepaliveTime)
+	bgpNeighborResponse.BfdNeighborState = neighborState.BfdNeighborState
+	bgpNeighborResponse.PeerGroup = neighborState.PeerGroup
+	bgpNeighborResponse.AddPathsRx = neighborState.AddPathsRx
+	bgpNeighborResponse.AddPathsMaxTx = int8(neighborState.AddPathsMaxTx)
+
+	bgpNeighborResponse.MaxPrefixes = int32(neighborState.MaxPrefixes)
+	bgpNeighborResponse.MaxPrefixesThresholdPct = int8(neighborState.MaxPrefixesThresholdPct)
+	bgpNeighborResponse.MaxPrefixesDisconnect = neighborState.MaxPrefixesDisconnect
+	bgpNeighborResponse.MaxPrefixesRestartTimer = int8(neighborState.MaxPrefixesRestartTimer)
+	bgpNeighborResponse.TotalPrefixes = int32(neighborState.TotalPrefixes)
+
+	received := bgpd.NewBGPCounters()
+	received.Notification = int64(neighborState.Messages.Received.Notification)
+	received.Update = int64(neighborState.Messages.Received.Update)
+	sent := bgpd.NewBGPCounters()
+	sent.Notification = int64(neighborState.Messages.Sent.Notification)
+	sent.Update = int64(neighborState.Messages.Sent.Update)
+	messages := bgpd.NewBGPMessages()
+	messages.Received = received
+	messages.Sent = sent
+	bgpNeighborResponse.Messages = messages
+
+	queues := bgpd.NewBGPQueues()
+	queues.Input = int32(neighborState.Queues.Input)
+	queues.Output = int32(neighborState.Queues.Output)
+	bgpNeighborResponse.Queues = queues
+
+	return bgpNeighborResponse
+}
+
+func (h *BGPHandler) GetBGPv6NeighborState(neighborAddr string, ifIndex int32) (*bgpd.BGPv6NeighborState, error) {
+	ip, _, err := h.getIPAndIfIndexForV6Neighbor(neighborAddr, ifIndex)
+	if err != nil {
+		h.logger.Info("GetBGPv4NeighborState: getIPAndIfIndexForV4Neighbor failed for neighbor address", neighborAddr,
+			"and ifIndex", ifIndex)
+		return bgpd.NewBGPv6NeighborState(), err
+	}
+
+	bgpNeighborState := h.server.GetBGPNeighborState(ip.String())
+	if bgpNeighborState == nil {
+		return bgpd.NewBGPv6NeighborState(), errors.New(fmt.Sprintf("GetBGPNeighborState: Neighbor %s not configured", ip))
+	}
+	bgpNeighborResponse := h.convertToThriftV6Neighbor(bgpNeighborState)
+	return bgpNeighborResponse, nil
+}
+
+func (h *BGPHandler) GetBulkBGPv6NeighborState(index bgpd.Int, count bgpd.Int) (*bgpd.BGPv6NeighborStateGetInfo,
+	error) {
+	nextIdx, currCount, bgpNeighbors := h.server.BulkGetBGPv6Neighbors(int(index), int(count))
+	bgpNeighborsResponse := make([]*bgpd.BGPv6NeighborState, len(bgpNeighbors))
+	for idx, item := range bgpNeighbors {
+		bgpNeighborsResponse[idx] = h.convertToThriftV6Neighbor(item)
+	}
+
+	bgpNeighborStateBulk := bgpd.NewBGPv6NeighborStateGetInfo()
+	bgpNeighborStateBulk.EndIdx = bgpd.Int(nextIdx)
+	bgpNeighborStateBulk.Count = bgpd.Int(currCount)
+	bgpNeighborStateBulk.More = (nextIdx != 0)
+	bgpNeighborStateBulk.BGPv6NeighborStateList = bgpNeighborsResponse
+
+	return bgpNeighborStateBulk, nil
+}
+
+func (h *BGPHandler) UpdateBGPv6Neighbor(origN *bgpd.BGPv6Neighbor, updatedN *bgpd.BGPv6Neighbor, attrSet []bool,
+	op []*bgpd.PatchOpInfo) (bool, error) {
+	h.logger.Info("Update peer attrs:", updatedN)
+	return h.SendBGPv6Neighbor(origN, updatedN, attrSet)
+}
+
+func (h *BGPHandler) DeleteBGPv6Neighbor(bgpNeighbor *bgpd.BGPv6Neighbor) (bool, error) {
+	h.logger.Info("Delete BGP neighbor:", bgpNeighbor.NeighborAddress)
+	ip, _, err := h.getIPAndIfIndexForV6Neighbor(bgpNeighbor.NeighborAddress, bgpNeighbor.IfIndex)
+	if err != nil {
+		h.logger.Info("DeleteBGPv6Neighbor: getIPAndIfIndexForV6Neighbor failed for neighbor address",
+			bgpNeighbor.NeighborAddress, "and ifIndex", bgpNeighbor.IfIndex)
+		return false, err
+	}
+
+	h.server.RemPeerCh <- ip.String()
 	return true, nil
 }
 
@@ -754,7 +1077,7 @@ func (h *BGPHandler) PeerCommand(in *PeerConfigCommands, out *bool) error {
 	return nil
 }
 
-func (h *BGPHandler) ValidateBGPPeerGroup(peerGroup *bgpd.BGPPeerGroup) (group config.PeerGroupConfig,
+func (h *BGPHandler) ValidateBGPv4PeerGroup(peerGroup *bgpd.BGPv4PeerGroup) (group config.PeerGroupConfig,
 	err error) {
 	if peerGroup == nil {
 		return group, err
@@ -769,6 +1092,7 @@ func (h *BGPHandler) ValidateBGPPeerGroup(peerGroup *bgpd.BGPPeerGroup) (group c
 		BaseConfig: config.BaseConfig{
 			PeerAS:                  uint32(peerGroup.PeerAS),
 			LocalAS:                 uint32(peerGroup.LocalAS),
+			PeerAddressType:         config.PeerAddressV4,
 			UpdateSource:            peerGroup.UpdateSource,
 			AuthPassword:            peerGroup.AuthPassword,
 			Description:             peerGroup.Description,
@@ -792,15 +1116,14 @@ func (h *BGPHandler) ValidateBGPPeerGroup(peerGroup *bgpd.BGPPeerGroup) (group c
 	return group, err
 }
 
-func (h *BGPHandler) SendBGPPeerGroup(oldGroup *bgpd.BGPPeerGroup,
-	newGroup *bgpd.BGPPeerGroup, attrSet []bool) (
+func (h *BGPHandler) SendBGPv4PeerGroup(oldGroup *bgpd.BGPv4PeerGroup, newGroup *bgpd.BGPv4PeerGroup, attrSet []bool) (
 	bool, error) {
-	oldGroupConf, err := h.ValidateBGPPeerGroup(oldGroup)
+	oldGroupConf, err := h.ValidateBGPv4PeerGroup(oldGroup)
 	if err != nil {
 		return false, err
 	}
 
-	newGroupConf, err := h.ValidateBGPPeerGroup(newGroup)
+	newGroupConf, err := h.ValidateBGPv4PeerGroup(newGroup)
 	if err != nil {
 		return false, err
 	}
@@ -809,18 +1132,89 @@ func (h *BGPHandler) SendBGPPeerGroup(oldGroup *bgpd.BGPPeerGroup,
 	return true, nil
 }
 
-func (h *BGPHandler) CreateBGPPeerGroup(peerGroup *bgpd.BGPPeerGroup) (bool, error) {
+func (h *BGPHandler) CreateBGPv4PeerGroup(peerGroup *bgpd.BGPv4PeerGroup) (bool, error) {
 	h.logger.Info("Create BGP peer group attrs:", peerGroup)
-	return h.SendBGPPeerGroup(nil, peerGroup, make([]bool, 0))
+	return h.SendBGPv4PeerGroup(nil, peerGroup, make([]bool, 0))
 }
 
-func (h *BGPHandler) UpdateBGPPeerGroup(origG *bgpd.BGPPeerGroup, updatedG *bgpd.BGPPeerGroup,
-	attrSet []bool, op []*bgpd.PatchOpInfo) (bool, error) {
+func (h *BGPHandler) UpdateBGPv4PeerGroup(origG *bgpd.BGPv4PeerGroup, updatedG *bgpd.BGPv4PeerGroup, attrSet []bool,
+	op []*bgpd.PatchOpInfo) (bool, error) {
 	h.logger.Info("Update peer attrs:", updatedG)
-	return h.SendBGPPeerGroup(origG, updatedG, attrSet)
+	return h.SendBGPv4PeerGroup(origG, updatedG, attrSet)
 }
 
-func (h *BGPHandler) DeleteBGPPeerGroup(peerGroup *bgpd.BGPPeerGroup) (bool, error) {
+func (h *BGPHandler) DeleteBGPv4PeerGroup(peerGroup *bgpd.BGPv4PeerGroup) (bool, error) {
+	h.logger.Info("Delete BGP peer group:", peerGroup.Name)
+	h.server.RemPeerGroupCh <- peerGroup.Name
+	return true, nil
+}
+
+func (h *BGPHandler) ValidateBGPv6PeerGroup(peerGroup *bgpd.BGPv6PeerGroup) (group config.PeerGroupConfig,
+	err error) {
+	if peerGroup == nil {
+		return group, err
+	}
+
+	if !h.isValidIP(peerGroup.UpdateSource) {
+		err = errors.New(fmt.Sprintf("Update source %s not a valid IP", peerGroup.UpdateSource))
+		return group, err
+	}
+
+	group = config.PeerGroupConfig{
+		BaseConfig: config.BaseConfig{
+			PeerAS:                  uint32(peerGroup.PeerAS),
+			LocalAS:                 uint32(peerGroup.LocalAS),
+			PeerAddressType:         config.PeerAddressV6,
+			UpdateSource:            peerGroup.UpdateSource,
+			Description:             peerGroup.Description,
+			RouteReflectorClusterId: uint32(peerGroup.RouteReflectorClusterId),
+			RouteReflectorClient:    peerGroup.RouteReflectorClient,
+			MultiHopEnable:          peerGroup.MultiHopEnable,
+			MultiHopTTL:             uint8(peerGroup.MultiHopTTL),
+			ConnectRetryTime:        uint32(peerGroup.ConnectRetryTime),
+			HoldTime:                uint32(peerGroup.HoldTime),
+			KeepaliveTime:           uint32(peerGroup.KeepaliveTime),
+			AddPathsRx:              peerGroup.AddPathsRx,
+			AddPathsMaxTx:           uint8(peerGroup.AddPathsMaxTx),
+			MaxPrefixes:             uint32(peerGroup.MaxPrefixes),
+			MaxPrefixesThresholdPct: uint8(peerGroup.MaxPrefixesThresholdPct),
+			MaxPrefixesDisconnect:   peerGroup.MaxPrefixesDisconnect,
+			MaxPrefixesRestartTimer: uint8(peerGroup.MaxPrefixesRestartTimer),
+		},
+		Name: peerGroup.Name,
+	}
+
+	return group, err
+}
+
+func (h *BGPHandler) SendBGPv6PeerGroup(oldGroup *bgpd.BGPv6PeerGroup, newGroup *bgpd.BGPv6PeerGroup, attrSet []bool) (
+	bool, error) {
+	oldGroupConf, err := h.ValidateBGPv6PeerGroup(oldGroup)
+	if err != nil {
+		return false, err
+	}
+
+	newGroupConf, err := h.ValidateBGPv6PeerGroup(newGroup)
+	if err != nil {
+		return false, err
+	}
+
+	h.server.AddPeerGroupCh <- server.PeerGroupUpdate{oldGroupConf, newGroupConf, attrSet}
+	return true, nil
+}
+
+func (h *BGPHandler) CreateBGPv6PeerGroup(peerGroup *bgpd.BGPv6PeerGroup) (bool, error) {
+	h.logger.Info("Create BGP peer group attrs:", peerGroup)
+	return h.SendBGPv6PeerGroup(nil, peerGroup, make([]bool, 0))
+}
+
+func (h *BGPHandler) UpdateBGPv6PeerGroup(origG *bgpd.BGPv6PeerGroup, updatedG *bgpd.BGPv6PeerGroup, attrSet []bool,
+	op []*bgpd.PatchOpInfo) (bool, error) {
+	h.logger.Info("Update peer attrs:", updatedG)
+	return h.SendBGPv6PeerGroup(origG, updatedG, attrSet)
+}
+
+func (h *BGPHandler) DeleteBGPv6PeerGroup(peerGroup *bgpd.BGPv6PeerGroup) (bool, error) {
 	h.logger.Info("Delete BGP peer group:", peerGroup.Name)
 	h.server.RemPeerGroupCh <- peerGroup.Name
 	return true, nil

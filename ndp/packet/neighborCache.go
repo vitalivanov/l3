@@ -30,6 +30,29 @@ import (
 )
 
 /*
+ * Delay first probe timer handler
+ */
+func (c *NeighborCache) DelayProbe() {
+	if c.DelayFirstProbeTimer != nil {
+		// we should never come here
+		debug.Logger.Debug("Resetting delay probe timer for ifIndex:", c.MyLinkInfo.IfIndex, "linkIp:", c.MyLinkInfo.IpAddr,
+			"nbrIp:", c.IpAddr)
+		c.DelayFirstProbeTimer.Reset(time.Duration(DELAY_FIRST_PROBE_TIME) * time.Second)
+	} else {
+		var DelayProbeExpired_func func()
+		DelayProbeExpired_func = func() {
+			debug.Logger.Debug("Delay Probe Timer Expired for ifIndex:", c.MyLinkInfo.IfIndex, "linkIp:",
+				c.MyLinkInfo.IpAddr, "nbrIp:", c.IpAddr, "Sending Probe NS msgs")
+			c.MyLinkInfo.ReturnCh <- config.PacketData{c.MyLinkInfo.IpAddr, c.IpAddr, c.MyLinkInfo.IfIndex}
+		}
+		debug.Logger.Debug("Setting Delay Probe timer for ifIndex:", c.MyLinkInfo.IfIndex, "linkIp:", c.MyLinkInfo.IpAddr,
+			"nbrIp:", c.IpAddr)
+		c.DelayFirstProbeTimer = time.AfterFunc(time.Duration(DELAY_FIRST_PROBE_TIME)*time.Second,
+			DelayProbeExpired_func)
+	}
+}
+
+/*
  *    Re-Transmit Timer
  */
 func (c *NeighborCache) Timer() {
@@ -62,9 +85,13 @@ func (c *NeighborCache) Timer() {
  *  Start Reachable Timer
  */
 func (c *NeighborCache) RchTimer() {
+	// When reachable timer is running or updated we need to stop delay probe timer and re-transmit timer
+	// no matter what happens
+	c.StopDelayProbeTimer()
+	c.StopReTransmitTimer()
 	if c.ReachableTimer != nil {
-		// if Re-Transmit Timer is still running then stop it
-		c.StopReTransmitTimer()
+		// if Re-Transmit Timer is still running then stop it, this is now taken care of by UpdateProbe
+		//c.StopReTransmitTimer()
 		debug.Logger.Debug("Re-Setting Reachable Timer for neighbor:", c.IpAddr, "for my Link:", *c.MyLinkInfo)
 		//Reset the timer as we have received an advertisment for the neighbor
 		c.ReachableTimer.Reset(time.Duration(c.BaseReachableTimer) * time.Millisecond)
@@ -72,11 +99,12 @@ func (c *NeighborCache) RchTimer() {
 		// This is first time initialization of reachable timer... let set it up
 		var ReachableTimer_func func()
 		ReachableTimer_func = func() {
-			debug.Logger.Debug("Reachable Timer expired for neighbor:", c.IpAddr, "starting RetransTimer",
+			debug.Logger.Debug("Reachable Timer expired for neighbor:", c.IpAddr, "initiating unicast NS",
 				"for my Link:", *c.MyLinkInfo)
-			c.Timer()
+			c.MyLinkInfo.ReturnCh <- config.PacketData{c.MyLinkInfo.IpAddr, c.IpAddr, c.MyLinkInfo.IfIndex}
+			//c.Timer()
 			// also re-setting the reachable timer..
-			c.ReachableTimer.Reset(time.Duration(c.BaseReachableTimer) * time.Millisecond)
+			//c.ReachableTimer.Reset(time.Duration(c.BaseReachableTimer) * time.Millisecond)
 		}
 		debug.Logger.Debug("Setting Reachable Timer for neighbor:", c.IpAddr, "for my Link:", *c.MyLinkInfo)
 		c.ReachableTimer = time.AfterFunc(time.Duration(c.BaseReachableTimer)*time.Millisecond,
@@ -144,6 +172,29 @@ func (c *NeighborCache) StopReComputeBaseTimer() {
 }
 
 /*
+ *  stop delay probe Timer
+ */
+func (c *NeighborCache) StopDelayProbeTimer() {
+	if c.DelayFirstProbeTimer != nil {
+		debug.Logger.Debug("Stopping DelayFirstProbeTimer for Neighbor", c.IpAddr)
+		c.DelayFirstProbeTimer.Stop()
+		c.DelayFirstProbeTimer = nil
+	}
+}
+
+/*
+ *  Update Probe Information
+ *	1) Stop Delay Timer if running
+ *	2) Stop Re-Transmit Timer if running
+ *	3) Update Probes Sent counter to 0
+ */
+func (c *NeighborCache) UpdateProbe() {
+	c.StopDelayProbeTimer()
+	c.StopReTransmitTimer()
+	c.ProbesSent = uint8(0)
+}
+
+/*
  *  Initialize cache with default values..
  */
 func (c *NeighborCache) InitCache(reachableTime, retransTime uint32, myIp, myLinkip string, myLinkIfIndex int32,
@@ -171,6 +222,7 @@ func (c *NeighborCache) DeInitCache() {
 	c.StopReTransmitTimer()
 	c.StopReachableTimer()
 	c.StopReComputeBaseTimer()
+	c.StopDelayProbeTimer()
 	// deleting link information
 	c.MyLinkInfo = nil
 }

@@ -154,6 +154,33 @@ func RemoveMPAttrs(pathAttrs *[]BGPPathAttr) (mpReach *BGPPathAttrMPReachNLRI, m
 	return mpReach, mpUnreach
 }
 
+func getPathAttr(updateMsg *BGPMessage, code BGPPathAttrType) BGPPathAttr {
+	body := updateMsg.Body.(*BGPUpdate)
+	return getTypeFromPathAttrs(body.PathAttributes, code)
+}
+
+func getTypeFromPathAttrs(pathAttrs []BGPPathAttr, code BGPPathAttrType) BGPPathAttr {
+	for _, pa := range pathAttrs {
+		if pa.GetCode() == code {
+			return pa
+		}
+	}
+	return nil
+}
+
+func GetMPAttrs(pathAttrs []BGPPathAttr) (mpReach *BGPPathAttrMPReachNLRI, mpUnreach *BGPPathAttrMPUnreachNLRI) {
+	reach := getTypeFromPathAttrs(pathAttrs, BGPPathAttrTypeMPReachNLRI)
+	if reach != nil {
+		mpReach = reach.(*BGPPathAttrMPReachNLRI)
+	}
+
+	unreach := getTypeFromPathAttrs(pathAttrs, BGPPathAttrTypeMPUnreachNLRI)
+	if unreach != nil {
+		mpUnreach = unreach.(*BGPPathAttrMPUnreachNLRI)
+	}
+	return mpReach, mpUnreach
+}
+
 func SetLocalPref(updateMsg *BGPMessage, pref uint32) {
 	body := updateMsg.Body.(*BGPUpdate)
 
