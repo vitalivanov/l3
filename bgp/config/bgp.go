@@ -32,6 +32,7 @@ type SourcePolicyMap struct {
 	Sources string
 	Policy  string
 }
+
 type GlobalConfig struct {
 	AS                  uint32
 	RouterId            net.IP
@@ -65,6 +66,13 @@ const (
 	PeerTypeExternal
 )
 
+type PeerAddressType int
+
+const (
+	PeerAddressV4 PeerAddressType = iota
+	PeerAddressV6
+)
+
 type BgpCounters struct {
 	Update       uint64
 	Notification uint64
@@ -83,6 +91,7 @@ type Queues struct {
 type BaseConfig struct {
 	PeerAS                  uint32
 	LocalAS                 uint32
+	PeerAddressType         PeerAddressType
 	UpdateSource            string
 	AuthPassword            string
 	Description             string

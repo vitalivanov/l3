@@ -1465,24 +1465,40 @@ func (s *BGPServer) GetBGPNeighborState(neighborIP string) *config.NeighborState
 	return &peer.NeighborConf.Neighbor.State
 }
 
-func (s *BGPServer) BulkGetBGPNeighbors(index int, count int) (int, int, []*config.NeighborState) {
+func (s *BGPServer) bulkGetBGPNeighbors(index int, count int, addrType config.PeerAddressType) (int, int,
+	[]*config.NeighborState) {
 	defer s.NeighborMutex.RUnlock()
 
 	s.NeighborMutex.RLock()
-	if index+count > len(s.Neighbors) {
-		count = len(s.Neighbors) - index
+
+	num := 0
+	result := make([]*config.NeighborState, 0)
+	for i := index; i < len(s.Neighbors); i++ {
+		if s.Neighbors[i+index].NeighborConf.Neighbor.Config.PeerAddressType == addrType {
+			num++
+			if num <= count {
+				result = append(result, &s.Neighbors[i+index].NeighborConf.Neighbor.State)
+			} else {
+				break
+			}
+		}
 	}
 
-	result := make([]*config.NeighborState, count)
-	for i := 0; i < count; i++ {
-		result[i] = &s.Neighbors[i+index].NeighborConf.Neighbor.State
-	}
-
-	index += count
-	if index >= len(s.Neighbors) {
+	if num > count {
+		index += count
+	} else {
 		index = 0
+		count = num
 	}
 	return index, count, result
+}
+
+func (s *BGPServer) BulkGetBGPv4Neighbors(index int, count int) (int, int, []*config.NeighborState) {
+	return s.bulkGetBGPNeighbors(index, count, config.PeerAddressV4)
+}
+
+func (s *BGPServer) BulkGetBGPv6Neighbors(index int, count int) (int, int, []*config.NeighborState) {
+	return s.bulkGetBGPNeighbors(index, count, config.PeerAddressV6)
 }
 
 func (s *BGPServer) VerifyBgpGlobalConfig() bool {
