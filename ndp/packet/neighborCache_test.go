@@ -23,7 +23,6 @@
 package packet
 
 import (
-	"fmt"
 	"github.com/google/gopacket/pcap"
 	"l3/ndp/config"
 	"l3/ndp/debug"
@@ -76,16 +75,17 @@ func addTestNbrEntryWithMac(ipAddr string, peerIP string, macAddr string) {
 }
 
 func addTestNbrEntry(ipAddr string, peerIP string) {
+	t := &testing.T{}
 	cache := NeighborCache{
-		State:            REACHABLE,
 		LinkLayerAddress: "aa:bb:cc:dd:ee:ff",
 		IpAddr:           peerIP,
 	}
 	link, exists := testPktObj.GetLink(ipAddr)
 	if !exists {
-		fmt.Println("ERROR: link should exists", ipAddr, "peerIP:", peerIP)
+		t.Error("ERROR: link should exists", ipAddr, "peerIP:", peerIP)
 		return
 	}
+	// Init cache will set the STATE to be In-complete
 	cache.InitCache(link.ReachableTime, link.RetransTimer, cache.IpAddr, ipAddr, link.PortIfIndex, testPktDataCh)
 	link.NbrCache[peerIP] = cache
 	testPktObj.SetLink(ipAddr, link)
@@ -109,9 +109,11 @@ func TestNDSMsgSend(t *testing.T) {
 	initTestPacket()
 	testPktObj.InitLink(100, "2002::1/64", "00:e0:ec:26:a7:ee")
 	//dumpLinkInfo(t)
-	addTestNbrEntry(ipAddr, "2002::2")
+	// add neighbors
+	helperForAddingNbr(ipAddr)
 	initPcapHandlerForTest(t)
 	var err error
+
 	err = testPktObj.SendNSMsgIfRequired(ipAddr, testPcapHdl)
 	if err == nil {
 		t.Error(err)
@@ -169,6 +171,40 @@ func TestReComputerTimer(t *testing.T) {
 	}
 }
 
+func TestDelayFirstTimer(t *testing.T) {
+	initTestPacket()
+	cache := cacheInitHelper()
+	cache.DelayProbe()
+	if cache.DelayFirstProbeTimer == nil {
+		t.Error("Failed to start delay probe timer")
+	}
+	cache.DelayProbe()
+	if cache.DelayFirstProbeTimer == nil {
+		t.Error("Failed to reset delay probe timer")
+	}
+
+	cache.StopDelayProbeTimer()
+	if cache.DelayFirstProbeTimer != nil {
+		t.Error("Failed to stop delay probe timer")
+	}
+	// delete the cache and then restart the proble
+	cache.DeInitCache()
+	if cache.DelayFirstProbeTimer != nil {
+		t.Error("Failed to stop delay probe timer")
+	}
+
+	cache = cacheInitHelper()
+	cache.DelayProbe()
+	if cache.DelayFirstProbeTimer == nil {
+		t.Error("Failed to start delay probe timer")
+	}
+	// delete the cache and make sure delay probe is stopped in that
+	cache.DeInitCache()
+	if cache.DelayFirstProbeTimer != nil {
+		t.Error("Failed to stop delay probe timer")
+	}
+}
+
 func TestNeighborCacheInitDeInit(t *testing.T) {
 	cache := cacheInitHelper()
 	wantCache := NeighborCache{
@@ -210,26 +246,32 @@ func TestNeighborCacheInitDeInit(t *testing.T) {
 	}
 }
 
-func TestNeighborCacheReTransmitTimer(t *testing.T) {
+func helperForLinkNbr() (string, string) {
 	sip := "2002::1/64"
 	dip := "2002::2/64"
 	ipD, _, _ := net.ParseCIDR(dip)
 	ipS, _, _ := net.ParseCIDR(sip)
 	srcMac := "00:e0:ec:26:a7:ee"
-	initTestPacket()
 	testPktObj.InitLink(100, sip, srcMac)
 	addTestNbrEntry(ipS.String(), ipD.String())
-	link, _ := testPktObj.GetLink(ipS.String())
-	cache, exists := link.NbrCache[ipD.String()]
-	if !exists {
-		t.Error("Initializing failure")
-	} else {
-		go func() {
-			cache.Timer()
-		}()
-	}
+	return ipS.String(), ipD.String()
+}
 
-	var pktData config.PacketData
+func ValidateRcvdPktData(pktData config.PacketData, ipS, ipD string) {
+	t := &testing.T{}
+	if !reflect.DeepEqual(pktData.IpAddr, ipS) {
+		t.Error("mismatch in src ip", pktData.IpAddr, "!=", ipS)
+	}
+	if !reflect.DeepEqual(pktData.NeighborIp, ipD) {
+		t.Error("mismatch in dst ip", pktData.NeighborIp, "!=", ipD)
+	}
+	if pktData.IfIndex != int32(100) {
+		t.Error("invalid ifIndex received on packet channel", pktData.IfIndex)
+	}
+}
+
+func helperFoValidatingChannelInfo(ipS, ipD string) (pktData config.PacketData) {
+	//t := &testing.T{}
 	for {
 		select {
 		case pktData = <-testPktDataCh:
@@ -237,14 +279,130 @@ func TestNeighborCacheReTransmitTimer(t *testing.T) {
 		}
 		break
 	}
+	ValidateRcvdPktData(pktData, ipS, ipD)
+	return pktData
+}
 
-	if !reflect.DeepEqual(pktData.IpAddr, ipS.String()) {
-		t.Error("mismatch in src ip", pktData.IpAddr, "!=", ipS.String())
+func ValidateRetryUnicastSoliciation(pktData config.PacketData) (deleteEntries []string) {
+	t := &testing.T{}
+	// Send a packet on delay retry
+	retry := testPktObj.RetryUnicastSolicitation(pktData.IpAddr, pktData.NeighborIp, testPcapHdl)
+	if !retry {
+		// delete single Neighbor entry from Neighbor Cache
+		deleteEntries, err := testPktObj.DeleteNeighbor(pktData.IpAddr, pktData.NeighborIp)
+		if len(deleteEntries) > 0 && err == nil {
+			return deleteEntries
+		} else {
+			t.Error("We should have got delete request for Nbr", pktData.NeighborIp)
+		}
 	}
-	if !reflect.DeepEqual(pktData.NeighborIp, ipD.String()) {
-		t.Error("mismatch in dst ip", pktData.NeighborIp, "!=", ipD.String())
+	return deleteEntries
+}
+
+func ValidateProbes(ipS, ipD string, quit chan bool, t *testing.T) {
+	link, _ := testPktObj.GetLink(ipS)
+	exit := false
+	for {
+		select {
+		case pktData := <-testPktDataCh:
+			ValidateRcvdPktData(pktData, ipS, ipD)
+			deleteEntries := ValidateRetryUnicastSoliciation(pktData)
+			if len(deleteEntries) == 0 { // then you validate neighbor information
+				cache, exists := link.NbrCache[ipD]
+				if !exists {
+					t.Error("Initializing failure")
+					exit = true
+				}
+
+				if cache.ProbesSent == 0 {
+					continue
+				} else {
+					if cache.State != PROBE {
+						t.Error("Updating State from DELAY to PROBE failed on Delay Timer Expiry")
+						exit = true
+						//break
+					} else {
+						if cache.RetransTimer == nil {
+							t.Error("Failer to restart re-transmit timer even when state is PROBE")
+							exit = true
+						}
+					}
+				}
+			} else {
+				exit = true
+				t.Log("deleted neighbor Entry information is", deleteEntries[0])
+			}
+		}
+		if exit {
+			quit <- true
+			return
+		}
 	}
-	if pktData.IfIndex != int32(100) {
-		t.Error("invalid ifIndex received on packet channel", pktData.IfIndex)
+}
+
+func TestNeighborCacheDelayTransmitTimer(t *testing.T) {
+	initTestPacket()
+	initPcapHandlerForTest(t)
+	ipS, ipD := helperForLinkNbr()
+	link, _ := testPktObj.GetLink(ipS)
+	cache, exists := link.NbrCache[ipD]
+	if !exists {
+		t.Error("Initializing failure")
+		return
 	}
+	// set state to be reachable for testing purpose
+	cache.State = REACHABLE
+	link.NbrCache[ipD] = cache
+	testPktObj.SetLink(ipS, link)
+
+	//start delay timer and test functionality of only delay timer
+	go func() {
+		cache.DelayProbe()
+	}()
+
+	//wait for delay timer expiry
+	pktData := helperFoValidatingChannelInfo(ipS, ipD)
+	ValidateRetryUnicastSoliciation(pktData)
+	cache, exists = link.NbrCache[ipD]
+	if !exists {
+		t.Error("Initializing failure")
+	}
+
+	if cache.State != DELAY {
+		t.Error("Update Stating from REACHABLE to DELAY failed on Reachable Timer Expiry")
+		return
+	}
+
+	// re-start delay time and test functionality of delay timer triggering re-transmit timer
+	cache.StopReTransmitTimer() // just making sure that re-transmit is stopped
+	cache.State = REACHABLE
+	cache.ProbesSent = 0
+	link.NbrCache[ipD] = cache
+	testPktObj.SetLink(ipS, link)
+	quit := make(chan bool)
+	go ValidateProbes(ipS, ipD, quit, t)
+	cache, exists = link.NbrCache[ipD]
+	if !exists {
+		t.Error("Initializing failure")
+	}
+	go func() {
+		cache.DelayProbe()
+	}()
+
+	<-quit
+}
+
+func TestNeighborCacheReTransmitTimer(t *testing.T) {
+	initTestPacket()
+	ipS, ipD := helperForLinkNbr()
+	link, _ := testPktObj.GetLink(ipS)
+	cache, exists := link.NbrCache[ipD]
+	if !exists {
+		t.Error("Initializing failure")
+	} else {
+		go func() {
+			cache.Timer()
+		}()
+	}
+	_ = helperFoValidatingChannelInfo(ipS, ipD)
 }

@@ -63,16 +63,18 @@ type ParentLinkInfo struct {
 }
 
 type NeighborCache struct {
-	BaseReachableTimer  float32
-	RetransTimerConfig  uint32
-	ReachableTimeConfig uint32
-	RecomputeBaseTimer  *time.Timer
-	ReachableTimer      *time.Timer
-	RetransTimer        *time.Timer
-	State               int
-	LinkLayerAddress    string // this is our neighbor port mac address
-	IpAddr              string
-	MyLinkInfo          *ParentLinkInfo
+	BaseReachableTimer   float32
+	RetransTimerConfig   uint32
+	ReachableTimeConfig  uint32
+	RecomputeBaseTimer   *time.Timer
+	ReachableTimer       *time.Timer
+	RetransTimer         *time.Timer
+	DelayFirstProbeTimer *time.Timer
+	ProbesSent           uint8
+	State                int
+	LinkLayerAddress     string // this is our neighbor port mac address
+	IpAddr               string
+	MyLinkInfo           *ParentLinkInfo
 }
 
 type Link struct {
@@ -106,6 +108,11 @@ const (
 	ICMPV6_SOURCE_LINK_LAYER_LENGTH uint16 = 8
 	SOLICITATED_NODE_ADDRESS               = "ff02::1:ff00:0000"
 	SOLICITATED_SRC_IP                     = "::"
+	MAX_UNICAST_SOLICIT             uint8  = 3
+	MAX_MULTICAST_SOLICIT                  = 3
+	MAX_ANYCAST_DELAY_TIMER                = 1
+	MAX_NEIGHBOR_ADVERTISEMENT             = 3
+	DELAY_FIRST_PROBE_TIME                 = 5 // this is in seconds
 	MIN_RANDOM_FACTOR                      = 0.5
 	MAX_RANDOM_FACTOR                      = 1.5
 	RECOMPUTE_BASE_REACHABLE_TIMER         = 1 // this is in hour

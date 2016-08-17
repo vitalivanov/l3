@@ -73,6 +73,15 @@ func (svr *NDPServer) StartRxTx(ifIndex int32) {
 			ifIndex, "is not allowed")
 		return
 	}
+
+	if ipPort.PcapBase.PcapUsers != 0 {
+		// update pcap user and move on
+		ipPort.PcapBase.PcapUsers += 1
+		svr.L3Port[ifIndex] = ipPort
+		debug.Logger.Info("Updating total pcap user for", ipPort.IntfRef, "to", ipPort.PcapBase.PcapUsers)
+		debug.Logger.Info("Start receiving packets for ip:", ipPort.IpAddr, "on Port", ipPort.IntfRef)
+		return
+	}
 	// create pcap handler if there is none created right now
 	if ipPort.PcapBase.PcapHandle == nil {
 		var err error
@@ -85,6 +94,7 @@ func (svr *NDPServer) StartRxTx(ifIndex int32) {
 	if ipPort.PcapBase.PcapCtrl == nil {
 		ipPort.PcapBase.PcapCtrl = make(chan bool)
 	}
+	ipPort.PcapBase.PcapUsers += 1
 	svr.L3Port[ifIndex] = ipPort
 	debug.Logger.Info("Start rx/tx for port:", ipPort.IntfRef, "ifIndex:", ipPort.IfIndex, "ip address", ipPort.IpAddr)
 
@@ -107,6 +117,24 @@ func (svr *NDPServer) StopRxTx(ifIndex int32) {
 		debug.Logger.Err("No entry found for ifIndex:", ifIndex)
 		return
 	}
+
+	/* The below check is based on following assumptions:
+	 *	1) fpPort1 has one ip address, bypass the check and delete pcap
+	 *	2) fpPort1 has two ip address
+	 *		a) 2003::2/64 	- Global Scope
+	 *		b) fe80::123/64 - Link Scope
+	 *		In this case we will get two Notification for port down from the chip, one is for
+	 *		Global Scope Ip and second is for Link Scope..
+	 *		On first Notification NDP will update pcap users and move on. Only when second delete
+	 *		notification comes then NDP will delete pcap
+	 */
+	if ipPort.PcapBase.PcapUsers > 1 {
+		ipPort.PcapBase.PcapUsers -= 1
+		svr.L3Port[ifIndex] = ipPort
+		debug.Logger.Info("Updating total pcap user for", ipPort.IntfRef, "to", ipPort.PcapBase.PcapUsers)
+		debug.Logger.Info("Stop receiving packets for ip:", ipPort.IpAddr, "on Port", ipPort.IntfRef)
+		return
+	}
 	// Inform go routine spawned for ipPort to exit..
 	ipPort.PcapBase.PcapCtrl <- true
 	<-ipPort.PcapBase.PcapCtrl
@@ -116,6 +144,7 @@ func (svr *NDPServer) StopRxTx(ifIndex int32) {
 
 	// deleted ctrl channel to avoid any memory usage
 	ipPort.PcapBase.PcapCtrl = nil
+	ipPort.PcapBase.PcapUsers = 0 // set to zero
 	svr.L3Port[ifIndex] = ipPort
 
 	debug.Logger.Info("Stop rx/tx for port:", ipPort.IntfRef, "ifIndex:", ipPort.IfIndex,
@@ -258,6 +287,16 @@ func (svr *NDPServer) ProcessTimerExpiry(pktData config.PacketData) {
 	if !exists {
 		return
 	}
+	retry := svr.Packet.RetryUnicastSolicitation(pktData.IpAddr, pktData.NeighborIp, l3Port.PcapBase.PcapHandle)
+	//if retry {
 	// use pktData.IpAddr because that will be your src ip without CIDR format, same goes for NeighborIP
-	svr.Packet.SendUnicastNeighborSolicitation(pktData.IpAddr, pktData.NeighborIp, l3Port.PcapBase.PcapHandle)
+	//	svr.Packet.SendUnicastNeighborSolicitation(pktData.IpAddr, pktData.NeighborIp, l3Port.PcapBase.PcapHandle)
+	//} else {
+	if !retry {
+		// delete single Neighbor entry from Neighbor Cache
+		deleteEntries, err := svr.Packet.DeleteNeighbor(pktData.IpAddr, pktData.NeighborIp)
+		if len(deleteEntries) > 0 && err == nil {
+			svr.DeleteNeighborInfo(deleteEntries)
+		}
+	}
 }

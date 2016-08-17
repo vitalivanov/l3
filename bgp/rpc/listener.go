@@ -516,16 +516,15 @@ func (h *BGPHandler) getIPAndIfIndexForNeighbor(neighborIP string,
 			if err != nil {
 				h.logger.Err("getIPAndIfIndexForNeighbor - IpAddr", ipv4Intf, "of the interface", neighborIfIndex,
 					"is not valid, error:", err)
-				err = errors.New(fmt.Sprintf("IpAddr %s of the interface %d is not",
-					"valid, error: %s", ipv4Intf, neighborIfIndex, err))
+				err = errors.New(fmt.Sprintf("IpAddr %s of the interface %d is not valid, error: %s", ipv4Intf,
+					neighborIfIndex, err))
 				return ip, ifIndex, err
 			}
 			if ipMask.Mask[len(ipMask.Mask)-1] < 252 {
 				h.logger.Err("getIPAndIfIndexForNeighbor - IpAddr", ipv4Intf, "of the interface", neighborIfIndex,
 					"is not /30 or /31 address")
-				err = errors.New(fmt.Sprintln("getIPAndIfIndexForNeighbor - IpAddr %s",
-					"of the interface %s is not /30 or /31 address",
-					ipv4Intf, neighborIfIndex))
+				err = errors.New(fmt.Sprintln("getIPAndIfIndexForNeighbor - IpAddr", ipv4Intf,
+					"of the interface", neighborIfIndex, "is not /30 or /31 address"))
 				return ip, ifIndex, err
 			}
 			h.logger.Info("getIPAndIfIndexForNeighbor - IpAddr", ifIP, "of the interface", neighborIfIndex)
@@ -582,8 +581,8 @@ func (h *BGPHandler) ValidateBGPNeighbor(bgpNeighbor *bgpd.BGPNeighbor) (pConf c
 	var ifIndex int32
 	ip, ifIndex, err = h.getIPAndIfIndexForNeighbor(bgpNeighbor.NeighborAddress, bgpNeighbor.IntfRef)
 	if err != nil {
-		h.logger.Info("ValidateBGPNeighbor: getIPAndIfIndexForNeighbor", "failed for neighbor address",
-			bgpNeighbor.NeighborAddress, "and ifIndex", bgpNeighbor.IntfRef)
+		h.logger.Info("ValidateBGPNeighbor: getIPAndIfIndexForNeighbor failed for neighbor address",
+			bgpNeighbor.NeighborAddress, "and ifIndex", bgpNeighbor.IfIndex)
 		return pConf, err
 	}
 
@@ -754,7 +753,7 @@ func (h *BGPHandler) DeleteBGPNeighbor(bgpNeighbor *bgpd.BGPNeighbor) (bool, err
 	h.logger.Info("Delete BGP neighbor:", bgpNeighbor.NeighborAddress)
 	ip := net.ParseIP(bgpNeighbor.NeighborAddress)
 	if ip == nil {
-		h.logger.Infof("Can't delete BGP neighbor - IP[%s] not valid", bgpNeighbor.NeighborAddress)
+		h.logger.Infof("Can't delete BGP neighbor - IP %s not valid", bgpNeighbor.NeighborAddress)
 		return false, errors.New(fmt.Sprintf("Neighbor Address %s not valid", bgpNeighbor.NeighborAddress))
 	}
 	h.server.RemPeerCh <- bgpNeighbor.NeighborAddress

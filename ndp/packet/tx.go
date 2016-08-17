@@ -73,12 +73,36 @@ func (p *Packet) SendNDPkt(pkt []byte, pHdl *pcap.Handle) error {
 }
 
 /*
+ *    Check how many solicitations are send out to the neighbor,
+ *    if != MAX_UNICAST_SOLICIT then send Unicast NS
+ */
+func (p *Packet) RetryUnicastSolicitation(srcIP, dstIP string, pHdl *pcap.Handle) bool {
+	link, exists := p.GetLink(srcIP)
+	if !exists {
+		debug.Logger.Info("Link is not valid, delete neigbor")
+		return false
+	}
+	cache, exists := link.NbrCache[dstIP]
+	if !exists {
+		debug.Logger.Err("No Neighbor entry", dstIP, "found for", srcIP)
+		return false
+	}
+	if cache.ProbesSent == MAX_UNICAST_SOLICIT {
+		return false
+	}
+
+	// use pktData.IpAddr because that will be your src ip without CIDR format, same goes for NeighborIP
+	p.SendUnicastNeighborSolicitation(srcIP, dstIP, pHdl)
+	return true
+}
+
+/*
  *    Send Unicast Neighbor Solicitation on Timer Expiry
  */
 func (p *Packet) SendUnicastNeighborSolicitation(srcIP, dstIP string, pHdl *pcap.Handle) error {
 	link, exists := p.GetLink(srcIP)
 	if !exists {
-		debug.Logger.Err("Sending Unicast NS Failed as link entry for ipAddr", srcIP,
+		debug.Logger.Err("Sending Unicast NS Failed as2 link entry for ipAddr", srcIP,
 			"not found in linkInfo.")
 		return errors.New(fmt.Sprintln("Sending Unicast NS Failed as link entry for ipAddr", srcIP,
 			"not found in linkInfo."))
@@ -97,9 +121,23 @@ func (p *Packet) SendUnicastNeighborSolicitation(srcIP, dstIP string, pHdl *pcap
 		debug.Logger.Err("packet send failed:", err)
 		return errors.New(fmt.Sprintln("packet send failed:", err))
 	}
-	// when sending unicast packet re-start retransmit timer.. rest all will be taken care of when
+
+	// when sending unicast packet re-start retransmit/delay probe timer.. rest all will be taken care of when
 	// NA packet is received..
-	cache.Timer()
+	if cache.State == REACHABLE {
+		// This means that Reachable Timer has expierd and hence we are sending Unicast Message..
+		// Lets set the time for delay first probe
+		cache.DelayProbe()
+		cache.State = DELAY
+		cache.ProbesSent = 0
+	} else {
+		// Probes Sent can still be zero but the state has changed to Delay..
+		// Start Timer for Probe and move the state from delay to Probe
+		cache.Timer()
+		cache.State = PROBE
+		cache.ProbesSent += 1
+	}
+	//cache.State = STALE
 	link.NbrCache[dstIP] = cache
 	p.SetLink(srcIP, link)
 	return nil

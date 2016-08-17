@@ -38,6 +38,8 @@ type PolicyExtensions struct {
 
 type LocRibPolicyEngine struct {
 	BasePolicyEngine
+	maxId uint32
+	ids   []uint32
 }
 
 func NewLocRibPolicyEngine(logger *logging.Writer) *LocRibPolicyEngine {
@@ -48,7 +50,29 @@ func NewLocRibPolicyEngine(logger *logging.Writer) *LocRibPolicyEngine {
 	return policyEngine
 }
 
-func (eng *LocRibPolicyEngine) CreatePolicyDefinition(defCfg utilspolicy.PolicyDefinitionConfig) error {
+func (l *LocRibPolicyEngine) CreatePolicyDefinition(defCfg utilspolicy.PolicyDefinitionConfig) error {
 	defCfg.Extensions = PolicyExtensions{}
-	return eng.PolicyEngine.CreatePolicyDefinition(defCfg)
+	return l.PolicyEngine.CreatePolicyDefinition(defCfg)
+}
+
+func (l *LocRibPolicyEngine) GetNextId() uint32 {
+	var id uint32
+	if len(l.ids) > 0 {
+		id = l.ids[len(l.ids)-1]
+		l.ids = l.ids[:len(l.ids)-1]
+		return id
+	}
+
+	id = l.maxId
+	l.maxId++
+	return id
+}
+
+func (l *LocRibPolicyEngine) ReleaseId(id uint32) {
+	if id+1 == l.maxId {
+		l.maxId--
+		return
+	}
+
+	l.ids = append(l.ids, id)
 }
