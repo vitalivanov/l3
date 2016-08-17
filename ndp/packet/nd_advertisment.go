@@ -82,6 +82,7 @@ func (p *Packet) HandleNAMsg(hdr *layers.ICMPv6, srcIP, dstIP net.IP) (*NDInfo, 
 				" link IP:" + srcIP.String())
 		}
 		cache.State = REACHABLE
+		cache.UpdateProbe()
 		cache.RchTimer()
 		debug.Logger.Debug("MYOWNNA: nbrCach (key, value) ---> (", dstIP.String(), ",", cache, ")")
 		myLink.NbrCache[dstIP.String()] = cache
@@ -99,6 +100,7 @@ func (p *Packet) HandleNAMsg(hdr *layers.ICMPv6, srcIP, dstIP net.IP) (*NDInfo, 
 				" link IP:" + dstIP.String())
 		}
 		cache.State = REACHABLE
+		cache.UpdateProbe()
 		cache.RchTimer()
 		if len(ndInfo.Options) > 0 {
 			for _, option := range ndInfo.Options {
