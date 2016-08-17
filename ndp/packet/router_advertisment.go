@@ -75,7 +75,7 @@ func (nd *NDInfo) ValidateRAInfo() error {
  */
 func (p *Packet) HandleRAMsg(hdr *layers.ICMPv6, srcIP, dstIP net.IP) (*NDInfo, error) {
 	ndInfo := &NDInfo{}
-	ndInfo.DecodeRAInfo(hdr.LayerPayload())
+	ndInfo.DecodeRAInfo(hdr.TypeBytes, hdr.LayerPayload())
 	err := ndInfo.ValidateRAInfo()
 	if err != nil {
 		return ndInfo, err
@@ -98,10 +98,8 @@ func (p *Packet) HandleRAMsg(hdr *layers.ICMPv6, srcIP, dstIP net.IP) (*NDInfo, 
 		cache.State = REACHABLE
 		cache.UpdateProbe()
 		cache.RchTimer()
-		fmt.Println("len of options:", len(ndInfo.Options))
 		if len(ndInfo.Options) > 0 {
 			for _, option := range ndInfo.Options {
-				fmt.Println("option", option)
 				if option.Type == NDOptionTypeSourceLinkLayerAddress {
 					mac := net.HardwareAddr(option.Value)
 					cache.LinkLayerAddress = mac.String()

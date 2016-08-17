@@ -23,7 +23,7 @@
 package packet
 
 import (
-	"fmt"
+	_ "fmt"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"reflect"
@@ -98,7 +98,7 @@ func helperForVerifyingICMPv6DecodedPayload(ndInfo *NDInfo, t *testing.T) {
 func TestDecodeRAInfo(t *testing.T) {
 	ndInfo := &NDInfo{}
 	// icmp ra packets has icmpv6 4 bytes also and hence ignoring those 4 bytes
-	ndInfo.DecodeRAInfo(icmpRATestPkt[4:])
+	ndInfo.DecodeRAInfo(icmpRATestPkt[4:8], icmpRATestPkt[8:])
 	helperForVerifyingICMPv6DecodedPayload(ndInfo, t)
 
 	// validate decoded RA information from packet
@@ -137,7 +137,6 @@ func TestInvalidRAInfo(t *testing.T) {
 
 func createGoPacketForRATesting() gopacket.Packet {
 	t := &testing.T{}
-	fmt.Println(len(raTestPkt))
 	p := gopacket.NewPacket(raTestPkt, layers.LinkTypeEthernet, gopacket.Default)
 	if p.ErrorLayer() != nil {
 		t.Error("Failed to create go-packet:", p.ErrorLayer().Error())
@@ -182,12 +181,6 @@ func TestHandleRAMsgForDstIpAsMyLink(t *testing.T) {
 	if err != nil {
 		t.Error("Decoding ipv6 and icmpv6 header failed", err)
 	}
-
-	fmt.Println("icmpv6Hdr type", icmpv6Hdr.TypeCode)
-	fmt.Printf("icmpv6Hdr Checksum 0x%x\n", icmpv6Hdr.Checksum)
-	fmt.Println("icmpv6 hop limit ", icmpv6Hdr.LayerPayload())
-	fmt.Println("len of payload is ", len(icmpv6Hdr.LayerPayload()))
-	//	_, err1 := testPktObj.decodeICMPv6Hdr(icmpv6Hdr, ipv6Hdr.SrcIP, ipv6Hdr.DstIP)
 
 	_, err1 := testPktObj.HandleRAMsg(icmpv6Hdr, ipv6Hdr.SrcIP, ipv6Hdr.DstIP)
 

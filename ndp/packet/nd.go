@@ -24,7 +24,6 @@ package packet
 
 import (
 	"encoding/binary"
-	"fmt"
 	"net"
 )
 
@@ -93,31 +92,29 @@ func (nd *NDInfo) DecodeNDInfo(payload []byte) {
  *  0                   1                   2                   3
  *  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
  *  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *  |     Type      |     Code      |          Checksum             |     <------ ICMPV6 Infomration
+ *  |     Type      |     Code      |          Checksum             |     <------ ICMPV6 Info Start - 0
  *  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *  | Cur Hop Limit |M|O|  Reserved |       Router Lifetime         |     <------ MIN RA Info Start - 4
+ *  | Cur Hop Limit |M|O|  Reserved |       Router Lifetime         |     <------ ICMPV6 Ends here  - 4
  *  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *  |                         Reachable Time                        |				    - 8
+ *  |                         Reachable Time                        |	  <------ MIN RA Info Start - 8, 0 - 4
  *  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *  |                          Retrans Timer                        |     <------ MIN RA Info Ends  - 12
+ *  |                          Retrans Timer                        |     <------ MIN RA Info Ends  - 12, 4 - 8
  *  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
  *  |   Options ...
  *  +-+-+-+-+-+-+-+-+-+-+-+-
  */
-func (nd *NDInfo) DecodeRAInfo(payload []byte) {
-	nd.CurHopLimit = payload[0]
-	nd.ReservedFlags = payload[1]
-	nd.RouterLifetime = binary.BigEndian.Uint16(payload[2:4])
-	nd.ReachableTime = binary.BigEndian.Uint32(payload[4:8])
-	nd.RetransTime = binary.BigEndian.Uint32(payload[8:12])
-	fmt.Println(len(payload))
+func (nd *NDInfo) DecodeRAInfo(typeByte, payload []byte) {
+	nd.CurHopLimit = typeByte[0]
+	nd.ReservedFlags = typeByte[1]
+	nd.RouterLifetime = binary.BigEndian.Uint16(typeByte[2:4])
+	nd.ReachableTime = binary.BigEndian.Uint32(payload[:4])
+	nd.RetransTime = binary.BigEndian.Uint32(payload[4:8])
 	// if more than min payload length then it means that we have got options
 	if len(payload) > ICMPV6_MIN_PAYLOAD_LENGTH_RA {
 		for base := ICMPV6_MIN_PAYLOAD_LENGTH_RA; base < len(payload); base = base + 8 {
 			if base+8 > len(payload) {
 				break
 			}
-			fmt.Println("adding option")
 			ndOpt := DecodeOptionLayer(payload[base:(base + 8)])
 			nd.Options = append(nd.Options, ndOpt)
 		}

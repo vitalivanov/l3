@@ -119,5 +119,5 @@ const (
 
 	// Router Advertisement Specific Constants
 	ICMPV6_MIN_LENGTH_RA         uint16 = 16
-	ICMPV6_MIN_PAYLOAD_LENGTH_RA        = 12
+	ICMPV6_MIN_PAYLOAD_LENGTH_RA        = 8
 )
