@@ -171,7 +171,7 @@ func TestValidateIpv6hdr(t *testing.T) {
 	if err != nil {
 		t.Error("Decoding ipv6 and icmpv6 header failed", err)
 	}
-	validateIPv6Hdr(ipv6Hdr)
+	validateIPv6Hdr(ipv6Hdr, layers.ICMPv6TypeNeighborSolicitation)
 	if err != nil {
 		t.Error("Validating IPv6 Hdr failed", err)
 	}

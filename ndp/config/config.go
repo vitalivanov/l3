@@ -39,10 +39,13 @@ type PcapBase struct {
 	// Pcap Handler for Each Port
 	PcapHandle *pcap.Handle
 	PcapCtrl   chan bool
+	// at any give time there can be two users for Pcap..
+	// if 0 then only start rx/tx
+	// if 1 then only stop rx/tx
+	PcapUsers uint8
 }
 
 type PortInfo struct {
-	PcapBase
 	IntfRef     string
 	IfIndex     int32
 	Name        string
