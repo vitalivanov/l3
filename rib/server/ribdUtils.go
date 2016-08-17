@@ -152,6 +152,7 @@ func BuildProtocolAdminDistanceSlice() {
 	ProtocolAdminDistanceSlice = make([]ribd.RouteDistanceState, 0)
 	if ProtocolAdminDistanceMapDB == nil {
 		ProtocolAdminDistanceMapDB = make(map[string]RouteDistanceConfig)
+		BuildProtocolAdminDistanceMapDB()
 	}
 	for k, v := range ProtocolAdminDistanceMapDB {
 		protocol = k
