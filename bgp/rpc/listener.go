@@ -493,7 +493,7 @@ func (h *BGPHandler) getIPAndIfIndexForNeighbor(neighborIP string,
 	err error) {
 	if strings.TrimSpace(neighborIP) != "" {
 		ip = net.ParseIP(strings.TrimSpace(neighborIP))
-		ifIndex = 0
+		ifIndex = -1
 		if ip == nil {
 			err = errors.New(fmt.Sprintf("Neighbor address %s not valid", neighborIP))
 		}
@@ -659,7 +659,7 @@ func (h *BGPHandler) convertToThriftNeighbor(neighborState *config.NeighborState
 	bgpNeighborResponse := bgpd.NewBGPNeighborState()
 	bgpNeighborResponse.NeighborAddress = neighborState.NeighborAddress.String()
 	//bgpNeighborResponse.IfIndex = neighborState.IfIndex
-	bgpNeighborResponse.IntfRef = strconv.Itoa(int(neighborState.IfIndex))
+	bgpNeighborResponse.IntfRef = "" //strconv.Itoa(int(neighborState.IfIndex))
 	intfEntry, ok := h.server.IntfIdNameMap[int32(neighborState.IfIndex)]
 	if ok {
 		h.logger.Info("Map foud for ifndex : ", neighborState.IfIndex, "Name = ", intfEntry.Name)
