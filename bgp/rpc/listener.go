@@ -582,7 +582,7 @@ func (h *BGPHandler) ValidateBGPNeighbor(bgpNeighbor *bgpd.BGPNeighbor) (pConf c
 	ip, ifIndex, err = h.getIPAndIfIndexForNeighbor(bgpNeighbor.NeighborAddress, bgpNeighbor.IntfRef)
 	if err != nil {
 		h.logger.Info("ValidateBGPNeighbor: getIPAndIfIndexForNeighbor failed for neighbor address",
-			bgpNeighbor.NeighborAddress, "and ifIndex", bgpNeighbor.IfIndex)
+			bgpNeighbor.NeighborAddress, "and ifIndex", bgpNeighbor.IntfRef)
 		return pConf, err
 	}
 

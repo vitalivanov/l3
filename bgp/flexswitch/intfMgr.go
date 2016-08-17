@@ -28,7 +28,6 @@ import (
 	"asicdServices"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"l3/bgp/api"
 	"l3/bgp/config"
 	"l3/bgp/rpc"
@@ -216,26 +215,26 @@ func (mgr *FSIntfMgr) GetIfIndex(ifIndex, ifType int) int32 {
 }
 
 func (m *FSIntfMgr) GetLogicalIntfInfo() []config.IntfMapInfo {
-	fmt.Println("MADHAVI!!Getting Logical Interfaces from asicd")
+	m.logger.Info("Getting Logical Interfaces from asicd")
 	intfMaps := make([]config.IntfMapInfo, 0)
 	var currMarker asicdServices.Int
 	var count asicdServices.Int
 	count = 100
 	for {
-		fmt.Println("MADHAVI!!Getting ", count, "GetBulkLogicalIntf objects from currMarker:", currMarker)
+		m.logger.Info("Getting ", count, "GetBulkLogicalIntf objects from currMarker:", currMarker)
 		bulkInfo, err := m.AsicdClient.GetBulkLogicalIntfState(currMarker, count)
 		if err != nil {
-			fmt.Println("GetBulkLogicalIntfState with err ", err)
+			m.logger.Err("GetBulkLogicalIntfState with err ", err)
 			return intfMaps
 		}
 		if bulkInfo.Count == 0 {
-			fmt.Println("0 objects returned from GetBulkLogicalIntfState")
+			m.logger.Err("0 objects returned from GetBulkLogicalIntfState")
 			return intfMaps
 		}
-		fmt.Println("MADHAVI!!len(bulkInfo.GetBulkLogicalIntfState)  = ", len(bulkInfo.LogicalIntfStateList), " num objects returned = ", bulkInfo.Count)
+		m.logger.Info("len(bulkInfo.GetBulkLogicalIntfState)  = ", len(bulkInfo.LogicalIntfStateList), " num objects returned = ", bulkInfo.Count)
 		for i := 0; i < int(bulkInfo.Count); i++ {
 			ifId := (bulkInfo.LogicalIntfStateList[i].IfIndex)
-			fmt.Println("MADHAVI!!logical interface = ", bulkInfo.LogicalIntfStateList[i].Name, "ifId = ", ifId)
+			m.logger.Info("logical interface = ", bulkInfo.LogicalIntfStateList[i].Name, "ifId = ", ifId)
 			intfMap := config.IntfMapInfo{Idx: ifId, IfName: bulkInfo.LogicalIntfStateList[i].Name}
 			intfMaps = append(intfMaps, intfMap)
 		}
@@ -247,26 +246,26 @@ func (m *FSIntfMgr) GetLogicalIntfInfo() []config.IntfMapInfo {
 	return intfMaps
 }
 func (m *FSIntfMgr) GetVlanInfo() []config.IntfMapInfo {
-	fmt.Println("MADHAVI!!Getting vlans from asicd")
+	m.logger.Info("Getting vlans from asicd")
 	intfMaps := make([]config.IntfMapInfo, 0)
 	var currMarker asicdServices.Int
 	var count asicdServices.Int
 	count = 100
 	for {
-		fmt.Println("MADHAVI!! Getting ", count, "GetBulkVlan objects from currMarker:", currMarker)
+		m.logger.Info("Getting ", count, "GetBulkVlan objects from currMarker:", currMarker)
 		bulkInfo, err := m.AsicdClient.GetBulkVlanState(currMarker, count)
 		if err != nil {
-			fmt.Println("GetBulkVlan with err ", err)
+			m.logger.Err("GetBulkVlan with err ", err)
 			return intfMaps
 		}
 		if bulkInfo.Count == 0 {
-			fmt.Println("0 objects returned from GetBulkVlan")
+			m.logger.Err("0 objects returned from GetBulkVlan")
 			return intfMaps
 		}
-		fmt.Println("MADHAVI!! len(bulkInfo.GetBulkVlan)  = ", len(bulkInfo.VlanStateList), " num objects returned = ", bulkInfo.Count)
+		m.logger.Info("len(bulkInfo.GetBulkVlan)  = ", len(bulkInfo.VlanStateList), " num objects returned = ", bulkInfo.Count)
 		for i := 0; i < int(bulkInfo.Count); i++ {
 			ifId := (bulkInfo.VlanStateList[i].IfIndex)
-			fmt.Println("MADHAVI!! vlan = ", bulkInfo.VlanStateList[i].VlanId, "ifId = ", ifId)
+			m.logger.Info("vlan = ", bulkInfo.VlanStateList[i].VlanId, "ifId = ", ifId)
 			intfMap := config.IntfMapInfo{Idx: ifId, IfName: bulkInfo.VlanStateList[i].VlanName}
 			intfMaps = append(intfMaps, intfMap)
 		}
@@ -278,26 +277,26 @@ func (m *FSIntfMgr) GetVlanInfo() []config.IntfMapInfo {
 	return intfMaps
 }
 func (m *FSIntfMgr) GetPortInfo() []config.IntfMapInfo {
-	fmt.Println("MADHAVI!!Getting ports from asicd")
+	m.logger.Info("Getting ports from asicd")
 	intfMaps := make([]config.IntfMapInfo, 0)
 	var currMarker asicdServices.Int
 	var count asicdServices.Int
 	count = 100
 	for {
-		fmt.Println("MADHAVI!! Getting ", count, "objects from currMarker:", currMarker)
+		m.logger.Info(" Getting ", count, "objects from currMarker:", currMarker)
 		bulkInfo, err := m.AsicdClient.GetBulkPortState(currMarker, count)
 		if err != nil {
-			fmt.Println("GetBulkPortState with err ", err)
+			m.logger.Err("GetBulkPortState with err ", err)
 			return intfMaps
 		}
 		if bulkInfo.Count == 0 {
-			fmt.Println("0 objects returned from GetBulkPortState")
+			m.logger.Err("0 objects returned from GetBulkPortState")
 			return intfMaps
 		}
-		fmt.Println("MADHAVI!! len(bulkInfo.PortStateList)  = ", len(bulkInfo.PortStateList), " num objects returned = ", bulkInfo.Count)
+		m.logger.Info("len(bulkInfo.PortStateList)  = ", len(bulkInfo.PortStateList), " num objects returned = ", bulkInfo.Count)
 		for i := 0; i < int(bulkInfo.Count); i++ {
 			ifId := bulkInfo.PortStateList[i].IfIndex
-			fmt.Println("MADHAV!! ifId = ", ifId)
+			m.logger.Info("MADHAV!! ifId = ", ifId)
 			intfMap := config.IntfMapInfo{Idx: ifId, IfName: bulkInfo.PortStateList[i].Name}
 			intfMaps = append(intfMaps, intfMap)
 		}
