@@ -124,7 +124,7 @@ func main() {
 		bgpServer := server.NewBGPServer(logger, bgpPolicyMgr, iMgr, rMgr, bMgr, sDBMgr)
 		go bgpServer.StartServer()
 
-		logger.Info(fmt.Sprintln("Starting config listener..."))
+		logger.Info(" Starting config listener...")
 		confIface := rpc.NewBGPHandler(bgpServer, bgpPolicyMgr, logger, dbUtil, fileName)
 		//dbUtil.Disconnect()
 
@@ -170,6 +170,8 @@ func main() {
 
 		bgpServer := server.NewBGPServer(logger, bgpPolicyMgr, iMgr, rMgr, bMgr, sDBMgr)
 		go bgpServer.StartServer()
+		up := <-bgpServer.ServerUpCh
+		logger.Info(" Serverup:", up)
 
 		api.InitPolicy(bgpPolicyMgr)
 		api.Init(bgpServer)

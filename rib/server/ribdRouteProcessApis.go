@@ -339,7 +339,7 @@ func (m RIBDServer) GetBulkRouteDistanceState(fromIndex ribd.Int, rcount ribd.In
 	i = 0
 	routeDistanceStates = &returnGetInfo
 	more := true
-	BuildProtocolAdminDistanceSlice()
+	BuildProtocolAdminDistanceSlice(false)
 	if ProtocolAdminDistanceSlice == nil {
 		//logger.Debug("ProtocolAdminDistanceSlice not initialized")
 		return routeDistanceStates, err
@@ -803,7 +803,7 @@ func SelectNextBestRoute(routeInfoRecordList RouteInfoRecordList, protocol strin
 	/*
 	   Build protocol admin distance slice based on the current admin distance values
 	*/
-	BuildProtocolAdminDistanceSlice()
+	BuildProtocolAdminDistanceSlice(false)
 	for i := 0; i < len(ProtocolAdminDistanceSlice); i++ {
 		tempSelectedProtocol = ProtocolAdminDistanceSlice[i].Protocol
 		if tempSelectedProtocol == protocol {
@@ -828,17 +828,17 @@ func SelectNextBestRoute(routeInfoRecordList RouteInfoRecordList, protocol strin
    Function which determines the best route when a route is deleted or updated
 */
 func SelectBestRoute(routeInfoRecordList RouteInfoRecordList) (addRouteList []RouteOpInfoRecord, deleteRouteList []RouteOpInfoRecord, newSelectedProtocol string) {
-	logger.Debug("SelectBestRoute, the current selected route protocol is ", routeInfoRecordList.selectedRouteProtocol)
+	logger.Info("SelectBestRoute, the current selected route protocol is ", routeInfoRecordList.selectedRouteProtocol)
 	tempSelectedProtocol := "INVALID"
 	newSelectedProtocol = "INVALID"
 	deleteRouteList = make([]RouteOpInfoRecord, 0)
 	addRouteList = make([]RouteOpInfoRecord, 0)
 	var routeOpInfoRecord RouteOpInfoRecord
-	//logger.Debug("len(protocolAdminDistanceSlice):", len(ProtocolAdminDistanceSlice))
 	/*
 	   Build protocol admin distance slice based on the current admin distance values
 	*/
-	BuildProtocolAdminDistanceSlice()
+	BuildProtocolAdminDistanceSlice(false)
+	logger.Info("len(protocolAdminDistanceSlice):", len(ProtocolAdminDistanceSlice))
 	/*
 	   go over the protocol admin distance slice, select the protocols from best to worst
 	   and check if there are any routes configured with that protocol type
@@ -849,7 +849,7 @@ func SelectBestRoute(routeInfoRecordList RouteInfoRecordList) (addRouteList []Ro
 	*/
 	for i := 0; i < len(ProtocolAdminDistanceSlice); i++ {
 		tempSelectedProtocol = ProtocolAdminDistanceSlice[i].Protocol
-		//logger.Debug("Best preferred protocol ", tempSelectedProtocol)
+		logger.Info("Best preferred protocol ", tempSelectedProtocol, " at i= ", i)
 		routeInfoList := routeInfoRecordList.routeInfoProtocolMap[tempSelectedProtocol]
 		if routeInfoList == nil || len(routeInfoList) == 0 {
 			logger.Debug("No routes are configured with this protocol ", tempSelectedProtocol, " for this route")
@@ -863,13 +863,13 @@ func SelectBestRoute(routeInfoRecordList RouteInfoRecordList) (addRouteList []Ro
 			entity, _ := buildPolicyEntityFromRoute(policyRoute, RouteParams{})
 			actionList := PolicyEngineDB.PolicyEngineCheckActionsForEntity(entity, policyCommonDefs.PolicyConditionTypeProtocolMatch)
 			if !PolicyEngineDB.ActionNameListHasAction(actionList, policyCommonDefs.PolicyActionTypeRouteDisposition, "Reject") {
-				logger.Debug("atleast one of the routes of this protocol will not be rejected by the policy engine")
+				logger.Info("atleast one of the routes of this protocol will not be rejected by the policy engine -protocol at index i:", i)
 				tempSelectedProtocol = ProtocolAdminDistanceSlice[i].Protocol
 				break
 			}
 		}
 		if tempSelectedProtocol != "INVALID" {
-			logger.Debug("Found a valid protocol ", tempSelectedProtocol)
+			logger.Info("Found a valid protocol ", tempSelectedProtocol)
 			break
 		}
 	}

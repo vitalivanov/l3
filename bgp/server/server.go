@@ -81,7 +81,9 @@ type PolicyParams struct {
 	withdrawn       *([]*bgprib.Destination)
 	updatedAddPaths *([]*bgprib.Destination)
 }
-
+type IntfEntry struct {
+	Name string
+}
 type BGPServer struct {
 	logger           *logging.Writer
 	policyManager    *bgppolicy.BGPPolicyManager
@@ -107,18 +109,22 @@ type BGPServer struct {
 	BGPPktSrcCh      chan *packet.BGPPktSrc
 	BfdCh            chan config.BfdInfo
 	IntfCh           chan config.IntfStateInfo
+	IntfMapCh        chan config.IntfMapInfo
 	RoutesCh         chan *config.RouteCh
 	acceptCh         chan *net.TCPConn
+	ServerUpCh       chan bool
 	GlobalCfgDone    bool
 
-	NeighborMutex  sync.RWMutex
-	PeerMap        map[string]*Peer
-	Neighbors      []*Peer
-	LocRib         *bgprib.LocRib
-	ConnRoutesPath *bgprib.Path
-	IfacePeerMap   map[int32][]string
-	ifaceIP        net.IP
-	AddPathCount   int
+	NeighborMutex   sync.RWMutex
+	PeerMap         map[string]*Peer
+	Neighbors       []*Peer
+	LocRib          *bgprib.LocRib
+	ConnRoutesPath  *bgprib.Path
+	IfacePeerMap    map[int32][]string
+	IntfIdNameMap   map[int32]IntfEntry
+	IfNameToIfIndex map[string]int32
+	ifaceIP         net.IP
+	AddPathCount    int
 	// all managers
 	IntfMgr    config.IntfStateMgrIntf
 	routeMgr   config.RouteMgrIntf
@@ -149,7 +155,9 @@ func NewBGPServer(logger *logging.Writer, policyManager *bgppolicy.BGPPolicyMana
 	bgpServer.BGPPktSrcCh = make(chan *packet.BGPPktSrc)
 	bgpServer.BfdCh = make(chan config.BfdInfo)
 	bgpServer.IntfCh = make(chan config.IntfStateInfo)
+	bgpServer.IntfMapCh = make(chan config.IntfMapInfo)
 	bgpServer.RoutesCh = make(chan *config.RouteCh)
+	bgpServer.ServerUpCh = make(chan bool)
 
 	bgpServer.NeighborMutex = sync.RWMutex{}
 	bgpServer.PeerMap = make(map[string]*Peer)
@@ -159,6 +167,8 @@ func NewBGPServer(logger *logging.Writer, policyManager *bgppolicy.BGPPolicyMana
 	bgpServer.bfdMgr = bMgr
 	bgpServer.stateDBMgr = sDBMgr
 	bgpServer.LocRib = bgprib.NewLocRib(logger, rMgr, sDBMgr, &bgpServer.BgpConfig.Global.Config)
+	bgpServer.IfNameToIfIndex = make(map[string]int32)
+	bgpServer.IntfIdNameMap = make(map[int32]IntfEntry)
 	bgpServer.IfacePeerMap = make(map[int32][]string)
 	bgpServer.ifaceIP = nil
 	bgpServer.AddPathCount = 0
@@ -760,6 +770,7 @@ func (s *BGPServer) ProcessUpdate(pktInfo *packet.BGPPktSrc) {
 
 func (s *BGPServer) convertDestIPToIPPrefix(routes []*config.RouteInfo) map[uint32][]packet.NLRI {
 	pfNLRI := make(map[uint32][]packet.NLRI)
+	var protoFamily uint32
 	for _, r := range routes {
 		ip := net.ParseIP(r.IPAddr)
 		if ip == nil {
@@ -767,7 +778,6 @@ func (s *BGPServer) convertDestIPToIPPrefix(routes []*config.RouteInfo) map[uint
 			continue
 		}
 
-		var protoFamily uint32
 		if ip.To4() != nil {
 			protoFamily = packet.GetProtocolFamily(packet.AfiIP, packet.SafiUnicast)
 		} else {
@@ -1384,13 +1394,29 @@ func (s *BGPServer) listenChannelUpdates() {
 			} else if ifState.State == config.INTF_DELETED {
 				s.ifaceMgr.RemoveIface(ifState.Idx, ifState.IPAddr)
 			}
+		case ifMap := <-s.IntfMapCh:
+			s.ProcessIntfMapUpdates([]config.IntfMapInfo{config.IntfMapInfo{Idx: ifMap.Idx, IfName: ifMap.IfName}})
+
 		case routeInfo := <-s.RoutesCh:
 			s.ProcessConnectedRoutes(routeInfo.Add, routeInfo.Remove)
 		}
 	}
 
 }
+func (s *BGPServer) ProcessIntfMapUpdates(cfg []config.IntfMapInfo) {
+	if s.IntfIdNameMap == nil {
+		s.IntfIdNameMap = make(map[int32]IntfEntry)
+	}
+	if s.IfNameToIfIndex == nil {
+		s.IfNameToIfIndex = make(map[string]int32)
+	}
+	for _, ifMap := range cfg {
+		intfEntry := IntfEntry{Name: ifMap.IfName}
+		s.IntfIdNameMap[int32(ifMap.Idx)] = intfEntry
+		s.IfNameToIfIndex[ifMap.IfName] = ifMap.Idx
 
+	}
+}
 func (s *BGPServer) InitBGPEvent() {
 	// Start DB Util
 	s.eventDbHdl = dbutils.NewDBUtil(s.logger)
@@ -1404,10 +1430,36 @@ func (s *BGPServer) InitBGPEvent() {
 		s.logger.Err("Unable to initialize events", err)
 	}
 }
+func (s *BGPServer) GetIntfObjects() {
+
+	intfs := s.IntfMgr.GetIPv4Intfs()
+	s.ProcessIntfStates(intfs)
+	s.logger.Info("After ProcessIntfStates for intfs")
+
+	v6intfs := s.IntfMgr.GetIPv6Intfs()
+	s.ProcessIntfStates(v6intfs)
+	s.logger.Info("After ProcessIntfStates for v6Intfs")
+
+	portIntfMap := s.IntfMgr.GetPortInfo()
+	s.ProcessIntfMapUpdates(portIntfMap)
+	s.logger.Info("After ProcessIntfStates for ports")
+
+	vlanIntfMap := s.IntfMgr.GetVlanInfo()
+	s.ProcessIntfMapUpdates(vlanIntfMap)
+	s.logger.Info("After ProcessIntfStates for vlans")
+
+	logicalIntfMap := s.IntfMgr.GetLogicalIntfInfo()
+	s.ProcessIntfMapUpdates(logicalIntfMap)
+	s.logger.Info("After ProcessIntfStates for logicalIntfs")
+}
 
 func (s *BGPServer) StartServer() {
 	// Initialize Event Handler
 	s.InitBGPEvent()
+	//read the intfMgr objects before the global conf - this is the case during restart
+	s.GetIntfObjects()
+	s.ServerUpCh <- true
+	s.logger.Info("Setting serverup to true")
 
 	globalUpdate := <-s.GlobalConfigCh
 	gConf := globalUpdate.NewConfig
@@ -1418,7 +1470,9 @@ func (s *BGPServer) StartServer() {
 	s.BgpConfig.PeerGroups = make(map[string]*config.PeerGroup)
 
 	pathAttrs := packet.ConstructPathAttrForConnRoutes(gConf.AS)
-	s.ConnRoutesPath = bgprib.NewPath(s.LocRib, nil, pathAttrs, nil, bgprib.RouteTypeConnected)
+	protoFamily := packet.GetProtocolFamily(packet.AfiIP6, packet.SafiUnicast)
+	ipv6MPReach := packet.ConstructIPv6MPReachNLRIForConnRoutes(protoFamily)
+	s.ConnRoutesPath = bgprib.NewPath(s.LocRib, nil, pathAttrs, ipv6MPReach, bgprib.RouteTypeConnected)
 
 	s.logger.Info("Setting up Peer connections")
 	// channel for accepting connections
@@ -1445,10 +1499,7 @@ func (s *BGPServer) StartServer() {
 	if add != nil && remove != nil {
 		s.ProcessConnectedRoutes(add, remove)
 	}
-
-	intfs := s.IntfMgr.GetIPv4Intfs()
-	s.ProcessIntfStates(intfs)
-
+	s.GetIntfObjects()
 	s.listenChannelUpdates()
 }
 
@@ -1503,4 +1554,24 @@ func (s *BGPServer) BulkGetBGPv6Neighbors(index int, count int) (int, int, []*co
 
 func (s *BGPServer) VerifyBgpGlobalConfig() bool {
 	return s.GlobalCfgDone
+}
+
+func (s *BGPServer) ConvertIntfStrToIfIndexStr(intfString string) (ifIndex string, err error) {
+	if val, err := strconv.Atoi(intfString); err == nil {
+		//Verify ifIndex is valid
+		s.logger.Info("IfIndex = ", val)
+		_, ok := s.IntfIdNameMap[int32(val)]
+		if !ok {
+			s.logger.Err("Cannot create ip route on a unknown L3 interface")
+			return ifIndex, errors.New("Cannot create ip route on a unknown L3 interface")
+		}
+		ifIndex = intfString
+	} else {
+		//Verify ifName is valid
+		if _, ok := s.IfNameToIfIndex[intfString]; !ok {
+			return ifIndex, errors.New("Invalid ifName value")
+		}
+		ifIndex = strconv.Itoa(int(s.IfNameToIfIndex[intfString]))
+	}
+	return ifIndex, nil
 }
