@@ -29,6 +29,27 @@ import (
 	"time"
 )
 
+type ParentLinkInfo struct {
+	IfIndex  int32
+	IpAddr   string
+	ReturnCh chan config.PacketData
+}
+
+type NeighborCache struct {
+	BaseReachableTimer   float32
+	RetransTimerConfig   uint32
+	ReachableTimeConfig  uint32
+	RecomputeBaseTimer   *time.Timer
+	ReachableTimer       *time.Timer
+	RetransTimer         *time.Timer
+	DelayFirstProbeTimer *time.Timer
+	ProbesSent           uint8
+	State                int
+	LinkLayerAddress     string // this is our neighbor port mac address
+	IpAddr               string
+	MyLinkInfo           *ParentLinkInfo
+}
+
 /*
  * Delay first probe timer handler
  */

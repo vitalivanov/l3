@@ -27,6 +27,7 @@ import (
 	"l3/ndp/config"
 	"l3/ndp/debug"
 	"l3/ndp/packet"
+	"l3/ndp/publisher"
 	_ "models/objects"
 	"os"
 	"os/signal"
@@ -90,6 +91,11 @@ func (svr *NDPServer) InitGlobalDS() {
 	svr.Timeout = 1 * time.Second
 	svr.NeigborEntryLock = &sync.RWMutex{}
 	svr.Packet = packet.Init(svr.PktDataCh)
+
+	// init publisher
+	pub := publisher.NewPublisher()
+	pub.InitPublisher()
+	svr.notifyChan = pub.PubChan.All
 }
 
 func (svr *NDPServer) DeInitGlobalDS() {

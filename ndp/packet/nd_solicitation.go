@@ -234,6 +234,9 @@ func (p *Packet) HandleNSMsg(hdr *layers.ICMPv6, srcIP, dstIP net.IP) (*NDInfo, 
 	return ndInfo, nil
 }
 
+/*
+ * From eth, ipv6 and ndInfo populate neighbor information for programming chip
+ */
 func (p *Packet) GetNbrInfoUsingNSPkt(eth *layers.Ethernet, v6hdr *layers.IPv6, ndInfo *NDInfo) config.NeighborInfo {
 	nbrInfo := config.NeighborInfo{}
 	var entry NeighborCache
