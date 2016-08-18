@@ -66,7 +66,9 @@ func NewFSIntfMgr(logger *logging.Writer, fileName string) (*FSIntfMgr, error) {
  */
 func (mgr *FSIntfMgr) Start() {
 	mgr.asicdL3IntfSubSocket, _ = mgr.setupSubSocket(asicdCommonDefs.PUB_SOCKET_ADDR)
+	mgr.ndpIntfSubSocket, _ = mgr.setupSubSocket("ipc:///tmp/ndpd_all.ipc")
 	go mgr.listenForAsicdEvents()
+	//go mgr.listenForNDPEvents()
 }
 
 /*  Create One way communication asicd sub-socket
@@ -97,6 +99,45 @@ func (mgr *FSIntfMgr) setupSubSocket(address string) (*nanomsg.SubSocket, error)
 	return socket, nil
 }
 
+/*  listen for ndp events mainly ipv6 neighbor events
+ */
+/*
+func (mgr *FSIntfMgr) listenForNDPEvents() {
+	for {
+		mgr.logger.Info("Read on NDP subscriber socket...")
+		rxBuf, err := mgr.ndpIntfSubSocket.Recv(0)
+		if err != nil {
+			mgr.logger.Info("Error in receiving NDP events", err)
+			return
+		}
+
+		mgr.logger.Info("NDP subscriber recv returned", rxBuf)
+		event := commonDefs.NdpNotification{}
+		err = json.Unmarshal(rxBuf, &event)
+		if err != nil {
+			mgr.logger.Errf("Unmarshal NDP event failed with err %s", err)
+			return
+		}
+
+		switch event.MsgType {
+		case commonDefs.NOTIFY_IPV6_NEIGHBOR_CREATE, commonDefs.NOTIFY_IPV6_NEIGHBOR_DELETE:
+			var msg commonDefs.Ipv6NeighborNotification
+			err = json.Unmarshal(event.Msg, &msg)
+			if err != nil {
+				mgr.logger.Errf("Unmarshal NDP IPV6 neighbor event failed with err %s", err)
+				return
+			}
+
+			mgr.logger.Info("NDP IPV6 neighbor event idx %d ip %s", msg.IfIndex, msg.IpAddr)
+			if event.MsgType == commonDefs.NOTIFY_IPV6_NEIGHBOR_CREATE {
+				api.SendIntfNotification(msg.IfIndex, msg.IpAddr, config.IPV6_NEIGHBOR_CREATED)
+			} else {
+				api.SendIntfNotification(msg.IfIndex, msg.IpAddr, config.IPV6_NEIGHBOR_DELETED)
+			}
+		}
+	}
+}
+*/
 /*  listen for asicd events mainly L3 interface state change
  */
 func (mgr *FSIntfMgr) listenForAsicdEvents() {

@@ -813,9 +813,9 @@ func (s *BGPServer) ProcessIntfStates(intfs []*config.IntfStateInfo) {
 			s.ifaceMgr.AddIface(ifState.Idx, ifState.IPAddr)
 		} else if ifState.State == config.INTF_DELETED {
 			s.ifaceMgr.RemoveIface(ifState.Idx, ifState.IPAddr)
-		} else if ifState.State == config.LINK_LOCAL_CREATED {
+		} else if ifState.State == config.IPV6_NEIGHBOR_CREATED {
 			s.ifaceMgr.AddLinkLocalIface(ifState.Idx, ifState.LinkLocalIP)
-		} else if ifState.State == config.LINK_LOCAL_DELETED {
+		} else if ifState.State == config.IPV6_NEIGHBOR_DELETED {
 			s.ifaceMgr.RemoveLinkLocalIface(ifState.Idx, ifState.LinkLocalIP)
 		}
 	}
