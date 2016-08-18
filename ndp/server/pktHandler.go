@@ -219,7 +219,7 @@ func (svr *NDPServer) CreateNeighborInfo(nbrInfo *config.NeighborInfo) {
  *		        c) If exists then we will call DeleteIPV6Neighbor for that entry and remove
  *			   the entry from our runtime information
  */
-func (svr *NDPServer) DeleteNeighborInfo(deleteEntries []string) {
+func (svr *NDPServer) DeleteNeighborInfo(deleteEntries []string, ifIndex int32) {
 	svr.NeigborEntryLock.Lock()
 	for _, nbrIp := range deleteEntries {
 		nbrEntry, exists := svr.NeighborInfo[nbrIp]
@@ -233,6 +233,7 @@ func (svr *NDPServer) DeleteNeighborInfo(deleteEntries []string) {
 			debug.Logger.Err("delete ipv6 neigbor failed for", nbrEntry, "error is", err)
 		}
 		svr.deleteNeighborInfo(nbrIp)
+		svr.SendIPv6DeleteNotification(nbrIp, ifIndex)
 		// delete the entry from neighbor map
 		delete(svr.NeighborInfo, nbrIp)
 	}
@@ -297,7 +298,7 @@ func (svr *NDPServer) ProcessTimerExpiry(pktData config.PacketData) {
 		// delete single Neighbor entry from Neighbor Cache
 		deleteEntries, err := svr.Packet.DeleteNeighbor(pktData.IpAddr, pktData.NeighborIp)
 		if len(deleteEntries) > 0 && err == nil {
-			svr.DeleteNeighborInfo(deleteEntries)
+			svr.DeleteNeighborInfo(deleteEntries, pktData.IfIndex)
 		}
 	}
 }

@@ -269,12 +269,12 @@ func (svr *NDPServer) HandlePhyPortStateNotification(msg *config.StateNotificati
 		debug.Logger.Info("Deleting Neigbors for", l3Port.IpAddr)
 		deleteEntries, err := svr.Packet.FlushNeighbors(l3Port.IpAddr)
 		if len(deleteEntries) > 0 && err == nil {
-			svr.DeleteNeighborInfo(deleteEntries)
+			svr.DeleteNeighborInfo(deleteEntries, msg.IfIndex)
 		}
 		debug.Logger.Info("Deleting Neigbors for", l3Port.LinkLocalIp)
 		deleteEntries, err = svr.Packet.FlushNeighbors(l3Port.LinkLocalIp)
 		if len(deleteEntries) > 0 && err == nil {
-			svr.DeleteNeighborInfo(deleteEntries)
+			svr.DeleteNeighborInfo(deleteEntries, msg.IfIndex)
 		}
 	}
 }
@@ -300,7 +300,7 @@ func (svr *NDPServer) HandleStateNotification(msg *config.StateNotification) {
 		// stop the timer
 		deleteEntries, err := svr.Packet.FlushNeighbors(msg.IpAddr)
 		if len(deleteEntries) > 0 && err == nil {
-			svr.DeleteNeighborInfo(deleteEntries)
+			svr.DeleteNeighborInfo(deleteEntries, msg.IfIndex)
 		}
 	}
 }
