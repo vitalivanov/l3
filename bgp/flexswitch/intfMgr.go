@@ -68,7 +68,7 @@ func (mgr *FSIntfMgr) Start() {
 	mgr.asicdL3IntfSubSocket, _ = mgr.setupSubSocket(asicdCommonDefs.PUB_SOCKET_ADDR)
 	mgr.ndpIntfSubSocket, _ = mgr.setupSubSocket("ipc:///tmp/ndpd_all.ipc")
 	go mgr.listenForAsicdEvents()
-	//go mgr.listenForNDPEvents()
+	go mgr.listenForNDPEvents()
 }
 
 /*  Create One way communication asicd sub-socket
@@ -101,7 +101,7 @@ func (mgr *FSIntfMgr) setupSubSocket(address string) (*nanomsg.SubSocket, error)
 
 /*  listen for ndp events mainly ipv6 neighbor events
  */
-/*
+
 func (mgr *FSIntfMgr) listenForNDPEvents() {
 	for {
 		mgr.logger.Info("Read on NDP subscriber socket...")
@@ -137,7 +137,7 @@ func (mgr *FSIntfMgr) listenForNDPEvents() {
 		}
 	}
 }
-*/
+
 /*  listen for asicd events mainly L3 interface state change
  */
 func (mgr *FSIntfMgr) listenForAsicdEvents() {
