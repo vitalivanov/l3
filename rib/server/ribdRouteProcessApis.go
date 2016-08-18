@@ -593,10 +593,10 @@ func (m RIBDServer) GetBulkRIBEventState(fromIndex ribd.Int, rcount ribd.Int) (e
 */
 
 func (m RIBDServer) GetRouteReachabilityInfo(destNet string) (nextHopIntf *ribdInt.NextHopInfo, err error) {
-	logger.Debug("GetRouteReachabilityInfo of ", destNet)
+	//logger.Debug("GetRouteReachabilityInfo of ", destNet)
 	nextHopIntf, err = RouteServiceHandler.GetV4RouteReachabilityInfo(destNet)
 	if err != nil {
-		logger.Err("next hop ", destNet, " not reachable via ipv4 network")
+		//logger.Info("next hop ", destNet, " not reachable via ipv4 network")
 		nextHopIntf, err = RouteServiceHandler.GetV6RouteReachabilityInfo(destNet)
 		if err != nil {
 			logger.Err("next hop ", destNet, " not reachable")

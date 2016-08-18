@@ -58,7 +58,7 @@ func (m RIBDServer) GetV4RouteReachabilityInfo(destNet string) (nextHopIntf *rib
 	}
 	lookupIp := destNetIp.To4()
 	if lookupIp == nil {
-		logger.Err("Incorrect ip type lookup")
+		//logger.Err("Incorrect ip type lookup")
 		return nextHopIntf, errors.New("Incorrect ip type lookup")
 	}
 	destNetIp = lookupIp
