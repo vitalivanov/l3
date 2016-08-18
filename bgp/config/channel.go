@@ -42,6 +42,8 @@ const (
 	BFD_STATE_INVALID
 	INTF_CREATED
 	INTF_DELETED
+	LINK_LOCAL_CREATED
+	LINK_LOCAL_DELETED
 	INTF_STATE_DOWN
 	INTF_STATE_UP
 	NOTIFY_POLICY_CONDITION_CREATED
@@ -62,9 +64,10 @@ type BfdInfo struct {
 }
 
 type IntfStateInfo struct {
-	Idx    int32
-	IPAddr string
-	State  Operation
+	Idx         int32
+	IPAddr      string
+	LinkLocalIP string
+	State       Operation
 }
 
 type IntfMapInfo struct {

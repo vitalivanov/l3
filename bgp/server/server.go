@@ -813,10 +813,17 @@ func (s *BGPServer) ProcessIntfStates(intfs []*config.IntfStateInfo) {
 			s.ifaceMgr.AddIface(ifState.Idx, ifState.IPAddr)
 		} else if ifState.State == config.INTF_DELETED {
 			s.ifaceMgr.RemoveIface(ifState.Idx, ifState.IPAddr)
+		} else if ifState.State == config.LINK_LOCAL_CREATED {
+			s.ifaceMgr.AddLinkLocalIface(ifState.Idx, ifState.LinkLocalIP)
+		} else if ifState.State == config.LINK_LOCAL_DELETED {
+			s.ifaceMgr.RemoveLinkLocalIface(ifState.Idx, ifState.LinkLocalIP)
 		}
 	}
 }
-
+func (s *BGPServer) GetIfaceIP(ifIndex int32) (ipInfo utils.IPInfo, err error) {
+	ipInfo, err = s.ifaceMgr.GetIfaceIP(ifIndex)
+	return ipInfo, err
+}
 func (s *BGPServer) ProcessRemoveNeighbor(peerIp string, peer *Peer) {
 	updated, withdrawn, updatedAddPaths := s.LocRib.RemoveUpdatesFromNeighbor(peerIp, peer.NeighborConf,
 		s.AddPathCount)

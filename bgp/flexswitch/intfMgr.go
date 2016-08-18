@@ -152,6 +152,20 @@ func (mgr *FSIntfMgr) listenForAsicdEvents() {
 				api.SendIntfNotification(msg.IfIndex, msg.IpAddr, config.INTF_STATE_UP)
 			}
 
+		case asicdCommonDefs.NOTIFY_IPV6INTF_CREATE, asicdCommonDefs.NOTIFY_IPV6INTF_DELETE:
+			var msg asicdCommonDefs.IPv6IntfNotifyMsg
+			err = json.Unmarshal(event.Msg, &msg)
+			if err != nil {
+				mgr.logger.Errf("Unmarshal Asicd IPV6INTF event failed with err %s", err)
+				return
+			}
+
+			mgr.logger.Info("Asicd IPV6INTF event idx %d ip %s", msg.IfIndex, msg.IpAddr)
+			if event.MsgType == asicdCommonDefs.NOTIFY_IPV6INTF_CREATE {
+				api.SendIntfNotification(msg.IfIndex, msg.IpAddr, config.INTF_CREATED)
+			} else {
+				api.SendIntfNotification(msg.IfIndex, msg.IpAddr, config.INTF_DELETED)
+			}
 		case asicdCommonDefs.NOTIFY_IPV4INTF_CREATE, asicdCommonDefs.NOTIFY_IPV4INTF_DELETE:
 			var msg asicdCommonDefs.IPv4IntfNotifyMsg
 			err = json.Unmarshal(event.Msg, &msg)
@@ -160,7 +174,7 @@ func (mgr *FSIntfMgr) listenForAsicdEvents() {
 				return
 			}
 
-			mgr.logger.Infof("Asicd IPV4INTF event idx %d ip %s", msg.IfIndex, msg.IpAddr)
+			mgr.logger.Info("Asicd IPV4INTF event idx %d ip %s", msg.IfIndex, msg.IpAddr)
 			if event.MsgType == asicdCommonDefs.NOTIFY_IPV4INTF_CREATE {
 				api.SendIntfNotification(msg.IfIndex, msg.IpAddr, config.INTF_CREATED)
 			} else {
