@@ -13,13 +13,13 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 package config
 
@@ -29,7 +29,12 @@ type IntfStateMgrIntf interface {
 	Start()
 	PortStateChange()
 	GetIPv4Intfs() []*IntfStateInfo
+	GetIPv6Intfs() []*IntfStateInfo
+	GetPortInfo() []IntfMapInfo
+	GetVlanInfo() []IntfMapInfo
+	GetLogicalIntfInfo() []IntfMapInfo
 	GetIPv4Information(ifIndex int32) (string, error)
+	GetIPv6Information(ifIndex int32) (string, error)
 	GetIfIndex(int, int) int32
 }
 
@@ -40,7 +45,7 @@ type RouteMgrIntf interface {
 	GetNextHopInfo(ipAddr string) (*NextHopInfo, error)
 	CreateRoute(*RouteConfig)
 	DeleteRoute(*RouteConfig)
-	UpdateRoute(cfg *RouteConfig , op string)
+	UpdateRoute(cfg *RouteConfig, op string)
 	ApplyPolicy(protocol string, policy string, action string, conditions []*ConditionInfo)
 	GetRoutes() ([]*RouteInfo, []*RouteInfo)
 }
