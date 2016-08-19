@@ -108,6 +108,8 @@ func (n *NeighborConf) SetNeighborState(peerConf *config.NeighborConfig) {
 		MaxPrefixesDisconnect:   peerConf.MaxPrefixesDisconnect,
 		MaxPrefixesRestartTimer: peerConf.MaxPrefixesRestartTimer,
 		TotalPrefixes:           0,
+		AdjRIBInFilter:          peerConf.AdjRIBInFilter,
+		AdjRIBOutFilter:         peerConf.AdjRIBOutFilter,
 	}
 	n.MaxPrefixesThreshold = uint32(float64(peerConf.MaxPrefixes*uint32(peerConf.MaxPrefixesThresholdPct)) / 100)
 }
@@ -233,6 +235,14 @@ func (n *NeighborConf) GetConfFromNeighbor(inConf *config.NeighborConfig, outCon
 
 	if inConf.MaxPrefixesRestartTimer != 0 {
 		outConf.MaxPrefixesRestartTimer = inConf.MaxPrefixesRestartTimer
+	}
+
+	if inConf.AdjRIBInFilter != "" {
+		outConf.AdjRIBInFilter = inConf.AdjRIBInFilter
+	}
+
+	if inConf.AdjRIBOutFilter != "" {
+		outConf.AdjRIBOutFilter = inConf.AdjRIBOutFilter
 	}
 
 	outConf.NeighborAddress = inConf.NeighborAddress
