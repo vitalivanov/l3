@@ -633,26 +633,32 @@ func (h *BGPHandler) getIPAndIfIndexForV4Neighbor(neighborIP string,
 		}
 		ifIndexInt, _ := strconv.Atoi(ifIndexStr)
 		neighborIfIndex := int32(ifIndexInt)
-		var ipv4Intf string
+		//var ipv4Intf string
 		// @TODO: this needs to be interface once we decide to move listener
-		ipv4Intf, err = h.server.IntfMgr.GetIPv4Information(neighborIfIndex)
+		//ipv4Intf, err = h.server.IntfMgr.GetIPv4Information(neighborIfIndex)
+		ipInfo, err := h.server.GetIfaceIP(neighborIfIndex)
+		h.logger.Info("ipInfo:", ipInfo, " err:", err)
+		ifIP := ipInfo.IpAddr
+		ipMask := ipInfo.IpMask
 		if err == nil {
 			h.logger.Info("Call ASICd to get IPv4 address for interface with ifIndex:", neighborIfIndex)
-			ifIP, ipMask, err := net.ParseCIDR(ipv4Intf)
-			if err != nil {
-				h.logger.Err("IPv4Addr", ipv4Intf, "of the interface", neighborIfIndex, "is not valid, error:", err)
-				err = errors.New(fmt.Sprintf("IPv4Addr %s of the interface %d is not valid, error: %s", ipv4Intf,
-					neighborIfIndex, err))
-				return ip, ifIndex, err
-			}
-			if ipMask.Mask[len(ipMask.Mask)-1] < 252 {
-				h.logger.Err("IPv4Addr", ipv4Intf, "of the interface", neighborIfIndex, "is not /30 or /31 address")
-				err = errors.New(fmt.Sprintln("IPv4Addr", ipv4Intf, "of the interface", neighborIfIndex,
+			/*	ifIP, ipMask, err := net.ParseCIDR(ipv4Intf)
+				if err != nil {
+					h.logger.Err("IPv4Addr", ipv4Intf, "of the interface", neighborIfIndex, "is not valid, error:", err)
+					err = errors.New(fmt.Sprintf("IPv4Addr %s of the interface %d is not valid, error: %s", ipv4Intf,
+						neighborIfIndex, err))
+					return ip, ifIndex, err
+				}*/
+			//if ipMask.Mask[len(ipMask.Mask)-1] < 252 {
+			if ipMask[len(ipMask)-1] < 252 {
+				h.logger.Err("IPv4Addr", ifIP, "of the interface", neighborIfIndex, "is not /30 or /31 address")
+				err = errors.New(fmt.Sprintln("IPv4Addr", ifIP, "of the interface", neighborIfIndex,
 					"is not /30 or /31 address"))
 				return ip, ifIndex, err
 			}
 			h.logger.Info("IPv4Addr of the v4Neighbor local interface", neighborIfIndex, "is", ifIP)
-			ifIP[len(ifIP)-1] = ifIP[len(ifIP)-1] ^ (^ipMask.Mask[len(ipMask.Mask)-1])
+			//ifIP[len(ifIP)-1] = ifIP[len(ifIP)-1] ^ (^ipMask.Mask[len(ipMask.Mask)-1])
+			ifIP[len(ifIP)-1] = ifIP[len(ifIP)-1] ^ (^ipMask[len(ipMask)-1])
 			h.logger.Info("IPv4Addr of the v4Neighbor remote interface is", ifIP)
 			ip = ifIP
 			ifIndex = neighborIfIndex
@@ -889,33 +895,37 @@ func (h *BGPHandler) getIPAndIfIndexForV6Neighbor(neighborIP string, neighborInt
 		}
 		ifIndexInt, _ := strconv.Atoi(ifIndexStr)
 		neighborIfIndex := int32(ifIndexInt)
-		var ipv6Intf string
+		//var ipv6Intf string
 		// @TODO: this needs to be interface once we decide to move listener
-		ipv6Intf, err = h.server.IntfMgr.GetIPv6Information(neighborIfIndex)
-		if err == nil {
-			h.logger.Info("Call ASICd to get IPv6 address for interface with ifIndex:", neighborIfIndex)
-			ifIP, ipMask, err := net.ParseCIDR(ipv6Intf)
-			if err != nil {
-				h.logger.Err("IPv6Addr", ipv6Intf, "of the interface", neighborIfIndex, "is not valid, error:", err)
-				err = errors.New(fmt.Sprintf("IPv6Addr %s of the interface %d is not valid, error: %s", ipv6Intf,
-					neighborIfIndex, err))
-				return ip, ifIndex, err
-			}
-			if ipMask.Mask[len(ipMask.Mask)-1] < 252 {
-				h.logger.Err("IPv6Addr", ipv6Intf, "of the interface", neighborIfIndex, "is not /126 or /127 address")
-				err = errors.New(fmt.Sprintln("IPv6Addr", ipv6Intf, "of the interface", neighborIfIndex,
-					"is not /126 or /127 address"))
-				return ip, ifIndex, err
-			}
-			h.logger.Info("IPv6Addr of the v6Neighbor local interface", neighborIfIndex, "is", ifIP)
-			ifIP[len(ifIP)-1] = ifIP[len(ifIP)-1] ^ (^ipMask.Mask[len(ipMask.Mask)-1])
-			h.logger.Info("IPv6Addr of the v6Neighbor remote interface is", ifIP)
-			ip = ifIP
-			ifIndex = neighborIfIndex
-			h.logger.Info("v6Neighbor IP address:", ip.String())
-		} else {
-			h.logger.Err("v6Neighbor IP", neighborIP, "or interface", neighborIfIndex, "not configured ")
-		}
+		//ipv6Intf, err = h.server.IntfMgr.GetIPv6Information(neighborIfIndex)
+		ipInfo, err := h.server.GetIfaceIP(neighborIfIndex)
+		h.logger.Info("getIPAndIfIndexForV6Neighbor:ipInfo.LinkLocalIpAddr :", ipInfo.LinklocalIpAddr, " err:", err, " after GetIfaceIP of neighborIfIndex:", neighborIfIndex)
+		ifIndex = neighborIfIndex
+		ip = net.ParseIP(ipInfo.LinklocalIpAddr)
+		/*		if err == nil {
+					h.logger.Info("Call ASICd to get IPv6 address for interface with ifIndex:", neighborIfIndex)
+					ifIP, ipMask, err := net.ParseCIDR(ipv6Intf)
+					if err != nil {
+						h.logger.Err("IPv6Addr", ipv6Intf, "of the interface", neighborIfIndex, "is not valid, error:", err)
+						err = errors.New(fmt.Sprintf("IPv6Addr %s of the interface %d is not valid, error: %s", ipv6Intf,
+							neighborIfIndex, err))
+						return ip, ifIndex, err
+					}
+					if ipMask.Mask[len(ipMask.Mask)-1] < 252 {
+						h.logger.Err("IPv6Addr", ipv6Intf, "of the interface", neighborIfIndex, "is not /126 or /127 address")
+						err = errors.New(fmt.Sprintln("IPv6Addr", ipv6Intf, "of the interface", neighborIfIndex,
+							"is not /126 or /127 address"))
+						return ip, ifIndex, err
+					}
+					h.logger.Info("IPv6Addr of the v6Neighbor local interface", neighborIfIndex, "is", ifIP)
+					ifIP[len(ifIP)-1] = ifIP[len(ifIP)-1] ^ (^ipMask.Mask[len(ipMask.Mask)-1])
+					h.logger.Info("IPv6Addr of the v6Neighbor remote interface is", ifIP)
+					ip = ifIP
+					ifIndex = neighborIfIndex
+					h.logger.Info("v6Neighbor IP address:", ip.String())
+				} else {
+					h.logger.Err("v6Neighbor IP", neighborIP, "or interface", neighborIfIndex, "not configured ")
+				}*/
 	}
 	return ip, ifIndex, err
 }

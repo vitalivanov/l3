@@ -1022,10 +1022,17 @@ func (s *BGPServer) ProcessIntfStates(intfs []*config.IntfStateInfo) {
 			s.ifaceMgr.AddIface(ifState.Idx, ifState.IPAddr)
 		} else if ifState.State == config.INTF_DELETED {
 			s.ifaceMgr.RemoveIface(ifState.Idx, ifState.IPAddr)
+		} else if ifState.State == config.IPV6_NEIGHBOR_CREATED {
+			s.ifaceMgr.AddLinkLocalIface(ifState.Idx, ifState.LinkLocalIP)
+		} else if ifState.State == config.IPV6_NEIGHBOR_DELETED {
+			s.ifaceMgr.RemoveLinkLocalIface(ifState.Idx, ifState.LinkLocalIP)
 		}
 	}
 }
-
+func (s *BGPServer) GetIfaceIP(ifIndex int32) (ipInfo utils.IPInfo, err error) {
+	ipInfo, err = s.ifaceMgr.GetIfaceIP(ifIndex)
+	return ipInfo, err
+}
 func (s *BGPServer) ProcessRemoveNeighbor(peerIp string, peer *Peer) {
 	updated, withdrawn, updatedAddPaths := s.LocRib.RemoveUpdatesFromNeighbor(peerIp, peer.NeighborConf,
 		s.AddPathCount)
@@ -1590,6 +1597,7 @@ func (s *BGPServer) listenChannelUpdates() {
 			s.handleBfdNotifications(bfdNotify.Oper,
 				bfdNotify.DestIp, bfdNotify.State)
 		case ifState := <-s.IntfCh:
+			s.logger.Info("Received message on ItfCh")
 			if ifState.State == config.INTF_STATE_DOWN {
 				if peerList, ok := s.IfacePeerMap[ifState.Idx]; ok {
 					for _, peerIP := range peerList {
@@ -1602,8 +1610,14 @@ func (s *BGPServer) listenChannelUpdates() {
 				s.ifaceMgr.AddIface(ifState.Idx, ifState.IPAddr)
 			} else if ifState.State == config.INTF_DELETED {
 				s.ifaceMgr.RemoveIface(ifState.Idx, ifState.IPAddr)
+			} else if ifState.State == config.IPV6_NEIGHBOR_CREATED {
+				s.logger.Info("IPV6_NEIGHBOR_CREATED message")
+				s.ifaceMgr.AddLinkLocalIface(ifState.Idx, ifState.LinkLocalIP)
+			} else if ifState.State == config.IPV6_NEIGHBOR_DELETED {
+				s.ifaceMgr.RemoveLinkLocalIface(ifState.Idx, ifState.LinkLocalIP)
 			}
 		case ifMap := <-s.IntfMapCh:
+			s.logger.Info("Received interface map")
 			s.ProcessIntfMapUpdates([]config.IntfMapInfo{config.IntfMapInfo{Idx: ifMap.Idx, IfName: ifMap.IfName}})
 
 		case routeInfo := <-s.RoutesCh:
@@ -1649,17 +1663,22 @@ func (s *BGPServer) GetIntfObjects() {
 	s.ProcessIntfStates(v6intfs)
 	s.logger.Info("After ProcessIntfStates for v6Intfs")
 
+	v6Neighbors := s.IntfMgr.GetIPv6Neighbors()
+	s.ProcessIntfStates(v6Neighbors)
+	s.logger.Info("After ProcessIntfStates for v6Neighbors")
+
 	portIntfMap := s.IntfMgr.GetPortInfo()
 	s.ProcessIntfMapUpdates(portIntfMap)
-	s.logger.Info("After ProcessIntfStates for ports")
+	s.logger.Info("After ProcessIntfMapUpdates for ports")
 
 	vlanIntfMap := s.IntfMgr.GetVlanInfo()
 	s.ProcessIntfMapUpdates(vlanIntfMap)
-	s.logger.Info("After ProcessIntfStates for vlans")
+	s.logger.Info("After ProcessIntfMapUpdates for vlans")
 
 	logicalIntfMap := s.IntfMgr.GetLogicalIntfInfo()
 	s.ProcessIntfMapUpdates(logicalIntfMap)
-	s.logger.Info("After ProcessIntfStates for logicalIntfs")
+	s.logger.Info("After ProcessIntfMapUpdates for logicalIntfs")
+
 }
 
 func (s *BGPServer) StartServer() {

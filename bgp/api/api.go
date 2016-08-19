@@ -65,11 +65,12 @@ func SendBfdNotification(DestIp string, State bool, Oper config.Operation) {
 
 /*  Send interface state notification to server
  */
-func SendIntfNotification(ifIndex int32, ipAddr string, state config.Operation) {
+func SendIntfNotification(ifIndex int32, ipAddr string, linklocalIp string, state config.Operation) {
 	bgpapi.server.IntfCh <- config.IntfStateInfo{
-		Idx:    ifIndex,
-		IPAddr: ipAddr,
-		State:  state,
+		Idx:         ifIndex,
+		IPAddr:      ipAddr,
+		LinkLocalIP: linklocalIp,
+		State:       state,
 	}
 }
 
