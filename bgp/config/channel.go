@@ -67,6 +67,11 @@ type IntfStateInfo struct {
 	State  Operation
 }
 
+type IntfMapInfo struct {
+	Idx    int32
+	IfName string
+}
+
 func NewIntfStateInfo(idx int32, ipAddr string, state Operation) *IntfStateInfo {
 	return &IntfStateInfo{
 		Idx:    idx,

@@ -13,13 +13,13 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 // bgp_client.go
 package main
@@ -63,13 +63,13 @@ func main() {
 	}
 	fmt.Println("Created BGP global conf")
 
-	peerConfigArgs := bgpd.NewBGPNeighbor()
+	peerConfigArgs := bgpd.NewBGPv4Neighbor()
 	peerConfigArgs.NeighborAddress = "11.1.11.203"
 	peerConfigArgs.LocalAS = 5000
 	peerConfigArgs.PeerAS = 5000
 	peerConfigArgs.Description = "IBGP Peer"
 	fmt.Println("calling CreateBgpPeer with attr:", peerConfigArgs)
-	ret, err = client.CreateBGPNeighbor(peerConfigArgs)
+	ret, err = client.CreateBGPv4Neighbor(peerConfigArgs)
 	if !ret {
 		fmt.Println("CreateBgpPeer FAILED, ret:", ret, "err:", err)
 	}

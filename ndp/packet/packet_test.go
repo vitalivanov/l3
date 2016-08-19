@@ -212,7 +212,7 @@ func TestValidateICMPv6Hdr(t *testing.T) {
 	var testPkt = net.IP{
 		0xfe, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xc0, 0x00, 0x54, 0xff, 0xfe, 0xf5, 0x00, 0x00,
 	}
-	nds, err := pkt.decodeICMPv6Hdr(icmpv6Hdr, ipv6Hdr.SrcIP, ipv6Hdr.DstIP)
+	nds, err := pkt.decodeICMPv6Hdr(icmpv6Hdr, ipv6Hdr.SrcIP, ipv6Hdr.DstIP, 100)
 	if err != nil {
 		t.Error("Validating ICMPv6 Header failed:", err)
 	}
@@ -289,7 +289,7 @@ func TestValidateNDSPkt(t *testing.T) {
 		t.Error("Failed to decode packet:", p.ErrorLayer().Error())
 	}
 	nbrInfo := &config.NeighborInfo{}
-	err := pkt.ValidateAndParse(nbrInfo, p)
+	err := pkt.ValidateAndParse(nbrInfo, p, 100)
 	if err != nil {
 		t.Error("Failed to Validate Packet, Error:", err)
 	}
@@ -321,7 +321,7 @@ func TestDecodeNDA(t *testing.T) {
 	if err != nil {
 		t.Error("Decoding ipv6 and icmpv6 header failed", err)
 	}
-	nda, err := pkt.decodeICMPv6Hdr(icmpv6Hdr, ipv6Hdr.SrcIP, ipv6Hdr.DstIP)
+	nda, err := pkt.decodeICMPv6Hdr(icmpv6Hdr, ipv6Hdr.SrcIP, ipv6Hdr.DstIP, 100)
 	if err != nil {
 		t.Error("Validating ICMPv6 Header failed:", err)
 	}
@@ -383,7 +383,7 @@ func TestNDAChecksum(t *testing.T) {
 		t.Error("Decoding ipv6 and icmpv6 header failed", err)
 	}
 
-	nda, err := pkt.decodeICMPv6Hdr(icmpv6Hdr, ipv6Hdr.SrcIP, ipv6Hdr.DstIP)
+	nda, err := pkt.decodeICMPv6Hdr(icmpv6Hdr, ipv6Hdr.SrcIP, ipv6Hdr.DstIP, 100)
 	if err != nil {
 		t.Error("Validating ICMPv6 Header failed:", err)
 	}
@@ -420,12 +420,12 @@ func TestUnSupportedICMPv6(t *testing.T) {
 	icmpv6Hdr.Checksum = binary.BigEndian.Uint16(csum[:])
 	icmpv6Hdr.TypeBytes = append(icmpv6Hdr.TypeBytes, flags...)
 	var ip net.IP
-	_, err := pkt.decodeICMPv6Hdr(icmpv6Hdr, ip, ip)
+	_, err := pkt.decodeICMPv6Hdr(icmpv6Hdr, ip, ip, 100)
 	if err == nil {
 		t.Error("Validating ICMPv6 Header should have failed:", err)
 	}
 	icmpv6Hdr.TypeCode = layers.CreateICMPv6TypeCode(133, 0)
-	_, err = pkt.decodeICMPv6Hdr(icmpv6Hdr, ip, ip)
+	_, err = pkt.decodeICMPv6Hdr(icmpv6Hdr, ip, ip, 100)
 	if err == nil {
 		t.Error("Validating ICMPv6 Header should have failed:", err)
 	}
@@ -441,7 +441,7 @@ func TestValidateNDAPkt(t *testing.T) {
 	}
 	nbrInfo := &config.NeighborInfo{}
 	pkt := testPktObj
-	err := pkt.ValidateAndParse(nbrInfo, p)
+	err := pkt.ValidateAndParse(nbrInfo, p, 100)
 	if err != nil {
 		t.Error("Failed to Validate Packet, Error:", err)
 	}
@@ -479,7 +479,7 @@ func TestNDSOption(t *testing.T) {
 		t.Error("Decoding ipv6 and icmpv6 header failed", err)
 	}
 
-	nds, err := pkt.decodeICMPv6Hdr(icmpv6Hdr, ipv6Hdr.SrcIP, ipv6Hdr.DstIP)
+	nds, err := pkt.decodeICMPv6Hdr(icmpv6Hdr, ipv6Hdr.SrcIP, ipv6Hdr.DstIP, 100)
 	if err != nil {
 		t.Error("Validating ICMPv6 Header failed:", err)
 	}

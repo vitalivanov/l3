@@ -568,6 +568,10 @@ func ConstructIPv6MPReachNLRI(protoFamily uint32, nextHop, nextHopLinkLocal net.
 	return mpReachNLRI
 }
 
+func ConstructIPv6MPReachNLRIForConnRoutes(protoFamily uint32) *BGPPathAttrMPReachNLRI {
+	return ConstructIPv6MPReachNLRI(protoFamily, net.IPv6zero, nil, nil)
+}
+
 func AddOriginatorId(updateMsg *BGPMessage, id net.IP) bool {
 	body := updateMsg.Body.(*BGPUpdate)
 	var pa BGPPathAttr

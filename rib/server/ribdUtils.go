@@ -145,9 +145,13 @@ func (slice AdminDistanceSlice) Swap(i, j int) {
 	slice[i].Protocol, slice[j].Protocol = slice[j].Protocol, slice[i].Protocol
 	slice[i].Distance, slice[j].Distance = slice[j].Distance, slice[i].Distance
 }
-func BuildProtocolAdminDistanceSlice() {
+func BuildProtocolAdminDistanceSlice(force bool) {
 	distance := 0
 	protocol := ""
+	if ProtocolAdminDistanceSlice != nil && force == false {
+		//dont build it if it is already built
+		return
+	}
 	ProtocolAdminDistanceSlice = nil
 	ProtocolAdminDistanceSlice = make([]ribd.RouteDistanceState, 0)
 	if ProtocolAdminDistanceMapDB == nil {
@@ -168,7 +172,7 @@ func BuildProtocolAdminDistanceSlice() {
 func (m RIBDServer) ConvertIntfStrToIfIndexStr(intfString string) (ifIndex string, err error) {
 	if val, err := strconv.Atoi(intfString); err == nil {
 		//Verify ifIndex is valid
-		logger.Info("IfIndex = ", val)
+		//logger.Info("IfIndex = ", val)
 		_, ok := IntfIdNameMap[int32(val)]
 		if !ok {
 			logger.Err("Cannot create ip route on a unknown L3 interface")
