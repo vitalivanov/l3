@@ -28,6 +28,7 @@ import (
 	"github.com/google/gopacket/pcap"
 	"l3/ndp/debug"
 	"net"
+	"time"
 )
 
 /*
@@ -38,22 +39,44 @@ import (
  *    solicitated before......In this case we will send out multicast solicitation and whoever repsonds will we
  *    learn about them via Neighbor Advertisement... That way our nexthop neighbor entry is always up-to-date
  */
-func (p *Packet) SendNSMsgIfRequired(ipAddr string, pHdl *pcap.Handle) error {
+func (p *Packet) SendNAMsg(srcMac, ipAddr string, pHdl *pcap.Handle) error {
 	ip, _, err := net.ParseCIDR(ipAddr)
 	if err != nil {
 		return errors.New(fmt.Sprintln("Parsing CIDR", ipAddr, "failed with Error:", err))
 	}
-	link, exists := p.GetLink(ip.String())
-	if !exists {
-		debug.Logger.Debug("link entry for ipAddr", ip, "not found in linkInfo.",
-			"Waiting for linux to finish of neighbor duplicate detection")
-		return nil
+	// Hard Coded this value... @jgheewala: fix this asap
+	pktToSend := ConstructRAPacket(srcMac, "33:33:00:00:00:01", ip.String(), "ff02::1")
+	/*
+			link, exists := p.GetLink(ip.String())
+			if !exists {
+				debug.Logger.Debug("link entry for ipAddr", ip, "not found in linkInfo.",
+					"Waiting for linux to finish of neighbor duplicate detection")
+				return nil
+			}
+			debug.Logger.Debug("link info", link, "ip address", ip)
+		pktToSend := ConstructNSPacket(link.LinkLocalAddress, IPV6_ICMPV6_MULTICAST_DST_MAC, ip.String(),
+			SOLICITATED_NODE_ADDRESS)
+		debug.Logger.Debug("sending pkt from link", link.LinkLocalAddress, "bytes are:", pktToSend)
+	*/
+	//@HACK: jgheewala fix this with re-ordering of links
+
+	var raTimer *time.Timer
+	resends := 0
+	p.SendNDPkt(pktToSend, pHdl)
+	var resendRAMsg_func func()
+	resendRAMsg_func = func() {
+		debug.Logger.Debug("Re-sending RA for", srcMac, ipAddr)
+		err := p.SendNDPkt(pktToSend, pHdl)
+		if err != nil {
+			debug.Logger.Err("Failed sending pkt for", srcMac, ipAddr, "re-send number", resends)
+		}
+		if resends <= 3 {
+			raTimer.Reset(time.Duration(16) * time.Second)
+			resends++
+		}
 	}
-	debug.Logger.Debug("link info", link, "ip address", ip)
-	pktToSend := ConstructNSPacket(link.LinkLocalAddress, IPV6_ICMPV6_MULTICAST_DST_MAC, ip.String(),
-		SOLICITATED_NODE_ADDRESS)
-	debug.Logger.Debug("sending pkt from link", link.LinkLocalAddress, "bytes are:", pktToSend)
-	return p.SendNDPkt(pktToSend, pHdl)
+	raTimer = time.AfterFunc(time.Duration(16)*time.Second, resendRAMsg_func)
+	return nil //p.SendNDPkt(pktToSend, pHdl)
 }
 
 /*
