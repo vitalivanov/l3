@@ -330,7 +330,6 @@ func ValidateProbes(ipS, ipD string, quit chan bool, t *testing.T) {
 				}
 			} else {
 				exit = true
-				t.Log("deleted neighbor Entry information is", deleteEntries[0])
 			}
 		}
 		if exit {

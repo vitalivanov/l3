@@ -295,7 +295,7 @@ func TestValidateNDSPktForEncode(t *testing.T) {
 		t.Error("Failed to decode packet:", p.ErrorLayer().Error())
 	}
 	nbrInfo := &config.NeighborInfo{}
-	err := pkt.ValidateAndParse(nbrInfo, p)
+	err := pkt.ValidateAndParse(nbrInfo, p, 100)
 	if err != nil {
 		t.Error("Failed to Validate Packet, Error:", err)
 	}

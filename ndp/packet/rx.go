@@ -32,14 +32,6 @@ import (
 	"net"
 )
 
-func Init(pktCh chan config.PacketData) *Packet {
-	pkt := &Packet{
-		PktCh: pktCh,
-	}
-	pkt.LinkInfo = make(map[string]Link, 100)
-	return pkt
-}
-
 func getEthLayer(pkt gopacket.Packet, eth *layers.Ethernet) error {
 	ethLayer := pkt.Layer(layers.LayerTypeEthernet)
 	if ethLayer == nil {
@@ -92,11 +84,15 @@ func validateIPv6Hdr(hdr *layers.IPv6, layerType uint8) error {
 		if hdr.Length < ICMPV6_MIN_LENGTH {
 			return errors.New(fmt.Sprintf("Invalid ICMP length %d", hdr.Length))
 		}
+	case layers.ICMPv6TypeRouterAdvertisement:
+		if hdr.Length < ICMPV6_MIN_LENGTH_RA {
+			return errors.New(fmt.Sprintf("Invalid ICMP length %d", hdr.Length))
+		}
 	}
 	return nil
 }
 
-func (p *Packet) decodeICMPv6Hdr(hdr *layers.ICMPv6, srcIP net.IP, dstIP net.IP) (*NDInfo, error) {
+func (p *Packet) decodeICMPv6Hdr(hdr *layers.ICMPv6, srcIP net.IP, dstIP net.IP, ifIndex int32) (*NDInfo, error) {
 	ndInfo := &NDInfo{}
 	var err error
 	// Validating checksum received, if success then only start parsing icmp payload
@@ -114,14 +110,15 @@ func (p *Packet) decodeICMPv6Hdr(hdr *layers.ICMPv6, srcIP net.IP, dstIP net.IP)
 		ndInfo, err = p.HandleNSMsg(hdr, srcIP, dstIP)
 
 	case layers.ICMPv6TypeNeighborAdvertisement:
-		debug.Logger.Debug("Neigbor Advertisemnt  Received from", srcIP, "---->", dstIP)
+		debug.Logger.Debug("Neigbor Advertisemnt Received from", srcIP, "---->", dstIP)
 		ndInfo, err = p.HandleNAMsg(hdr, srcIP, dstIP)
 
 	case layers.ICMPv6TypeRouterSolicitation:
 		return nil, errors.New("Router Solicitation is not yet supported")
 
 	case layers.ICMPv6TypeRouterAdvertisement:
-		return nil, errors.New("Router Advertisement is not yet supported")
+		debug.Logger.Debug("Router Advertisement Received from", srcIP, "---->", dstIP)
+		ndInfo, err = p.HandleRAMsg(hdr, srcIP, dstIP, ifIndex)
 	default:
 		return nil, errors.New(fmt.Sprintln("Not Supported ICMPv6 Type:", typeCode.Type()))
 	}
@@ -144,6 +141,8 @@ func (p *Packet) populateNeighborInfo(nbrInfo *config.NeighborInfo, eth *layers.
 		*nbrInfo = p.GetNbrInfoUsingNSPkt(eth, ipv6Hdr, ndInfo)
 	case layers.ICMPv6TypeNeighborAdvertisement:
 		*nbrInfo = p.GetNbrInfoUsingNAPkt(eth, ipv6Hdr, ndInfo)
+	case layers.ICMPv6TypeRouterAdvertisement:
+		*nbrInfo = p.GetNbrInfoUsingRAPkt(eth, ipv6Hdr, ndInfo)
 	}
 	debug.Logger.Debug("Neighbor Populated:", *nbrInfo)
 }
@@ -171,7 +170,7 @@ func (p *Packet) populateNeighborInfo(nbrInfo *config.NeighborInfo, eth *layers.
  *  - If the IP source address is the unspecified address, there is no
  *    source link-layer address option in the message. <- @TODO: need to be done later
  */
-func (p *Packet) ValidateAndParse(nbrInfo *config.NeighborInfo, pkt gopacket.Packet) error {
+func (p *Packet) ValidateAndParse(nbrInfo *config.NeighborInfo, pkt gopacket.Packet, ifIndex int32) error {
 	// first decode all the layers
 	icmpv6Hdr := &layers.ICMPv6{}
 	ipv6Hdr := &layers.IPv6{}
@@ -197,7 +196,7 @@ func (p *Packet) ValidateAndParse(nbrInfo *config.NeighborInfo, pkt gopacket.Pac
 	}
 
 	// Validating icmpv6 header
-	ndInfo, err := p.decodeICMPv6Hdr(icmpv6Hdr, ipv6Hdr.SrcIP, ipv6Hdr.DstIP)
+	ndInfo, err := p.decodeICMPv6Hdr(icmpv6Hdr, ipv6Hdr.SrcIP, ipv6Hdr.DstIP, ifIndex)
 	if err != nil {
 		return err
 	}
