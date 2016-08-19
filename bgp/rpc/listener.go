@@ -895,8 +895,9 @@ func (h *BGPHandler) getIPAndIfIndexForV6Neighbor(neighborIP string, neighborInt
 		// @TODO: this needs to be interface once we decide to move listener
 		//ipv6Intf, err = h.server.IntfMgr.GetIPv6Information(neighborIfIndex)
 		ipInfo, err := h.server.GetIfaceIP(neighborIfIndex)
+		h.logger.Info("getIPAndIfIndexForV6Neighbor:ipInfo.LinkLocalIpAddr :", ipInfo.LinklocalIpAddr, " err:", err, " after GetIfaceIP of neighborIfIndex:", neighborIfIndex)
 		ifIndex = neighborIfIndex
-		ip = net.IP(ipInfo.LinklocalIpAddr)
+		ip = net.ParseIP(ipInfo.LinklocalIpAddr)
 		/*		if err == nil {
 					h.logger.Info("Call ASICd to get IPv6 address for interface with ifIndex:", neighborIfIndex)
 					ifIP, ipMask, err := net.ParseCIDR(ipv6Intf)

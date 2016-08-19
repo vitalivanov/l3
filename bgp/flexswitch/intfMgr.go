@@ -31,6 +31,7 @@ import (
 	"l3/bgp/api"
 	"l3/bgp/config"
 	"l3/bgp/rpc"
+	"ndpd"
 	"strconv"
 	"utils/commonDefs"
 	"utils/logging"
@@ -45,6 +46,9 @@ func NewFSIntfMgr(logger *logging.Writer, fileName string) (*FSIntfMgr, error) {
 	var asicdClient *asicdServices.ASICDServicesClient = nil
 	asicdClientChan := make(chan *asicdServices.ASICDServicesClient)
 
+	var ndpdClient *ndpd.NDPDServicesClient = nil
+	ndpdClientChan := make(chan *ndpd.NDPDServicesClient)
+
 	logger.Info("Connecting to ASICd")
 	go rpc.StartAsicdClient(logger, fileName, asicdClientChan)
 	asicdClient = <-asicdClientChan
@@ -54,9 +58,19 @@ func NewFSIntfMgr(logger *logging.Writer, fileName string) (*FSIntfMgr, error) {
 	} else {
 		logger.Info("Connected to ASICd")
 	}
+	logger.Info("Connecting to NDPd")
+	go rpc.StartNdpdClient(logger, fileName, ndpdClientChan)
+	ndpdClient = <-ndpdClientChan
+	if ndpdClient == nil {
+		logger.Err("Failed to connect to NDPd")
+		return nil, errors.New("Failed to connect to NDPd")
+	} else {
+		logger.Info("Connected to NDPd")
+	}
 	mgr := &FSIntfMgr{
 		plugin:      "ovsdb",
 		AsicdClient: asicdClient,
+		NdpdClient:  ndpdClient,
 		logger:      logger,
 	}
 	return mgr, nil
@@ -67,6 +81,7 @@ func NewFSIntfMgr(logger *logging.Writer, fileName string) (*FSIntfMgr, error) {
 func (mgr *FSIntfMgr) Start() {
 	mgr.asicdL3IntfSubSocket, _ = mgr.setupSubSocket(asicdCommonDefs.PUB_SOCKET_ADDR)
 	mgr.ndpIntfSubSocket, _ = mgr.setupSubSocket("ipc:///tmp/ndpd_all.ipc")
+	mgr.logger.Err("ndp socket set up")
 	go mgr.listenForAsicdEvents()
 	go mgr.listenForNDPEvents()
 }
@@ -75,23 +90,24 @@ func (mgr *FSIntfMgr) Start() {
  */
 func (mgr *FSIntfMgr) setupSubSocket(address string) (*nanomsg.SubSocket, error) {
 	var err error
+	mgr.logger.Info("setupSubSocket for address:", address)
 	var socket *nanomsg.SubSocket
 	if socket, err = nanomsg.NewSubSocket(); err != nil {
-		mgr.logger.Errf("Failed to create subscribe socket %s, error:%s", address, err)
+		mgr.logger.Err("Failed to create subscribe socket %s, error:%s", address, err)
 		return nil, err
 	}
 
 	if err = socket.Subscribe(""); err != nil {
-		mgr.logger.Errf("Failed to subscribe to \"\" on subscribe socket %s, error:%s", address, err)
+		mgr.logger.Err("Failed to subscribe to \"\" on subscribe socket %s, address", " error:", err)
 		return nil, err
 	}
 
 	if _, err = socket.Connect(address); err != nil {
-		mgr.logger.Errf("Failed to connect to publisher socket %s, error:%s", address, err)
+		mgr.logger.Err("Failed to connect to publisher socket %s, error:%s", address, err)
 		return nil, err
 	}
 
-	mgr.logger.Infof("Connected to publisher socker %s", address)
+	mgr.logger.Info("Connected to publisher socket %s", address)
 	if err = socket.SetRecvBuffer(1024 * 1024); err != nil {
 		mgr.logger.Err("Failed to set the buffer size for subsriber socket %s, error:", address, err)
 		return nil, err
@@ -128,11 +144,11 @@ func (mgr *FSIntfMgr) listenForNDPEvents() {
 				return
 			}
 
-			mgr.logger.Info("NDP IPV6 neighbor event idx %d ip %s", msg.IfIndex, msg.IpAddr)
+			mgr.logger.Info("NDP IPV6 neighbor event idx ", msg.IfIndex, " ip ", msg.IpAddr)
 			if event.MsgType == commonDefs.NOTIFY_IPV6_NEIGHBOR_CREATE {
-				api.SendIntfNotification(msg.IfIndex, msg.IpAddr, config.IPV6_NEIGHBOR_CREATED)
+				api.SendIntfNotification(msg.IfIndex, "", msg.IpAddr, config.IPV6_NEIGHBOR_CREATED)
 			} else {
-				api.SendIntfNotification(msg.IfIndex, msg.IpAddr, config.IPV6_NEIGHBOR_DELETED)
+				api.SendIntfNotification(msg.IfIndex, "", msg.IpAddr, config.IPV6_NEIGHBOR_DELETED)
 			}
 		}
 	}
@@ -188,9 +204,9 @@ func (mgr *FSIntfMgr) listenForAsicdEvents() {
 
 			mgr.logger.Infof("Asicd L3INTF event idx %d ip %s state %d", msg.IfIndex, msg.IpAddr, msg.IfState)
 			if msg.IfState == asicdCommonDefs.INTF_STATE_DOWN {
-				api.SendIntfNotification(msg.IfIndex, msg.IpAddr, config.INTF_STATE_DOWN)
+				api.SendIntfNotification(msg.IfIndex, msg.IpAddr, "", config.INTF_STATE_DOWN)
 			} else {
-				api.SendIntfNotification(msg.IfIndex, msg.IpAddr, config.INTF_STATE_UP)
+				api.SendIntfNotification(msg.IfIndex, msg.IpAddr, "", config.INTF_STATE_UP)
 			}
 
 		case asicdCommonDefs.NOTIFY_IPV6INTF_CREATE, asicdCommonDefs.NOTIFY_IPV6INTF_DELETE:
@@ -203,9 +219,9 @@ func (mgr *FSIntfMgr) listenForAsicdEvents() {
 
 			mgr.logger.Info("Asicd IPV6INTF event idx %d ip %s", msg.IfIndex, msg.IpAddr)
 			if event.MsgType == asicdCommonDefs.NOTIFY_IPV6INTF_CREATE {
-				api.SendIntfNotification(msg.IfIndex, msg.IpAddr, config.INTF_CREATED)
+				api.SendIntfNotification(msg.IfIndex, msg.IpAddr, "", config.INTF_CREATED)
 			} else {
-				api.SendIntfNotification(msg.IfIndex, msg.IpAddr, config.INTF_DELETED)
+				api.SendIntfNotification(msg.IfIndex, msg.IpAddr, "", config.INTF_DELETED)
 			}
 		case asicdCommonDefs.NOTIFY_IPV4INTF_CREATE, asicdCommonDefs.NOTIFY_IPV4INTF_DELETE:
 			var msg asicdCommonDefs.IPv4IntfNotifyMsg
@@ -217,9 +233,9 @@ func (mgr *FSIntfMgr) listenForAsicdEvents() {
 
 			mgr.logger.Info("Asicd IPV4INTF event idx %d ip %s", msg.IfIndex, msg.IpAddr)
 			if event.MsgType == asicdCommonDefs.NOTIFY_IPV4INTF_CREATE {
-				api.SendIntfNotification(msg.IfIndex, msg.IpAddr, config.INTF_CREATED)
+				api.SendIntfNotification(msg.IfIndex, msg.IpAddr, "", config.INTF_CREATED)
 			} else {
-				api.SendIntfNotification(msg.IfIndex, msg.IpAddr, config.INTF_DELETED)
+				api.SendIntfNotification(msg.IfIndex, msg.IpAddr, "", config.INTF_DELETED)
 			}
 		}
 	}
@@ -244,7 +260,7 @@ func (mgr *FSIntfMgr) GetIPv4Intfs() []*config.IntfStateInfo {
 		mgr.logger.Info("len(getBulkInfo.IPv4IntfStateList)  =", len(getBulkInfo.IPv4IntfStateList),
 			"num objects returned =", getBulkInfo.Count)
 		for _, intfState := range getBulkInfo.IPv4IntfStateList {
-			intf := config.NewIntfStateInfo(intfState.IfIndex, intfState.IpAddr, config.INTF_CREATED)
+			intf := config.NewIntfStateInfo(intfState.IfIndex, intfState.IpAddr, "", config.INTF_CREATED)
 			intfs = append(intfs, intf)
 		}
 		if getBulkInfo.More == false {
@@ -257,6 +273,38 @@ func (mgr *FSIntfMgr) GetIPv4Intfs() []*config.IntfStateInfo {
 	return intfs
 }
 
+func (mgr *FSIntfMgr) GetIPv6Neighbors() []*config.IntfStateInfo {
+	var currMarker ndpd.Int
+	var count ndpd.Int
+	intfs := make([]*config.IntfStateInfo, 0)
+	count = 100
+	for {
+		mgr.logger.Info("Getting ", count, "NDPEntryState objects from currMarker", currMarker)
+		getBulkInfo, err := mgr.NdpdClient.GetBulkNDPEntryState(currMarker, count)
+		if err != nil {
+			mgr.logger.Info("GetBulkNDPEntryState failed with error", err)
+			break
+		}
+		if getBulkInfo.Count == 0 {
+			mgr.logger.Info("0 objects returned from GetBulkNDPEntryState")
+			break
+		}
+		mgr.logger.Info("len(getBulkInfo.NDPEntryStateList)  =", len(getBulkInfo.NDPEntryStateList),
+			"num objects returned =", getBulkInfo.Count)
+		for _, intfState := range getBulkInfo.NDPEntryStateList {
+			//TO-DO: Update with the correct ifIndex once NDP getbulk is updated
+			intf := config.NewIntfStateInfo(0, "", intfState.IpAddr, config.IPV6_NEIGHBOR_CREATED)
+			intfs = append(intfs, intf)
+		}
+		if getBulkInfo.More == false {
+			mgr.logger.Info("more returned as false, so no more get bulks")
+			break
+		}
+		currMarker = getBulkInfo.EndIdx
+	}
+
+	return intfs
+}
 func (mgr *FSIntfMgr) GetIPv6Intfs() []*config.IntfStateInfo {
 	var currMarker asicdServices.Int
 	var count asicdServices.Int
@@ -276,7 +324,7 @@ func (mgr *FSIntfMgr) GetIPv6Intfs() []*config.IntfStateInfo {
 		mgr.logger.Info("len(getBulkInfo.IPv6IntfStateList)  =", len(getBulkInfo.IPv6IntfStateList),
 			"num objects returned =", getBulkInfo.Count)
 		for _, intfState := range getBulkInfo.IPv6IntfStateList {
-			intf := config.NewIntfStateInfo(intfState.IfIndex, intfState.IpAddr, config.INTF_CREATED)
+			intf := config.NewIntfStateInfo(intfState.IfIndex, intfState.IpAddr, "", config.INTF_CREATED)
 			intfs = append(intfs, intf)
 		}
 		if getBulkInfo.More == false {

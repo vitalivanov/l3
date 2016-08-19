@@ -75,11 +75,12 @@ type IntfMapInfo struct {
 	IfName string
 }
 
-func NewIntfStateInfo(idx int32, ipAddr string, state Operation) *IntfStateInfo {
+func NewIntfStateInfo(idx int32, ipAddr string, linklocalIp string, state Operation) *IntfStateInfo {
 	return &IntfStateInfo{
-		Idx:    idx,
-		IPAddr: ipAddr,
-		State:  state,
+		Idx:         idx,
+		IPAddr:      ipAddr,
+		LinkLocalIP: linklocalIp,
+		State:       state,
 	}
 }
 

@@ -122,7 +122,7 @@ func (i *InterfaceMgr) AddIface(ifIndex int32, addr string) {
 func (i *InterfaceMgr) AddLinkLocalIface(ifIndex int32, addr string) {
 	i.rwMutex.Lock()
 	defer i.rwMutex.Unlock()
-	i.logger.Info("AddIface: ifIndex", ifIndex, "ip", addr, "ifIndexToIP", i.ifIndexToIP, "ipToIfIndex", i.ipToIfIndex)
+	i.logger.Info("AddLinkLocalIface: ifIndex", ifIndex, "ip", addr, "ifIndexToIP", i.ifIndexToIP, "ipToIfIndex", i.ipToIfIndex)
 
 	var ipAddr net.IP
 	var ipMask net.IPMask

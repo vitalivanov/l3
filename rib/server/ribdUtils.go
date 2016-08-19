@@ -792,33 +792,44 @@ func validateNetworkPrefix(ipAddr string, mask string) (destNet patriciaDB.Prefi
 	return destNet, err
 }
 func getNetworkPrefix(destNetIp net.IP, networkMask net.IP) (destNet patriciaDB.Prefix, nwAddr string, err error) {
-	//logger.Debug("getNetworkPrefix for ip: ", destNetIp, "  networkMask: ", networkMask)
+	logger.Debug("getNetworkPrefix for ip: ", destNetIp, "  networkMask: ", networkMask)
 	prefixLen, err := getPrefixLen(networkMask)
 	if err != nil {
 		logger.Err("err when getting prefixLen, err= ", err)
 		return destNet, nwAddr, errors.New(fmt.Sprintln("Invalid networkmask ", networkMask))
 	}
-	var netIp net.IP
-	vdestMask := net.IPMask(networkMask)
-	//logger.Debug("vdestMask:", vdestMask)
-	if isIPv4Mask(net.IP(vdestMask)) {
-		netIp = destNetIp.Mask(vdestMask[12:16])
-		//logger.Debug("ipv4 case, netIp = ", netIp, " vdestMask:", vdestMask[12:16])
-	} else {
-		netIp = destNetIp.Mask(vdestMask)
-		//logger.Debug("ipv6 case, netIp = ", netIp, " vdestMask:", vdestMask)
-	}
 	numbytes := prefixLen / 8
 	if (prefixLen % 8) != 0 {
 		numbytes++
 	}
-	//logger.Debug("getNetworkPrefix: prefixLen  = ", prefixLen, " netIp:", netIp, " numbytes:", numbytes, " len(netIp):", len(netIp))
+	var netIp net.IP
+	vdestMask := net.IPMask(networkMask)
+	logger.Debug("vdestMask:", vdestMask)
+	if isIPv4Mask(net.IP(vdestMask)) {
+		netIp = destNetIp.Mask(vdestMask[12:16])
+		nwAddr = (destNetIp.Mask(net.IPMask(networkMask))).String() + "/" + strconv.Itoa(prefixLen)
+		logger.Debug("ipv4 case, netIp = ", netIp, " vdestMask:", vdestMask[12:16], " nwAddr:", nwAddr)
+	} else {
+		ipAddrStr := destNetIp.String()
+		ipAddr := strings.Split(ipAddrStr, "::")
+		logger.Info("ipAddr:", ipAddr, " for ipAddrStr:", ipAddrStr)
+		masklen := len(ipAddr)
+		numbytes = masklen
+		logger.Info("masklen:", masklen)
+		ipMask := make(net.IPMask, 16)
+		for idx := 0; idx < masklen; idx++ {
+			ipMask[idx] = vdestMask[idx]
+		}
+		netIp = destNetIp.Mask(ipMask)
+		nwAddr = (netIp.Mask(net.IPMask(networkMask))).String() + "/" + strconv.Itoa(prefixLen)
+		logger.Debug("ipv6 case, netIp = ", netIp, " vdestMask:", vdestMask, " ipMask:", ipMask, " nwAddr:", nwAddr)
+	}
+	logger.Debug("getNetworkPrefix: prefixLen  = ", prefixLen, " netIp:", netIp, " numbytes:", numbytes, " len(netIp):", len(netIp))
 	destNet = make([]byte, numbytes)
 	for i := 0; i < numbytes; i++ {
 		destNet[i] = netIp[i]
-		logger.Debug("destnet[i]:", destNet[i], " netIp[i]:", netIp[i])
+		logger.Debug("destnet[", i, "]:", destNet[i], " netIp[", i, "]:", netIp[i])
 	}
-	nwAddr = (destNetIp.Mask(net.IPMask(networkMask))).String() + "/" + strconv.Itoa(prefixLen)
 	return destNet, nwAddr, err
 }
 func getNetowrkPrefixFromStrings(ipAddr string, mask string) (prefix patriciaDB.Prefix, err error) {

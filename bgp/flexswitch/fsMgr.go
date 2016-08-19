@@ -27,6 +27,7 @@ import (
 	"asicdServices"
 	"bfdd"
 	nanomsg "github.com/op/go-nanomsg"
+	"ndpd"
 	"ribd"
 	"utils/logging"
 )
@@ -47,6 +48,7 @@ type FSIntfMgr struct {
 	plugin               string
 	logger               *logging.Writer
 	AsicdClient          *asicdServices.ASICDServicesClient
+	NdpdClient           *ndpd.NDPDServicesClient
 	asicdL3IntfSubSocket *nanomsg.SubSocket
 	ndpIntfSubSocket     *nanomsg.SubSocket
 }
