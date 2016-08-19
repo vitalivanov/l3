@@ -728,6 +728,8 @@ func (h *BGPHandler) ValidateV4Neighbor(bgpNeighbor *bgpd.BGPv4Neighbor) (pConf 
 			MaxPrefixesThresholdPct: uint8(bgpNeighbor.MaxPrefixesThresholdPct),
 			MaxPrefixesDisconnect:   bgpNeighbor.MaxPrefixesDisconnect,
 			MaxPrefixesRestartTimer: uint8(bgpNeighbor.MaxPrefixesRestartTimer),
+			AdjRIBInFilter:          bgpNeighbor.AdjRIBInFilter,
+			AdjRIBOutFilter:         bgpNeighbor.AdjRIBOutFilter,
 		},
 		NeighborAddress: ip,
 		IfIndex:         ifIndex,
@@ -797,6 +799,8 @@ func (h *BGPHandler) convertToThriftV4Neighbor(neighborState *config.NeighborSta
 	bgpNeighborResponse.MaxPrefixesDisconnect = neighborState.MaxPrefixesDisconnect
 	bgpNeighborResponse.MaxPrefixesRestartTimer = int8(neighborState.MaxPrefixesRestartTimer)
 	bgpNeighborResponse.TotalPrefixes = int32(neighborState.TotalPrefixes)
+	bgpNeighborResponse.AdjRIBInFilter = neighborState.AdjRIBInFilter
+	bgpNeighborResponse.AdjRIBOutFilter = neighborState.AdjRIBOutFilter
 
 	received := bgpd.NewBGPCounters()
 	received.Notification = int64(neighborState.Messages.Received.Notification)
@@ -957,6 +961,8 @@ func (h *BGPHandler) ValidateV6Neighbor(bgpNeighbor *bgpd.BGPv6Neighbor) (pConf 
 			MaxPrefixesThresholdPct: uint8(bgpNeighbor.MaxPrefixesThresholdPct),
 			MaxPrefixesDisconnect:   bgpNeighbor.MaxPrefixesDisconnect,
 			MaxPrefixesRestartTimer: uint8(bgpNeighbor.MaxPrefixesRestartTimer),
+			AdjRIBInFilter:          bgpNeighbor.AdjRIBInFilter,
+			AdjRIBOutFilter:         bgpNeighbor.AdjRIBOutFilter,
 		},
 		NeighborAddress: ip,
 		IfIndex:         ifIndex,
@@ -1025,6 +1031,8 @@ func (h *BGPHandler) convertToThriftV6Neighbor(neighborState *config.NeighborSta
 	bgpNeighborResponse.MaxPrefixesDisconnect = neighborState.MaxPrefixesDisconnect
 	bgpNeighborResponse.MaxPrefixesRestartTimer = int8(neighborState.MaxPrefixesRestartTimer)
 	bgpNeighborResponse.TotalPrefixes = int32(neighborState.TotalPrefixes)
+	bgpNeighborResponse.AdjRIBInFilter = neighborState.AdjRIBInFilter
+	bgpNeighborResponse.AdjRIBOutFilter = neighborState.AdjRIBOutFilter
 
 	received := bgpd.NewBGPCounters()
 	received.Notification = int64(neighborState.Messages.Received.Notification)
@@ -1136,6 +1144,8 @@ func (h *BGPHandler) ValidateBGPv4PeerGroup(peerGroup *bgpd.BGPv4PeerGroup) (gro
 			MaxPrefixesThresholdPct: uint8(peerGroup.MaxPrefixesThresholdPct),
 			MaxPrefixesDisconnect:   peerGroup.MaxPrefixesDisconnect,
 			MaxPrefixesRestartTimer: uint8(peerGroup.MaxPrefixesRestartTimer),
+			AdjRIBInFilter:          peerGroup.AdjRIBInFilter,
+			AdjRIBOutFilter:         peerGroup.AdjRIBOutFilter,
 		},
 		Name: peerGroup.Name,
 	}
@@ -1207,6 +1217,8 @@ func (h *BGPHandler) ValidateBGPv6PeerGroup(peerGroup *bgpd.BGPv6PeerGroup) (gro
 			MaxPrefixesThresholdPct: uint8(peerGroup.MaxPrefixesThresholdPct),
 			MaxPrefixesDisconnect:   peerGroup.MaxPrefixesDisconnect,
 			MaxPrefixesRestartTimer: uint8(peerGroup.MaxPrefixesRestartTimer),
+			AdjRIBInFilter:          peerGroup.AdjRIBInFilter,
+			AdjRIBOutFilter:         peerGroup.AdjRIBOutFilter,
 		},
 		Name: peerGroup.Name,
 	}

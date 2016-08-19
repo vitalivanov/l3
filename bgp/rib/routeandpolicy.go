@@ -26,22 +26,57 @@ package rib
 
 import (
 	"l3/bgp/packet"
+	"net"
+)
+
+type AdjRIBDir int
+
+const (
+	AdjRIBDirIn AdjRIBDir = iota
+	AdjRIBDirOut
 )
 
 type AdjRIBRoute struct {
+	Neighbor         net.IP
+	ProtocolFamily   uint32
 	NLRI             packet.NLRI
-	Path             *Path
-	PathId           uint32
+	PathMap          map[uint32]*Path
 	PolicyList       []string
 	PolicyHitCounter int
 }
 
-func NewAdjRIBRoute(nlri packet.NLRI, path *Path, pathId uint32) *AdjRIBRoute {
+func NewAdjRIBRoute(neighbor net.IP, protoFamily uint32, nlri packet.NLRI) *AdjRIBRoute {
 	return &AdjRIBRoute{
+		Neighbor:         neighbor,
+		ProtocolFamily:   protoFamily,
 		NLRI:             nlri,
-		Path:             path,
-		PathId:           pathId,
+		PathMap:          make(map[uint32]*Path),
 		PolicyList:       make([]string, 0),
 		PolicyHitCounter: 0,
 	}
+}
+
+func (a *AdjRIBRoute) AddPath(pathId uint32, path *Path) {
+	a.PathMap[pathId] = path
+}
+
+func (a *AdjRIBRoute) RemovePath(pathId uint32) {
+	delete(a.PathMap, pathId)
+}
+
+func (a *AdjRIBRoute) GetPath(pathId uint32) *Path {
+	return a.PathMap[pathId]
+}
+
+func (a *AdjRIBRoute) DoesPathsExist() bool {
+	return len(a.PathMap) != 0
+}
+
+func (a *AdjRIBRoute) GetPathMap() map[uint32]*Path {
+	return a.PathMap
+}
+
+func (a *AdjRIBRoute) RemoveAllPaths() {
+	a.PathMap = nil
+	a.PathMap = make(map[uint32]*Path)
 }

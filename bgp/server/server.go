@@ -81,9 +81,11 @@ type PolicyParams struct {
 	withdrawn       *([]*bgprib.Destination)
 	updatedAddPaths *([]*bgprib.Destination)
 }
+
 type IntfEntry struct {
 	Name string
 }
+
 type BGPServer struct {
 	logger           *logging.Writer
 	policyManager    *bgppolicy.BGPPolicyManager
@@ -194,13 +196,13 @@ func (s *BGPServer) initPolicyEngines() {
 		packet.AfiIP:  TraverseFuncMap{s.TraverseAndApplyBGPRib, s.TrAndRevAggForIPv4},
 		packet.AfiIP6: TraverseFuncMap{s.TraverseAndApplyBGPRib, s.TrAndRevAggForIPv6},
 	}
-	var aggrActionFunc bgppolicy.PolicyActionFunc
+	var actionFunc bgppolicy.PolicyActionFunc
 	actionFuncMap := make(map[int]bgppolicy.PolicyActionFunc)
 	s.locRibPE = make(map[uint32]*bgppolicy.LocRibPolicyEngine)
 
-	aggrActionFunc.ApplyFunc = s.ApplyAggregateAction
-	aggrActionFunc.UndoFunc = s.UndoAggregateAction
-	actionFuncMap[policyCommonDefs.PolicyActionTypeAggregate] = aggrActionFunc
+	actionFunc.ApplyFunc = s.ApplyAggregateAction
+	actionFunc.UndoFunc = s.UndoAggregateAction
+	actionFuncMap[policyCommonDefs.PolicyActionTypeAggregate] = actionFunc
 	s.logger.Infof("BGPServer: actionfuncmap=%v", actionFuncMap)
 
 	for _, pfNumber := range packet.ProtocolFamilyMap {
@@ -215,8 +217,30 @@ func (s *BGPServer) initPolicyEngines() {
 		}
 		locRibPE.SetTraverseFuncs(traverseFuncs.ApplyFunc, traverseFuncs.ReverseFunc)
 		s.locRibPE[pfNumber] = locRibPE
-		s.policyManager.AddPolicyEngine(locRibPE)
+		//s.policyManager.AddPolicyEngine(locRibPE)
 	}
+
+	s.ribInPE = bgppolicy.NewAdjRibPolicyEngine(s.logger)
+	s.ribOutPE = bgppolicy.NewAdjRibPolicyEngine(s.logger)
+
+	actionFunc.ApplyFunc = s.ApplyAdjRIBAction
+	actionFunc.UndoFunc = s.UndoAdjRIBAction
+
+	s.ribInPE.SetEntityUpdateFunc(s.UpdateAdjRIBInRouteAndPolicyDB)
+	s.ribInPE.SetIsEntityPresentFunc(s.DoesAdjRIBInRouteExist)
+	actionFuncMap = make(map[int]bgppolicy.PolicyActionFunc)
+	actionFuncMap[policyCommonDefs.PolicyActionTypeRIBIn] = actionFunc
+	s.ribInPE.SetActionFuncs(actionFuncMap)
+	s.ribInPE.SetTraverseFuncs(s.TraverseAndApplyAdjRibIn, s.TraverseAndReverseAdjRIBIn)
+	s.policyManager.AddPolicyEngine(s.ribInPE)
+
+	s.ribOutPE.SetEntityUpdateFunc(s.UpdateAdjRIBOutRouteAndPolicyDB)
+	s.ribOutPE.SetIsEntityPresentFunc(s.DoesAdjRIBOutRouteExist)
+	actionFuncMap = make(map[int]bgppolicy.PolicyActionFunc)
+	actionFuncMap[policyCommonDefs.PolicyActionTypeRIBOut] = actionFunc
+	s.ribOutPE.SetActionFuncs(actionFuncMap)
+	s.ribOutPE.SetTraverseFuncs(s.TraverseAndApplyAdjRibOut, s.TraverseAndReverseAdjRIBOut)
+	s.policyManager.AddPolicyEngine(s.ribOutPE)
 }
 
 func (s *BGPServer) createListener(proto string) (*net.TCPListener, error) {
@@ -489,8 +513,7 @@ func (s *BGPServer) UndoAggregateAction(actionInfo interface{},
 	return
 }
 
-func (s *BGPServer) ApplyAggregateAction(actionInfo interface{},
-	conditionInfo []interface{}, params interface{}) {
+func (s *BGPServer) ApplyAggregateAction(actionInfo interface{}, conditionInfo []interface{}, params interface{}) {
 	policyParams := params.(PolicyParams)
 	ipPrefix := packet.NewIPPrefix(net.ParseIP(policyParams.route.Dest.BGPRouteState.Network),
 		uint8(policyParams.route.Dest.BGPRouteState.CIDRLen))
@@ -649,7 +672,7 @@ func (s *BGPServer) UpdateRouteAndPolicyDB(policyDetails utilspolicy.PolicyDetai
 }
 
 func (s *BGPServer) TraverseAndApplyBGPRib(data interface{}, updateFunc utilspolicy.PolicyApplyfunc) {
-	s.logger.Infof("BGPServer:TraverseRibForPolicies - start")
+	s.logger.Infof("BGPServer:TraverseAndApplyBGPRib - start")
 	policy := data.(utilspolicy.ApplyPolicyInfo)
 	updated := make(map[uint32]map[*bgprib.Path][]*bgprib.Destination, 10)
 	withdrawn := make([]*bgprib.Destination, 0, 10)
@@ -688,7 +711,7 @@ func (s *BGPServer) TraverseAndApplyBGPRib(data interface{}, updateFunc utilspol
 			}
 		}
 	}
-	s.logger.Infof("BGPServer:TraverseRibForPolicies - updated %v withdrawn %v", updated, withdrawn)
+	s.logger.Infof("BGPServer:TraverseAndApplyBGPRib - updated %v withdrawn %v", updated, withdrawn)
 	s.SendUpdate(updated, withdrawn, updatedAddPaths)
 }
 
@@ -754,6 +777,192 @@ func (s *BGPServer) TraverseAndReverseBGPRib(policyData interface{}, pe *bgppoli
 		pe.DeleteRoutePolicyState(route, policy.Name)
 		pe.PolicyEngine.DeletePolicyEntityMapEntry(peEntity, policy.Name)
 	}
+}
+
+func (s *BGPServer) DoesAdjRIBRouteExist(params interface{}, adjRIBDir bgprib.AdjRIBDir) bool {
+	policyParams := params.(*AdjRIBPolicyParams)
+	peer := policyParams.Peer
+	if peer == nil {
+		s.logger.Info("BGPServer:DoesAdjRIBRouteExist - Neighbor not set for route, nlri =",
+			policyParams.Route.NLRI.String())
+		return false
+	}
+
+	adjRIB := s.GetAdjRIB(peer, adjRIBDir)
+	if prefixRouteMap, ok := adjRIB[policyParams.Route.ProtocolFamily]; ok {
+		if prefixRouteMap[policyParams.Route.NLRI.String()] != nil {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (s *BGPServer) DoesAdjRIBInRouteExist(params interface{}) bool {
+	return s.DoesAdjRIBRouteExist(params, bgprib.AdjRIBDirIn)
+}
+
+func (s *BGPServer) DoesAdjRIBOutRouteExist(params interface{}) bool {
+	return s.DoesAdjRIBRouteExist(params, bgprib.AdjRIBDirOut)
+}
+
+func (s *BGPServer) ApplyAdjRIBAction(actionInfo interface{}, conditionInfo []interface{}, params interface{}) {
+	policyParams := params.(*AdjRIBPolicyParams)
+	s.logger.Infof("BGPServer:ApplyAdjRIBAction - policyParams=%+v\n", policyParams)
+	policyParams.Accept = Accept
+}
+
+func (s *BGPServer) UndoAdjRIBAction(actionInfo interface{}, conditionInfo []interface{}, params interface{},
+	policyStmt utilspolicy.PolicyStmt) {
+	policyParams := params.(*AdjRIBPolicyParams)
+	s.logger.Info("BGPServer:UndoAdjRIBAction - policyParams=%+v\n", policyParams)
+	policyParams.Accept = Accept
+}
+
+func (s *BGPServer) UpdateAdjRIBRouteAndPolicyDB(policyDetails utilspolicy.PolicyDetails, params interface{},
+	pe *bgppolicy.AdjRibPPolicyEngine) {
+	var op int
+	policyParams := params.(*AdjRIBPolicyParams)
+
+	if policyParams.DeleteType != bgppolicy.Invalid {
+		op = bgppolicy.Del
+	} else {
+		if policyDetails.EntityDeleted == false {
+			s.logger.Info("Reject action was not applied, so add this policy to the route")
+			op = bgppolicy.Add
+			bgppolicy.UpdateAdjRIBRoutePolicyState(policyParams.Route, op, policyDetails.Policy,
+				policyDetails.PolicyStmt)
+		}
+		policyParams.Route.PolicyHitCounter++
+	}
+	pe.UpdateAdjRIBPolicyRouteMap(policyParams.Route, policyDetails.Policy, op)
+}
+
+func (s *BGPServer) UpdateAdjRIBInRouteAndPolicyDB(policyDetails utilspolicy.PolicyDetails, params interface{}) {
+	s.UpdateAdjRIBRouteAndPolicyDB(policyDetails, params, s.ribInPE)
+}
+
+func (s *BGPServer) UpdateAdjRIBOutRouteAndPolicyDB(policyDetails utilspolicy.PolicyDetails, params interface{}) {
+	s.UpdateAdjRIBRouteAndPolicyDB(policyDetails, params, s.ribOutPE)
+}
+
+func (s *BGPServer) GetAdjRIB(peer *Peer, adjRIBDir bgprib.AdjRIBDir) map[uint32]map[string]*bgprib.AdjRIBRoute {
+	switch adjRIBDir {
+	case bgprib.AdjRIBDirIn:
+		return peer.ribIn
+
+	case bgprib.AdjRIBDirOut:
+		return peer.ribOut
+	}
+	return nil
+}
+
+func (s *BGPServer) TraverseAndApplyAdjRib(data interface{}, updateFunc utilspolicy.PolicyApplyfunc,
+	pe *bgppolicy.AdjRibPPolicyEngine, adjRibDir bgprib.AdjRIBDir) {
+	s.logger.Infof("BGPServer:TraverseAndApplyAdjRib - start")
+	policyInfo := data.(utilspolicy.ApplyPolicyInfo)
+	conditionsDB := pe.PolicyEngine.PolicyConditionsDB
+	var neighborIP string
+	var peer *Peer
+	var ok bool
+
+	for _, condition := range policyInfo.Conditions {
+		s.logger.Infof("BGPServer:TraverseAndApplyAdjRib - condition:%+v", condition)
+		nodeGet := conditionsDB.Get(patriciaDB.Prefix(condition))
+		if nodeGet == nil {
+			s.logger.Err("Condition", condition, "not defined")
+			return
+		}
+		node := nodeGet.(utilspolicy.PolicyCondition)
+		if node.ConditionType == policyCommonDefs.PolicyConditionTypeNeighborMatch {
+			neighborIP = node.ConditionInfo.(string)
+		}
+	}
+
+	if peer, ok = s.PeerMap[neighborIP]; !ok {
+		s.logger.Err("Can't apply policy... Neighbor %s not found", neighborIP)
+		return
+	}
+
+	adjRIB := s.GetAdjRIB(peer, adjRibDir)
+	for _, prefixRouteMap := range adjRIB {
+		for _, adjRoute := range prefixRouteMap {
+			if adjRoute == nil {
+				continue
+			}
+
+			s.logger.Debugf("Peer %s - NLRI %s policylist %v hit %v before applying create policy",
+				adjRoute.NLRI.GetPrefix(), adjRoute.PolicyList, adjRoute.PolicyHitCounter)
+			peEntity := utilspolicy.PolicyEngineFilterEntityParams{
+				DestNetIp:  adjRoute.NLRI.GetPrefix().String() + "/" + strconv.Itoa(int(adjRoute.NLRI.GetLength())),
+				Neighbor:   peer.NeighborConf.RunningConf.NeighborAddress.String(),
+				PolicyList: adjRoute.PolicyList,
+			}
+			callbackInfo := &AdjRIBPolicyParams{
+				CreateType: utilspolicy.Invalid,
+				DeleteType: utilspolicy.Invalid,
+				Peer:       peer,
+				Route:      adjRoute,
+			}
+
+			updateFunc(peEntity, policyInfo, callbackInfo)
+		}
+	}
+}
+
+func (s *BGPServer) TraverseAndApplyAdjRibIn(data interface{}, updateFunc utilspolicy.PolicyApplyfunc) {
+	s.TraverseAndApplyAdjRib(data, updateFunc, s.ribInPE, bgprib.AdjRIBDirIn)
+}
+
+func (s *BGPServer) TraverseAndApplyAdjRibOut(data interface{}, updateFunc utilspolicy.PolicyApplyfunc) {
+	s.TraverseAndApplyAdjRib(data, updateFunc, s.ribOutPE, bgprib.AdjRIBDirOut)
+}
+
+func (s *BGPServer) TraverseAndReverseAdjRIB(policyData interface{}, pe *bgppolicy.AdjRibPPolicyEngine) {
+	policy := policyData.(utilspolicy.Policy)
+	s.logger.Info("BGPServer:TraverseAndReverseAdjRIB - policy", policy.Name)
+	policyExtensions := policy.Extensions.(bgppolicy.AdjRibPolicyExtensions)
+	if len(policyExtensions.RouteList) == 0 {
+		fmt.Println("No route affected by this policy, so nothing to do")
+		return
+	}
+
+	var route *bgprib.AdjRIBRoute
+	var peer *Peer
+	for idx := 0; idx < len(policyExtensions.RouteInfoList); idx++ {
+		route = policyExtensions.RouteInfoList[idx]
+		peerIP := route.Neighbor.String()
+		if peer == nil {
+			var ok bool
+			if peer, ok = s.PeerMap[peerIP]; ok {
+				s.logger.Err("Peer not found for ip", peerIP, "for NLRI", route.NLRI.GetIPPrefix().String())
+				continue
+			}
+		}
+
+		callbackInfo := &AdjRIBPolicyParams{
+			CreateType: utilspolicy.Invalid,
+			DeleteType: utilspolicy.Invalid,
+			Route:      route,
+			Peer:       peer,
+		}
+		peEntity := utilspolicy.PolicyEngineFilterEntityParams{
+			DestNetIp: route.NLRI.GetPrefix().String() + "/" + strconv.Itoa(int(route.NLRI.GetLength())),
+			Neighbor:  route.Neighbor.String(),
+		}
+
+		pe.PolicyEngine.PolicyEngineUndoPolicyForEntity(peEntity, policy, callbackInfo)
+		pe.AdjRIBDeleteRoutePolicyState(route, policy.Name)
+		pe.PolicyEngine.DeletePolicyEntityMapEntry(peEntity, policy.Name)
+	}
+}
+
+func (s *BGPServer) TraverseAndReverseAdjRIBIn(policyData interface{}) {
+	s.TraverseAndReverseAdjRIB(policyData, s.ribInPE)
+}
+
+func (s *BGPServer) TraverseAndReverseAdjRIBOut(policyData interface{}) {
+	s.TraverseAndReverseAdjRIB(policyData, s.ribOutPE)
 }
 
 func (s *BGPServer) ProcessUpdate(pktInfo *packet.BGPPktSrc) {
