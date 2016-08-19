@@ -56,6 +56,7 @@ func convertNDPEntryStateToThriftEntry(state config.NeighborInfo) *ndpd.NDPEntry
 	entry.MacAddr = state.MacAddr
 	entry.Vlan = strconv.Itoa(int(state.VlanId))
 	entry.Intf = state.Intf
+	entry.IfIndex = state.IfIndex
 	entry.ExpiryTimeLeft = state.ExpiryTimeLeft
 
 	return entry

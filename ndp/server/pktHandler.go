@@ -249,7 +249,7 @@ func (svr *NDPServer) DeleteNeighborInfo(deleteEntries []string, ifIndex int32) 
  *			c) CreateIPv6 Neighbor entry
  */
 func (svr *NDPServer) ProcessRxPkt(ifIndex int32, pkt gopacket.Packet) {
-	_, exists := svr.L3Port[ifIndex]
+	l3Port, exists := svr.L3Port[ifIndex]
 	if !exists {
 		return
 	}
@@ -262,6 +262,7 @@ func (svr *NDPServer) ProcessRxPkt(ifIndex int32, pkt gopacket.Packet) {
 	// @ALERT: always overwrite ifIndex when creating neighbor, if ifIndex has reverse map entry for
 	//	   vlanID then that will be overwritten again with vlan ifIndex
 	nbrInfo.IfIndex = ifIndex
+	nbrInfo.Intf = l3Port.IntfRef
 	if nbrInfo.PktOperation == byte(packet.PACKET_DROP) {
 		debug.Logger.Err("Dropping message as PktOperation is PACKET_DROP for", nbrInfo.IpAddr)
 		return
