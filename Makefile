@@ -7,7 +7,9 @@ COMPS=arp\
       bfd \
       vrrp\
       tunnel/vxlan\
-      ndp
+      ndp\
+      isis
+
 
 IPCS=arp\
      rib\
@@ -18,7 +20,8 @@ IPCS=arp\
      bfd\
      vrrp\
      tunnel/vxlan\
-     ndp
+     ndp\
+     isis
 
 define timedMake
 @echo -n "Building component $(1) started at :`date`\n"

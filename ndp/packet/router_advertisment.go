@@ -23,12 +23,13 @@
 package packet
 
 import (
-	_ "encoding/binary"
+	"encoding/binary"
 	"errors"
 	"fmt"
+	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"l3/ndp/config"
-	_ "l3/ndp/debug"
+	"l3/ndp/debug"
 	"net"
 )
 
@@ -129,4 +130,79 @@ func (p *Packet) GetNbrInfoUsingRAPkt(eth *layers.Ethernet, v6hdr *layers.IPv6,
 	nbrInfo.IpAddr = v6hdr.SrcIP.String()
 
 	return nbrInfo
+}
+
+/*
+ *  Router Advertisement Packet
+ */
+func ConstructRAPacket(srcMac, dstMac, srcIP, dstIP string) []byte {
+
+	// Ethernet Layer Information
+	srcMAC, _ := net.ParseMAC(srcMac)
+	dstMAC, _ := net.ParseMAC(dstMac)
+
+	eth := &layers.Ethernet{
+		SrcMAC:       srcMAC,
+		DstMAC:       dstMAC,
+		EthernetType: layers.EthernetTypeIPv6,
+	}
+	debug.Logger.Debug("ethernet layer is", *eth)
+
+	// IPv6 Layer Information
+	sip := net.ParseIP(srcIP)
+	dip := net.ParseIP(dstIP)
+
+	ipv6 := &layers.IPv6{
+		Version:      IPV6_VERSION,
+		TrafficClass: 0,
+		NextHeader:   layers.IPProtocolICMPv6,
+		SrcIP:        sip,
+		DstIP:        dip,
+		HopLimit:     HOP_LIMIT,
+	}
+	debug.Logger.Debug("ipv6 layer is", *ipv6)
+
+	// ICMPV6 Layer Information
+	payload := make([]byte, ICMPV6_MIN_LENGTH_RA)
+	payload[0] = byte(layers.ICMPv6TypeRouterAdvertisement)
+	payload[1] = byte(0)
+	binary.BigEndian.PutUint16(payload[2:4], 0) // Putting zero for checksum before calculating checksum
+	payload[4] = byte(64)
+	payload[5] = byte(0)
+	binary.BigEndian.PutUint16(payload[6:8], 1800) // Router Lifetime
+	binary.BigEndian.PutUint32(payload[8:12], 0)   // reachable time
+	binary.BigEndian.PutUint32(payload[12:16], 0)  // retrans time
+
+	// Append Source Link Layer Option here
+	srcOption := NDOption{
+		Type:   NDOptionTypeSourceLinkLayerAddress,
+		Length: 1,
+		Value:  srcMAC,
+	}
+
+	mtuOption := NDOption{
+		Type:   NDOptionTypeMTU,
+		Length: 1,
+		Value:  []byte{0x00, 0x00, 0x05, 0xdc},
+	}
+	payload = append(payload, byte(srcOption.Type))
+	payload = append(payload, srcOption.Length)
+	payload = append(payload, srcOption.Value...)
+
+	payload = append(payload, byte(mtuOption.Type))
+	payload = append(payload, mtuOption.Length)
+	payload = append(payload, mtuOption.Value...)
+	binary.BigEndian.PutUint16(payload[2:4], getCheckSum(ipv6, payload))
+	debug.Logger.Debug("icmpv6 info is", payload)
+	ipv6.Length = uint16(len(payload))
+	debug.Logger.Debug("ipv6 layer is", *ipv6)
+	// GoPacket serialized buffer that will be used to send out raw bytes
+	buffer := gopacket.NewSerializeBuffer()
+	options := gopacket.SerializeOptions{
+		FixLengths:       true,
+		ComputeChecksums: true,
+	}
+
+	gopacket.SerializeLayers(buffer, options, eth, ipv6, gopacket.Payload(payload))
+	return buffer.Bytes()
 }
