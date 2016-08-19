@@ -31,6 +31,7 @@ import (
 	"encoding/json"
 	_ "fmt"
 	"io/ioutil"
+	"ndpd"
 	"ribd"
 	"strconv"
 	"time"
@@ -173,6 +174,36 @@ func StartRibdClient(logger *logging.Writer, filePath string, ribdClient chan *r
 
 	client := ribd.NewRIBDServicesClientFactory(clientTransport, protocolFactory)
 	ribdClient <- client
+}
+
+func StartNdpdClient(logger *logging.Writer, filePath string, ndpdClient chan *ndpd.NDPDServicesClient) {
+	fileName := filePath + ClientsFileName
+	clientJson, err := getClient(logger, fileName, "ndpd")
+	if err != nil || clientJson == nil {
+		ndpdClient <- nil
+		return
+	}
+
+	clientTransport, protocolFactory, err := ipcutils.CreateIPCHandles("localhost:" + strconv.Itoa(clientJson.Port))
+	if err != nil {
+		logger.Infof("Failed to connect to NDPd, retrying until connection is successful")
+		count := 0
+		ticker := time.NewTicker(time.Duration(1000) * time.Millisecond)
+		for _ = range ticker.C {
+			clientTransport, protocolFactory, err = ipcutils.CreateIPCHandles("localhost:" + strconv.Itoa(clientJson.Port))
+			if err == nil {
+				ticker.Stop()
+				break
+			}
+			count++
+			if (count % 10) == 0 {
+				logger.Infof("Still can't connect to NDPd, retrying...")
+			}
+		}
+	}
+
+	client := ndpd.NewNDPDServicesClientFactory(clientTransport, protocolFactory)
+	ndpdClient <- client
 }
 
 func StartBfddClient(logger *logging.Writer, filePath string, bfddClient chan *bfdd.BFDDServicesClient) {
