@@ -265,6 +265,11 @@ func (svr *NDPServer) ProcessRxPkt(ifIndex int32, pkt gopacket.Packet) {
 	nbrInfo.Intf = l3Port.IntfRef
 	if nbrInfo.PktOperation == byte(packet.PACKET_DROP) {
 		debug.Logger.Err("Dropping message as PktOperation is PACKET_DROP for", nbrInfo.IpAddr)
+		//temp to get neighbor entry to work
+		/*
+			nbrInfo.IpAddr = "fe80::10:9cf8:fcff:fe4a:1615"
+			nbrInfo.MacAddr = "9e:f8:fc:4a:16:15"
+			svr.CreateNeighborInfo(nbrInfo)*/
 		return
 	} else if nbrInfo.State == packet.INCOMPLETE {
 		debug.Logger.Err("Received message but packet state is INCOMPLETE hence not calling create ipv6 neighbor for ",

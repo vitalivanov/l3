@@ -292,7 +292,7 @@ func (mgr *FSIntfMgr) GetIPv6Neighbors() []*config.IntfStateInfo {
 		mgr.logger.Info("len(getBulkInfo.NDPEntryStateList)  =", len(getBulkInfo.NDPEntryStateList),
 			"num objects returned =", getBulkInfo.Count)
 		for _, intfState := range getBulkInfo.NDPEntryStateList {
-			intf := config.NewIntfStateInfo(IfIndex, "", intfState.IpAddr, config.IPV6_NEIGHBOR_CREATED)
+			intf := config.NewIntfStateInfo(intfState.IfIndex, "", intfState.IpAddr, config.IPV6_NEIGHBOR_CREATED)
 			intfs = append(intfs, intf)
 		}
 		if getBulkInfo.More == false {
