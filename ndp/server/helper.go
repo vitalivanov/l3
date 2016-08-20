@@ -323,7 +323,7 @@ func (svr *NDPServer) SendIPv6CreateNotification(ipAddr string, ifIndex int32) {
 		MsgType: commonDefs.NOTIFY_IPV6_NEIGHBOR_CREATE,
 		Msg:     msgBuf,
 	}
-	debug.Logger.Debug("Sending Create notification for ip address:", ipAddr, "and ifIndex:", ifIndex)
+	debug.Logger.Info("Sending Create notification for ip address:", ipAddr, "and ifIndex:", ifIndex)
 	svr.pushNotification(notification)
 }
 
@@ -340,6 +340,6 @@ func (svr *NDPServer) SendIPv6DeleteNotification(ipAddr string, ifIndex int32) {
 		MsgType: commonDefs.NOTIFY_IPV6_NEIGHBOR_DELETE,
 		Msg:     msgBuf,
 	}
-	debug.Logger.Debug("Sending Delete notification for ip address:", ipAddr, "and ifIndex:", ifIndex)
+	debug.Logger.Info("Sending Delete notification for ip address:", ipAddr, "and ifIndex:", ifIndex)
 	svr.pushNotification(notification)
 }
