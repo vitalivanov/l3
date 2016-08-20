@@ -22,25 +22,6 @@
 //
 package packet
 
-type PACKET_OPERATION byte
-
-const (
-	PACKET_DROP                  PACKET_OPERATION = 1
-	PACKET_PROCESS               PACKET_OPERATION = 2
-	PACKET_FAILED_VALIDATION     PACKET_OPERATION = 3
-	NEIGBOR_SOLICITATED_PACKET   PACKET_OPERATION = 4
-	NEIGBOR_ADVERTISEMENT_PACKET PACKET_OPERATION = 5
-)
-
-const (
-	_ = iota
-	INCOMPLETE
-	REACHABLE
-	STALE
-	DELAY
-	PROBE
-)
-
 type NDOptionType byte
 
 const (
@@ -65,14 +46,6 @@ const (
 	ICMPV6_SOURCE_LINK_LAYER_LENGTH uint16 = 8
 	SOLICITATED_NODE_ADDRESS               = "ff02::1:ff00:0000"
 	SOLICITATED_SRC_IP                     = "::"
-	MAX_UNICAST_SOLICIT             uint8  = 3
-	MAX_MULTICAST_SOLICIT                  = 3
-	MAX_ANYCAST_DELAY_TIMER                = 1
-	MAX_NEIGHBOR_ADVERTISEMENT             = 3
-	DELAY_FIRST_PROBE_TIME                 = 5 // this is in seconds
-	MIN_RANDOM_FACTOR                      = 0.5
-	MAX_RANDOM_FACTOR                      = 1.5
-	RECOMPUTE_BASE_REACHABLE_TIMER         = 1 // this is in hour
 
 	// Router Advertisement Specific Constants
 	ICMPV6_MIN_LENGTH_RA         uint16 = 16

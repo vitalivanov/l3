@@ -24,7 +24,7 @@
 package config
 
 import (
-	"github.com/google/gopacket/pcap"
+	"github.com/google/gopacket/layers"
 )
 
 const (
@@ -34,16 +34,6 @@ const (
 	CONFIG_DELETE = "DELETE"
 	CONFIG_UPDATE = "UPDATE"
 )
-
-type PcapBase struct {
-	// Pcap Handler for Each Port
-	PcapHandle *pcap.Handle
-	PcapCtrl   chan bool
-	// at any give time there can be two users for Pcap..
-	// if 0 then only start rx/tx
-	// if 1 then only stop rx/tx
-	PcapUsers uint8
-}
 
 type PortInfo struct {
 	IntfRef     string
@@ -60,7 +50,6 @@ type PortState struct {
 }
 
 type IPv6IntfInfo struct {
-	PcapBase
 	IntfRef     string
 	IfIndex     int32
 	IpAddr      string
@@ -81,7 +70,7 @@ type StateNotification struct {
 	IpAddr  string
 }
 
-type NeighborInfo struct {
+type NeighborConfig struct {
 	MacAddr        string
 	VlanId         int32
 	IfIndex        int32
@@ -90,7 +79,6 @@ type NeighborInfo struct {
 	LinkLocalIp    string
 	ExpiryTimeLeft string
 	State          int
-	PktOperation   byte
 }
 
 type VlanInfo struct {
@@ -108,7 +96,8 @@ type VlanNotification struct {
 }
 
 type PacketData struct {
-	IpAddr     string
-	NeighborIp string
-	IfIndex    int32
+	SendPktType layers.ICMPv6TypeCode
+	NeighborIp  string
+	NeighborMac string
+	IfIndex     int32
 }

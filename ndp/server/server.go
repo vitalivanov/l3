@@ -76,10 +76,10 @@ func (svr *NDPServer) OSSignalHandle() {
 func (svr *NDPServer) InitGlobalDS() {
 	svr.PhyPort = make(map[int32]config.PortInfo, NDP_SERVER_MAP_INITIAL_CAP)
 	svr.SwitchMacMapEntries = make(map[string]struct{}, NDP_SERVER_MAP_INITIAL_CAP)
-	svr.L3Port = make(map[int32]config.IPv6IntfInfo, NDP_SERVER_MAP_INITIAL_CAP)
+	svr.L3Port = make(map[int32]Interface, NDP_SERVER_MAP_INITIAL_CAP)
 	svr.VlanInfo = make(map[int32]config.VlanInfo, NDP_SERVER_MAP_INITIAL_CAP)
 	svr.VlanIfIdxVlanIdMap = make(map[int32]int32, NDP_SERVER_MAP_INITIAL_CAP)
-	svr.NeighborInfo = make(map[string]config.NeighborInfo, NDP_SERVER_MAP_INITIAL_CAP)
+	svr.NeighborInfo = make(map[string]config.NeighborConfig, NDP_SERVER_MAP_INITIAL_CAP)
 	svr.PhyPortStateCh = make(chan *config.StateNotification)
 	svr.IpIntfCh = make(chan *config.IPIntfNotification)
 	svr.IpStateCh = make(chan *config.StateNotification)
@@ -90,7 +90,7 @@ func (svr *NDPServer) InitGlobalDS() {
 	svr.Promiscuous = false
 	svr.Timeout = 1 * time.Second
 	svr.NeigborEntryLock = &sync.RWMutex{}
-	svr.Packet = packet.Init(svr.PktDataCh)
+	svr.Packet = packet.Init()
 
 	// init publisher
 	pub := publisher.NewPublisher()
@@ -108,6 +108,7 @@ func (svr *NDPServer) DeInitGlobalDS() {
 	svr.RxPktCh = nil
 }
 
+/*
 func (svr *NDPServer) InitSystemIPIntf(entry *config.IPv6IntfInfo, ipInfo *config.IPv6IntfInfo) {
 	if ipInfo == nil || entry == nil {
 		return
@@ -118,6 +119,7 @@ func (svr *NDPServer) InitSystemIPIntf(entry *config.IPv6IntfInfo, ipInfo *confi
 	entry.IpAddr = ipInfo.IpAddr
 	svr.ndpL3IntfStateSlice = append(svr.ndpL3IntfStateSlice, ipInfo.IfIndex)
 }
+*/
 
 /*
  * API: it will collect all ipv6 interface ports from the system... If needed we can collect port information

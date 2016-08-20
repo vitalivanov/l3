@@ -27,7 +27,6 @@ import (
 	"fmt"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
-	"l3/ndp/config"
 	"l3/ndp/debug"
 	"net"
 )
@@ -75,24 +74,49 @@ func getIpAndICMPv6Hdr(pkt gopacket.Packet, ipv6Hdr *layers.IPv6, icmpv6Hdr *lay
 	return nil
 }
 
-func validateIPv6Hdr(hdr *layers.IPv6, layerType uint8) error {
-	if hdr.HopLimit != HOP_LIMIT {
-		return errors.New(fmt.Sprintln("Invalid Hop Limit", hdr.HopLimit))
+func (p *Packet) decodeNS(hdr *layers.ICMPv6, srcIP, dstIP net.IP) (*NDInfo, error) {
+	ndInfo := &NDInfo{}
+	ndInfo.PktType = layers.ICMPv6TypeNeighborSolicitation
+	ndInfo.DecodeNDInfo(hdr.LayerPayload())
+	if ndInfo.IsTargetMulticast() {
+		return nil, errors.New(fmt.Sprintln("Targent Address specified", ndInfo.TargetAddress,
+			"is a multicast address"))
 	}
-	switch layerType {
-	case layers.ICMPv6TypeNeighborSolicitation, layers.ICMPv6TypeNeighborAdvertisement:
-		if hdr.Length < ICMPV6_MIN_LENGTH {
-			return errors.New(fmt.Sprintf("Invalid ICMP length %d", hdr.Length))
-		}
-	case layers.ICMPv6TypeRouterAdvertisement:
-		if hdr.Length < ICMPV6_MIN_LENGTH_RA {
-			return errors.New(fmt.Sprintf("Invalid ICMP length %d", hdr.Length))
-		}
+	err := ndInfo.ValidateNDSInfo(srcIP, dstIP)
+	if err != nil {
+		return nil, err
 	}
-	return nil
+	return ndInfo, nil
 }
 
-func (p *Packet) decodeICMPv6Hdr(hdr *layers.ICMPv6, srcIP net.IP, dstIP net.IP, ifIndex int32) (*NDInfo, error) {
+func (p *Packet) decodeNA(hdr *layers.ICMPv6, srcIP, dstIP net.IP) (*NDInfo, error) {
+	ndInfo := &NDInfo{}
+	ndInfo.PktType = layers.ICMPv6TypeNeighborAdvertisement
+	ndInfo.DecodeNDInfo(hdr.LayerPayload())
+	if ndInfo.IsTargetMulticast() {
+		return nil, errors.New(fmt.Sprintln("Targent Address specified", ndInfo.TargetAddress,
+			"is a multicast address"))
+	}
+	err := ndInfo.ValidateNDAInfo(hdr.TypeBytes, dstIP)
+	if err != nil {
+		return nil, err
+	}
+	return ndInfo, nil
+}
+
+func (p *Packet) decodeRA(hdr *layers.ICMPv6, srcIP, dstIP net.IP) (*NDInfo, error) {
+	//prefixFound := false
+	ndInfo := &NDInfo{}
+	ndInfo.PktType = layers.ICMPv6TypeRouterAdvertisement
+	ndInfo.DecodeRAInfo(hdr.TypeBytes, hdr.LayerPayload())
+	err := ndInfo.ValidateRAInfo()
+	if err != nil {
+		return ndInfo, err
+	}
+	return ndInfo, nil
+}
+
+func (p *Packet) decodeICMPv6Hdr(hdr *layers.ICMPv6, srcIP net.IP, dstIP net.IP) (*NDInfo, error) {
 	ndInfo := &NDInfo{}
 	var err error
 	// Validating checksum received, if success then only start parsing icmp payload
@@ -107,18 +131,21 @@ func (p *Packet) decodeICMPv6Hdr(hdr *layers.ICMPv6, srcIP net.IP, dstIP net.IP,
 	switch typeCode.Type() {
 	case layers.ICMPv6TypeNeighborSolicitation:
 		debug.Logger.Debug("Neigbor Solicitation Received from", srcIP, "---->", dstIP)
-		ndInfo, err = p.HandleNSMsg(hdr, srcIP, dstIP)
+		//ndInfo, err = p.HandleNSMsg(hdr, srcIP, dstIP)
+		ndInfo, err = p.decodeNS(hdr, srcIP, dstIP)
 
 	case layers.ICMPv6TypeNeighborAdvertisement:
 		debug.Logger.Debug("Neigbor Advertisemnt Received from", srcIP, "---->", dstIP)
-		ndInfo, err = p.HandleNAMsg(hdr, srcIP, dstIP)
+		//ndInfo, err = p.HandleNAMsg(hdr, srcIP, dstIP)
+		ndInfo, err = p.decodeNA(hdr, srcIP, dstIP)
 
 	case layers.ICMPv6TypeRouterSolicitation:
 		return nil, errors.New("Router Solicitation is not yet supported")
 
 	case layers.ICMPv6TypeRouterAdvertisement:
 		debug.Logger.Debug("Router Advertisement Received from", srcIP, "---->", dstIP)
-		ndInfo, err = p.HandleRAMsg(hdr, srcIP, dstIP, ifIndex)
+		//ndInfo, err = p.HandleRAMsg(hdr, srcIP, dstIP)
+		ndInfo, err = p.decodeRA(hdr, srcIP, dstIP)
 	default:
 		return nil, errors.New(fmt.Sprintln("Not Supported ICMPv6 Type:", typeCode.Type()))
 	}
@@ -128,6 +155,7 @@ func (p *Packet) decodeICMPv6Hdr(hdr *layers.ICMPv6, srcIP net.IP, dstIP net.IP,
 	return ndInfo, nil
 }
 
+/*
 func (p *Packet) populateNeighborInfo(nbrInfo *config.NeighborInfo, eth *layers.Ethernet, ipv6Hdr *layers.IPv6,
 	icmpv6Hdr *layers.ICMPv6, ndInfo *NDInfo) {
 	if eth == nil || ipv6Hdr == nil || icmpv6Hdr == nil {
@@ -146,6 +174,7 @@ func (p *Packet) populateNeighborInfo(nbrInfo *config.NeighborInfo, eth *layers.
 	}
 	debug.Logger.Debug("Neighbor Populated:", *nbrInfo)
 }
+*/
 
 /* API: Get IPv6 & ICMPv6 Header
  *      Does Validation of IPv6
@@ -170,7 +199,8 @@ func (p *Packet) populateNeighborInfo(nbrInfo *config.NeighborInfo, eth *layers.
  *  - If the IP source address is the unspecified address, there is no
  *    source link-layer address option in the message. <- @TODO: need to be done later
  */
-func (p *Packet) ValidateAndParse(nbrInfo *config.NeighborInfo, pkt gopacket.Packet, ifIndex int32) error {
+//func (p *Packet) ValidateAndParse(nbrInfo *config.NeighborInfo, pkt gopacket.Packet, ifIndex int32) error {
+func (p *Packet) DecodeND(pkt gopacket.Packet) (*NDInfo, error) {
 	// first decode all the layers
 	icmpv6Hdr := &layers.ICMPv6{}
 	ipv6Hdr := &layers.IPv6{}
@@ -180,28 +210,33 @@ func (p *Packet) ValidateAndParse(nbrInfo *config.NeighborInfo, pkt gopacket.Pac
 	// Get Ethernet Layer
 	err = getEthLayer(pkt, eth)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// First get ipv6 and icmp6 information
 	err = getIpAndICMPv6Hdr(pkt, ipv6Hdr, icmpv6Hdr)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// Validating ipv6 header
 	err = validateIPv6Hdr(ipv6Hdr, icmpv6Hdr.TypeCode.Type())
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// Validating icmpv6 header
-	ndInfo, err := p.decodeICMPv6Hdr(icmpv6Hdr, ipv6Hdr.SrcIP, ipv6Hdr.DstIP, ifIndex)
+	ndInfo, err := p.decodeICMPv6Hdr(icmpv6Hdr, ipv6Hdr.SrcIP, ipv6Hdr.DstIP)
 	if err != nil {
-		return err
+		return ndInfo, err
 	}
 
+	ndInfo.SrcMac = eth.SrcMAC.String()   // Update SRC MAC From ethernet
+	ndInfo.DstMac = eth.DstMAC.String()   // Update DST MAC from ethernet
+	ndInfo.SrcIp = ipv6Hdr.SrcIP.String() // copy sender ip address to this
+	ndInfo.DstIp = ipv6Hdr.DstIP.String() // copy destination ip
+
 	// Populate Neighbor Information
-	p.populateNeighborInfo(nbrInfo, eth, ipv6Hdr, icmpv6Hdr, ndInfo)
-	return nil
+	//p.populateNeighborInfo(nbrInfo, eth, ipv6Hdr, icmpv6Hdr, ndInfo)
+	return ndInfo, nil
 }

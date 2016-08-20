@@ -25,7 +25,6 @@ package server
 import (
 	"encoding/json"
 	_ "errors"
-	"github.com/google/gopacket/pcap"
 	"l3/ndp/config"
 	"l3/ndp/debug"
 	"net"
@@ -121,12 +120,8 @@ func (svr *NDPServer) GetIPIntf() {
 		return
 	}
 	for _, obj := range ipsInfo {
-		ipInfo := config.IPv6IntfInfo{
-			IntfRef:   obj.IntfRef,
-			IfIndex:   obj.IfIndex,
-			OperState: obj.OperState,
-			IpAddr:    obj.IpAddr,
-		}
+		ipInfo := Interface{}
+		ipInfo.InitIntf(obj, svr.PktDataCh)
 		svr.L3Port[ipInfo.IfIndex] = ipInfo
 		svr.ndpL3IntfStateSlice = append(svr.ndpL3IntfStateSlice, ipInfo.IfIndex)
 	}
@@ -137,6 +132,7 @@ func (svr *NDPServer) GetIPIntf() {
 /*
  * API: will create pcap handler for each port
  */
+/*
 func (svr *NDPServer) CreatePcapHandler(name string) (pHdl *pcap.Handle, err error) {
 	pHdl, err = pcap.OpenLive(name, svr.SnapShotLen, svr.Promiscuous, svr.Timeout)
 	if err != nil {
@@ -152,16 +148,19 @@ func (svr *NDPServer) CreatePcapHandler(name string) (pHdl *pcap.Handle, err err
 	}
 	return pHdl, err
 }
+*/
 
 /*
  * API: will delete pcap handler for each port
  */
+/*
 func (svr *NDPServer) DeletePcapHandler(pHdl **pcap.Handle) {
 	if *pHdl != nil {
 		(*pHdl).Close()
 		*pHdl = nil
 	}
 }
+*/
 
 /*
  *  API: given an ifIndex, it will search portMap (fpPort1, fpPort2, etc) to get the name or it will do
@@ -182,8 +181,11 @@ func (svr *NDPServer) GetIntfRefName(ifIndex int32) string {
 	return INTF_REF_NOT_FOUND
 }
 
-func (svr *NDPServer) IsLinkLocal(ipAddr string) bool {
-	ip, _, _ := net.ParseCIDR(ipAddr)
+func isLinkLocal(ipAddr string) bool {
+	ip, _, err := net.ParseCIDR(ipAddr)
+	if err != nil {
+		ip = net.ParseIP(ipAddr)
+	}
 	return ip.IsLinkLocalUnicast() && (ip.To4() == nil)
 }
 
@@ -207,37 +209,31 @@ func (svr *NDPServer) HandleCreateIPIntf(obj *config.IPIntfNotification) {
 	ipInfo, exists := svr.L3Port[obj.IfIndex]
 	switch obj.Operation {
 	case config.CONFIG_CREATE:
-		defer svr.Packet.InitLink(obj.IfIndex, obj.IpAddr, svr.SwitchMac)
+		// Done during Init
+
+		//defer svr.Packet.InitLink(obj.IfIndex, obj.IpAddr, svr.SwitchMac)
 		if exists {
-			if svr.IsLinkLocal(obj.IpAddr) {
-				debug.Logger.Debug("Updating link local Ip", obj.IpAddr, "for", obj.IfIndex)
-				ipInfo.LinkLocalIp = obj.IpAddr
-				svr.L3Port[obj.IfIndex] = ipInfo
-				return
-			}
-			debug.Logger.Err("Received create notification for ifIndex", obj.IfIndex,
-				"when entry already exist in the database. Dumping IpAddr for debugging info.",
-				"Received Ip:", obj.IpAddr, "stored Ip:", ipInfo.IpAddr)
+			ipInfo.UpdateIntf(obj.IpAddr)
+			svr.L3Port[obj.IfIndex] = ipInfo
 			return
 		}
-		ipInfo = config.IPv6IntfInfo{
-			IfIndex: obj.IfIndex,
-			IpAddr:  obj.IpAddr,
-		}
-		ipInfo.IntfRef = svr.GetIntfRefName(ipInfo.IfIndex)
-		if ipInfo.IntfRef == INTF_REF_NOT_FOUND {
-			debug.Logger.Alert("Couldn't find name for ifIndex:", ipInfo.IfIndex,
-				"and hence pcap create will be failure")
-		}
+
+		ipInfo = Interface{}
+		ipInfo.CreateIntf(obj, svr.GetIntfRefName(obj.IfIndex), svr.PktDataCh)
 		debug.Logger.Info("Created IP inteface", ipInfo.IntfRef, "ifIndex:", ipInfo.IfIndex)
-		svr.L3Port[ipInfo.IfIndex] = ipInfo
 		svr.ndpL3IntfStateSlice = append(svr.ndpL3IntfStateSlice, ipInfo.IfIndex)
+		svr.L3Port[ipInfo.IfIndex] = ipInfo
 	case config.CONFIG_DELETE:
-		//@TODO: need to handle delete cases
+		if !exists {
+			debug.Logger.Err("Got Delete request for non existing l3 port", obj.IfIndex)
+			return
+		}
+		// stop rx/tx on the deleted interface
+		svr.StopRxTx(obj.IfIndex)
 	}
 }
 
-func (svr *NDPServer) findL3Port(ifIndex int32) (config.IPv6IntfInfo, bool) {
+func (svr *NDPServer) findL3Port(ifIndex int32) (Interface, bool) {
 	l3port, exists := svr.L3Port[ifIndex]
 	return l3port, exists
 }
@@ -266,16 +262,6 @@ func (svr *NDPServer) HandlePhyPortStateNotification(msg *config.StateNotificati
 		// includes deleting neighbor from link local ip address also
 		debug.Logger.Info("Stop receiving frames for", l3Port.IntfRef)
 		svr.StopRxTx(msg.IfIndex)
-		debug.Logger.Info("Deleting Neigbors for", l3Port.IpAddr)
-		deleteEntries, err := svr.Packet.FlushNeighbors(l3Port.IpAddr)
-		if len(deleteEntries) > 0 && err == nil {
-			svr.DeleteNeighborInfo(deleteEntries, msg.IfIndex)
-		}
-		debug.Logger.Info("Deleting Neigbors for", l3Port.LinkLocalIp)
-		deleteEntries, err = svr.Packet.FlushNeighbors(l3Port.LinkLocalIp)
-		if len(deleteEntries) > 0 && err == nil {
-			svr.DeleteNeighborInfo(deleteEntries, msg.IfIndex)
-		}
 	}
 }
 
@@ -296,12 +282,6 @@ func (svr *NDPServer) HandleStateNotification(msg *config.StateNotification) {
 		debug.Logger.Info("Delete pkt handler for", msg.IfIndex, "IpAddr:", msg.IpAddr)
 		// stop pcap handler
 		svr.StopRxTx(msg.IfIndex)
-		// delete neighbor entries first for the link
-		// stop the timer
-		deleteEntries, err := svr.Packet.FlushNeighbors(msg.IpAddr)
-		if len(deleteEntries) > 0 && err == nil {
-			svr.DeleteNeighborInfo(deleteEntries, msg.IfIndex)
-		}
 	}
 }
 
@@ -322,7 +302,7 @@ func (svr *NDPServer) DeleteL3IntfFromUpState(ifIndex int32) {
 /*
  *    API: It will populate correct vlan information which will be used for ipv6 neighbor create
  */
-func (svr *NDPServer) PopulateVlanInfo(nbrInfo *config.NeighborInfo, ifIndex int32) {
+func (svr *NDPServer) PopulateVlanInfo(nbrInfo *config.NeighborConfig, ifIndex int32) {
 	// check if the ifIndex is present in the reverse map..
 	vlanId, exists := svr.VlanIfIdxVlanIdMap[ifIndex]
 	if exists {
