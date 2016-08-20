@@ -36,13 +36,15 @@ import (
 )
 
 const (
-	NDP_PCAP_SNAPSHOTlEN                  = 1024
-	NDP_PCAP_PROMISCUOUS                  = false
-	NDP_PCAP_TIMEOUT                      = 1 * time.Second
-	NDP_PCAP_FILTER                       = "(ip6[6] == 0x3a) and (ip6[40] >= 133 && ip6[40] <= 137)"
-	MAX_INITIAL_RTR_ADVERT_INTERVAL uint8 = 16
-	MAX_INITIAL_RTR_ADVERTISEMENTS  uint8 = 3
-	MIN_DELAY_BETWEEN_RAS           uint8 = 3 // RFC: 4861
+	NDP_PCAP_FILTER                              = "(ip6[6] == 0x3a) and (ip6[40] >= 133 && ip6[40] <= 137)"
+	NDP_PCAP_TIMEOUT                             = 1 * time.Second
+	NDP_PCAP_SNAPSHOTlEN                         = 1024
+	NDP_PCAP_PROMISCUOUS                         = false
+	MIN_DELAY_BETWEEN_RAS                  uint8 = 3 // RFC: 4861
+	MAX_INITIAL_RTR_ADVERTISEMENTS         uint8 = 3
+	MAX_INITIAL_RTR_ADVERT_INTERVAL        uint8 = 16
+	ALL_NODES_MULTICAST_IPV6_ADDRESS             = "ff02::1"
+	ALL_NODES_MULTICAST_LINK_LAYER_ADDRESS       = "33:33:00:00:00:01"
 )
 
 type PcapBase struct {

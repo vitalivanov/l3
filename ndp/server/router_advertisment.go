@@ -23,13 +23,9 @@
 package server
 
 import (
-	_ "encoding/binary"
-	_ "github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"l3/ndp/config"
-	_ "l3/ndp/debug"
 	"l3/ndp/packet"
-	_ "net"
 )
 
 /*
@@ -81,6 +77,8 @@ func (intf *Interface) processRA(ndInfo *packet.NDInfo) (nbrInfo *config.Neighbo
 func (intf *Interface) SendRA(srcMac string) {
 	pkt := &packet.Packet{
 		SrcMac: srcMac,
+		DstMac: ALL_NODES_MULTICAST_LINK_LAYER_ADDRESS,
+		DstIp:  ALL_NODES_MULTICAST_IPV6_ADDRESS,
 		PType:  layers.ICMPv6TypeRouterAdvertisement,
 	}
 	pkt.SrcIp = intf.linkScope
