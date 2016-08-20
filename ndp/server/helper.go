@@ -130,39 +130,6 @@ func (svr *NDPServer) GetIPIntf() {
 }
 
 /*
- * API: will create pcap handler for each port
- */
-/*
-func (svr *NDPServer) CreatePcapHandler(name string) (pHdl *pcap.Handle, err error) {
-	pHdl, err = pcap.OpenLive(name, svr.SnapShotLen, svr.Promiscuous, svr.Timeout)
-	if err != nil {
-		debug.Logger.Err("Creating Pcap Handler failed for", name, "Error:", err)
-		return pHdl, err
-	}
-	filter := "(ip6[6] == 0x3a) and (ip6[40] >= 133 && ip6[40] <= 137)"
-	err = pHdl.SetBPFFilter(filter)
-	if err != nil {
-		debug.Logger.Err("Creating BPF Filter failed Error", err)
-		pHdl = nil
-		return pHdl, err
-	}
-	return pHdl, err
-}
-*/
-
-/*
- * API: will delete pcap handler for each port
- */
-/*
-func (svr *NDPServer) DeletePcapHandler(pHdl **pcap.Handle) {
-	if *pHdl != nil {
-		(*pHdl).Close()
-		*pHdl = nil
-	}
-}
-*/
-
-/*
  *  API: given an ifIndex, it will search portMap (fpPort1, fpPort2, etc) to get the name or it will do
  *	 reverse search for vlanMap (vlan ifIndex ---> to vlanId) and from that we will get the name
  */
@@ -210,8 +177,6 @@ func (svr *NDPServer) HandleCreateIPIntf(obj *config.IPIntfNotification) {
 	switch obj.Operation {
 	case config.CONFIG_CREATE:
 		// Done during Init
-
-		//defer svr.Packet.InitLink(obj.IfIndex, obj.IpAddr, svr.SwitchMac)
 		if exists {
 			ipInfo.UpdateIntf(obj.IpAddr)
 			svr.L3Port[obj.IfIndex] = ipInfo
@@ -229,6 +194,7 @@ func (svr *NDPServer) HandleCreateIPIntf(obj *config.IPIntfNotification) {
 			return
 		}
 		// stop rx/tx on the deleted interface
+		debug.Logger.Info("Delete IP interface received for", ipInfo.IntfRef, "ifIndex:", ipInfo.IfIndex)
 		svr.StopRxTx(obj.IfIndex)
 	}
 }
@@ -246,7 +212,7 @@ func (svr *NDPServer) HandlePhyPortStateNotification(msg *config.StateNotificati
 	debug.Logger.Info("Received State:", msg.State, "for ifIndex:", msg.IfIndex)
 	l3Port, exists := svr.findL3Port(msg.IfIndex)
 	if !exists {
-		debug.Logger.Err("No l3 port exists for ifIndex:", msg.IfIndex, "ignoring port state notification")
+		debug.Logger.Warning("Physical Port for ifIndex:", msg.IfIndex, "is not l3 port and ignoring port state notification")
 		return
 	}
 	// search this ifIndex in l3 map to get the ifIndex -> ipAddr map

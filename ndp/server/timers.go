@@ -201,6 +201,10 @@ func (c *NeighborInfo) ReComputeBaseReachableTimer() {
  * Router Advertisment Timer: Only timer owned by Interface Object
  */
 func (intf *Interface) RAResTransmitTimer() {
+	if intf.PcapBase.PcapHandle == nil {
+		intf.StopRATimer()
+		return
+	}
 	if intf.raTimer != nil {
 		if intf.initialRASend < MAX_INITIAL_RTR_ADVERTISEMENTS {
 			intf.raTimer.Reset(time.Duration(MAX_INITIAL_RTR_ADVERT_INTERVAL) * time.Second)

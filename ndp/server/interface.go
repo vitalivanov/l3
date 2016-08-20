@@ -245,10 +245,15 @@ func (intf *Interface) DeletePcap() {
 }
 
 func (intf *Interface) writePkt(pkt []byte) error {
-	err := intf.PcapBase.PcapHandle.WritePacketData(pkt)
-	if err != nil {
-		debug.Logger.Err("Sending Packet failed error:", err)
-		return errors.New("Sending Packet Failed")
+	if intf.PcapBase.PcapHandle != nil {
+		err := intf.PcapBase.PcapHandle.WritePacketData(pkt)
+		if err != nil {
+			debug.Logger.Err("Sending Packet failed error:", err)
+			return errors.New("Sending Packet Failed")
+		}
+	} else {
+		debug.Logger.Warning("Pcap deleted for interface:", intf.IntfRef)
+		return errors.New("Pcap deleted for interface:" + intf.IntfRef)
 	}
 	return nil
 }

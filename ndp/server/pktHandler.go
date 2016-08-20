@@ -23,41 +23,11 @@
 package server
 
 import (
-	_ "fmt"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"l3/ndp/config"
 	"l3/ndp/debug"
-	_ "net"
 )
-
-/*
- *	Receive Ndp Packet
- */
-/*
-func (svr *NDPServer) ReceivedNdpPkts(ifIndex int32) {
-	ipPort, _ := svr.L3Port[ifIndex]
-	if ipPort.PcapBase.PcapHandle == nil {
-		debug.Logger.Err("pcap handler for port:", ipPort.IntfRef, "is not valid. ABORT!!!!")
-		return
-	}
-	src := gopacket.NewPacketSource(ipPort.PcapBase.PcapHandle, layers.LayerTypeEthernet)
-	in := src.Packets()
-	for {
-		select {
-		case pkt, ok := <-in:
-			if !ok {
-				continue
-			}
-			svr.RxPktCh <- &RxPktInfo{pkt, ipPort.IfIndex}
-		case <-ipPort.PcapBase.PcapCtrl:
-			ipPort.PcapBase.PcapCtrl <- true
-			return
-		}
-	}
-	return
-}
-*/
 
 /*
  *	StartRxTx      a) Check if entry is present in the map
@@ -75,36 +45,15 @@ func (svr *NDPServer) StartRxTx(ifIndex int32) {
 		return
 	}
 
-	/*
-		if ipPort.PcapBase.PcapUsers != 0 {
-			// update pcap user and move on
-			//ipPort.PcapBase.PcapUsers += 1
-			ipPort.AddPcapUser()
-			svr.L3Port[ifIndex] = ipPort
-			debug.Logger.Info("Updating total pcap user for", ipPort.IntfRef, "to", ipPort.PcapBase.PcapUsers)
-			debug.Logger.Info("Start receiving packets for ip:", ipPort.IpAddr, "on Port", ipPort.IntfRef)
-			return
-		}
-	*/
 	// create pcap handler if there is none created right now
-	//if ipPort.PcapBase.PcapHandle == nil {
 	err := ipPort.CreatePcap()
-	//ipPort.PcapBase.PcapHandle, err = svr.CreatePcapHandler(ipPort.IntfRef)
 	if err != nil {
 		return
 	}
-	//}
-	/*
-		   // create pcap ctrl channel if not created
-		   	if ipPort.PcapBase.PcapCtrl == nil {
-		   		ipPort.PcapBase.PcapCtrl = make(chan bool)
-		   	}
-		ipPort.PcapBase.PcapUsers += 1
-	*/
-	debug.Logger.Info("Start rx/tx for port:", ipPort.IntfRef, "ifIndex:", ipPort.IfIndex, "ip address", ipPort.IpAddr)
+	debug.Logger.Info("Start rx/tx for port:", ipPort.IntfRef, "ifIndex:", ipPort.IfIndex, "ip GS:", ipPort.IpAddr,
+		"LS:", ipPort.LinkLocalIp, "is done")
 
 	// Spawn go routines for rx & tx
-	//go svr.ReceivedNdpPkts(ipPort.IfIndex)
 	go ipPort.ReceiveNdpPkts(svr.RxPktCh)
 	svr.ndpUpL3IntfStateSlice = append(svr.ndpUpL3IntfStateSlice, ifIndex)
 
@@ -114,8 +63,6 @@ func (svr *NDPServer) StartRxTx(ifIndex int32) {
 	}
 	ipPort.SendND(pktData, svr.SwitchMac)
 	svr.L3Port[ifIndex] = ipPort
-	// @TODO:When port comes up are we suppose to send out Neigbor Solicitation or Router Solicitation??
-	//	svr.Packet.SendNAMsg(svr.SwitchMac, ipPort.IpAddr, ipPort.PcapBase.PcapHandle)
 }
 
 /*
@@ -149,7 +96,8 @@ func (svr *NDPServer) StopRxTx(ifIndex int32) {
 	}
 
 	svr.L3Port[ifIndex] = ipPort
-	debug.Logger.Info("Stop rx/tx for port:", ipPort.IntfRef, "ifIndex:", ipPort.IfIndex, "ip address", ipPort.IpAddr, "is done")
+	debug.Logger.Info("Stop rx/tx for port:", ipPort.IntfRef, "ifIndex:", ipPort.IfIndex, "ip GS:", ipPort.IpAddr,
+		"LS:", ipPort.LinkLocalIp, "is done")
 	// Delete Entry from Slice
 	svr.DeleteL3IntfFromUpState(ipPort.IfIndex)
 }
@@ -177,7 +125,6 @@ func (svr *NDPServer) insertNeigborInfo(nbrInfo *config.NeighborConfig) {
 /*
  *	deleteNeighborInfo: Helper API to update list of neighbor keys that are deleted by ndp
  *	@NOTE: caller is responsible for acquiring the lock to access slice
- *	//@TODO: need optimazation here...
  */
 func (svr *NDPServer) deleteNeighborInfo(nbrIp string) {
 	for idx, _ := range svr.neighborKey {
