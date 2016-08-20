@@ -30,6 +30,7 @@ type IntfStateMgrIntf interface {
 	PortStateChange()
 	GetIPv4Intfs() []*IntfStateInfo
 	GetIPv6Intfs() []*IntfStateInfo
+	GetIPv6Neighbors() []*IntfStateInfo
 	GetPortInfo() []IntfMapInfo
 	GetVlanInfo() []IntfMapInfo
 	GetLogicalIntfInfo() []IntfMapInfo

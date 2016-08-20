@@ -262,6 +262,12 @@ func (mgr *FSPolicyMgr) handlePolicyUpdates(rxBuf []byte) {
 	case ribdCommonDefs.NOTIFY_POLICY_CONDITION_CREATED, ribdCommonDefs.NOTIFY_POLICY_CONDITION_DELETED,
 		ribdCommonDefs.NOTIFY_POLICY_CONDITION_UPDATED:
 		mgr.handlePolicyConditionUpdates(msg)
+	case ribdCommonDefs.NOTIFY_POLICY_STMT_CREATED, ribdCommonDefs.NOTIFY_POLICY_STMT_DELETED,
+		ribdCommonDefs.NOTIFY_POLICY_STMT_UPDATED:
+		mgr.handlePolicyStmtUpdates(msg)
+	case ribdCommonDefs.NOTIFY_POLICY_DEFINITION_CREATED, ribdCommonDefs.NOTIFY_POLICY_DEFINITION_DELETED,
+		ribdCommonDefs.NOTIFY_POLICY_DEFINITION_UPDATED:
+		mgr.handlePolicyDefinitionUpdates(msg)
 	default:
 		mgr.logger.Errf("**** Received Policy update with unknown type %d ****", msg.MsgType)
 	}

@@ -102,7 +102,7 @@ func (svr *NDPServer) StartRxTx(ifIndex int32) {
 	go svr.ReceivedNdpPkts(ipPort.IfIndex)
 	svr.ndpUpL3IntfStateSlice = append(svr.ndpUpL3IntfStateSlice, ifIndex)
 	// @TODO:When port comes up are we suppose to send out Neigbor Solicitation or Router Solicitation??
-	//svr.Packet.SendNSMsgIfRequired(ipPort.IpAddr, ipPort.PcapBase.PcapHandle)
+	svr.Packet.SendNAMsg(svr.SwitchMac, ipPort.IpAddr, ipPort.PcapBase.PcapHandle)
 }
 
 /*
@@ -249,7 +249,7 @@ func (svr *NDPServer) DeleteNeighborInfo(deleteEntries []string, ifIndex int32) 
  *			c) CreateIPv6 Neighbor entry
  */
 func (svr *NDPServer) ProcessRxPkt(ifIndex int32, pkt gopacket.Packet) {
-	_, exists := svr.L3Port[ifIndex]
+	l3Port, exists := svr.L3Port[ifIndex]
 	if !exists {
 		return
 	}
@@ -262,8 +262,14 @@ func (svr *NDPServer) ProcessRxPkt(ifIndex int32, pkt gopacket.Packet) {
 	// @ALERT: always overwrite ifIndex when creating neighbor, if ifIndex has reverse map entry for
 	//	   vlanID then that will be overwritten again with vlan ifIndex
 	nbrInfo.IfIndex = ifIndex
+	nbrInfo.Intf = l3Port.IntfRef
 	if nbrInfo.PktOperation == byte(packet.PACKET_DROP) {
 		debug.Logger.Err("Dropping message as PktOperation is PACKET_DROP for", nbrInfo.IpAddr)
+		//temp to get neighbor entry to work
+		/*
+			nbrInfo.IpAddr = "fe80::10:9cf8:fcff:fe4a:1615"
+			nbrInfo.MacAddr = "9e:f8:fc:4a:16:15"
+			svr.CreateNeighborInfo(nbrInfo)*/
 		return
 	} else if nbrInfo.State == packet.INCOMPLETE {
 		debug.Logger.Err("Received message but packet state is INCOMPLETE hence not calling create ipv6 neighbor for ",
