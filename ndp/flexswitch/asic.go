@@ -26,6 +26,7 @@ import (
 	"asicd/asicdCommonDefs"
 	"l3/ndp/api"
 	"l3/ndp/config"
+	"l3/ndp/debug"
 	"sync"
 	"utils/commonDefs"
 )
@@ -75,15 +76,19 @@ func (notifyHdl *AsicNotificationHdl) ProcessNotification(msg commonDefs.AsicdNo
 	case commonDefs.L2IntfStateNotifyMsg:
 		l2Msg := msg.(commonDefs.L2IntfStateNotifyMsg)
 		if l2Msg.IfState == asicdCommonDefs.INTF_STATE_UP {
+			debug.Logger.Debug("Received Asicd L2 Port Notfication UP")
 			api.SendL2PortNotification(l2Msg.IfIndex, config.STATE_UP)
 		} else {
+			debug.Logger.Debug("Received Asicd L2 Port Notfication DOWN")
 			api.SendL2PortNotification(l2Msg.IfIndex, config.STATE_DOWN)
 		}
 	case commonDefs.L3IntfStateNotifyMsg:
 		l3Msg := msg.(commonDefs.L3IntfStateNotifyMsg)
 		if l3Msg.IfState == asicdCommonDefs.INTF_STATE_UP {
+			debug.Logger.Debug("Received Asicd L3 Port Notfication UP")
 			api.SendL3PortNotification(l3Msg.IfIndex, config.STATE_UP, l3Msg.IpAddr)
 		} else {
+			debug.Logger.Debug("Received Asicd L3 Port Notfication DOWN")
 			api.SendL3PortNotification(l3Msg.IfIndex, config.STATE_DOWN, l3Msg.IpAddr)
 		}
 	case commonDefs.VlanNotifyMsg:
@@ -100,18 +105,23 @@ func (notifyHdl *AsicNotificationHdl) ProcessNotification(msg commonDefs.AsicdNo
 		oper := ""
 		switch vlanMsg.MsgType {
 		case commonDefs.NOTIFY_VLAN_CREATE:
+			debug.Logger.Debug("Received Asicd VLAN CREATE")
 			oper = config.CONFIG_CREATE
 		case commonDefs.NOTIFY_VLAN_DELETE:
+			debug.Logger.Debug("Received Asicd VLAN DELETE")
 			oper = config.CONFIG_DELETE
 		case commonDefs.NOTIFY_VLAN_UPDATE:
+			debug.Logger.Debug("Received Asicd VLAN UPDATE")
 			oper = config.CONFIG_UPDATE
 		}
 		api.SendVlanNotification(oper, int32(vlanMsg.VlanId), vlanMsg.VlanName, vlanMsg.UntagPorts)
 	case commonDefs.IPv6IntfNotifyMsg:
 		ipv6Msg := msg.(commonDefs.IPv6IntfNotifyMsg)
 		if ipv6Msg.MsgType == commonDefs.NOTIFY_IPV6INTF_CREATE {
+			debug.Logger.Debug("Received Asicd IPV6 INTF Notfication CREATE")
 			api.SendIPIntfNotfication(ipv6Msg.IfIndex, ipv6Msg.IpAddr, config.CONFIG_CREATE)
 		} else {
+			debug.Logger.Debug("Received Asicd IPV6 INTF Notfication DELETE")
 			api.SendIPIntfNotfication(ipv6Msg.IfIndex, ipv6Msg.IpAddr, config.CONFIG_DELETE)
 		}
 	}
