@@ -81,13 +81,17 @@ func (intf *Interface) SendRA(srcMac string) {
 		DstIp:  ALL_NODES_MULTICAST_IPV6_ADDRESS,
 		PType:  layers.ICMPv6TypeRouterAdvertisement,
 	}
-	pkt.SrcIp = intf.linkScope
-	pktToSend := pkt.Encode()
-	intf.writePkt(pktToSend)
+	if intf.linkScope != "" {
+		pkt.SrcIp = intf.linkScope
+		pktToSend := pkt.Encode()
+		intf.writePkt(pktToSend)
 
-	pkt.SrcIp = intf.globalScope
-	pktToSend = pkt.Encode()
-	intf.writePkt(pktToSend)
+	}
+	if intf.globalScope != "" {
+		pkt.SrcIp = intf.globalScope
+		pktToSend := pkt.Encode()
+		intf.writePkt(pktToSend)
+	}
 
 	intf.RAResTransmitTimer()
 }
