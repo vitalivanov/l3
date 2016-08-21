@@ -40,13 +40,13 @@ type NDPServer struct {
 	SwitchPlugin asicdClient.AsicdClientIntf
 
 	// System Ports information, key is IntfRef
-	PhyPort             map[int32]config.PortInfo      // key is l2 ifIndex
-	L3Port              map[int32]config.IPv6IntfInfo  // key is l3 ifIndex
-	VlanInfo            map[int32]config.VlanInfo      // key is vlanId
-	VlanIfIdxVlanIdMap  map[int32]int32                //reverse map for ifIndex ----> vlanId, used during ipv6 neig create
-	SwitchMacMapEntries map[string]struct{}            // cache entry for all mac addresses on a switch
-	NeighborInfo        map[string]config.NeighborInfo // cache which neighbors are created by NDP
-	neighborKey         []string                       // keys for all neighbor entries is stored here for GET calls
+	PhyPort             map[int32]config.PortInfo        // key is l2 ifIndex
+	L3Port              map[int32]Interface              // key is l3 ifIndex
+	VlanInfo            map[int32]config.VlanInfo        // key is vlanId
+	VlanIfIdxVlanIdMap  map[int32]int32                  //reverse map for ifIndex ----> vlanId, used during ipv6 neig create
+	SwitchMacMapEntries map[string]struct{}              // cache entry for all mac addresses on a switch
+	NeighborInfo        map[string]config.NeighborConfig // neighbor created by NDP used for STATE
+	neighborKey         []string                         // keys for all neighbor entries is stored here for GET calls
 
 	// Lock for reading/writing NeighorInfo
 	// We need this lock because getbulk/getentry is not requested on the main entry point channel, rather it's a
@@ -55,7 +55,7 @@ type NDPServer struct {
 	NeigborEntryLock *sync.RWMutex
 
 	// Physical Port/ L2 Port State Notification
-	PhyPortStateCh chan *config.StateNotification
+	PhyPortStateCh chan *config.PortState
 	//IPV6 Create/Delete Notification Channel
 	IpIntfCh chan *config.IPIntfNotification
 	// IPv6 Up/Down Notification Channel

@@ -1,3 +1,6 @@
+//
+//Copyright [2016] [SnapRoute Inc]
+//
 //Licensed under the Apache License, Version 2.0 (the "License");
 //you may not use this file except in compliance with the License.
 //You may obtain a copy of the License at
@@ -17,27 +20,39 @@
 // |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
 // |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
 //
-package packet
+package server
 
 import (
-	"time"
+	"l3/ndp/config"
+	"l3/ndp/packet"
 )
 
-type PrefixInfo struct {
-	MacAddr           string
-	IpAddr            string
-	InvalidationTimer *time.Timer
-}
-
-type PrefixLink struct {
-	GlobalIp    string
-	LinkLocalIp string
-	PrefixList  []PrefixInfo
-}
-
-func (prefix *PrefixInfo) InitPrefix(ip, mac string, lifeTime uint16) {
-	prefix.IpAddr = ip
-	prefix.MacAddr = mac
-	// @TODO need to start the timer during init
-	//prefix.InvalidationTimer = time.Duration(lifeTime) * time.Second
+/*
+ * When we get advertisement packet we need to update the mac address of peer and move the state to
+ * REACHABLE
+ *
+ * If srcIP is my own IP then linux is responding for earlier solicitation message and hence we need to update
+ * our cache entry with reachable
+ * If srcIP is peer ip then we need to use dst ip to get link information and then update cache entry to be
+ * reachable and also update peer mac address into the cache
+ * @TODO: handle un-solicited Neighbor Advertisemtn
+ */
+func (intf *Interface) processNA(ndInfo *packet.NDInfo) (nbrInfo *config.NeighborConfig, oper NDP_OPERATION) {
+	nbrKey := intf.createNbrKey(ndInfo)
+	nbr, exists := intf.Neighbor[nbrKey]
+	if exists {
+		// update existing neighbor timers and move
+		nbr.State = REACHABLE
+		nbr.UpdateProbe()
+		nbr.RchTimer()
+		oper = UPDATE
+	} else {
+		// create new neighbor
+		nbr.InitCache(intf.reachableTime, intf.retransTime, nbrKey, intf.PktDataCh, intf.IfIndex)
+		nbr.State = REACHABLE
+		oper = CREATE
+		nbrInfo = nbr.populateNbrInfo(intf.IfIndex, intf.IntfRef)
+	}
+	intf.Neighbor[nbrKey] = nbr
+	return nbrInfo, oper
 }

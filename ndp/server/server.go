@@ -76,21 +76,21 @@ func (svr *NDPServer) OSSignalHandle() {
 func (svr *NDPServer) InitGlobalDS() {
 	svr.PhyPort = make(map[int32]config.PortInfo, NDP_SERVER_MAP_INITIAL_CAP)
 	svr.SwitchMacMapEntries = make(map[string]struct{}, NDP_SERVER_MAP_INITIAL_CAP)
-	svr.L3Port = make(map[int32]config.IPv6IntfInfo, NDP_SERVER_MAP_INITIAL_CAP)
+	svr.L3Port = make(map[int32]Interface, NDP_SERVER_MAP_INITIAL_CAP)
 	svr.VlanInfo = make(map[int32]config.VlanInfo, NDP_SERVER_MAP_INITIAL_CAP)
 	svr.VlanIfIdxVlanIdMap = make(map[int32]int32, NDP_SERVER_MAP_INITIAL_CAP)
-	svr.NeighborInfo = make(map[string]config.NeighborInfo, NDP_SERVER_MAP_INITIAL_CAP)
-	svr.PhyPortStateCh = make(chan *config.StateNotification)
-	svr.IpIntfCh = make(chan *config.IPIntfNotification)
-	svr.IpStateCh = make(chan *config.StateNotification)
+	svr.NeighborInfo = make(map[string]config.NeighborConfig, NDP_SERVER_MAP_INITIAL_CAP)
+	svr.PhyPortStateCh = make(chan *config.PortState, 2)
+	svr.IpIntfCh = make(chan *config.IPIntfNotification, 2)
+	svr.IpStateCh = make(chan *config.StateNotification, 2)
 	svr.VlanCh = make(chan *config.VlanNotification)
-	svr.RxPktCh = make(chan *RxPktInfo)
-	svr.PktDataCh = make(chan config.PacketData)
+	svr.RxPktCh = make(chan *RxPktInfo, 10)
+	svr.PktDataCh = make(chan config.PacketData, 10)
 	svr.SnapShotLen = 1024
 	svr.Promiscuous = false
 	svr.Timeout = 1 * time.Second
 	svr.NeigborEntryLock = &sync.RWMutex{}
-	svr.Packet = packet.Init(svr.PktDataCh)
+	svr.Packet = packet.Init()
 
 	// init publisher
 	pub := publisher.NewPublisher()
@@ -106,17 +106,6 @@ func (svr *NDPServer) DeInitGlobalDS() {
 	svr.IpStateCh = nil
 	svr.VlanCh = nil
 	svr.RxPktCh = nil
-}
-
-func (svr *NDPServer) InitSystemIPIntf(entry *config.IPv6IntfInfo, ipInfo *config.IPv6IntfInfo) {
-	if ipInfo == nil || entry == nil {
-		return
-	}
-	entry.IfIndex = ipInfo.IfIndex
-	entry.IntfRef = ipInfo.IntfRef
-	entry.OperState = ipInfo.OperState
-	entry.IpAddr = ipInfo.IpAddr
-	svr.ndpL3IntfStateSlice = append(svr.ndpL3IntfStateSlice, ipInfo.IfIndex)
 }
 
 /*
