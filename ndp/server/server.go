@@ -80,7 +80,7 @@ func (svr *NDPServer) InitGlobalDS() {
 	svr.VlanInfo = make(map[int32]config.VlanInfo, NDP_SERVER_MAP_INITIAL_CAP)
 	svr.VlanIfIdxVlanIdMap = make(map[int32]int32, NDP_SERVER_MAP_INITIAL_CAP)
 	svr.NeighborInfo = make(map[string]config.NeighborConfig, NDP_SERVER_MAP_INITIAL_CAP)
-	svr.PhyPortStateCh = make(chan *config.StateNotification, 2)
+	svr.PhyPortStateCh = make(chan *config.PortState, 2)
 	svr.IpIntfCh = make(chan *config.IPIntfNotification, 2)
 	svr.IpStateCh = make(chan *config.StateNotification, 2)
 	svr.VlanCh = make(chan *config.VlanNotification)

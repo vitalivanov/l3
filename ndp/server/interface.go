@@ -151,6 +151,7 @@ func (intf *Interface) CreateIntf(obj *config.IPIntfNotification, intfRef string
  * DeleteIntf will kill pcap, flush neighbors and then stop all timers
  */
 func (intf *Interface) DeleteIntf() ([]string, error) {
+	debug.Logger.Debug("Deleting Interface:", intf.IntfRef, intf.IpAddr, intf.LinkLocalIp)
 	intf.DeletePcap()
 	if intf.PcapBase.PcapHandle == nil && intf.PcapBase.PcapUsers == 0 {
 		intf.StopRATimer()
@@ -224,10 +225,18 @@ func (intf *Interface) deletePcapUser() {
  *		notification comes then NDP will delete pcap
  */
 func (intf *Interface) DeletePcap() {
+	if intf.PcapBase.PcapHandle == nil {
+		// create ip interface but state down will not have pcap handler created
+		return
+	}
 	if intf.PcapBase.PcapUsers > 1 {
-		intf.deletePcapUser()
 		debug.Logger.Info("Updating total pcap user for", intf.IntfRef, "to", intf.PcapBase.PcapUsers)
 		debug.Logger.Info("Stop receiving packets for ip:", intf.IpAddr, "on Port", intf.IntfRef)
+		intf.deletePcapUser()
+	}
+
+	if intf.PcapBase.PcapUsers != 0 {
+		// there are still some pcap users and hence we should not delete
 		return
 	}
 

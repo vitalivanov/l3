@@ -208,15 +208,15 @@ func (svr *NDPServer) findL3Port(ifIndex int32) (Interface, bool) {
  *	  Update map entry and then call state notification
  *
  */
-func (svr *NDPServer) HandlePhyPortStateNotification(msg *config.StateNotification) {
-	debug.Logger.Info("Received State:", msg.State, "for ifIndex:", msg.IfIndex)
+func (svr *NDPServer) HandlePhyPortStateNotification(msg *config.PortState) {
+	debug.Logger.Info("Received State:", msg.IfState, "for ifIndex:", msg.IfIndex)
 	l3Port, exists := svr.findL3Port(msg.IfIndex)
 	if !exists {
-		debug.Logger.Warning("Physical Port for ifIndex:", msg.IfIndex, "is not l3 port and ignoring port state notification")
+		debug.Logger.Debug("Physical Port for ifIndex:", msg.IfIndex, "is not l3 port and ignoring port state notification")
 		return
 	}
 	// search this ifIndex in l3 map to get the ifIndex -> ipAddr map
-	switch msg.State {
+	switch msg.IfState {
 	case config.STATE_UP:
 		// if the port state is up, then we need to start RX/TX only for global scope ip address,
 		// if it is not started

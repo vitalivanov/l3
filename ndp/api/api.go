@@ -50,9 +50,9 @@ func Init(svr *server.NDPServer) {
 }
 
 func SendL2PortNotification(ifIndex int32, state string) {
-	ndpApi.server.PhyPortStateCh <- &config.StateNotification{
+	ndpApi.server.PhyPortStateCh <- &config.PortState{
 		IfIndex: ifIndex,
-		State:   state,
+		IfState: state,
 	}
 }
 
