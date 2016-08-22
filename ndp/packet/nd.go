@@ -24,6 +24,7 @@ package packet
 
 import (
 	"encoding/binary"
+	"github.com/google/gopacket/layers"
 	"net"
 )
 
@@ -40,7 +41,11 @@ type NDOption struct {
 type NDInfo struct {
 	// NS/NA Information
 	TargetAddress net.IP
-
+	PktType       layers.ICMPv6TypeCode
+	SrcMac        string
+	SrcIp         string
+	DstIp         string
+	DstMac        string
 	// RA Information
 	CurHopLimit    uint8
 	ReservedFlags  uint8

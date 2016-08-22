@@ -50,9 +50,9 @@ func Init(svr *server.NDPServer) {
 }
 
 func SendL2PortNotification(ifIndex int32, state string) {
-	ndpApi.server.PhyPortStateCh <- &config.StateNotification{
+	ndpApi.server.PhyPortStateCh <- &config.PortState{
 		IfIndex: ifIndex,
-		State:   state,
+		IfState: state,
 	}
 }
 
@@ -81,11 +81,11 @@ func SendIPIntfNotfication(ifIndex int32, ipaddr, msgType string) {
 	}
 }
 
-func GetAllNeigborEntries(from, count int) (int, int, []config.NeighborInfo) {
+func GetAllNeigborEntries(from, count int) (int, int, []config.NeighborConfig) {
 	n, c, result := ndpApi.server.GetNeighborEntries(from, count)
 	return n, c, result
 }
 
-func GetNeighborEntry(ipAddr string) *config.NeighborInfo {
+func GetNeighborEntry(ipAddr string) *config.NeighborConfig {
 	return ndpApi.server.GetNeighborEntry(ipAddr)
 }
