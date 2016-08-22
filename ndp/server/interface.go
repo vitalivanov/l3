@@ -335,27 +335,6 @@ func (intf *Interface) FlushNeighbors() ([]string, error) {
 		deleteEntries = append(deleteEntries, nbr.IpAddr)
 		delete(intf.Neighbor, nbr.IpAddr)
 	}
-	/*
-			localIp, _, err := net.ParseCIDR(ip)
-			if err != nil {
-				debug.Logger.Err("Parsing ip", ip, "failed with err:", err)
-				return deleteEntries, errors.New(fmt.Sprintln("Parsing ip", ip, "failed with err:", err))
-			}
-			link, exists := p.GetLink(localIp.String())
-			if !exists {
-				debug.Logger.Err("Cannot delete neighbors for", localIp.String(), "as there is no such link entry")
-				return deleteEntries, errors.New(fmt.Sprintln("Cannot delete neighbors for", localIp.String(),
-					"as there is no such link entry"))
-			}
-		for _, cache := range link.NbrCache {
-			key := cache.IpAddr
-			deleteEntries = append(deleteEntries, key)
-			debug.Logger.Debug("Deleting Neighbor", cache.IpAddr)
-			cache.DeInitCache()
-			delete(link.NbrCache, key)
-		}
-		p.SetLink(localIp.String(), link)
-	*/
 	// do not delete link information here... only if IP interface is deleted then we need to delete
 	// link information
 	return deleteEntries, nil
@@ -373,27 +352,6 @@ func (intf *Interface) FlushNeighborPerIp(nbrKey, ipAddr string) ([]string, erro
 	nbr.DeInit()
 	deleteEntries = append(deleteEntries, ipAddr)
 	delete(intf.Neighbor, nbrKey)
-	/*
-		if isLinkLocal(ipAddr) {
-			// delete all neighbors with link scope ip
-			for nbrIp, nbr := range intf.Neighbor {
-				if isLinkLocal(nbr.IpAddr) {
-					nbr.DeInit()
-					deleteEntries = append(deleteEntries, nbrIp)
-					delete(intf.Neighbor, nbrIp)
-				}
-			}
-		} else {
-			// delete all neighbors with global scope ip
-			for nbrIp, nbr := range intf.Neighbor {
-				if !isLinkLocal(nbr.IpAddr) {
-					nbr.DeInit()
-					deleteEntries = append(deleteEntries, nbrIp)
-					delete(intf.Neighbor, nbrIp)
-				}
-			}
-		}
-	*/
 	return deleteEntries, nil
 }
 

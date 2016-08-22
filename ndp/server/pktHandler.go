@@ -224,7 +224,6 @@ func (svr *NDPServer) ProcessRxPkt(ifIndex int32, pkt gopacket.Packet) {
 }
 
 func (svr *NDPServer) ProcessTimerExpiry(pktData config.PacketData) {
-
 	l3Port, exists := svr.L3Port[pktData.IfIndex]
 	if !exists {
 		return
