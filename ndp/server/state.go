@@ -28,7 +28,7 @@ import (
 	_ "l3/ndp/debug"
 )
 
-func (svr *NDPServer) GetNeighborEntries(idx, cnt int) (int, int, []config.NeighborInfo) {
+func (svr *NDPServer) GetNeighborEntries(idx, cnt int) (int, int, []config.NeighborConfig) {
 	var nextIdx int
 	var count int
 	var i, j int
@@ -37,7 +37,7 @@ func (svr *NDPServer) GetNeighborEntries(idx, cnt int) (int, int, []config.Neigh
 	if length == 0 {
 		return 0, 0, nil
 	}
-	var result []config.NeighborInfo
+	var result []config.NeighborConfig
 
 	svr.NeigborEntryLock.RLock()
 	for i, j = 0, idx; i < cnt && j < length; j++ {
@@ -53,7 +53,7 @@ func (svr *NDPServer) GetNeighborEntries(idx, cnt int) (int, int, []config.Neigh
 	return nextIdx, count, result
 }
 
-func (svr *NDPServer) GetNeighborEntry(ipAddr string) *config.NeighborInfo {
+func (svr *NDPServer) GetNeighborEntry(ipAddr string) *config.NeighborConfig {
 	svr.NeigborEntryLock.RLock()
 	defer svr.NeigborEntryLock.RUnlock()
 
