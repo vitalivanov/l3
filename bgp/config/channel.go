@@ -110,3 +110,10 @@ type NextHopInfo struct {
 	NextHopIfType  int32
 	NextHopIfIndex int32
 }
+
+type ApplyPolicyInfo struct {
+	Protocol   string
+	Policy     string
+	Action     string
+	Conditions []*ConditionInfo
+}

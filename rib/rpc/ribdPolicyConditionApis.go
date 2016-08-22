@@ -30,6 +30,23 @@ import (
 	"utils/policy"
 )
 
+func (m RIBDServicesHandler) CreatePolicyPrefixSet(cfg *ribd.PolicyPrefixSet) (val bool, err error) {
+	return val, err
+}
+func (m RIBDServicesHandler) UpdatePolicyPrefixSet(origconfig *ribd.PolicyPrefixSet, newconfig *ribd.PolicyPrefixSet, attrset []bool, op []*ribd.PatchOpInfo) (val bool, err error) {
+	return val, err
+}
+func (m RIBDServicesHandler) DeletePolicyPrefixSet(cfg *ribd.PolicyPrefixSet) (val bool, err error) {
+	return val, err
+}
+func (m RIBDServicesHandler) GetBulkPolicyPrefixSetState(fromIndex ribd.Int, count ribd.Int) (state *ribd.PolicyPrefixSetStateGetInfo, err error) {
+	return state, err
+}
+func (m RIBDServicesHandler) GetPolicyPrefixSetState(name string) (state *ribd.PolicyPrefixSetState, err error) {
+	state = ribd.NewPolicyPrefixSetState()
+	return state, err
+}
+
 func (m RIBDServicesHandler) CreatePolicyCondition(cfg *ribd.PolicyCondition) (val bool, err error) {
 	logger.Debug("CreatePolicyConditioncfg: ", cfg.Name)
 	newPolicy := policy.PolicyConditionConfig{Name: cfg.Name, ConditionType: cfg.ConditionType, MatchProtocolConditionInfo: cfg.Protocol}

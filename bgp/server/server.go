@@ -25,6 +25,7 @@
 package server
 
 import (
+	"bgpd"
 	"errors"
 	"fmt"
 	"l3/bgp/config"
@@ -52,6 +53,7 @@ type GlobalUpdate struct {
 	OldConfig config.GlobalConfig
 	NewConfig config.GlobalConfig
 	AttrSet   []bool
+	Op        []*bgpd.PatchOpInfo
 }
 
 type PeerUpdate struct {
@@ -117,16 +119,17 @@ type BGPServer struct {
 	ServerUpCh       chan bool
 	GlobalCfgDone    bool
 
-	NeighborMutex   sync.RWMutex
-	PeerMap         map[string]*Peer
-	Neighbors       []*Peer
-	LocRib          *bgprib.LocRib
-	ConnRoutesPath  *bgprib.Path
-	IfacePeerMap    map[int32][]string
-	IntfIdNameMap   map[int32]IntfEntry
-	IfNameToIfIndex map[string]int32
-	ifaceIP         net.IP
-	AddPathCount    int
+	NeighborMutex     sync.RWMutex
+	PeerMap           map[string]*Peer
+	Neighbors         []*Peer
+	LocRib            *bgprib.LocRib
+	ConnRoutesPath    *bgprib.Path
+	IfacePeerMap      map[int32][]string
+	IntfIdNameMap     map[int32]IntfEntry
+	IfNameToIfIndex   map[string]int32
+	RedistributionMap map[string]string
+	ifaceIP           net.IP
+	AddPathCount      int
 	// all managers
 	IntfMgr    config.IntfStateMgrIntf
 	routeMgr   config.RouteMgrIntf
@@ -172,6 +175,7 @@ func NewBGPServer(logger *logging.Writer, policyManager *bgppolicy.BGPPolicyMana
 	bgpServer.IfNameToIfIndex = make(map[string]int32)
 	bgpServer.IntfIdNameMap = make(map[int32]IntfEntry)
 	bgpServer.IfacePeerMap = make(map[int32][]string)
+	bgpServer.RedistributionMap = make(map[string]string)
 	bgpServer.ifaceIP = nil
 	bgpServer.AddPathCount = 0
 	bgpServer.initGlobalConfig()
@@ -1098,6 +1102,12 @@ func (s *BGPServer) SetupRedistribution(gConf config.GlobalConfig) {
 		s.logger.Info("No redistribution policies configured")
 		return
 	}
+	if s.RedistributionMap == nil {
+		s.RedistributionMap = make(map[string]string)
+	}
+	applyList := make([]config.ApplyPolicyInfo, 0)
+	undoApplyList := make([]config.ApplyPolicyInfo, 0)
+	source := ""
 	conditions := make([]*config.ConditionInfo, 0)
 	for i := 0; i < len(gConf.Redistribution); i++ {
 		s.logger.Info("Sources: ", gConf.Redistribution[i].Sources)
@@ -1109,13 +1119,37 @@ func (s *BGPServer) SetupRedistribution(gConf config.GlobalConfig) {
 			if sources[j] == "" {
 				continue
 			}
+			source = sources[j]
 			conditions = append(conditions, &config.ConditionInfo{ConditionType: "MatchProtocol", Protocol: sources[j]})
+			_, ok := s.RedistributionMap[source]
+			if !ok {
+				s.RedistributionMap[source] = gConf.Redistribution[i].Policy
+				applyList = append(applyList, config.ApplyPolicyInfo{
+					Protocol:   "BGP",
+					Policy:     gConf.Redistribution[i].Policy,
+					Action:     "Redistribution",
+					Conditions: conditions})
+			} else {
+				applyList = append(applyList, config.ApplyPolicyInfo{
+					Protocol:   "BGP",
+					Policy:     gConf.Redistribution[i].Policy,
+					Action:     "Redistribution",
+					Conditions: conditions})
+
+				undoApplyList = append(undoApplyList, config.ApplyPolicyInfo{
+					Protocol:   "BGP",
+					Policy:     s.RedistributionMap[source],
+					Action:     "Redistribution",
+					Conditions: conditions})
+				s.RedistributionMap[sources] = gConf.Redistribution[i].Policy
+			}
 		}
-		s.logger.Info("")
 		s.routeMgr.ApplyPolicy("BGP", gConf.Redistribution[i].Policy, "Redistribution", conditions)
 	}
 }
+func (s *BGPServer) SetupRedistributionForPatchUpdate(oldConfig, newConfig config.GlobalConfig, op []*bgpd.PatchOpInfo) {
 
+}
 func (s *BGPServer) DeleteAgg(aggConf config.BGPAggregate) error {
 	pe, ok := s.locRibPE[aggConf.AddressFamily]
 	if ok {
@@ -1355,7 +1389,11 @@ func (s *BGPServer) listenChannelUpdates() {
 			for _, peer := range s.PeerMap {
 				peer.Init()
 			}
-			s.SetupRedistribution(gConf)
+			if op == nil || len(op) == 0 {
+				s.SetupRedistribution(gConf)
+			} else {
+				s.SetupRedistributionForPatchUpdate(globalUpdate.OldConfig, globalUpdate.NewConfig, op)
+			}
 
 		case peerUpdate := <-s.AddPeerCh:
 			s.logger.Info("message received on AddPeerCh")
