@@ -131,12 +131,10 @@ func (p *Packet) decodeICMPv6Hdr(hdr *layers.ICMPv6, srcIP net.IP, dstIP net.IP)
 	switch typeCode.Type() {
 	case layers.ICMPv6TypeNeighborSolicitation:
 		debug.Logger.Debug("Neigbor Solicitation Received from", srcIP, "---->", dstIP)
-		//ndInfo, err = p.HandleNSMsg(hdr, srcIP, dstIP)
 		ndInfo, err = p.decodeNS(hdr, srcIP, dstIP)
 
 	case layers.ICMPv6TypeNeighborAdvertisement:
 		debug.Logger.Debug("Neigbor Advertisemnt Received from", srcIP, "---->", dstIP)
-		//ndInfo, err = p.HandleNAMsg(hdr, srcIP, dstIP)
 		ndInfo, err = p.decodeNA(hdr, srcIP, dstIP)
 
 	case layers.ICMPv6TypeRouterSolicitation:
@@ -144,7 +142,6 @@ func (p *Packet) decodeICMPv6Hdr(hdr *layers.ICMPv6, srcIP net.IP, dstIP net.IP)
 
 	case layers.ICMPv6TypeRouterAdvertisement:
 		debug.Logger.Debug("Router Advertisement Received from", srcIP, "---->", dstIP)
-		//ndInfo, err = p.HandleRAMsg(hdr, srcIP, dstIP)
 		ndInfo, err = p.decodeRA(hdr, srcIP, dstIP)
 	default:
 		return nil, errors.New(fmt.Sprintln("Not Supported ICMPv6 Type:", typeCode.Type()))
@@ -154,27 +151,6 @@ func (p *Packet) decodeICMPv6Hdr(hdr *layers.ICMPv6, srcIP net.IP, dstIP net.IP)
 	}
 	return ndInfo, nil
 }
-
-/*
-func (p *Packet) populateNeighborInfo(nbrInfo *config.NeighborInfo, eth *layers.Ethernet, ipv6Hdr *layers.IPv6,
-	icmpv6Hdr *layers.ICMPv6, ndInfo *NDInfo) {
-	if eth == nil || ipv6Hdr == nil || icmpv6Hdr == nil {
-		return
-	}
-	debug.Logger.Debug("populate neighbor called:", eth.SrcMAC, eth.DstMAC, ipv6Hdr.SrcIP.String(),
-		ipv6Hdr.DstIP.String(), ndInfo.TargetAddress.String())
-
-	switch icmpv6Hdr.TypeCode.Type() {
-	case layers.ICMPv6TypeNeighborSolicitation:
-		*nbrInfo = p.GetNbrInfoUsingNSPkt(eth, ipv6Hdr, ndInfo)
-	case layers.ICMPv6TypeNeighborAdvertisement:
-		*nbrInfo = p.GetNbrInfoUsingNAPkt(eth, ipv6Hdr, ndInfo)
-	case layers.ICMPv6TypeRouterAdvertisement:
-		*nbrInfo = p.GetNbrInfoUsingRAPkt(eth, ipv6Hdr, ndInfo)
-	}
-	debug.Logger.Debug("Neighbor Populated:", *nbrInfo)
-}
-*/
 
 /* API: Get IPv6 & ICMPv6 Header
  *      Does Validation of IPv6
@@ -199,7 +175,6 @@ func (p *Packet) populateNeighborInfo(nbrInfo *config.NeighborInfo, eth *layers.
  *  - If the IP source address is the unspecified address, there is no
  *    source link-layer address option in the message. <- @TODO: need to be done later
  */
-//func (p *Packet) ValidateAndParse(nbrInfo *config.NeighborInfo, pkt gopacket.Packet, ifIndex int32) error {
 func (p *Packet) DecodeND(pkt gopacket.Packet) (*NDInfo, error) {
 	// first decode all the layers
 	icmpv6Hdr := &layers.ICMPv6{}
@@ -236,7 +211,5 @@ func (p *Packet) DecodeND(pkt gopacket.Packet) (*NDInfo, error) {
 	ndInfo.SrcIp = ipv6Hdr.SrcIP.String() // copy sender ip address to this
 	ndInfo.DstIp = ipv6Hdr.DstIP.String() // copy destination ip
 
-	// Populate Neighbor Information
-	//p.populateNeighborInfo(nbrInfo, eth, ipv6Hdr, icmpv6Hdr, ndInfo)
 	return ndInfo, nil
 }
