@@ -73,3 +73,25 @@ func TestValidateICMPv6UnicastNSChecksum(t *testing.T) {
 		t.Error("Validating Checksum failed", err)
 	}
 }
+
+func TestPseudoChecksumBuf(t *testing.T) {
+	initPacketTestBasics()
+	p := gopacket.NewPacket(naBaseTestPkt, layers.LinkTypeEthernet, gopacket.Default)
+	if p.ErrorLayer() != nil {
+		t.Error("Failed to decode packet:", p.ErrorLayer().Error())
+	}
+	icmpv6Hdr := &layers.ICMPv6{}
+	ipv6Hdr := &layers.IPv6{}
+
+	err := getIpAndICMPv6Hdr(p, ipv6Hdr, icmpv6Hdr)
+	if err != nil {
+		t.Error("Decoding ipv6 and icmpv6 header failed", err)
+	}
+	buf := createPseudoHeader(ipv6Hdr.SrcIP, ipv6Hdr.DstIP, icmpv6Hdr)
+	if buf[39] != ICMPV6_NEXT_HEADER {
+		t.Error("creating pseudo header failed")
+	}
+	if len(buf) != 40 {
+		t.Error("invalid pseudo header for checksum calculation")
+	}
+}
