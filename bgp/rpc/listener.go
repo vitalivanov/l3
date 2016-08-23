@@ -29,6 +29,7 @@ import (
 	"errors"
 	"fmt"
 	"l3/bgp/config"
+	"l3/bgp/fsm"
 	"l3/bgp/packet"
 	bgppolicy "l3/bgp/policy"
 	"l3/bgp/server"
@@ -615,8 +616,7 @@ func (h *BGPHandler) DeleteBGPGlobal(bgpGlobal *bgpd.BGPGlobal) (bool, error) {
 	return true, nil
 }
 
-func (h *BGPHandler) getIPAndIfIndexForV4Neighbor(neighborIP string,
-	neighborIntfRef string) (ip net.IP, ifIndex int32,
+func (h *BGPHandler) getIPAndIfIndexForV4Neighbor(neighborIP string, neighborIntfRef string) (ip net.IP, ifIndex int32,
 	err error) {
 	if strings.TrimSpace(neighborIP) != "" {
 		ip = net.ParseIP(strings.TrimSpace(neighborIP))
@@ -633,26 +633,32 @@ func (h *BGPHandler) getIPAndIfIndexForV4Neighbor(neighborIP string,
 		}
 		ifIndexInt, _ := strconv.Atoi(ifIndexStr)
 		neighborIfIndex := int32(ifIndexInt)
-		var ipv4Intf string
+		//var ipv4Intf string
 		// @TODO: this needs to be interface once we decide to move listener
-		ipv4Intf, err = h.server.IntfMgr.GetIPv4Information(neighborIfIndex)
+		//ipv4Intf, err = h.server.IntfMgr.GetIPv4Information(neighborIfIndex)
+		ipInfo, err := h.server.GetIfaceIP(neighborIfIndex)
+		h.logger.Info("ipInfo:", ipInfo, " err:", err)
+		ifIP := ipInfo.IpAddr
+		ipMask := ipInfo.IpMask
 		if err == nil {
 			h.logger.Info("Call ASICd to get IPv4 address for interface with ifIndex:", neighborIfIndex)
-			ifIP, ipMask, err := net.ParseCIDR(ipv4Intf)
-			if err != nil {
-				h.logger.Err("IPv4Addr", ipv4Intf, "of the interface", neighborIfIndex, "is not valid, error:", err)
-				err = errors.New(fmt.Sprintf("IPv4Addr %s of the interface %d is not valid, error: %s", ipv4Intf,
-					neighborIfIndex, err))
-				return ip, ifIndex, err
-			}
-			if ipMask.Mask[len(ipMask.Mask)-1] < 252 {
-				h.logger.Err("IPv4Addr", ipv4Intf, "of the interface", neighborIfIndex, "is not /30 or /31 address")
-				err = errors.New(fmt.Sprintln("IPv4Addr", ipv4Intf, "of the interface", neighborIfIndex,
+			/*	ifIP, ipMask, err := net.ParseCIDR(ipv4Intf)
+				if err != nil {
+					h.logger.Err("IPv4Addr", ipv4Intf, "of the interface", neighborIfIndex, "is not valid, error:", err)
+					err = errors.New(fmt.Sprintf("IPv4Addr %s of the interface %d is not valid, error: %s", ipv4Intf,
+						neighborIfIndex, err))
+					return ip, ifIndex, err
+				}*/
+			//if ipMask.Mask[len(ipMask.Mask)-1] < 252 {
+			if ipMask[len(ipMask)-1] < 252 {
+				h.logger.Err("IPv4Addr", ifIP, "of the interface", neighborIfIndex, "is not /30 or /31 address")
+				err = errors.New(fmt.Sprintln("IPv4Addr", ifIP, "of the interface", neighborIfIndex,
 					"is not /30 or /31 address"))
 				return ip, ifIndex, err
 			}
 			h.logger.Info("IPv4Addr of the v4Neighbor local interface", neighborIfIndex, "is", ifIP)
-			ifIP[len(ifIP)-1] = ifIP[len(ifIP)-1] ^ (^ipMask.Mask[len(ipMask.Mask)-1])
+			//ifIP[len(ifIP)-1] = ifIP[len(ifIP)-1] ^ (^ipMask.Mask[len(ipMask.Mask)-1])
+			ifIP[len(ifIP)-1] = ifIP[len(ifIP)-1] ^ (^ipMask[len(ipMask)-1])
 			h.logger.Info("IPv4Addr of the v4Neighbor remote interface is", ifIP)
 			ip = ifIP
 			ifIndex = neighborIfIndex
@@ -728,6 +734,8 @@ func (h *BGPHandler) ValidateV4Neighbor(bgpNeighbor *bgpd.BGPv4Neighbor) (pConf 
 			MaxPrefixesThresholdPct: uint8(bgpNeighbor.MaxPrefixesThresholdPct),
 			MaxPrefixesDisconnect:   bgpNeighbor.MaxPrefixesDisconnect,
 			MaxPrefixesRestartTimer: uint8(bgpNeighbor.MaxPrefixesRestartTimer),
+			AdjRIBInFilter:          bgpNeighbor.AdjRIBInFilter,
+			AdjRIBOutFilter:         bgpNeighbor.AdjRIBOutFilter,
 		},
 		NeighborAddress: ip,
 		IfIndex:         ifIndex,
@@ -797,6 +805,8 @@ func (h *BGPHandler) convertToThriftV4Neighbor(neighborState *config.NeighborSta
 	bgpNeighborResponse.MaxPrefixesDisconnect = neighborState.MaxPrefixesDisconnect
 	bgpNeighborResponse.MaxPrefixesRestartTimer = int8(neighborState.MaxPrefixesRestartTimer)
 	bgpNeighborResponse.TotalPrefixes = int32(neighborState.TotalPrefixes)
+	bgpNeighborResponse.AdjRIBInFilter = neighborState.AdjRIBInFilter
+	bgpNeighborResponse.AdjRIBOutFilter = neighborState.AdjRIBOutFilter
 
 	received := bgpd.NewBGPCounters()
 	received.Notification = int64(neighborState.Messages.Received.Notification)
@@ -885,33 +895,37 @@ func (h *BGPHandler) getIPAndIfIndexForV6Neighbor(neighborIP string, neighborInt
 		}
 		ifIndexInt, _ := strconv.Atoi(ifIndexStr)
 		neighborIfIndex := int32(ifIndexInt)
-		var ipv6Intf string
+		//var ipv6Intf string
 		// @TODO: this needs to be interface once we decide to move listener
-		ipv6Intf, err = h.server.IntfMgr.GetIPv6Information(neighborIfIndex)
-		if err == nil {
-			h.logger.Info("Call ASICd to get IPv6 address for interface with ifIndex:", neighborIfIndex)
-			ifIP, ipMask, err := net.ParseCIDR(ipv6Intf)
-			if err != nil {
-				h.logger.Err("IPv6Addr", ipv6Intf, "of the interface", neighborIfIndex, "is not valid, error:", err)
-				err = errors.New(fmt.Sprintf("IPv6Addr %s of the interface %d is not valid, error: %s", ipv6Intf,
-					neighborIfIndex, err))
-				return ip, ifIndex, err
-			}
-			if ipMask.Mask[len(ipMask.Mask)-1] < 252 {
-				h.logger.Err("IPv6Addr", ipv6Intf, "of the interface", neighborIfIndex, "is not /126 or /127 address")
-				err = errors.New(fmt.Sprintln("IPv6Addr", ipv6Intf, "of the interface", neighborIfIndex,
-					"is not /126 or /127 address"))
-				return ip, ifIndex, err
-			}
-			h.logger.Info("IPv6Addr of the v6Neighbor local interface", neighborIfIndex, "is", ifIP)
-			ifIP[len(ifIP)-1] = ifIP[len(ifIP)-1] ^ (^ipMask.Mask[len(ipMask.Mask)-1])
-			h.logger.Info("IPv6Addr of the v6Neighbor remote interface is", ifIP)
-			ip = ifIP
-			ifIndex = neighborIfIndex
-			h.logger.Info("v6Neighbor IP address:", ip.String())
-		} else {
-			h.logger.Err("v6Neighbor IP", neighborIP, "or interface", neighborIfIndex, "not configured ")
-		}
+		//ipv6Intf, err = h.server.IntfMgr.GetIPv6Information(neighborIfIndex)
+		ipInfo, err := h.server.GetIfaceIP(neighborIfIndex)
+		h.logger.Info("getIPAndIfIndexForV6Neighbor:ipInfo.LinkLocalIpAddr :", ipInfo.LinklocalIpAddr, " err:", err, " after GetIfaceIP of neighborIfIndex:", neighborIfIndex)
+		ifIndex = neighborIfIndex
+		ip = net.ParseIP(ipInfo.LinklocalIpAddr)
+		/*		if err == nil {
+					h.logger.Info("Call ASICd to get IPv6 address for interface with ifIndex:", neighborIfIndex)
+					ifIP, ipMask, err := net.ParseCIDR(ipv6Intf)
+					if err != nil {
+						h.logger.Err("IPv6Addr", ipv6Intf, "of the interface", neighborIfIndex, "is not valid, error:", err)
+						err = errors.New(fmt.Sprintf("IPv6Addr %s of the interface %d is not valid, error: %s", ipv6Intf,
+							neighborIfIndex, err))
+						return ip, ifIndex, err
+					}
+					if ipMask.Mask[len(ipMask.Mask)-1] < 252 {
+						h.logger.Err("IPv6Addr", ipv6Intf, "of the interface", neighborIfIndex, "is not /126 or /127 address")
+						err = errors.New(fmt.Sprintln("IPv6Addr", ipv6Intf, "of the interface", neighborIfIndex,
+							"is not /126 or /127 address"))
+						return ip, ifIndex, err
+					}
+					h.logger.Info("IPv6Addr of the v6Neighbor local interface", neighborIfIndex, "is", ifIP)
+					ifIP[len(ifIP)-1] = ifIP[len(ifIP)-1] ^ (^ipMask.Mask[len(ipMask.Mask)-1])
+					h.logger.Info("IPv6Addr of the v6Neighbor remote interface is", ifIP)
+					ip = ifIP
+					ifIndex = neighborIfIndex
+					h.logger.Info("v6Neighbor IP address:", ip.String())
+				} else {
+					h.logger.Err("v6Neighbor IP", neighborIP, "or interface", neighborIfIndex, "not configured ")
+				}*/
 	}
 	return ip, ifIndex, err
 }
@@ -957,6 +971,8 @@ func (h *BGPHandler) ValidateV6Neighbor(bgpNeighbor *bgpd.BGPv6Neighbor) (pConf 
 			MaxPrefixesThresholdPct: uint8(bgpNeighbor.MaxPrefixesThresholdPct),
 			MaxPrefixesDisconnect:   bgpNeighbor.MaxPrefixesDisconnect,
 			MaxPrefixesRestartTimer: uint8(bgpNeighbor.MaxPrefixesRestartTimer),
+			AdjRIBInFilter:          bgpNeighbor.AdjRIBInFilter,
+			AdjRIBOutFilter:         bgpNeighbor.AdjRIBOutFilter,
 		},
 		NeighborAddress: ip,
 		IfIndex:         ifIndex,
@@ -1025,6 +1041,8 @@ func (h *BGPHandler) convertToThriftV6Neighbor(neighborState *config.NeighborSta
 	bgpNeighborResponse.MaxPrefixesDisconnect = neighborState.MaxPrefixesDisconnect
 	bgpNeighborResponse.MaxPrefixesRestartTimer = int8(neighborState.MaxPrefixesRestartTimer)
 	bgpNeighborResponse.TotalPrefixes = int32(neighborState.TotalPrefixes)
+	bgpNeighborResponse.AdjRIBInFilter = neighborState.AdjRIBInFilter
+	bgpNeighborResponse.AdjRIBOutFilter = neighborState.AdjRIBOutFilter
 
 	received := bgpd.NewBGPCounters()
 	received.Notification = int64(neighborState.Messages.Received.Notification)
@@ -1136,6 +1154,8 @@ func (h *BGPHandler) ValidateBGPv4PeerGroup(peerGroup *bgpd.BGPv4PeerGroup) (gro
 			MaxPrefixesThresholdPct: uint8(peerGroup.MaxPrefixesThresholdPct),
 			MaxPrefixesDisconnect:   peerGroup.MaxPrefixesDisconnect,
 			MaxPrefixesRestartTimer: uint8(peerGroup.MaxPrefixesRestartTimer),
+			AdjRIBInFilter:          peerGroup.AdjRIBInFilter,
+			AdjRIBOutFilter:         peerGroup.AdjRIBOutFilter,
 		},
 		Name: peerGroup.Name,
 	}
@@ -1207,6 +1227,8 @@ func (h *BGPHandler) ValidateBGPv6PeerGroup(peerGroup *bgpd.BGPv6PeerGroup) (gro
 			MaxPrefixesThresholdPct: uint8(peerGroup.MaxPrefixesThresholdPct),
 			MaxPrefixesDisconnect:   peerGroup.MaxPrefixesDisconnect,
 			MaxPrefixesRestartTimer: uint8(peerGroup.MaxPrefixesRestartTimer),
+			AdjRIBInFilter:          peerGroup.AdjRIBInFilter,
+			AdjRIBOutFilter:         peerGroup.AdjRIBOutFilter,
 		},
 		Name: peerGroup.Name,
 	}
@@ -1577,5 +1599,91 @@ func (h *BGPHandler) DeleteBGPIPv6Aggregate(bgpAgg *bgpd.BGPIPv6Aggregate) (bool
 	h.logger.Info("Delete IPv6 aggregate attrs:", bgpAgg)
 	agg, _ := h.validateBGPIPv6Aggregate(bgpAgg)
 	h.server.RemAggCh <- agg
+	return true, nil
+}
+
+func (h *BGPHandler) ExecuteActionResetBGPv4NeighborByIPAddr(resetIP *bgpd.ResetBGPv4NeighborByIPAddr) (bool, error) {
+	h.logger.Info("Reset IPv4 neighbor by IP address", resetIP.IPAddr)
+	ip := net.ParseIP(strings.TrimSpace(resetIP.IPAddr))
+	if ip == nil {
+		return false, errors.New(fmt.Sprintf("IPv4 Neighbor address %s is not a valid IP", resetIP.IPAddr))
+	}
+	h.server.PeerCommandCh <- config.PeerCommand{IP: ip, Command: int(fsm.BGPEventManualStop)}
+	return true, nil
+}
+
+func (h *BGPHandler) ExecuteActionResetBGPv4NeighborByInterface(resetIf *bgpd.ResetBGPv4NeighborByInterface) (bool,
+	error) {
+	h.logger.Info("Reset IPv4 neighbor by interface", resetIf.IntfRef)
+	ifIndexStr, err := h.server.ConvertIntfStrToIfIndexStr(resetIf.IntfRef)
+	if err != nil {
+		h.logger.Err("Invalid intfref:", resetIf.IntfRef)
+		return false, errors.New(fmt.Sprintf("Invalid IntfRef", resetIf.IntfRef))
+	}
+
+	ifIndexInt, _ := strconv.Atoi(ifIndexStr)
+	ipInfo, err := h.server.GetIfaceIP(int32(ifIndexInt))
+	if err != nil {
+		h.logger.Err("Failed to get IP for interface", resetIf.IntfRef)
+		return false, errors.New(fmt.Sprintf("Failed to get IP for interface %s", resetIf.IntfRef))
+	}
+
+	if ipInfo.IpAddr == nil && ipInfo.IpMask == nil {
+		return false, errors.New(fmt.Sprintln("IP address", ipInfo.IpAddr, "or netmask", ipInfo.IpMask,
+			"of the interface", resetIf.IntfRef, "is not valid"))
+	}
+
+	ifIP := ipInfo.IpAddr
+	ipMask := ipInfo.IpMask
+	if ipMask[len(ipMask)-1] < 252 {
+		h.logger.Err("IPv4Addr", ifIP, "of the interface", ifIndexInt, "is not /30 or /31 address")
+		return false, errors.New(fmt.Sprintln("IPv4Addr", ifIP, "of the interface", resetIf.IntfRef,
+			"is not /30 or /31 address"))
+	}
+	h.logger.Info("IPv4Addr of the v4Neighbor local interface", ifIndexInt, "is", ifIP)
+	ifIP[len(ifIP)-1] = ifIP[len(ifIP)-1] ^ (^ipMask[len(ipMask)-1])
+	h.logger.Info("IPv4Addr of the v4Neighbor remote interface is", ifIP)
+	ip := ifIP
+
+	h.server.PeerCommandCh <- config.PeerCommand{IP: ip, Command: int(fsm.BGPEventManualStop)}
+	return true, nil
+}
+
+func (h *BGPHandler) ExecuteActionResetBGPv6NeighborByIPAddr(resetIP *bgpd.ResetBGPv6NeighborByIPAddr) (bool, error) {
+	h.logger.Info("Reset IPv6 neighbor by IP address", resetIP.IPAddr)
+	ip := net.ParseIP(strings.TrimSpace(resetIP.IPAddr))
+	if ip == nil {
+		return false, errors.New(fmt.Sprintf("IPv6 Neighbor address %s is not a valid IP", resetIP.IPAddr))
+	}
+	h.server.PeerCommandCh <- config.PeerCommand{IP: ip, Command: int(fsm.BGPEventManualStop)}
+	return true, nil
+}
+
+func (h *BGPHandler) ExecuteActionResetBGPv6NeighborByInterface(resetIf *bgpd.ResetBGPv6NeighborByInterface) (bool,
+	error) {
+	h.logger.Info("Reset IPv6 neighbor by interface", resetIf.IntfRef)
+	ifIndexStr, err := h.server.ConvertIntfStrToIfIndexStr(resetIf.IntfRef)
+	if err != nil {
+		h.logger.Err("Invalid intfref:", resetIf.IntfRef)
+		return false, errors.New(fmt.Sprintf("Invalid IntfRef", resetIf.IntfRef))
+	}
+
+	ifIndexInt, _ := strconv.Atoi(ifIndexStr)
+	ipInfo, err := h.server.GetIfaceIP(int32(ifIndexInt))
+	if err != nil {
+		h.logger.Err("Failed to get IP for interface", resetIf.IntfRef)
+		return false, errors.New(fmt.Sprintf("Failed to get IP for interface %s", resetIf.IntfRef))
+	}
+
+	h.logger.Info("Reset IPv6 neighbor by interface - ipInfo:%+v", ipInfo)
+	ip := net.ParseIP(ipInfo.LinklocalIpAddr)
+
+	if ip == nil {
+		h.logger.Errf("IPv6 Neighbor address %s for interface %s is not a valid IP", ipInfo.LinklocalIpAddr,
+			resetIf.IntfRef)
+		return false, errors.New(fmt.Sprintf("IPv6 Neighbor address %s for interface %s is not a valid IP",
+			ipInfo.LinklocalIpAddr, resetIf.IntfRef))
+	}
+	h.server.PeerCommandCh <- config.PeerCommand{IP: ip, Command: int(fsm.BGPEventManualStop)}
 	return true, nil
 }

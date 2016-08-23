@@ -110,6 +110,8 @@ type BaseConfig struct {
 	MaxPrefixesThresholdPct uint8
 	MaxPrefixesDisconnect   bool
 	MaxPrefixesRestartTimer uint8
+	AdjRIBInFilter          string
+	AdjRIBOutFilter         string
 }
 
 type NeighborConfig struct {
@@ -148,6 +150,8 @@ type NeighborState struct {
 	MaxPrefixesDisconnect   bool
 	MaxPrefixesRestartTimer uint8
 	TotalPrefixes           uint32
+	AdjRIBInFilter          string
+	AdjRIBOutFilter         string
 }
 
 type TransportConfig struct {

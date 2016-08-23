@@ -20,47 +20,19 @@
 // |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
 // |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
 //
+package server
 
-package config
+import (
+	"testing"
+)
 
-/*  Port/Interface state change manager.
- */
-type IntfStateMgrIntf interface {
-	Start()
-	PortStateChange()
-	GetIPv4Intfs() []*IntfStateInfo
-	GetIPv6Intfs() []*IntfStateInfo
-	GetIPv6Neighbors() []*IntfStateInfo
-	GetPortInfo() []IntfMapInfo
-	GetVlanInfo() []IntfMapInfo
-	GetLogicalIntfInfo() []IntfMapInfo
-	GetIPv4Information(ifIndex int32) (string, error)
-	GetIPv6Information(ifIndex int32) (string, error)
-	GetIfIndex(int, int) int32
-}
+var testSrcMac = "88:1d:fc:cf:15:fc"
+var testLinkScopeIp = "fe80::8a1d:fcff:fecf:15fc"
 
-/*  Adding routes to rib/switch/linux interface
- */
-type RouteMgrIntf interface {
-	Start()
-	GetNextHopInfo(ipAddr string) (*NextHopInfo, error)
-	CreateRoute(*RouteConfig)
-	DeleteRoute(*RouteConfig)
-	UpdateRoute(cfg *RouteConfig, op string)
-	ApplyPolicy(protocol string, policy string, action string, conditions []*ConditionInfo)
-	GetRoutes() ([]*RouteInfo, []*RouteInfo)
-}
-
-/*  Interface for handling policy related operations
- */
-type PolicyMgrIntf interface {
-	Start()
-}
-
-/*  Interface for handling bfd state notifications
- */
-type BfdMgrIntf interface {
-	Start()
-	CreateBfdSession(ipAddr string, sessionParam string) (bool, error)
-	DeleteBfdSession(ipAddr string) (bool, error)
+func TestSendRA(t *testing.T) {
+	initServerBasic()
+	intf := Interface{
+		linkScope: testLinkScopeIp,
+	}
+	intf.SendRA(testSrcMac)
 }

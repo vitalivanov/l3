@@ -50,12 +50,13 @@ func (h *ConfigHandler) DeleteNDPGlobal(config *ndpd.NDPGlobal) (bool, error) {
 	ExpiryTimeLeft string `DESCRIPTION: "Time left before entry expires in case neighbor departs"`
 */
 
-func convertNDPEntryStateToThriftEntry(state config.NeighborInfo) *ndpd.NDPEntryState {
+func convertNDPEntryStateToThriftEntry(state config.NeighborConfig) *ndpd.NDPEntryState {
 	entry := ndpd.NewNDPEntryState()
 	entry.IpAddr = state.IpAddr
 	entry.MacAddr = state.MacAddr
 	entry.Vlan = strconv.Itoa(int(state.VlanId))
 	entry.Intf = state.Intf
+	entry.IfIndex = state.IfIndex
 	entry.ExpiryTimeLeft = state.ExpiryTimeLeft
 
 	return entry

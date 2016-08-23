@@ -112,7 +112,7 @@ func (eng *BasePolicyEngine) SetGetPolicyEntityMapIndexFunc(policyEntityKeyFunc 
 }
 
 func (eng *BasePolicyEngine) CreatePolicyCondition(condCfg utilspolicy.PolicyConditionConfig) (bool, error) {
-	return eng.PolicyEngine.CreatePolicyDstIpMatchPrefixSetCondition(condCfg)
+	return eng.PolicyEngine.CreatePolicyCondition(condCfg)
 }
 
 func (eng *BasePolicyEngine) CreatePolicyStmt(stmtCfg utilspolicy.PolicyStmtConfig) error {

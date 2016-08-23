@@ -42,6 +42,8 @@ const (
 	BFD_STATE_INVALID
 	INTF_CREATED
 	INTF_DELETED
+	IPV6_NEIGHBOR_CREATED
+	IPV6_NEIGHBOR_DELETED
 	INTF_STATE_DOWN
 	INTF_STATE_UP
 	NOTIFY_POLICY_CONDITION_CREATED
@@ -62,9 +64,10 @@ type BfdInfo struct {
 }
 
 type IntfStateInfo struct {
-	Idx    int32
-	IPAddr string
-	State  Operation
+	Idx         int32
+	IPAddr      string
+	LinkLocalIP string
+	State       Operation
 }
 
 type IntfMapInfo struct {
@@ -72,11 +75,12 @@ type IntfMapInfo struct {
 	IfName string
 }
 
-func NewIntfStateInfo(idx int32, ipAddr string, state Operation) *IntfStateInfo {
+func NewIntfStateInfo(idx int32, ipAddr string, linklocalIp string, state Operation) *IntfStateInfo {
 	return &IntfStateInfo{
-		Idx:    idx,
-		IPAddr: ipAddr,
-		State:  state,
+		Idx:         idx,
+		IPAddr:      ipAddr,
+		LinkLocalIP: linklocalIp,
+		State:       state,
 	}
 }
 

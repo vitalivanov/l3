@@ -28,38 +28,38 @@ import (
 	"testing"
 )
 
-var nbr []config.NeighborInfo
+var nbr []config.NeighborConfig
 
 func populateNbrInfoTest(svr *NDPServer) {
-	nbr1 := config.NeighborInfo{
+	nbr1 := config.NeighborConfig{
 		IpAddr:      "2002::1/64",
 		VlanId:      100,
 		IfIndex:     1234,
 		LinkLocalIp: "fe80::1/64",
 		MacAddr:     "aa:bb:cc:dd:ee:01",
 	}
-	nbr2 := config.NeighborInfo{
+	nbr2 := config.NeighborConfig{
 		IpAddr:      "2003::1/64",
 		VlanId:      100,
 		IfIndex:     1234,
 		LinkLocalIp: "fe80::2/64",
 		MacAddr:     "aa:bb:cc:dd:ee:02",
 	}
-	nbr3 := config.NeighborInfo{
+	nbr3 := config.NeighborConfig{
 		IpAddr:      "2004::1/64",
 		VlanId:      100,
 		IfIndex:     1234,
 		LinkLocalIp: "fe80::3/64",
 		MacAddr:     "aa:bb:cc:dd:ee:03",
 	}
-	nbr4 := config.NeighborInfo{
+	nbr4 := config.NeighborConfig{
 		IpAddr:      "2005::1/64",
 		VlanId:      100,
 		IfIndex:     1234,
 		LinkLocalIp: "fe80::4/64",
 		MacAddr:     "aa:bb:cc:dd:ee:04",
 	}
-	nbr5 := config.NeighborInfo{
+	nbr5 := config.NeighborConfig{
 		IpAddr:      "2006::1/64",
 		VlanId:      100,
 		IfIndex:     1234,
