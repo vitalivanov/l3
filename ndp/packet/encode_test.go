@@ -36,6 +36,21 @@ import (
 const (
 	TEST_ALL_NODES_MULTICAST_IPV6_ADDRESS       = "ff02::1"
 	TEST_ALL_NODES_MULTICAST_LINK_LAYER_ADDRESS = "33:33:00:00:00:01"
+	//Router Advertisement Const
+	testRASrcMac      = "88:1d:fc:cf:15:fc"
+	testRADstMac      = TEST_ALL_NODES_MULTICAST_LINK_LAYER_ADDRESS
+	testRALinkScopeIp = "fe80::8a1d:fcff:fecf:15fc"
+	testRADstIp       = TEST_ALL_NODES_MULTICAST_IPV6_ADDRESS
+	//Unicast Neighbor Solicitation Const
+	testNsSrcMac = "00:1f:16:25:33:ce"
+	testNsDstMac = "00:1f:16:25:34:31"
+	testNsSrcIp  = "fe80::21f:16ff:fe25:33ce"
+	testNsDstIp  = "2001:db8:0:f101::1"
+	//Neighbor Advertisement Const
+	testNaSrcMac = "f6:6d:e4:22:75:9e"
+	testNaDstMac = "00:1f:16:25:3e:71"
+	testNaSrcIp  = "2149::61:123:1"
+	testNaDstIp  = "2149::61:123:2"
 )
 
 var raBaseTestPkt = []byte{
@@ -56,13 +71,15 @@ var nsBaseTestPkt = []byte{
 	0x00, 0x1f, 0x16, 0x25, 0x33, 0xce,
 }
 
-var test_srcMac = "88:1d:fc:cf:15:fc"
-var test_linkScope_IP = "fe80::8a1d:fcff:fecf:15fc"
-
-var testNsSrcMac = "00:1f:16:25:33:ce"
-var testNsDstMac = "00:1f:16:25:34:31"
-var testNsSrcIp = "fe80::21f:16ff:fe25:33ce"
-var testNsDstIp = "2001:db8:0:f101::1"
+// eth1_icmpv6.pcap
+var naBaseTestPkt = []byte{
+	0x00, 0x1f, 0x16, 0x25, 0x3e, 0x71, 0xf6, 0x6d, 0xe4, 0x22, 0x75, 0x9e, 0x86, 0xdd, 0x60, 0x00,
+	0x00, 0x00, 0x00, 0x20, 0x3a, 0xff, 0x21, 0x49, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	0x00, 0x61, 0x01, 0x23, 0x00, 0x01, 0x21, 0x49, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	0x00, 0x61, 0x01, 0x23, 0x00, 0x02, 0x88, 0x00, 0xdd, 0x08, 0xe0, 0x00, 0x00, 0x00, 0x21, 0x49,
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x61, 0x01, 0x23, 0x00, 0x01, 0x02, 0x01,
+	0xf6, 0x6d, 0xe4, 0x22, 0x75, 0x9e,
+}
 
 func PacketTestNewLogger(name string, tag string, listenToConfig bool) (*logging.Writer, error) {
 	var err error
@@ -92,12 +109,12 @@ func initPacketTestBasics() {
 func TestRAEncode(t *testing.T) {
 	initPacketTestBasics()
 	pkt := &Packet{
-		SrcMac: test_srcMac,
+		SrcMac: testRASrcMac,
 		DstMac: TEST_ALL_NODES_MULTICAST_LINK_LAYER_ADDRESS,
 		DstIp:  TEST_ALL_NODES_MULTICAST_IPV6_ADDRESS,
 		PType:  layers.ICMPv6TypeRouterAdvertisement,
 	}
-	pkt.SrcIp = test_linkScope_IP
+	pkt.SrcIp = testRALinkScopeIp
 	pktToSend := pkt.Encode()
 
 	if !reflect.DeepEqual(pktToSend, raBaseTestPkt) {
