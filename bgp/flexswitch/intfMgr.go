@@ -219,9 +219,9 @@ func (mgr *FSIntfMgr) listenForAsicdEvents() {
 
 			mgr.logger.Info("Asicd IPV6INTF event idx %d ip %s", msg.IfIndex, msg.IpAddr)
 			if event.MsgType == asicdCommonDefs.NOTIFY_IPV6INTF_CREATE {
-				api.SendIntfNotification(msg.IfIndex, msg.IpAddr, "", config.INTF_CREATED)
+				api.SendIntfNotification(msg.IfIndex, msg.IpAddr, "", config.INTFV6_CREATED)
 			} else {
-				api.SendIntfNotification(msg.IfIndex, msg.IpAddr, "", config.INTF_DELETED)
+				api.SendIntfNotification(msg.IfIndex, msg.IpAddr, "", config.INTFV6_DELETED)
 			}
 		case asicdCommonDefs.NOTIFY_IPV4INTF_CREATE, asicdCommonDefs.NOTIFY_IPV4INTF_DELETE:
 			var msg asicdCommonDefs.IPv4IntfNotifyMsg
@@ -323,7 +323,7 @@ func (mgr *FSIntfMgr) GetIPv6Intfs() []*config.IntfStateInfo {
 		mgr.logger.Info("len(getBulkInfo.IPv6IntfStateList)  =", len(getBulkInfo.IPv6IntfStateList),
 			"num objects returned =", getBulkInfo.Count)
 		for _, intfState := range getBulkInfo.IPv6IntfStateList {
-			intf := config.NewIntfStateInfo(intfState.IfIndex, intfState.IpAddr, "", config.INTF_CREATED)
+			intf := config.NewIntfStateInfo(intfState.IfIndex, intfState.IpAddr, "", config.INTFV6_CREATED)
 			intfs = append(intfs, intf)
 		}
 		if getBulkInfo.More == false {
