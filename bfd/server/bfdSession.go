@@ -81,6 +81,7 @@ func (session *BfdSession) StartSessionClient(server *BFDServer) error {
 	defer session.txConn.Close()
 	session.txTimer = time.AfterFunc(time.Duration(session.txInterval)*time.Millisecond, func() { session.SendPeriodicControlPackets() })
 	session.sessionTimer = time.AfterFunc(time.Duration(session.rxInterval)*time.Millisecond, func() { session.HandleSessionTimeout() })
+	session.isClientActive = true
 	for {
 		select {
 		case <-session.SessionStopClientCh:
