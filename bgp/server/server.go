@@ -1026,6 +1026,10 @@ func (s *BGPServer) ProcessIntfStates(intfs []*config.IntfStateInfo) {
 			s.ifaceMgr.AddIface(ifState.Idx, ifState.IPAddr)
 		} else if ifState.State == config.INTF_DELETED {
 			s.ifaceMgr.RemoveIface(ifState.Idx, ifState.IPAddr)
+		} else if ifState.State == config.INTFV6_CREATED {
+			s.ifaceMgr.AddV6Iface(ifState.Idx, ifState.IPAddr)
+		} else if ifState.State == config.INTFV6_DELETED {
+			s.ifaceMgr.RemoveV6Iface(ifState.Idx, ifState.IPAddr)
 		} else if ifState.State == config.IPV6_NEIGHBOR_CREATED {
 			s.ifaceMgr.AddLinkLocalIface(ifState.Idx, ifState.LinkLocalIP)
 		} else if ifState.State == config.IPV6_NEIGHBOR_DELETED {
@@ -1659,6 +1663,10 @@ func (s *BGPServer) listenChannelUpdates() {
 				s.ifaceMgr.AddIface(ifState.Idx, ifState.IPAddr)
 			} else if ifState.State == config.INTF_DELETED {
 				s.ifaceMgr.RemoveIface(ifState.Idx, ifState.IPAddr)
+			} else if ifState.State == config.INTFV6_CREATED {
+				s.ifaceMgr.AddV6Iface(ifState.Idx, ifState.IPAddr)
+			} else if ifState.State == config.INTFV6_DELETED {
+				s.ifaceMgr.RemoveV6Iface(ifState.Idx, ifState.IPAddr)
 			} else if ifState.State == config.IPV6_NEIGHBOR_CREATED {
 				s.logger.Info("IPV6_NEIGHBOR_CREATED message")
 				s.ifaceMgr.AddLinkLocalIface(ifState.Idx, ifState.LinkLocalIP)

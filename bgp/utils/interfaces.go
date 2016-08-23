@@ -35,6 +35,7 @@ import (
 
 type IPInfo struct {
 	IpAddr          net.IP
+	IPv6Addr        net.IP
 	IpMask          net.IPMask
 	LinklocalIpAddr string
 }
@@ -119,6 +120,8 @@ func (i *InterfaceMgr) AddIface(ifIndex int32, addr string) {
 	i.ifIndexToIP[ifIndex] = ipInfo //ip.String()
 	i.ipToIfIndex[ip.String()] = ifIndex
 }
+func (i *InterfaceMgr) AddV6Iface(ifIndex int32, addr string) {
+}
 func (i *InterfaceMgr) AddLinkLocalIface(ifIndex int32, addr string) {
 	i.rwMutex.Lock()
 	defer i.rwMutex.Unlock()
@@ -158,6 +161,8 @@ func (i *InterfaceMgr) RemoveIface(ifIndex int32, addr string) {
 		}
 		i.ifIndexToIP[ifIndex] = ipInfo
 	}
+}
+func (i *InterfaceMgr) RemoveV6Iface(ifIndex int32, addr string) {
 }
 func (i *InterfaceMgr) RemoveLinkLocalIface(ifIndex int32, addr string) {
 	i.rwMutex.Lock()

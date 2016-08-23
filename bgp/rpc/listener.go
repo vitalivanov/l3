@@ -473,6 +473,70 @@ func (h *BGPHandler) handlePolicyDefinitions() error {
 	return nil
 }
 
+func (h *BGPHandler) convertModelToBGPv4Aggregate(obj objects.BGPv4Aggregate) (config.BGPAggregate, error) {
+	aggConf := config.BGPAggregate{
+		IPPrefix:        obj.IpPrefix,
+		GenerateASSet:   obj.GenerateASSet,
+		SendSummaryOnly: obj.SendSummaryOnly,
+		AddressFamily:   packet.GetProtocolFamily(packet.AfiIP, packet.SafiUnicast),
+	}
+
+	return aggConf, nil
+}
+
+func (h *BGPHandler) handleBGPv4Aggregate() error {
+	var obj objects.BGPv4Aggregate
+	objList, err := h.dbUtil.GetAllObjFromDb(obj)
+	if err != nil {
+		h.logger.Errf("GetAllObjFromDb failed for BGPv4Aggregate with error %s", err)
+		return err
+	}
+
+	for _, confObj := range objList {
+		obj = confObj.(objects.BGPv4Aggregate)
+
+		aggConf, err := h.convertModelToBGPv4Aggregate(obj)
+		if err != nil {
+			h.logger.Err("handleBGPv4Aggregate - Failed to convert Model object BGPv4Aggregate, error:", err)
+			return err
+		}
+		h.server.AddAggCh <- server.AggUpdate{config.BGPAggregate{}, aggConf, make([]bool, 0)}
+	}
+	return nil
+}
+
+func (h *BGPHandler) convertModelToBGPv6Aggregate(obj objects.BGPv6Aggregate) (config.BGPAggregate, error) {
+	aggConf := config.BGPAggregate{
+		IPPrefix:        obj.IpPrefix,
+		GenerateASSet:   obj.GenerateASSet,
+		SendSummaryOnly: obj.SendSummaryOnly,
+		AddressFamily:   packet.GetProtocolFamily(packet.AfiIP6, packet.SafiUnicast),
+	}
+
+	return aggConf, nil
+}
+
+func (h *BGPHandler) handleBGPv6Aggregate() error {
+	var obj objects.BGPv6Aggregate
+	objList, err := h.dbUtil.GetAllObjFromDb(obj)
+	if err != nil {
+		h.logger.Errf("GetAllObjFromDb failed for BGPv6Aggregate with error %s", err)
+		return err
+	}
+
+	for _, confObj := range objList {
+		obj = confObj.(objects.BGPv6Aggregate)
+
+		aggConf, err := h.convertModelToBGPv6Aggregate(obj)
+		if err != nil {
+			h.logger.Err("handleBGPv6Aggregate - Failed to convert Model object BGPv6Aggregate, error:", err)
+			return err
+		}
+		h.server.AddAggCh <- server.AggUpdate{config.BGPAggregate{}, aggConf, make([]bool, 0)}
+	}
+	return nil
+}
+
 func (h *BGPHandler) readConfigFromDB(filePath string) error {
 	var err error
 
@@ -493,6 +557,14 @@ func (h *BGPHandler) readConfigFromDB(filePath string) error {
 	}
 
 	if err = h.handleGlobalConfig(); err != nil {
+		return err
+	}
+
+	if err = h.handleBGPv4Aggregate(); err != nil {
+		return err
+	}
+
+	if err = h.handleBGPv6Aggregate(); err != nil {
 		return err
 	}
 
@@ -1528,7 +1600,7 @@ func (h *BGPHandler) DeleteBGPPolicyDefinition(cfg *bgpd.BGPPolicyDefinition) (v
 	return val, err
 }
 
-func (h *BGPHandler) validateBGPAggregate(bgpAgg *bgpd.BGPAggregate) (aggConf config.BGPAggregate, err error) {
+func (h *BGPHandler) validateBGPAggregate(bgpAgg *bgpd.BGPv4Aggregate) (aggConf config.BGPAggregate, err error) {
 	if bgpAgg == nil {
 		return aggConf, err
 	}
@@ -1556,7 +1628,7 @@ func (h *BGPHandler) validateBGPAggregate(bgpAgg *bgpd.BGPAggregate) (aggConf co
 	return aggConf, nil
 }
 
-func (h *BGPHandler) SendBGPAggregate(oldConfig *bgpd.BGPAggregate, newConfig *bgpd.BGPAggregate, attrSet []bool) (
+func (h *BGPHandler) SendBGPAggregate(oldConfig *bgpd.BGPv4Aggregate, newConfig *bgpd.BGPv4Aggregate, attrSet []bool) (
 	bool, error) {
 	oldAgg, err := h.validateBGPAggregate(oldConfig)
 	if err != nil {
@@ -1572,26 +1644,25 @@ func (h *BGPHandler) SendBGPAggregate(oldConfig *bgpd.BGPAggregate, newConfig *b
 	return true, err
 }
 
-func (h *BGPHandler) CreateBGPAggregate(bgpAgg *bgpd.BGPAggregate) (bool, error) {
+func (h *BGPHandler) CreateBGPv4Aggregate(bgpAgg *bgpd.BGPv4Aggregate) (bool, error) {
 	h.logger.Info("Create aggregate attrs:", bgpAgg)
 	return h.SendBGPAggregate(nil, bgpAgg, make([]bool, 0))
 }
 
-func (h *BGPHandler) UpdateBGPAggregate(origA *bgpd.BGPAggregate, updatedA *bgpd.BGPAggregate, attrSet []bool,
+func (h *BGPHandler) UpdateBGPv4Aggregate(origA *bgpd.BGPv4Aggregate, updatedA *bgpd.BGPv4Aggregate, attrSet []bool,
 	op []*bgpd.PatchOpInfo) (bool, error) {
 	h.logger.Info("Update aggregate attrs:", updatedA, "old config:", origA)
 	return h.SendBGPAggregate(origA, updatedA, attrSet)
 }
 
-func (h *BGPHandler) DeleteBGPAggregate(bgpAgg *bgpd.BGPAggregate) (bool, error) {
+func (h *BGPHandler) DeleteBGPv4Aggregate(bgpAgg *bgpd.BGPv4Aggregate) (bool, error) {
 	h.logger.Info("Delete aggregate attrs:", bgpAgg)
 	agg, _ := h.validateBGPAggregate(bgpAgg)
 	h.server.RemAggCh <- agg
 	return true, nil
 }
 
-func (h *BGPHandler) validateBGPIPv6Aggregate(bgpAgg *bgpd.BGPIPv6Aggregate) (aggConf config.BGPAggregate,
-	err error) {
+func (h *BGPHandler) validateBGPv6Aggregate(bgpAgg *bgpd.BGPv6Aggregate) (aggConf config.BGPAggregate, err error) {
 	if bgpAgg == nil {
 		return aggConf, err
 	}
@@ -1619,14 +1690,14 @@ func (h *BGPHandler) validateBGPIPv6Aggregate(bgpAgg *bgpd.BGPIPv6Aggregate) (ag
 	return aggConf, nil
 }
 
-func (h *BGPHandler) SendBGPIPv6Aggregate(oldConfig *bgpd.BGPIPv6Aggregate, newConfig *bgpd.BGPIPv6Aggregate,
+func (h *BGPHandler) SendBGPv6Aggregate(oldConfig *bgpd.BGPv6Aggregate, newConfig *bgpd.BGPv6Aggregate,
 	attrSet []bool) (bool, error) {
-	oldAgg, err := h.validateBGPIPv6Aggregate(oldConfig)
+	oldAgg, err := h.validateBGPv6Aggregate(oldConfig)
 	if err != nil {
 		return false, err
 	}
 
-	newAgg, err := h.validateBGPIPv6Aggregate(newConfig)
+	newAgg, err := h.validateBGPv6Aggregate(newConfig)
 	if err != nil {
 		return false, err
 	}
@@ -1635,20 +1706,20 @@ func (h *BGPHandler) SendBGPIPv6Aggregate(oldConfig *bgpd.BGPIPv6Aggregate, newC
 	return true, err
 }
 
-func (h *BGPHandler) CreateBGPIPv6Aggregate(bgpAgg *bgpd.BGPIPv6Aggregate) (bool, error) {
+func (h *BGPHandler) CreateBGPv6Aggregate(bgpAgg *bgpd.BGPv6Aggregate) (bool, error) {
 	h.logger.Info("Create IPv6 aggregate attrs:", bgpAgg)
-	return h.SendBGPIPv6Aggregate(nil, bgpAgg, make([]bool, 0))
+	return h.SendBGPv6Aggregate(nil, bgpAgg, make([]bool, 0))
 }
 
-func (h *BGPHandler) UpdateBGPIPv6Aggregate(origA *bgpd.BGPIPv6Aggregate, updatedA *bgpd.BGPIPv6Aggregate, attrSet []bool,
+func (h *BGPHandler) UpdateBGPv6Aggregate(origA *bgpd.BGPv6Aggregate, updatedA *bgpd.BGPv6Aggregate, attrSet []bool,
 	op []*bgpd.PatchOpInfo) (bool, error) {
 	h.logger.Info("Update IPv6 aggregate attrs:", updatedA, "old config:", origA)
-	return h.SendBGPIPv6Aggregate(origA, updatedA, attrSet)
+	return h.SendBGPv6Aggregate(origA, updatedA, attrSet)
 }
 
-func (h *BGPHandler) DeleteBGPIPv6Aggregate(bgpAgg *bgpd.BGPIPv6Aggregate) (bool, error) {
+func (h *BGPHandler) DeleteBGPv6Aggregate(bgpAgg *bgpd.BGPv6Aggregate) (bool, error) {
 	h.logger.Info("Delete IPv6 aggregate attrs:", bgpAgg)
-	agg, _ := h.validateBGPIPv6Aggregate(bgpAgg)
+	agg, _ := h.validateBGPv6Aggregate(bgpAgg)
 	h.server.RemAggCh <- agg
 	return true, nil
 }

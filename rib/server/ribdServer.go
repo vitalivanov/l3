@@ -474,7 +474,7 @@ func (ribdServiceHandler *RIBDServer) StartServer(paramsDir string) {
 	count := 0
 	for {
 		if !RouteServiceHandler.AcceptConfig {
-			if count%1000 == 0 {
+			if count%10000 == 0 {
 				logger.Debug("RIBD not ready to accept config")
 			}
 			count++
