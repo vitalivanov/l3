@@ -47,7 +47,7 @@ func NewFSBfdMgr(logger *logging.Writer, fileName string) (*FSBfdMgr, error) {
 	go rpc.StartBfddClient(logger, fileName, bfddClientChan)
 	bfddClient = <-bfddClientChan
 	if bfddClient == nil {
-		logger.Err("Failed to connect to BFDd\n")
+		logger.Err("Failed to connect to BFDd")
 		return nil, errors.New("Failed to connect to BFDd")
 	} else {
 		logger.Info("Connected to BFDd")
@@ -76,8 +76,7 @@ func (mgr *FSBfdMgr) listenForBFDNotifications() {
 		mgr.logger.Info("Read on BFD subscriber socket...")
 		rxBuf, err := mgr.bfdSubSocket.Recv(0)
 		if err != nil {
-			mgr.logger.Err("Recv on BFD subscriber socket failed with error:",
-				err)
+			mgr.logger.Err("Recv on BFD subscriber socket failed with error:", err)
 			continue
 		}
 		mgr.logger.Info("BFD subscriber recv returned:", rxBuf)
@@ -130,8 +129,7 @@ func (mgr *FSBfdMgr) SetupSubSocket(address string) (*nanomsg.SubSocket, error) 
 	}
 
 	if err = socket.Subscribe(""); err != nil {
-		mgr.logger.Errf("Failed to subscribe to \"\" on subscribe socket %s, error:%s",
-			address, err)
+		mgr.logger.Errf("Failed to subscribe to \"\" on subscribe socket %s, error:%s", address, err)
 		return nil, err
 	}
 
@@ -140,10 +138,9 @@ func (mgr *FSBfdMgr) SetupSubSocket(address string) (*nanomsg.SubSocket, error) 
 		return nil, err
 	}
 
-	mgr.logger.Infof("Connected to publisher socker %s", address)
+	mgr.logger.Infof("Connected to publisher socket %s", address)
 	if err = socket.SetRecvBuffer(1024 * 1024); err != nil {
-		mgr.logger.Err("Failed to set the buffer size for subsriber socket %s, error:",
-			address, err)
+		mgr.logger.Err("Failed to set the buffer size for subsriber socket %s, error:", address, err)
 		return nil, err
 	}
 	return socket, nil

@@ -95,7 +95,7 @@ func (server *OSPFServer) initAreaConfDefault() {
 
 func (server *OSPFServer) initAreaStateSlice(key AreaConfKey) {
 	//server.AreaStateMutex.Lock()
-	server.logger.Info(fmt.Sprintln("Initializing area slice", key))
+	server.logger.Debug(fmt.Sprintln("Initializing area slice", key))
 	ent, exist := server.AreaStateMap[key]
 	ent.SpfRuns = 0
 	ent.AreaBdrRtrCount = 0
@@ -116,7 +116,7 @@ func (server *OSPFServer) areaStateRefresh() {
 	var areaStateRefFunc func()
 	areaStateRefFunc = func() {
 		//server.AreaStateMutex.Lock()
-		server.logger.Info("Inside areaStateRefFunc()")
+		server.logger.Debug("Inside areaStateRefFunc()")
 		server.AreaStateSlice = []AreaConfKey{}
 		server.AreaConfKeyToSliceIdxMap = nil
 		server.AreaConfKeyToSliceIdxMap = make(map[AreaConfKey]int)
@@ -132,7 +132,7 @@ func (server *OSPFServer) areaStateRefresh() {
 
 func (server *OSPFServer) updateIntfToAreaMap(key IntfConfKey, oldAreaId string, newAreaId string) {
 
-	server.logger.Info(fmt.Sprintln("===========1. updateIntfToAreaMap============", server.AreaConfMap, "oldAreaId:", oldAreaId, "newAreaId:", newAreaId, "IntfConfKey:", key))
+	server.logger.Debug(fmt.Sprintln("===========1. updateIntfToAreaMap============", server.AreaConfMap, "oldAreaId:", oldAreaId, "newAreaId:", newAreaId, "IntfConfKey:", key))
 	if oldAreaId != "none" && newAreaId != "none" {
 		oldAreaConfKey := AreaConfKey{
 			AreaId: config.AreaId(oldAreaId),

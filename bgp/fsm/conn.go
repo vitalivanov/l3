@@ -61,14 +61,14 @@ func NewOutTCPConn(fsm *FSM, fsmConnCh chan net.Conn, fsmConnErrCh chan error) *
 	}
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	outConn.id = r.Uint32()
-	fsm.logger.Info("Neighbor:", fsm.pConf.NeighborAddress, "FSM", fsm.id,
-		"Creating new out TCP conn with id", outConn.id)
+	fsm.logger.Info("Neighbor:", fsm.pConf.NeighborAddress, "FSM", fsm.id, "Creating new out TCP conn with id",
+		outConn.id)
 	return &outConn
 }
 
 func (o *OutTCPConn) Connect(seconds uint32, remote, local string, connCh chan net.Conn, errCh chan error) {
-	o.logger.Info("Neighbor:", o.fsm.pConf.NeighborAddress, "FSM", o.fsm.id,
-		"Connect start, local IP:", local, "remote IP:", remote)
+	o.logger.Info("Neighbor:", o.fsm.pConf.NeighborAddress, "FSM", o.fsm.id, "Connect start, local IP:", local,
+		"remote IP:", remote)
 	remoteIP, _, err := net.SplitHostPort(remote)
 	if err != nil {
 		errCh <- err
@@ -102,12 +102,12 @@ func (o *OutTCPConn) Connect(seconds uint32, remote, local string, connCh chan n
 	}
 
 	if local != "" {
-		o.logger.Info("Neighbor:", o.fsm.pConf.NeighborAddress, "FSM", o.fsm.id,
-			"local IP is set to", local, "local IP len", len(local))
+		o.logger.Info("Neighbor:", o.fsm.pConf.NeighborAddress, "FSM", o.fsm.id, "local IP is set to", local,
+			"local IP len", len(local))
 		localIP, _, err := net.SplitHostPort(local)
 		if err != nil {
-			o.logger.Info("Neighbor:", o.fsm.pConf.NeighborAddress, "FSM", o.fsm.id,
-				"SplitHostPort for local IP", local, "failed with error", err)
+			o.logger.Info("Neighbor:", o.fsm.pConf.NeighborAddress, "FSM", o.fsm.id, "SplitHostPort for local IP",
+				local, "failed with error", err)
 			errCh <- err
 			return
 		}
@@ -128,15 +128,15 @@ func (o *OutTCPConn) Connect(seconds uint32, remote, local string, connCh chan n
 		"Connect called... calling DialTimeout with", seconds, "second timeout", "OutTCPCOnn id", o.id)
 	socket, err := netUtils.ConnectSocket("tcp", remote, local)
 	if err != nil {
-		o.logger.Info("Neighbor:", o.fsm.pConf.NeighborAddress, "FSM", o.fsm.id,
-			"ConnectSocket failed with error", err)
+		o.logger.Info("Neighbor:", o.fsm.pConf.NeighborAddress, "FSM", o.fsm.id, "ConnectSocket failed with error",
+			err)
 		errCh <- err
 		return
 	}
 
 	if o.fsm.pConf.AuthPassword != "" {
-		o.logger.Info("Neighbor:", o.fsm.pConf.NeighborAddress, "FSM", o.fsm.id,
-			"Set MD5 option on the socket:", socket, "password:", o.fsm.pConf.AuthPassword)
+		o.logger.Info("Neighbor:", o.fsm.pConf.NeighborAddress, "FSM", o.fsm.id, "Set MD5 option on the socket:",
+			socket, "password:", o.fsm.pConf.AuthPassword)
 		err = netUtils.SetSockoptTCPMD5(socket, remoteIP, o.fsm.pConf.AuthPassword)
 		if err != nil {
 			o.logger.Info("Neighbor:", o.fsm.pConf.NeighborAddress, "FSM", o.fsm.id,
@@ -148,8 +148,7 @@ func (o *OutTCPConn) Connect(seconds uint32, remote, local string, connCh chan n
 
 	err = netUtils.Connect(socket, "tcp", remote, local, time.Duration(seconds)*time.Second)
 	if err != nil {
-		o.logger.Info("Neighbor:", o.fsm.pConf.NeighborAddress, "FSM", o.fsm.id,
-			"Connect failed with error", err)
+		o.logger.Info("Neighbor:", o.fsm.pConf.NeighborAddress, "FSM", o.fsm.id, "Connect failed with error", err)
 		errCh <- err
 		return
 	}
@@ -177,8 +176,8 @@ func (o *OutTCPConn) ConnectToPeer(seconds uint32, remote, local string) {
 	connCh := make(chan net.Conn)
 	errCh := make(chan error)
 
-	o.logger.Info("Neighbor:", o.fsm.pConf.NeighborAddress, "FSM", o.fsm.id, "ConnectToPeer called",
-		"OutTCPCOnn id", o.id)
+	o.logger.Info("Neighbor:", o.fsm.pConf.NeighborAddress, "FSM", o.fsm.id, "ConnectToPeer called", "OutTCPCOnn id",
+		o.id)
 	connTime := seconds - 3
 	if connTime <= 0 {
 		connTime = seconds
@@ -276,8 +275,7 @@ func (p *PeerConn) StartReading() {
 			}
 
 		case <-exitCh:
-			p.logger.Info("Neighbor:", p.fsm.pConf.NeighborAddress, "FSM", p.fsm.id,
-				"conn: exit channel")
+			p.logger.Info("Neighbor:", p.fsm.pConf.NeighborAddress, "FSM", p.fsm.id, "conn: exit channel")
 			p.exitCh <- true
 
 		case readOk := <-doneReadingCh:
@@ -331,8 +329,8 @@ func (p *PeerConn) DecodeMessage(header *packet.BGPHeader, buf []byte) (*packet.
 	}
 
 	if err != nil {
-		p.logger.Info("Neighbor:", p.fsm.pConf.NeighborAddress, "FSM", p.fsm.id,
-			"BGP packet body decode failed, err:", err)
+		p.logger.Info("Neighbor:", p.fsm.pConf.NeighborAddress, "FSM", p.fsm.id, "BGP packet body decode failed, err:",
+			err)
 		//bgpPktInfo = packet.NewBGPPktInfo(msg, err.(*packet.BGPMessageError))
 		bgpErr := err.(packet.BGPMessageError)
 		msgErr = &bgpErr
@@ -341,12 +339,10 @@ func (p *PeerConn) DecodeMessage(header *packet.BGPHeader, buf []byte) (*packet.
 		p.peerAttrs.ASSize = packet.GetASSize(msg.Body.(*packet.BGPOpen))
 		p.peerAttrs.AddPathFamily = packet.GetAddPathFamily(msg.Body.(*packet.BGPOpen))
 		addPathsTxFarEnd := packet.IsAddPathsTxEnabledForIPv4(p.peerAttrs.AddPathFamily)
-		p.logger.Info("Neighbor:", p.fsm.pConf.NeighborAddress,
-			"Far end can send add paths")
+		p.logger.Info("Neighbor:", p.fsm.pConf.NeighborAddress, "Far end can send add paths")
 		if addPathsTxFarEnd && p.fsm.pConf.AddPathsRx {
 			p.peerAttrs.AddPathsRxActual = true
-			p.logger.Info("Neighbor:", p.fsm.pConf.NeighborAddress,
-				"negotiated to recieve add paths from far end")
+			p.logger.Info("Neighbor:", p.fsm.pConf.NeighborAddress, "negotiated to recieve add paths from far end")
 		}
 	}
 
@@ -406,8 +402,7 @@ func (p *PeerConn) ReadPkt(doneCh chan bool, stopCh chan bool, exitCh chan bool)
 			}
 
 			if header.Type != packet.BGPMsgTypeKeepAlive {
-				p.logger.Infof("Neighbor:%s FSM %d Received BGP packet %x", p.fsm.pConf.NeighborAddress,
-					p.fsm.id, buf)
+				p.logger.Infof("Neighbor:%s FSM %d Received BGP packet %x", p.fsm.pConf.NeighborAddress, p.fsm.id, buf)
 			}
 
 			msg, msgErr, msgOk := p.DecodeMessage(header, buf)
@@ -415,8 +410,7 @@ func (p *PeerConn) ReadPkt(doneCh chan bool, stopCh chan bool, exitCh chan bool)
 			doneCh <- msgOk
 
 		case <-stopCh:
-			p.logger.Info("Neighbor:", p.fsm.pConf.NeighborAddress, "FSM", p.fsm.id,
-				"Closing the peer connection")
+			p.logger.Info("Neighbor:", p.fsm.pConf.NeighborAddress, "FSM", p.fsm.id, "Closing the peer connection")
 			if p.conn != nil {
 				(*p.conn).Close()
 			}

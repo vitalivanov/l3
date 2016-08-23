@@ -23,12 +23,13 @@
 package server
 
 import (
+	"encoding/json"
 	_ "errors"
-	"fmt"
 	"github.com/google/gopacket/pcap"
 	"l3/ndp/config"
 	"l3/ndp/debug"
 	"net"
+	"utils/commonDefs"
 )
 
 /*
@@ -38,7 +39,7 @@ func (svr *NDPServer) GetPorts() {
 	debug.Logger.Info("Get Port State List")
 	portsInfo, err := svr.SwitchPlugin.GetAllPortState()
 	if err != nil {
-		debug.Logger.Err(fmt.Sprintln("Failed to get all ports from system, ERROR:", err))
+		debug.Logger.Err("Failed to get all ports from system, ERROR:", err)
 		return
 	}
 	for _, obj := range portsInfo {
@@ -51,14 +52,14 @@ func (svr *NDPServer) GetPorts() {
 		}
 		pObj, err := svr.SwitchPlugin.GetPort(obj.Name)
 		if err != nil {
-			debug.Logger.Err(fmt.Sprintln("Getting mac address for",
-				obj.Name, "failed, error:", err))
+			debug.Logger.Err("Getting mac address for", obj.Name, "failed, error:", err)
 		} else {
 			port.MacAddr = pObj.MacAddr
 			port.Description = pObj.Description
 		}
 		svr.PhyPort[port.IfIndex] = port
 		svr.SwitchMacMapEntries[port.MacAddr] = empty
+		svr.SwitchMac = port.MacAddr // @HACK.... need better solution
 	}
 
 	debug.Logger.Info("Done with Port State list")
@@ -74,14 +75,14 @@ func (svr *NDPServer) GetVlans() {
 	// Get Vlan State Information
 	vlansStateInfo, err := svr.SwitchPlugin.GetAllVlanState()
 	if err != nil {
-		debug.Logger.Err(fmt.Sprintln("Failed to get system vlan information, ERROR:", err))
+		debug.Logger.Err("Failed to get system vlan information, ERROR:", err)
 		return
 	}
 
 	// Get Vlan Config Information
 	vlansConfigInfo, err := svr.SwitchPlugin.GetAllVlan()
 	if err != nil {
-		debug.Logger.Err(fmt.Sprintln("Failed to get system vlan config information, ERROR:", err))
+		debug.Logger.Err("Failed to get system vlan config information, ERROR:", err)
 	}
 
 	// Store untag port information
@@ -98,7 +99,7 @@ func (svr *NDPServer) GetVlans() {
 	for _, vlanState := range vlansStateInfo {
 		entry, ok := svr.VlanInfo[vlanState.VlanId]
 		if !ok {
-			debug.Logger.Warning(fmt.Sprintln("config object for vlan", vlanState.VlanId, "not found"))
+			debug.Logger.Warning("config object for vlan", vlanState.VlanId, "not found")
 		}
 		entry.Name = vlanState.VlanName
 		entry.IfIndex = vlanState.IfIndex
@@ -116,7 +117,7 @@ func (svr *NDPServer) GetIPIntf() {
 	debug.Logger.Info("Get IPv6 Interface List")
 	ipsInfo, err := svr.SwitchPlugin.GetAllIPv6IntfState()
 	if err != nil {
-		debug.Logger.Err(fmt.Sprintln("Failed to get all ipv6 interfaces from system, ERROR:", err))
+		debug.Logger.Err("Failed to get all ipv6 interfaces from system, ERROR:", err)
 		return
 	}
 	for _, obj := range ipsInfo {
@@ -139,13 +140,13 @@ func (svr *NDPServer) GetIPIntf() {
 func (svr *NDPServer) CreatePcapHandler(name string) (pHdl *pcap.Handle, err error) {
 	pHdl, err = pcap.OpenLive(name, svr.SnapShotLen, svr.Promiscuous, svr.Timeout)
 	if err != nil {
-		debug.Logger.Err(fmt.Sprintln("Creating Pcap Handler failed for", name, "Error:", err))
+		debug.Logger.Err("Creating Pcap Handler failed for", name, "Error:", err)
 		return pHdl, err
 	}
 	filter := "(ip6[6] == 0x3a) and (ip6[40] >= 133 && ip6[40] <= 137)"
 	err = pHdl.SetBPFFilter(filter)
 	if err != nil {
-		debug.Logger.Err(fmt.Sprintln("Creating BPF Filter failed Error", err))
+		debug.Logger.Err("Creating BPF Filter failed Error", err)
 		pHdl = nil
 		return pHdl, err
 	}
@@ -206,16 +207,17 @@ func (svr *NDPServer) HandleCreateIPIntf(obj *config.IPIntfNotification) {
 	ipInfo, exists := svr.L3Port[obj.IfIndex]
 	switch obj.Operation {
 	case config.CONFIG_CREATE:
+		defer svr.Packet.InitLink(obj.IfIndex, obj.IpAddr, svr.SwitchMac)
 		if exists {
 			if svr.IsLinkLocal(obj.IpAddr) {
-				debug.Logger.Info(fmt.Sprintln("Updating link local Ip", obj.IpAddr, "for", obj.IfIndex))
+				debug.Logger.Debug("Updating link local Ip", obj.IpAddr, "for", obj.IfIndex)
 				ipInfo.LinkLocalIp = obj.IpAddr
 				svr.L3Port[obj.IfIndex] = ipInfo
 				return
 			}
-			debug.Logger.Err(fmt.Sprintln("Received create notification for ifIndex", obj.IfIndex,
+			debug.Logger.Err("Received create notification for ifIndex", obj.IfIndex,
 				"when entry already exist in the database. Dumping IpAddr for debugging info.",
-				"Received Ip:", obj.IpAddr, "stored Ip:", ipInfo.IpAddr))
+				"Received Ip:", obj.IpAddr, "stored Ip:", ipInfo.IpAddr)
 			return
 		}
 		ipInfo = config.IPv6IntfInfo{
@@ -224,10 +226,10 @@ func (svr *NDPServer) HandleCreateIPIntf(obj *config.IPIntfNotification) {
 		}
 		ipInfo.IntfRef = svr.GetIntfRefName(ipInfo.IfIndex)
 		if ipInfo.IntfRef == INTF_REF_NOT_FOUND {
-			debug.Logger.Alert(fmt.Sprintln("Couldn't find name for ifIndex:", ipInfo.IfIndex,
-				"and hence pcap create will be failure"))
+			debug.Logger.Alert("Couldn't find name for ifIndex:", ipInfo.IfIndex,
+				"and hence pcap create will be failure")
 		}
-		debug.Logger.Info(fmt.Sprintln("Created IP inteface", ipInfo.IntfRef, "ifIndex:", ipInfo.IfIndex))
+		debug.Logger.Info("Created IP inteface", ipInfo.IntfRef, "ifIndex:", ipInfo.IfIndex)
 		svr.L3Port[ipInfo.IfIndex] = ipInfo
 		svr.ndpL3IntfStateSlice = append(svr.ndpL3IntfStateSlice, ipInfo.IfIndex)
 	case config.CONFIG_DELETE:
@@ -235,12 +237,46 @@ func (svr *NDPServer) HandleCreateIPIntf(obj *config.IPIntfNotification) {
 	}
 }
 
+func (svr *NDPServer) findL3Port(ifIndex int32) (config.IPv6IntfInfo, bool) {
+	l3port, exists := svr.L3Port[ifIndex]
+	return l3port, exists
+}
+
 /*  API: will handle l2/physical notifications received from switch/asicd
  *	  Update map entry and then call state notification
  *
  */
 func (svr *NDPServer) HandlePhyPortStateNotification(msg *config.StateNotification) {
-	//@TODO: do we need to handle this case... i don't think so
+	debug.Logger.Info("Received State:", msg.State, "for ifIndex:", msg.IfIndex)
+	l3Port, exists := svr.findL3Port(msg.IfIndex)
+	if !exists {
+		debug.Logger.Err("No l3 port exists for ifIndex:", msg.IfIndex, "ignoring port state notification")
+		return
+	}
+	// search this ifIndex in l3 map to get the ifIndex -> ipAddr map
+	switch msg.State {
+	case config.STATE_UP:
+		// if the port state is up, then we need to start RX/TX only for global scope ip address,
+		// if it is not started
+		debug.Logger.Info("Create pkt handler for", msg.IfIndex, "IpAddr:", l3Port.IpAddr)
+		svr.StartRxTx(msg.IfIndex)
+
+	case config.STATE_DOWN:
+		// if the port state is down, then we need to delete all the neighbors for that ifIndex...which
+		// includes deleting neighbor from link local ip address also
+		debug.Logger.Info("Stop receiving frames for", l3Port.IntfRef)
+		svr.StopRxTx(msg.IfIndex)
+		debug.Logger.Info("Deleting Neigbors for", l3Port.IpAddr)
+		deleteEntries, err := svr.Packet.FlushNeighbors(l3Port.IpAddr)
+		if len(deleteEntries) > 0 && err == nil {
+			svr.DeleteNeighborInfo(deleteEntries, msg.IfIndex)
+		}
+		debug.Logger.Info("Deleting Neigbors for", l3Port.LinkLocalIp)
+		deleteEntries, err = svr.Packet.FlushNeighbors(l3Port.LinkLocalIp)
+		if len(deleteEntries) > 0 && err == nil {
+			svr.DeleteNeighborInfo(deleteEntries, msg.IfIndex)
+		}
+	}
 }
 
 /*  API: will handle IPv6 notifications received from switch/asicd
@@ -251,18 +287,20 @@ func (svr *NDPServer) HandlePhyPortStateNotification(msg *config.StateNotificati
  *		     Stop Rx/Tx in this case
  */
 func (svr *NDPServer) HandleStateNotification(msg *config.StateNotification) {
-	debug.Logger.Info(fmt.Sprintln("Received State:", msg.State, "for ifIndex:", msg.IfIndex, "ipAddr:", msg.IpAddr))
+	debug.Logger.Info("Received State:", msg.State, "for ifIndex:", msg.IfIndex, "ipAddr:", msg.IpAddr)
 	switch msg.State {
 	case config.STATE_UP:
-		if svr.IsIPv6Addr(msg.IpAddr) {
-			if !svr.IsLinkLocal(msg.IpAddr) {
-				debug.Logger.Info(fmt.Sprintln("Create pkt handler for", msg.IfIndex, "IpAddr:", msg.IpAddr))
-				svr.StartRxTx(msg.IfIndex)
-			}
-		}
+		debug.Logger.Info("Create pkt handler for", msg.IfIndex, "IpAddr:", msg.IpAddr)
+		svr.StartRxTx(msg.IfIndex)
 	case config.STATE_DOWN:
-		if svr.IsIPv6Addr(msg.IpAddr) {
-			svr.StopRxTx(msg.IfIndex)
+		debug.Logger.Info("Delete pkt handler for", msg.IfIndex, "IpAddr:", msg.IpAddr)
+		// stop pcap handler
+		svr.StopRxTx(msg.IfIndex)
+		// delete neighbor entries first for the link
+		// stop the timer
+		deleteEntries, err := svr.Packet.FlushNeighbors(msg.IpAddr)
+		if len(deleteEntries) > 0 && err == nil {
+			svr.DeleteNeighborInfo(deleteEntries, msg.IfIndex)
 		}
 	}
 }
@@ -295,5 +333,67 @@ func (svr *NDPServer) PopulateVlanInfo(nbrInfo *config.NeighborInfo, ifIndex int
 		// in this case use system reserved Vlan id which is -1
 		nbrInfo.VlanId = -1
 	}
-	nbrInfo.IfIndex = ifIndex
+}
+
+/*
+ * helper function to create notification msg
+ */
+func createNotificationMsg(ipAddr string, ifIndex int32) ([]byte, error) {
+	msg := commonDefs.Ipv6NeighborNotification{
+		IpAddr:  ipAddr,
+		IfIndex: ifIndex,
+	}
+	msgBuf, err := json.Marshal(msg)
+	if err != nil {
+		debug.Logger.Err("Failed to marshal IPv6 Neighbor Notification message", msg, "error:", err)
+		return msgBuf, err
+	}
+
+	return msgBuf, nil
+}
+
+/*
+ * helper function to marshal notification and push it on to the channel
+ */
+func (svr *NDPServer) pushNotification(notification commonDefs.NdpNotification) {
+	notifyBuf, err := json.Marshal(notification)
+	if err != nil {
+		debug.Logger.Err("Failed to marshal ipv6 notification before pushing it on channel error:", err)
+		return
+	}
+	svr.notifyChan <- notifyBuf
+}
+
+/*
+ *    API: send ipv6 neighbor create notification
+ */
+func (svr *NDPServer) SendIPv6CreateNotification(ipAddr string, ifIndex int32) {
+	msgBuf, err := createNotificationMsg(ipAddr, ifIndex)
+	if err != nil {
+		return
+	}
+
+	notification := commonDefs.NdpNotification{
+		MsgType: commonDefs.NOTIFY_IPV6_NEIGHBOR_CREATE,
+		Msg:     msgBuf,
+	}
+	debug.Logger.Debug("Sending Create notification for ip address:", ipAddr, "and ifIndex:", ifIndex)
+	svr.pushNotification(notification)
+}
+
+/*
+ *    API: send ipv6 neighbor delete notification
+ */
+func (svr *NDPServer) SendIPv6DeleteNotification(ipAddr string, ifIndex int32) {
+	msgBuf, err := createNotificationMsg(ipAddr, ifIndex)
+	if err != nil {
+		return
+	}
+
+	notification := commonDefs.NdpNotification{
+		MsgType: commonDefs.NOTIFY_IPV6_NEIGHBOR_DELETE,
+		Msg:     msgBuf,
+	}
+	debug.Logger.Debug("Sending Delete notification for ip address:", ipAddr, "and ifIndex:", ifIndex)
+	svr.pushNotification(notification)
 }

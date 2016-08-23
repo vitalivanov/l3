@@ -145,11 +145,19 @@ func (slice AdminDistanceSlice) Swap(i, j int) {
 	slice[i].Protocol, slice[j].Protocol = slice[j].Protocol, slice[i].Protocol
 	slice[i].Distance, slice[j].Distance = slice[j].Distance, slice[i].Distance
 }
-func BuildProtocolAdminDistanceSlice() {
+func BuildProtocolAdminDistanceSlice(force bool) {
 	distance := 0
 	protocol := ""
+	if ProtocolAdminDistanceSlice != nil && force == false {
+		//dont build it if it is already built
+		return
+	}
 	ProtocolAdminDistanceSlice = nil
 	ProtocolAdminDistanceSlice = make([]ribd.RouteDistanceState, 0)
+	if ProtocolAdminDistanceMapDB == nil {
+		ProtocolAdminDistanceMapDB = make(map[string]RouteDistanceConfig)
+		BuildProtocolAdminDistanceMapDB()
+	}
 	for k, v := range ProtocolAdminDistanceMapDB {
 		protocol = k
 		distance = v.defaultDistance
@@ -164,7 +172,7 @@ func BuildProtocolAdminDistanceSlice() {
 func (m RIBDServer) ConvertIntfStrToIfIndexStr(intfString string) (ifIndex string, err error) {
 	if val, err := strconv.Atoi(intfString); err == nil {
 		//Verify ifIndex is valid
-		logger.Info("IfIndex = ", val)
+		//logger.Info("IfIndex = ", val)
 		_, ok := IntfIdNameMap[int32(val)]
 		if !ok {
 			logger.Err("Cannot create ip route on a unknown L3 interface")
@@ -339,11 +347,11 @@ func BuildPolicyRouteFromribdIPv6Route(cfg *ribd.IPv6Route) (policyRoute ribdInt
 	}
 	return policyRoute
 }
-func findRouteWithNextHop(routeInfoList []RouteInfoRecord, nextHopIP string) (found bool, routeInfoRecord RouteInfoRecord, index int) {
-	logger.Info("findRouteWithNextHop")
+func findRouteWithNextHop(routeInfoList []RouteInfoRecord, nextHopIpType ribdCommonDefs.IPType, nextHopIP string) (found bool, routeInfoRecord RouteInfoRecord, index int) {
+	logger.Info("findRouteWithNextHop ", nextHopIP, " and type:", nextHopIpType)
 	index = -1
 	for i := 0; i < len(routeInfoList); i++ {
-		if routeInfoList[i].nextHopIp.String() == nextHopIP {
+		if routeInfoList[i].nextHopIp.String() == nextHopIP && routeInfoList[i].nextHopIpType == nextHopIpType {
 			//logger.Info("Next hop IP present")
 			found = true
 			routeInfoRecord = routeInfoList[i]
@@ -353,11 +361,11 @@ func findRouteWithNextHop(routeInfoList []RouteInfoRecord, nextHopIP string) (fo
 	}
 	return found, routeInfoRecord, index
 }
-func newNextHopIP(ip string, routeInfoList []RouteInfoRecord) (isNewNextHopIP bool) {
+func newNextHopIP(ipType ribdCommonDefs.IPType, ip string, routeInfoList []RouteInfoRecord) (isNewNextHopIP bool) {
 	logger.Info("newNextHopIP")
 	isNewNextHopIP = true
 	for i := 0; i < len(routeInfoList); i++ {
-		if routeInfoList[i].nextHopIp.String() == ip {
+		if routeInfoList[i].nextHopIp.String() == ip && routeInfoList[i].nextHopIpType == ipType {
 			logger.Info("Next hop IP already present")
 			isNewNextHopIP = false
 		}
@@ -366,7 +374,7 @@ func newNextHopIP(ip string, routeInfoList []RouteInfoRecord) (isNewNextHopIP bo
 }
 func isSameRoute(selectedRoute ribdInt.Routes, route ribdInt.Routes) (same bool) {
 	logger.Info("isSameRoute")
-	if selectedRoute.Ipaddr == route.Ipaddr && selectedRoute.Mask == route.Mask && selectedRoute.Prototype == route.Prototype {
+	if selectedRoute.IPAddrType == route.IPAddrType && selectedRoute.Ipaddr == route.Ipaddr && selectedRoute.Mask == route.Mask && selectedRoute.Prototype == route.Prototype {
 		same = true
 	}
 	return same
@@ -463,7 +471,7 @@ func deleteRoutePolicyStateAll(route ribdInt.Routes) {
 		return
 	}
 
-	routeInfoRecordListItem := RouteInfoMap.Get(destNet)
+	routeInfoRecordListItem := RouteInfoMapGet(ribdCommonDefs.IPType(route.IPAddrType), destNet)
 	if routeInfoRecordListItem == nil {
 		logger.Info(" entry not found for prefix %v", destNet)
 		return
@@ -471,7 +479,7 @@ func deleteRoutePolicyStateAll(route ribdInt.Routes) {
 	routeInfoRecordList := routeInfoRecordListItem.(RouteInfoRecordList)
 	routeInfoRecordList.policyHitCounter = ribd.Int(route.PolicyHitCounter)
 	routeInfoRecordList.policyList = nil //append(routeInfoRecordList.policyList[:0])
-	RouteInfoMap.Set(destNet, routeInfoRecordList)
+	RouteInfoMapSet(ribdCommonDefs.IPType(route.IPAddrType), destNet, routeInfoRecordList)
 	return
 }
 func addRoutePolicyState(route ribdInt.Routes, policy string, policyStmt string) {
@@ -481,7 +489,7 @@ func addRoutePolicyState(route ribdInt.Routes, policy string, policyStmt string)
 		return
 	}
 
-	routeInfoRecordListItem := RouteInfoMap.Get(destNet)
+	routeInfoRecordListItem := RouteInfoMapGet(ribdCommonDefs.IPType(route.IPAddrType), destNet)
 	if routeInfoRecordListItem == nil {
 		logger.Info("Unexpected - entry not found for prefix %v", destNet)
 		return
@@ -511,7 +519,7 @@ func addRoutePolicyState(route ribdInt.Routes, policy string, policyStmt string)
 		policyStmtList = append(policyStmtList,policyStmt)
 	    routeInfoRecordList.policyList[policy] = policyStmtList*/
 	routeInfoRecordList.policyList = append(routeInfoRecordList.policyList, policy)
-	RouteInfoMap.Set(destNet, routeInfoRecordList)
+	RouteInfoMapSet(ribdCommonDefs.IPType(route.IPAddrType), destNet, routeInfoRecordList)
 	logger.Debug("Adding to DBRouteCh from addRoutePolicyState")
 	RouteServiceHandler.DBRouteCh <- RIBdServerConfig{
 		OrigConfigObject: RouteDBInfo{routeInfoRecordList.routeInfoProtocolMap[routeInfoRecordList.selectedRouteProtocol][0], routeInfoRecordList},
@@ -520,11 +528,11 @@ func addRoutePolicyState(route ribdInt.Routes, policy string, policyStmt string)
 	//RouteServiceHandler.WriteIPv4RouteStateEntryToDB(RouteDBInfo{routeInfoRecordList.routeInfoProtocolMap[routeInfoRecordList.selectedRouteProtocol][0], routeInfoRecordList})
 	return
 }
-func deleteRoutePolicyState(ipPrefix patriciaDB.Prefix, policyName string) {
+func deleteRoutePolicyState(ipType ribdCommonDefs.IPType, ipPrefix patriciaDB.Prefix, policyName string) {
 	logger.Info("deleteRoutePolicyState")
 	found := false
 	idx := 0
-	routeInfoRecordListItem := RouteInfoMap.Get(ipPrefix)
+	routeInfoRecordListItem := RouteInfoMapGet(ipType, ipPrefix)
 	if routeInfoRecordListItem == nil {
 		logger.Info("routeInfoRecordListItem nil for prefix ", ipPrefix)
 		return
@@ -549,7 +557,7 @@ func deleteRoutePolicyState(ipPrefix patriciaDB.Prefix, policyName string) {
 	} else {
 		routeInfoRecordList.policyList = append(routeInfoRecordList.policyList[:idx], routeInfoRecordList.policyList[idx+1:]...)
 	}
-	RouteInfoMap.Set(ipPrefix, routeInfoRecordList)
+	RouteInfoMapSet(ipType, ipPrefix, routeInfoRecordList)
 }
 
 func updateRoutePolicyState(route ribdInt.Routes, op int, policy string, policyStmt string) {

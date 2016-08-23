@@ -45,7 +45,7 @@ const (
 type UUID string
 
 type BGPFlexSwitch struct {
-	neighbor bgpd.BGPNeighbor
+	neighbor bgpd.BGPv4Neighbor
 	global   bgpd.BGPGlobal
 }
 
@@ -123,7 +123,7 @@ func (ovsHdl *BGPOvsdbHandler) GetBGPRouterId(rtUuid UUID, table ovsdb.TableUpda
 		if sameUUID(rtUuid, key) {
 			rtrId, ok = value.New.Fields["router_id"].(string)
 			if ok {
-				ovsHdl.logger.Info("Router ID is " + rtrId)
+				ovsHdl.logger.Info("Router ID is", rtrId)
 				return rtrId
 			}
 		}
@@ -191,15 +191,13 @@ func (ovsHdl *BGPOvsdbHandler) DumpBgpNeighborInfo(addrs []net.IP, uuids []UUID,
 				newNeighborAddr := addrs[idx].String()
 				// @TODO: remove this neighbor config thrift call once interface for
 				// listener side is already implemented
-				neighborCfg := &bgpd.BGPNeighbor{
+				neighborCfg := &bgpd.BGPv4Neighbor{
 					PeerAS:          int32(newPeerAS),
 					LocalAS:         int32(ovsHdl.routerInfo.asn),
 					NeighborAddress: newNeighborAddr,
 				}
-				ovsHdl.logger.Info("PeerAS",
-					newPeerAS)
-				ovsHdl.logger.Info("Neighbor Addr",
-					newNeighborAddr)
+				ovsHdl.logger.Info("PeerAS", newPeerAS)
+				ovsHdl.logger.Info("Neighbor Addr", newNeighborAddr)
 				newDesc, ok := value.New.Fields["description"].(string)
 				if ok {
 					ovsHdl.logger.Info("Description", newDesc)
@@ -221,8 +219,7 @@ func (ovsHdl *BGPOvsdbHandler) DumpBgpNeighborInfo(addrs []net.IP, uuids []UUID,
 				if ok {
 					//@TODO: jgheewala talk with Harsha and figure out what is this
 					//interval
-					ovsHdl.logger.Info("Advertisement Interval",
-						newAdverInt)
+					ovsHdl.logger.Info("Advertisement Interval", newAdverInt)
 				}
 				// CreateBGPNeighbor(bgpNeighbor *bgpd.BGPNeighbor)
 				/*
@@ -251,7 +248,7 @@ func (ovsHdl *BGPOvsdbHandler) DumpBgpNeighborInfo(addrs []net.IP, uuids []UUID,
 						MaxPrefixesRestartTimer uint8
 					}
 				*/
-				ovsHdl.rpcHdl.CreateBGPNeighbor(neighborCfg)
+				ovsHdl.rpcHdl.CreateBGPv4Neighbor(neighborCfg)
 			}
 		}
 	}
@@ -284,8 +281,7 @@ func (ovsHdl *BGPOvsdbHandler) HandleBGPNeighborUpd(table ovsdb.TableUpdate) err
 	if err != nil {
 		return err
 	}
-	ovsHdl.logger.Info("neighborAddrs:", neighborAddrs, "uuid's:",
-		neighborUUIDs)
+	ovsHdl.logger.Info("neighborAddrs:", neighborAddrs, "uuid's:", neighborUUIDs)
 	ovsHdl.DumpBgpNeighborInfo(neighborAddrs, neighborUUIDs, table)
 	return nil
 }
@@ -297,8 +293,8 @@ func (ovsHdl *BGPOvsdbHandler) HandleBGPRouteUpd(table ovsdb.TableUpdate) error 
 		if err != nil {
 			return err
 		}
-		ovsHdl.logger.Info("Got BGP_Router Update asn:",
-			ovsHdl.routerInfo.asn, "BGP_Router UUID:", ovsHdl.routerInfo.uuid)
+		ovsHdl.logger.Info("Got BGP_Router Update asn:", ovsHdl.routerInfo.asn, "BGP_Router UUID:",
+			ovsHdl.routerInfo.uuid)
 	} else {
 		ovsHdl.routerInfo.routerId = ovsHdl.GetBGPRouterId(ovsHdl.routerInfo.uuid, table)
 	}

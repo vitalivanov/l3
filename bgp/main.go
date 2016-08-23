@@ -35,6 +35,9 @@ import (
 	"l3/bgp/rpc"
 	"l3/bgp/server"
 	"l3/bgp/utils"
+	"os"
+	"os/signal"
+	"syscall"
 	"utils/dbutils"
 	"utils/keepalive"
 	"utils/logging"
@@ -51,6 +54,17 @@ const (
 	OVSDB_PLUGIN = "ovsdb"
 )
 
+func BGPSignalHandler(sigChannel <-chan os.Signal, dbHdl *dbutils.DBUtil) {
+	signal := <-sigChannel
+	switch signal {
+	case syscall.SIGHUP:
+		dbHdl.DeleteObjectWithKeyFromDb("BGPRouteState*")
+		dbHdl.Disconnect()
+		os.Exit(0)
+	default:
+		os.Exit(0)
+	}
+}
 func main() {
 	//	defer profile.Start(profile.CPUProfile).Stop()
 	fmt.Println("Starting bgp daemon")
@@ -79,6 +93,11 @@ func main() {
 	// Start keepalive routine
 	go keepalive.InitKeepAlive("bgpd", fileName)
 
+	sigChannel := make(chan os.Signal, 1)
+	signalList := []os.Signal{syscall.SIGHUP}
+	signal.Notify(sigChannel, signalList...)
+	go BGPSignalHandler(sigChannel, dbUtil)
+
 	// @FIXME: Plugin name should come for json readfile...
 	//plugin := OVSDB_PLUGIN
 	// We need to revisit this plugin logic later. It should always be hidden inside a client
@@ -105,9 +124,9 @@ func main() {
 		bgpServer := server.NewBGPServer(logger, bgpPolicyMgr, iMgr, rMgr, bMgr, sDBMgr)
 		go bgpServer.StartServer()
 
-		logger.Info(fmt.Sprintln("Starting config listener..."))
+		logger.Info(" Starting config listener...")
 		confIface := rpc.NewBGPHandler(bgpServer, bgpPolicyMgr, logger, dbUtil, fileName)
-		dbUtil.Disconnect()
+		//dbUtil.Disconnect()
 
 		// create and start ovsdb handler
 		ovsdbManager, err := ovsMgr.NewBGPOvsdbHandler(logger, confIface)
@@ -151,6 +170,8 @@ func main() {
 
 		bgpServer := server.NewBGPServer(logger, bgpPolicyMgr, iMgr, rMgr, bMgr, sDBMgr)
 		go bgpServer.StartServer()
+		up := <-bgpServer.ServerUpCh
+		logger.Info(" Serverup:", up)
 
 		api.InitPolicy(bgpPolicyMgr)
 		api.Init(bgpServer)
@@ -160,7 +181,7 @@ func main() {
 
 		logger.Info(fmt.Sprintln("Starting config listener..."))
 		confIface := rpc.NewBGPHandler(bgpServer, bgpPolicyMgr, logger, dbUtil, fileName)
-		dbUtil.Disconnect()
+		//dbUtil.Disconnect()
 
 		rpc.StartServer(logger, confIface, fileName)
 	}

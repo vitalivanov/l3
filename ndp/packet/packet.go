@@ -1,6 +1,3 @@
-//
-//Copyright [2016] [SnapRoute Inc]
-//
 //Licensed under the Apache License, Version 2.0 (the "License");
 //you may not use this file except in compliance with the License.
 //You may obtain a copy of the License at
@@ -23,325 +20,147 @@
 package packet
 
 import (
-	"errors"
-	"fmt"
-	"github.com/google/gopacket"
-	"github.com/google/gopacket/layers"
 	"l3/ndp/config"
-	"l3/ndp/packet/rx"
+	"l3/ndp/debug"
 	"net"
 )
 
-type PACKET_OPERATION byte
-
-const (
-	PACKET_DROP                  PACKET_OPERATION = 1
-	PACKET_PROCESS               PACKET_OPERATION = 2
-	PACKET_FAILED_VALIDATION     PACKET_OPERATION = 3
-	NEIGBOR_SOLICITATED_PACKET   PACKET_OPERATION = 4
-	NEIGBOR_ADVERTISEMENT_PACKET PACKET_OPERATION = 5
-)
-
 type Packet struct {
+	PktCh chan config.PacketData
 	// Neighbor Cache Information
-	NbrCache map[string]NeighborCache
-	//Operation PACKET_OPERATION
+	// This is map of string to link with (map of string to NeighborCache). Each key of the outer map is the our own
+	// IP Address with its own Neigbor's map. Each inner map key is a Neighbor IP Address. Each inner map
+	// expression retrieve the information pertaining to that neighbor
+	LinkInfo map[string]Link
+
+	// Prefix List Information
+	// This is map of ifIndex (port where packet is received). Each key has PrefixList of its own
+	LinkPrefixInfo map[int32]PrefixLink
 }
 
-func Init() *Packet {
-	pkt := &Packet{}
-	pkt.NbrCache = make(map[string]NeighborCache, 100)
+func Init(pktCh chan config.PacketData) *Packet {
+	pkt := &Packet{
+		PktCh: pktCh,
+	}
+	pkt.LinkInfo = make(map[string]Link, 100)
+	pkt.LinkPrefixInfo = make(map[int32]PrefixLink, 100)
 	return pkt
 }
 
-func getEthLayer(pkt gopacket.Packet, eth *layers.Ethernet) error {
-	ethLayer := pkt.Layer(layers.LayerTypeEthernet)
-	if ethLayer == nil {
-		return errors.New("Decoding ethernet layer failed")
-	}
-	*eth = *ethLayer.(*layers.Ethernet)
-	return nil
+/*
+ * for a given link local ip address return the link information
+ * link should be created via InitLink only... and it should be accessed in non-CIDR format
+ */
+func (p *Packet) GetLink(localIP string) (Link, bool) {
+	debug.Logger.Debug("getlink called for", localIP)
+	link, exists := p.LinkInfo[localIP]
+	return link, exists
 }
 
 /*
- *			ICMPv6 MESSAGE FORMAT
- *
- *    0                   1                   2                   3
- *    0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |     Type      |     Code      |          Checksum             |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |                           Reserved                            |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |                                                               |
- *   +                                                               +
- *   |                                                               |
- *   +                       Target Address                          +
- *   |                                                               |
- *   +                                                               +
- *   |                                                               |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |   Options ...
- *   +-+-+-+-+-+-+-+-+-+-+-+-
- *
- *  API: given a packet it will fill in ip header and icmpv6
+ * Link has been modified update map entry with latest link information, this should only accept non-CIDR
+ * ip address format
  */
-func getIpAndICMPv6Hdr(pkt gopacket.Packet, ipv6Hdr *layers.IPv6, icmpv6Hdr *layers.ICMPv6) error {
-	ipLayer := pkt.Layer(layers.LayerTypeIPv6)
-	if ipLayer == nil {
-		return errors.New("Invalid IPv6 layer")
-	}
-	*ipv6Hdr = *ipLayer.(*layers.IPv6)
-	ipPayload := ipLayer.LayerPayload()
-	icmpv6Hdr.DecodeFromBytes(ipPayload, nil)
-	return nil
-}
-
-func validateIPv6Hdr(hdr *layers.IPv6) error {
-	if hdr.HopLimit != HOP_LIMIT {
-		return errors.New(fmt.Sprintln("Invalid Hop Limit", hdr.HopLimit))
-	}
-	if hdr.Length < ICMPv6_MIN_LENGTH {
-		return errors.New(fmt.Sprintln("Invalid ICMP length", hdr.Length))
-	}
-	return nil
-}
-
-func calculateChecksum(content []byte) uint16 {
-	var csum uint32
-	for i := 0; i < len(content); i += 2 {
-		csum += uint32(content[i]) << 8
-		csum += uint32(content[i+1])
-	}
-	return ^uint16((csum >> 16) + csum)
+func (p *Packet) SetLink(localIP string, link Link) {
+	p.LinkInfo[localIP] = link
 }
 
 /*
- *	          ICMPv6 PSEUDO-HDR MESSAGE FORMAT
- *
- *    0                   1                   2                   3
- *    0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
- * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- * |                                                               |
- * +                                                               +
- * |                                                               |
- * +                         Source Address                        +
- * |                                                               |
- * +                                                               +
- * |                                                               |
- * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- * |                                                               |
- * +                                                               +
- * |                                                               |
- * +                      Destination Address                      +
- * |                                                               |
- * +                                                               +
- * |                                                               |
- * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- * |                   Upper-Layer Packet Length                   |
- * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- * |                      zero                     |  Next Header  |
- * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ * Do Neighbor Cache Link Initialization Per Ip Address
  */
-func createPseudoHeader(srcIP, dstIP net.IP, icmpv6Hdr *layers.ICMPv6) []byte {
-	var buf []byte
-	/*
-	 *   PSEUDO HEADER BYTE START
-	 */
-	buf = append(buf, srcIP...)
-	buf = append(buf, dstIP...)
-	buf = append(buf, 0)
-	buf = append(buf, 0)
-	buf = append(buf, byte((ICMP_HDR_LENGTH+len(icmpv6Hdr.LayerPayload()))/256))
-	buf = append(buf, byte((ICMP_HDR_LENGTH+len(icmpv6Hdr.LayerPayload()))%256))
-	buf = append(buf, 0)
-	buf = append(buf, 0)
-	buf = append(buf, 0)
-	buf = append(buf, ICMP_PSEUDO_NEXT_HEADER)
-	/*
-	 *   PSEUDO HEADER BYTE END
-	 */
-	return buf
-}
-
-func validateChecksum(srcIP, dstIP net.IP, icmpv6Hdr *layers.ICMPv6) error {
-	var buf []byte
-	buf = append(buf, createPseudoHeader(srcIP, dstIP, icmpv6Hdr)...)
-	/*
-	 *   ICMPv6 HEADER BYTE START
-	 */
-	buf = append(buf, icmpv6Hdr.TypeCode.Type())
-	buf = append(buf, icmpv6Hdr.TypeCode.Code())
-	// add 2 bytes of Checksum..
-	for idx := 0; idx < 2; idx++ {
-		buf = append(buf, 0)
-	}
-	// add typebytes which is [4]bytes
-	buf = append(buf, icmpv6Hdr.TypeBytes...)
-	// Copy the payload which includes TargetAddress & Options..
-	buf = append(buf, icmpv6Hdr.LayerPayload()...)
-	// Pad to the next 32-bit boundary
-	for idx := 0; idx < 4-(len(icmpv6Hdr.LayerPayload())/4); idx++ {
-		buf = append(buf, 0)
-	}
-	/*
-	 *   ICMPv6 HEADER BYTE END
-	 */
-	rv := calculateChecksum(buf)
-	if rv != icmpv6Hdr.Checksum {
-		return errors.New(fmt.Sprintf("Calculated Checksum 0x%x and wanted checksum is 0x%x",
-			rv, icmpv6Hdr.Checksum))
-	}
-	return nil
-}
-
-func (p *Packet) decodeICMPv6Hdr(hdr *layers.ICMPv6, srcIP net.IP, dstIP net.IP) (*rx.NDInfo, error) {
-	ndInfo := &rx.NDInfo{}
-	typeCode := hdr.TypeCode
-	if typeCode.Code() != ICMPv6_CODE {
-		return nil, errors.New(fmt.Sprintln("Invalid Code", typeCode.Code()))
-	}
-	switch typeCode.Type() {
-	case layers.ICMPv6TypeNeighborSolicitation:
-		rx.DecodeNDInfo(hdr.LayerPayload(), ndInfo)
-		if rx.IsTargetMulticast(ndInfo.TargetAddress) {
-			return nil, errors.New(fmt.Sprintln("Targent Address specified", ndInfo.TargetAddress,
-				"is a multicast address"))
-		}
-		err := rx.ValidateNDSInfo(srcIP, dstIP, ndInfo.Options)
-		if err != nil {
-			return nil, err
-		}
-		// if source ip is not "::" then only we should update the nbrCache
-		if !srcIP.IsUnspecified() {
-			cache, exists := p.NbrCache[ndInfo.TargetAddress.String()]
-			if exists {
-				// @TODO: need to do something like updating timer or what not
-			}
-			// In this case check for Source Link Layer Option... if specified then mark the state as
-			// reachable and create neighbor entry in the platform
-			if len(ndInfo.Options) > 0 {
-				for _, option := range ndInfo.Options {
-					if option.Type == rx.NDOptionTypeSourceLinkLayerAddress {
-						cache.State = REACHABLE
-						mac := net.HardwareAddr(option.Value)
-						cache.LinkLayerAddress = mac.String()
-					}
-				}
-			} else {
-				cache.State = INCOMPLETE
-			}
-			p.NbrCache[ndInfo.TargetAddress.String()] = cache
-		}
-	case layers.ICMPv6TypeNeighborAdvertisement:
-		rx.DecodeNDInfo(hdr.LayerPayload(), ndInfo)
-		if rx.IsTargetMulticast(ndInfo.TargetAddress) {
-			return nil, errors.New(fmt.Sprintln("Targent Address specified", ndInfo.TargetAddress,
-				"is a multicast address"))
-		}
-		err := rx.ValidateNDAInfo(hdr.TypeBytes, dstIP)
-		if err != nil {
-			return nil, err
-		}
-		cache, exists := p.NbrCache[ndInfo.TargetAddress.String()]
-		if !exists {
-			//@TODO: need to drop advertisement packet??
-		}
-		cache.State = REACHABLE
-		if len(ndInfo.Options) > 0 {
-			for _, option := range ndInfo.Options {
-				if option.Type == rx.NDOptionTypeTargetLinkLayerAddress {
-					mac := net.HardwareAddr(option.Value)
-					cache.LinkLayerAddress = mac.String()
-				}
-			}
-		}
-		p.NbrCache[ndInfo.TargetAddress.String()] = cache
-
-	case layers.ICMPv6TypeRouterSolicitation:
-		return nil, errors.New("Router Solicitation is not yet supported")
-	default:
-		return nil, errors.New(fmt.Sprintln("Not Supported ICMPv6 Type:", typeCode.Type()))
-	}
-	return ndInfo, nil
-}
-
-func (p *Packet) populateNeighborInfo(nbrInfo *config.NeighborInfo, eth *layers.Ethernet, ipv6Hdr *layers.IPv6,
-	icmpv6Hdr *layers.ICMPv6, ndInfo *rx.NDInfo) {
-	if eth == nil || ipv6Hdr == nil || icmpv6Hdr == nil {
+func (p *Packet) initLinkInfo(ifIndex int32, ip, mac string) {
+	debug.Logger.Debug("Initializing link Info with ifIndex:", ifIndex, "ip:", ip, "mac:", mac)
+	localIP, _, err := net.ParseCIDR(ip)
+	if err != nil {
+		debug.Logger.Err("Creating link Info for ip:", ip, "mac:", mac, "ifIndex:", ifIndex,
+			"failed with error:", err)
 		return
 	}
-	nbrInfo.MacAddr = (eth.SrcMAC).String()
-	nbrInfo.IpAddr = (ipv6Hdr.SrcIP).String()
-	nbrInfo.LinkLocalIp = ndInfo.TargetAddress.String()
-	if entry, exists := p.NbrCache[ndInfo.TargetAddress.String()]; exists {
-		nbrInfo.State = entry.State
-	} else {
-		nbrInfo.PktOperation = byte(PACKET_DROP)
+	link, exists := p.LinkInfo[localIP.String()]
+	if !exists {
+		link.Init()
 	}
+	link.PortIfIndex = ifIndex
+	link.LinkLocalAddress = mac
+	// @TODO: need to get RETRANS_TIMER & REACHABLE_TIMER from config
+	link.RetransTimer = 1000
+	link.ReachableTime = 30000
+	p.SetLink(localIP.String(), link)
+	debug.Logger.Debug("New Packet LinkInfo is", link)
 }
 
-/* API: Get IPv6 & ICMPv6 Header
- *      Does Validation of IPv6
- *      Does Validation of ICMPv6
- * Validation Conditions are defined below, if anyone of them do not satisfy discard the packet:
- *  - The IP Hop Limit field has a value of 255, i.e., the packet
- *   could not possibly have been forwarded by a router. <- done
- *
- *  - ICMP Checksum is valid. <- done
- *
- *  - ICMP Code is 0. <- done
- *
- *  - ICMP length (derived from the IP length) is 24 or more octets. <- done
- *
- *  - Target Address is not a multicast address. <- done
- *
- *  - All included options have a length that is greater than zero. <- @TODO: need to add this later
- *
- *  - If the IP source address is the unspecified address, the IP
- *    destination address is a solicited-node multicast address. <- done
- *
- *  - If the IP source address is the unspecified address, there is no
- *    source link-layer address option in the message. <- @TODO: need to be done later
+/*
+ * for a given ifIndex it will return mylink where prefixes are learned
  */
-func (p *Packet) ValidateAndParse(nbrInfo *config.NeighborInfo, pkt gopacket.Packet) error {
-	// first decode all the layers
-	icmpv6Hdr := &layers.ICMPv6{}
-	ipv6Hdr := &layers.IPv6{}
-	eth := &layers.Ethernet{}
-	var err error
+func (p *Packet) GetLinkPrefix(ifIndex int32) (PrefixLink, bool) {
+	debug.Logger.Debug("GetLinkPrefix called for", ifIndex)
+	prefixLink, exists := p.LinkPrefixInfo[ifIndex]
+	return prefixLink, exists
+}
 
-	// Get Ethernet Layer
-	err = getEthLayer(pkt, eth)
+/*
+ * Prefix Link has been modified and hence updating the map
+ */
+func (p *Packet) SetLinkPrefix(ifIndex int32, prefixLink PrefixLink) {
+	p.LinkPrefixInfo[ifIndex] = prefixLink
+}
+
+/*
+ *  Do Prefix Link Initialization Per IfIndex
+ */
+func (p *Packet) initPrefixList(ifIndex int32, ipAddr, mac string) {
+	debug.Logger.Debug("Initializing Prefix Link for ifIndex:", ifIndex, "ip:", ipAddr, "mac:", mac)
+	ip, _, err := net.ParseCIDR(ipAddr)
 	if err != nil {
-		return err
+		debug.Logger.Err("Creating Link Prefix Info for ip:", ipAddr, "mac:", mac, "ifIndex:", ifIndex,
+			"failed with error:", err)
+		return
+	}
+	myLink, exists := p.LinkPrefixInfo[ifIndex]
+	if exists {
+		// then it means that we have received an update in ip address
+		debug.Logger.Debug("Received Update for ifIndex:", ifIndex, "ipAddr:", ipAddr)
+	} else {
+		// this is first time create for the ifIndex
+		debug.Logger.Debug("Received Create for ifIndex:", ifIndex, "ipAddr:", ipAddr)
 	}
 
-	// First get ipv6 and icmp6 information
-	err = getIpAndICMPv6Hdr(pkt, ipv6Hdr, icmpv6Hdr)
-	if err != nil {
-		return err
+	if ip.IsLinkLocalUnicast() {
+		// this is link local ip address
+		myLink.LinkLocalIp = ip.String()
+	} else {
+		myLink.GlobalIp = ip.String()
 	}
 
-	// Validating ipv6 header
-	err = validateIPv6Hdr(ipv6Hdr)
-	if err != nil {
-		return err
-	}
+	p.LinkPrefixInfo[ifIndex] = myLink
+	debug.Logger.Debug("New Packet LinkPrefixInfo is", myLink)
+}
 
-	// Validating icmpv6 header
-	ndInfo, err := p.decodeICMPv6Hdr(icmpv6Hdr, ipv6Hdr.SrcIP, ipv6Hdr.DstIP)
-	if err != nil {
-		return err
-	}
+/*
+ * Init Link information with IP Address, PortIfIndex, PortMacAddress, API is called when ip interface
+ * is created. Input is expected to be in CIDR format only. This will be called during ip link create
+ */
+func (p *Packet) InitLink(ifIndex int32, ip, mac string) {
+	// Initializing link for Neighbor Cache
+	p.initLinkInfo(ifIndex, ip, mac)
+	// Inititalizing link for PrefixList
+	p.initPrefixList(ifIndex, ip, mac)
+}
 
-	// Validating checksum received
-	err = validateChecksum(ipv6Hdr.SrcIP, ipv6Hdr.DstIP, icmpv6Hdr)
+/*
+ *  On delete ipv6 interface, we will get a request to delete the link.. we will call flush neighbor entries
+ *  internally within the api and return the caller list of neighbor entries that need to be deleted from
+ *  hardware
+ *  @NOTE: input should in CIDR format
+ */
+func (p *Packet) DeleteLink(ip string) []string {
+	deleteEntries, _ := p.FlushNeighbors(ip)
+	localIp, _, err := net.ParseCIDR(ip)
 	if err != nil {
-		return err
+		debug.Logger.Err("Parsing ip", ip, "failed with err:", err)
+		return deleteEntries
 	}
-
-	// Populate Neighbor Information
-	p.populateNeighborInfo(nbrInfo, eth, ipv6Hdr, icmpv6Hdr, ndInfo)
-	return nil
+	// @TODO: add api to handle ip interface delete
+	delete(p.LinkInfo, localIp.String())
+	return deleteEntries
 }

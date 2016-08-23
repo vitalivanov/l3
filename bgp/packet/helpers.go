@@ -154,6 +154,33 @@ func RemoveMPAttrs(pathAttrs *[]BGPPathAttr) (mpReach *BGPPathAttrMPReachNLRI, m
 	return mpReach, mpUnreach
 }
 
+func getPathAttr(updateMsg *BGPMessage, code BGPPathAttrType) BGPPathAttr {
+	body := updateMsg.Body.(*BGPUpdate)
+	return getTypeFromPathAttrs(body.PathAttributes, code)
+}
+
+func getTypeFromPathAttrs(pathAttrs []BGPPathAttr, code BGPPathAttrType) BGPPathAttr {
+	for _, pa := range pathAttrs {
+		if pa.GetCode() == code {
+			return pa
+		}
+	}
+	return nil
+}
+
+func GetMPAttrs(pathAttrs []BGPPathAttr) (mpReach *BGPPathAttrMPReachNLRI, mpUnreach *BGPPathAttrMPUnreachNLRI) {
+	reach := getTypeFromPathAttrs(pathAttrs, BGPPathAttrTypeMPReachNLRI)
+	if reach != nil {
+		mpReach = reach.(*BGPPathAttrMPReachNLRI)
+	}
+
+	unreach := getTypeFromPathAttrs(pathAttrs, BGPPathAttrTypeMPUnreachNLRI)
+	if unreach != nil {
+		mpUnreach = unreach.(*BGPPathAttrMPUnreachNLRI)
+	}
+	return mpReach, mpUnreach
+}
+
 func SetLocalPref(updateMsg *BGPMessage, pref uint32) {
 	body := updateMsg.Body.(*BGPUpdate)
 
@@ -456,7 +483,18 @@ func ConstructPathAttrForAggRoutes(pathAttrs []BGPPathAttr, generateASSet bool) 
 	return newPathAttrs
 }
 
-func ConstructPathAttrForConnRoutes(ip net.IP, as uint32) []BGPPathAttr {
+func ConstructMPReachNLRIForAggRoutes(protoFamily uint32) *BGPPathAttrMPReachNLRI {
+	nh := NewMPNextHopIP()
+	nh.SetNextHop(net.IPv6zero)
+	afi, safi := GetAfiSafi(protoFamily)
+	pa := NewBGPPathAttrMPReachNLRI()
+	pa.AFI = afi
+	pa.SAFI = safi
+	pa.SetNextHop(nh)
+	return pa
+}
+
+func ConstructPathAttrForConnRoutes(as uint32) []BGPPathAttr {
 	pathAttrs := make([]BGPPathAttr, 0)
 
 	origin := NewBGPPathAttrOrigin(BGPPathAttrOriginIncomplete)
@@ -466,7 +504,7 @@ func ConstructPathAttrForConnRoutes(ip net.IP, as uint32) []BGPPathAttr {
 	pathAttrs = append(pathAttrs, asPath)
 
 	nextHop := NewBGPPathAttrNextHop()
-	nextHop.Value = ip
+	nextHop.Value = net.IPv4zero
 	pathAttrs = append(pathAttrs, nextHop)
 
 	return pathAttrs
@@ -482,12 +520,12 @@ func ConstructIPPrefix(ipStr string, maskStr string) *IPPrefix {
 	ip := net.ParseIP(ipStr)
 	var mask net.IPMask
 	if ip.To4() != nil {
-		utils.Logger.Infof("ConstructIPPrefix IPv6 - mask ip %+v mask ip mask %+v",
-			net.ParseIP(maskStr), net.IPMask(net.ParseIP(maskStr).To4()))
+		utils.Logger.Infof("ConstructIPPrefix IPv6 - mask ip %+v mask ip mask %+v", net.ParseIP(maskStr),
+			net.IPMask(net.ParseIP(maskStr).To4()))
 		mask = net.IPMask(net.ParseIP(maskStr).To4())
 	} else {
-		utils.Logger.Infof("ConstructIPPrefix IPv4 - mask ip %+v mask ip mask %+v",
-			net.ParseIP(maskStr), net.IPMask(net.ParseIP(maskStr).To16()))
+		utils.Logger.Infof("ConstructIPPrefix IPv4 - mask ip %+v mask ip mask %+v", net.ParseIP(maskStr),
+			net.IPMask(net.ParseIP(maskStr).To16()))
 		mask = net.IPMask(net.ParseIP(maskStr).To16())
 	}
 	ones, _ := mask.Size()
@@ -503,6 +541,35 @@ func ConstructIPPrefixFromCIDR(cidr string) (*IPPrefix, error) {
 
 	ones, _ := ipNet.Mask.Size()
 	return NewIPPrefix(ipNet.IP, uint8(ones)), nil
+}
+
+func ConstructMPUnreachNLRI(protoFamily uint32, nlriList []NLRI) *BGPPathAttrMPUnreachNLRI {
+	afi, safi := GetAfiSafi(protoFamily)
+	mpUnreachNLRI := NewBGPPathAttrMPUnreachNLRI()
+	mpUnreachNLRI.AFI = afi
+	mpUnreachNLRI.SAFI = safi
+	mpUnreachNLRI.AddNLRIList(nlriList)
+	return mpUnreachNLRI
+}
+
+func ConstructIPv6MPReachNLRI(protoFamily uint32, nextHop, nextHopLinkLocal net.IP,
+	nlriList []NLRI) *BGPPathAttrMPReachNLRI {
+	afi, safi := GetAfiSafi(protoFamily)
+	mpReachNLRI := NewBGPPathAttrMPReachNLRI()
+	mpReachNLRI.AFI = afi
+	mpReachNLRI.SAFI = safi
+	mpNextHop := NewMPNextHopIP6()
+	mpNextHop.SetGlobalNextHop(nextHop)
+	if nextHopLinkLocal != nil && nextHopLinkLocal.To16() == nil {
+		mpNextHop.SetLinkLocalNextHop(nextHopLinkLocal)
+	}
+	mpReachNLRI.SetNextHop(mpNextHop)
+	mpReachNLRI.SetNLRIList(nlriList)
+	return mpReachNLRI
+}
+
+func ConstructIPv6MPReachNLRIForConnRoutes(protoFamily uint32) *BGPPathAttrMPReachNLRI {
+	return ConstructIPv6MPReachNLRI(protoFamily, net.IPv6zero, nil, nil)
 }
 
 func AddOriginatorId(updateMsg *BGPMessage, id net.IP) bool {
@@ -599,7 +666,7 @@ func ConstructOptParams(as uint32, afiSAfiMap map[uint32]bool, addPathsRx bool, 
 
 	for protoFamily, _ := range afiSAfiMap {
 		afi, safi := GetAfiSafi(protoFamily)
-		utils.Logger.Infof("Advertising capability for afi %d safi %d\n", afi, safi)
+		utils.Logger.Infof("Advertising capability for afi %d safi %d", afi, safi)
 		capAfiSafi := NewBGPCapMPExt(afi, safi)
 		capParams = append(capParams, capAfiSafi)
 
@@ -608,7 +675,7 @@ func ConstructOptParams(as uint32, afiSAfiMap map[uint32]bool, addPathsRx bool, 
 	}
 
 	if addPathFlags != 0 {
-		utils.Logger.Infof("Advertising capability for addPaths %+v\n", capAddPaths.Value)
+		utils.Logger.Infof("Advertising capability for addPaths %+v", capAddPaths.Value)
 		capParams = append(capParams, capAddPaths)
 	}
 
@@ -639,7 +706,7 @@ func GetAddPathFamily(openMsg *BGPOpen) map[AFI]map[SAFI]uint8 {
 		if capabilities, ok := optParam.(*BGPOptParamCapability); ok {
 			for _, capability := range capabilities.Value {
 				if addPathCap, ok := capability.(*BGPCapAddPath); ok {
-					utils.Logger.Infof("add path capability = %+v\n", addPathCap)
+					utils.Logger.Infof("add path capability = %+v", addPathCap)
 					for _, val := range addPathCap.Value {
 						if _, ok := addPathFamily[val.AFI]; !ok {
 							addPathFamily[val.AFI] = make(map[SAFI]uint8)
@@ -658,14 +725,25 @@ func GetAddPathFamily(openMsg *BGPOpen) map[AFI]map[SAFI]uint8 {
 
 func IsAddPathsTxEnabledForIPv4(addPathFamily map[AFI]map[SAFI]uint8) bool {
 	enabled := false
-	if _, ok := addPathFamily[AfiIP]; ok {
-		for safi, flags := range addPathFamily[AfiIP] {
-			if (safi == SafiUnicast || safi == SafiMulticast) && (flags&BGPCapAddPathTx != 0) {
+	/*
+		if _, ok := addPathFamily[AfiIP]; ok {
+			for safi, flags := range addPathFamily[AfiIP] {
+				if (safi == SafiUnicast || safi == SafiMulticast) && (flags&BGPCapAddPathTx != 0) {
+					utils.Logger.Infof("isAddPathsTxEnabledForIPv4 - add path Tx enabled for IPv4")
+					enabled = true
+				}
+			}
+		}
+	*/
+	for afi, _ := range addPathFamily {
+		for _, flags := range addPathFamily[afi] {
+			if flags&BGPCapAddPathTx != 0 {
 				utils.Logger.Infof("isAddPathsTxEnabledForIPv4 - add path Tx enabled for IPv4")
 				enabled = true
 			}
 		}
 	}
+
 	return enabled
 }
 

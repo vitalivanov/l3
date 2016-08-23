@@ -28,11 +28,11 @@ import (
 	"asicdServices"
 	"encoding/json"
 	"errors"
-	_ "fmt"
 	"l3/bgp/api"
 	"l3/bgp/config"
 	"l3/bgp/rpc"
 	"strconv"
+	"utils/commonDefs"
 	"utils/logging"
 
 	nanomsg "github.com/op/go-nanomsg"
@@ -75,27 +75,23 @@ func (mgr *FSIntfMgr) setupSubSocket(address string) (*nanomsg.SubSocket, error)
 	var err error
 	var socket *nanomsg.SubSocket
 	if socket, err = nanomsg.NewSubSocket(); err != nil {
-		mgr.logger.Errf("Failed to create subscribe socket %s, error:%s",
-			address, err)
+		mgr.logger.Errf("Failed to create subscribe socket %s, error:%s", address, err)
 		return nil, err
 	}
 
 	if err = socket.Subscribe(""); err != nil {
-		mgr.logger.Errf("Failed to subscribe to \"\" on subscribe socket %s,",
-			"error:%s", address, err)
+		mgr.logger.Errf("Failed to subscribe to \"\" on subscribe socket %s, error:%s", address, err)
 		return nil, err
 	}
 
 	if _, err = socket.Connect(address); err != nil {
-		mgr.logger.Errf("Failed to connect to publisher socket %s, error:%s",
-			address, err)
+		mgr.logger.Errf("Failed to connect to publisher socket %s, error:%s", address, err)
 		return nil, err
 	}
 
 	mgr.logger.Infof("Connected to publisher socker %s", address)
 	if err = socket.SetRecvBuffer(1024 * 1024); err != nil {
-		mgr.logger.Err("Failed to set the buffer size for subsriber socket %s,",
-			"error:", address, err)
+		mgr.logger.Err("Failed to set the buffer size for subsriber socket %s, error:", address, err)
 		return nil, err
 	}
 	return socket, nil
@@ -121,17 +117,35 @@ func (mgr *FSIntfMgr) listenForAsicdEvents() {
 		}
 
 		switch event.MsgType {
+		case asicdCommonDefs.NOTIFY_LOGICAL_INTF_CREATE:
+			mgr.logger.Info("asicdCommonDefs.NOTIFY_LOGICAL_INTF_CREATE")
+			var logicalIntfNotifyMsg asicdCommonDefs.LogicalIntfNotifyMsg
+			err = json.Unmarshal(event.Msg, &logicalIntfNotifyMsg)
+			if err != nil {
+				mgr.logger.Err("Unable to unmarshal logicalIntfNotifyMsg:", event.Msg)
+				return
+			}
+			api.SendIntfMapNotification(logicalIntfNotifyMsg.IfIndex, logicalIntfNotifyMsg.LogicalIntfName)
+			break
+		case asicdCommonDefs.NOTIFY_VLAN_CREATE:
+			mgr.logger.Info("asicdCommonDefs.NOTIFY_VLAN_CREATE")
+			var vlanNotifyMsg asicdCommonDefs.VlanNotifyMsg
+			err = json.Unmarshal(event.Msg, &vlanNotifyMsg)
+			if err != nil {
+				mgr.logger.Info("Unable to unmarshal vlanNotifyMsg:", event.Msg)
+				return
+			}
+			api.SendIntfMapNotification(asicdCommonDefs.GetIfIndexFromIntfIdAndIntfType(int(vlanNotifyMsg.VlanId), commonDefs.IfTypeVlan), vlanNotifyMsg.VlanName)
+			break
 		case asicdCommonDefs.NOTIFY_L3INTF_STATE_CHANGE:
 			var msg asicdCommonDefs.L3IntfStateNotifyMsg
 			err = json.Unmarshal(event.Msg, &msg)
 			if err != nil {
-				mgr.logger.Errf("Unmarshal Asicd L3INTF",
-					"event failed with err %s", err)
+				mgr.logger.Errf("Unmarshal Asicd L3INTF event failed with err %s", err)
 				return
 			}
 
-			mgr.logger.Infof("Asicd L3INTF event idx %d ip %s state %d\n", msg.IfIndex, msg.IpAddr,
-				msg.IfState)
+			mgr.logger.Infof("Asicd L3INTF event idx %d ip %s state %d", msg.IfIndex, msg.IpAddr, msg.IfState)
 			if msg.IfState == asicdCommonDefs.INTF_STATE_DOWN {
 				api.SendIntfNotification(msg.IfIndex, msg.IpAddr, config.INTF_STATE_DOWN)
 			} else {
@@ -146,7 +160,7 @@ func (mgr *FSIntfMgr) listenForAsicdEvents() {
 				return
 			}
 
-			mgr.logger.Infof("Asicd IPV4INTF event idx %d ip %s\n", msg.IfIndex, msg.IpAddr)
+			mgr.logger.Infof("Asicd IPV4INTF event idx %d ip %s", msg.IfIndex, msg.IpAddr)
 			if event.MsgType == asicdCommonDefs.NOTIFY_IPV4INTF_CREATE {
 				api.SendIntfNotification(msg.IfIndex, msg.IpAddr, config.INTF_CREATED)
 			} else {
@@ -162,8 +176,7 @@ func (mgr *FSIntfMgr) GetIPv4Intfs() []*config.IntfStateInfo {
 	intfs := make([]*config.IntfStateInfo, 0)
 	count = 100
 	for {
-		mgr.logger.Info("Getting ", count,
-			"IPv4IntfState objects from currMarker", currMarker)
+		mgr.logger.Info("Getting ", count, "IPv4IntfState objects from currMarker", currMarker)
 		getBulkInfo, err := mgr.AsicdClient.GetBulkIPv4IntfState(currMarker, count)
 		if err != nil {
 			mgr.logger.Info("GetBulkIPv4IntfState failed with error", err)
@@ -189,6 +202,38 @@ func (mgr *FSIntfMgr) GetIPv4Intfs() []*config.IntfStateInfo {
 	return intfs
 }
 
+func (mgr *FSIntfMgr) GetIPv6Intfs() []*config.IntfStateInfo {
+	var currMarker asicdServices.Int
+	var count asicdServices.Int
+	intfs := make([]*config.IntfStateInfo, 0)
+	count = 100
+	for {
+		mgr.logger.Info("Getting ", count, "IPv6IntfState objects from currMarker", currMarker)
+		getBulkInfo, err := mgr.AsicdClient.GetBulkIPv6IntfState(currMarker, count)
+		if err != nil {
+			mgr.logger.Info("GetBulkIPv6IntfState failed with error", err)
+			break
+		}
+		if getBulkInfo.Count == 0 {
+			mgr.logger.Info("0 objects returned from GetBulkIPv6IntfState")
+			break
+		}
+		mgr.logger.Info("len(getBulkInfo.IPv6IntfStateList)  =", len(getBulkInfo.IPv6IntfStateList),
+			"num objects returned =", getBulkInfo.Count)
+		for _, intfState := range getBulkInfo.IPv6IntfStateList {
+			intf := config.NewIntfStateInfo(intfState.IfIndex, intfState.IpAddr, config.INTF_CREATED)
+			intfs = append(intfs, intf)
+		}
+		if getBulkInfo.More == false {
+			mgr.logger.Info("more returned as false, so no more get bulks")
+			break
+		}
+		currMarker = getBulkInfo.EndIdx
+	}
+
+	return intfs
+}
+
 func (mgr *FSIntfMgr) GetIPv4Information(ifIndex int32) (string, error) {
 	ipv4IntfState, err := mgr.AsicdClient.GetIPv4IntfState(strconv.Itoa(int(ifIndex)))
 	if err != nil {
@@ -196,7 +241,108 @@ func (mgr *FSIntfMgr) GetIPv4Information(ifIndex int32) (string, error) {
 	}
 	return ipv4IntfState.IpAddr, err
 }
+func (mgr *FSIntfMgr) GetIPv6Information(ifIndex int32) (string, error) {
+	ipv6IntfState, err := mgr.AsicdClient.GetIPv6IntfState(strconv.Itoa(int(ifIndex)))
+	if err != nil {
+		return "", nil
+	}
+	return ipv6IntfState.IpAddr, err
+}
 
 func (mgr *FSIntfMgr) GetIfIndex(ifIndex, ifType int) int32 {
 	return asicdCommonDefs.GetIfIndexFromIntfIdAndIntfType(ifIndex, ifType)
+}
+
+func (m *FSIntfMgr) GetLogicalIntfInfo() []config.IntfMapInfo {
+	m.logger.Info("Getting Logical Interfaces from asicd")
+	intfMaps := make([]config.IntfMapInfo, 0)
+	var currMarker asicdServices.Int
+	var count asicdServices.Int
+	count = 100
+	for {
+		m.logger.Info("Getting ", count, "GetBulkLogicalIntf objects from currMarker:", currMarker)
+		bulkInfo, err := m.AsicdClient.GetBulkLogicalIntfState(currMarker, count)
+		if err != nil {
+			m.logger.Err("GetBulkLogicalIntfState with err ", err)
+			return intfMaps
+		}
+		if bulkInfo.Count == 0 {
+			m.logger.Err("0 objects returned from GetBulkLogicalIntfState")
+			return intfMaps
+		}
+		m.logger.Info("len(bulkInfo.GetBulkLogicalIntfState)  = ", len(bulkInfo.LogicalIntfStateList), " num objects returned = ", bulkInfo.Count)
+		for i := 0; i < int(bulkInfo.Count); i++ {
+			ifId := (bulkInfo.LogicalIntfStateList[i].IfIndex)
+			m.logger.Info("logical interface = ", bulkInfo.LogicalIntfStateList[i].Name, "ifId = ", ifId)
+			intfMap := config.IntfMapInfo{Idx: ifId, IfName: bulkInfo.LogicalIntfStateList[i].Name}
+			intfMaps = append(intfMaps, intfMap)
+		}
+		if bulkInfo.More == false {
+			return intfMaps
+		}
+		currMarker = asicdServices.Int(bulkInfo.EndIdx)
+	}
+	return intfMaps
+}
+func (m *FSIntfMgr) GetVlanInfo() []config.IntfMapInfo {
+	m.logger.Info("Getting vlans from asicd")
+	intfMaps := make([]config.IntfMapInfo, 0)
+	var currMarker asicdServices.Int
+	var count asicdServices.Int
+	count = 100
+	for {
+		m.logger.Info("Getting ", count, "GetBulkVlan objects from currMarker:", currMarker)
+		bulkInfo, err := m.AsicdClient.GetBulkVlanState(currMarker, count)
+		if err != nil {
+			m.logger.Err("GetBulkVlan with err ", err)
+			return intfMaps
+		}
+		if bulkInfo.Count == 0 {
+			m.logger.Err("0 objects returned from GetBulkVlan")
+			return intfMaps
+		}
+		m.logger.Info("len(bulkInfo.GetBulkVlan)  = ", len(bulkInfo.VlanStateList), " num objects returned = ", bulkInfo.Count)
+		for i := 0; i < int(bulkInfo.Count); i++ {
+			ifId := (bulkInfo.VlanStateList[i].IfIndex)
+			m.logger.Info("vlan = ", bulkInfo.VlanStateList[i].VlanId, "ifId = ", ifId)
+			intfMap := config.IntfMapInfo{Idx: ifId, IfName: bulkInfo.VlanStateList[i].VlanName}
+			intfMaps = append(intfMaps, intfMap)
+		}
+		if bulkInfo.More == false {
+			return intfMaps
+		}
+		currMarker = asicdServices.Int(bulkInfo.EndIdx)
+	}
+	return intfMaps
+}
+func (m *FSIntfMgr) GetPortInfo() []config.IntfMapInfo {
+	m.logger.Info("Getting ports from asicd")
+	intfMaps := make([]config.IntfMapInfo, 0)
+	var currMarker asicdServices.Int
+	var count asicdServices.Int
+	count = 100
+	for {
+		m.logger.Info(" Getting ", count, "objects from currMarker:", currMarker)
+		bulkInfo, err := m.AsicdClient.GetBulkPortState(currMarker, count)
+		if err != nil {
+			m.logger.Err("GetBulkPortState with err ", err)
+			return intfMaps
+		}
+		if bulkInfo.Count == 0 {
+			m.logger.Err("0 objects returned from GetBulkPortState")
+			return intfMaps
+		}
+		m.logger.Info("len(bulkInfo.PortStateList)  = ", len(bulkInfo.PortStateList), " num objects returned = ", bulkInfo.Count)
+		for i := 0; i < int(bulkInfo.Count); i++ {
+			ifId := bulkInfo.PortStateList[i].IfIndex
+			m.logger.Info("ifId = ", ifId)
+			intfMap := config.IntfMapInfo{Idx: ifId, IfName: bulkInfo.PortStateList[i].Name}
+			intfMaps = append(intfMaps, intfMap)
+		}
+		if bulkInfo.More == false {
+			return intfMaps
+		}
+		currMarker = asicdServices.Int(bulkInfo.EndIdx)
+	}
+	return intfMaps
 }

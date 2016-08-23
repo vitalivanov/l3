@@ -32,6 +32,7 @@ type SourcePolicyMap struct {
 	Sources string
 	Policy  string
 }
+
 type GlobalConfig struct {
 	AS                  uint32
 	RouterId            net.IP
@@ -65,6 +66,13 @@ const (
 	PeerTypeExternal
 )
 
+type PeerAddressType int
+
+const (
+	PeerAddressV4 PeerAddressType = iota
+	PeerAddressV6
+)
+
 type BgpCounters struct {
 	Update       uint64
 	Notification uint64
@@ -83,6 +91,7 @@ type Queues struct {
 type BaseConfig struct {
 	PeerAS                  uint32
 	LocalAS                 uint32
+	PeerAddressType         PeerAddressType
 	UpdateSource            string
 	AuthPassword            string
 	Description             string
@@ -233,13 +242,18 @@ type BGPAggregate struct {
 	IPPrefix        string
 	GenerateASSet   bool
 	SendSummaryOnly bool
+	AddressFamily   uint32
+}
+
+type AddressFamily struct {
+	BgpAggs map[string]*BGPAggregate
 }
 
 type Bgp struct {
 	Global     Global
 	PeerGroups map[string]*PeerGroup
 	Neighbors  []Neighbor
-	BgpAggs    map[string]*BGPAggregate
+	Afs        map[uint32]*AddressFamily
 }
 
 type ConditionInfo struct {
@@ -248,6 +262,7 @@ type ConditionInfo struct {
 	IpPrefix        string
 	MasklengthRange string
 }
+
 type RouteConfig struct {
 	Cost              int32
 	IntfType          int32
@@ -257,4 +272,5 @@ type RouteConfig struct {
 	DestinationNw     string
 	OutgoingInterface string
 	IsIPv6            bool
+	NullRoute         bool
 }

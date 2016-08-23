@@ -274,8 +274,7 @@ func (l *LocRib) ProcessRoutes(peerIP string, add, rem []packet.NLRI, addPath, r
 				addedAllPrefixes = false
 				continue
 			}
-			l.logger.Infof("Increment prefix count for destination %s from Peer %s",
-				nlri.GetPrefix().String(), peerIP)
+			l.logger.Infof("Increment prefix count for destination %s from Peer %s", nlri.GetPrefix().String(), peerIP)
 			addPath.NeighborConf.IncrPrefixCount()
 		}
 
@@ -307,8 +306,8 @@ func (l *LocRib) ProcessRoutesForReachableRoutes(nextHop string, reachabilityInf
 			path.SetReachabilityForNextHop(nextHop, reachabilityInfo)
 			peerIP := path.GetPeerIP()
 			if peerIP == "" {
-				l.logger.Errf("ProcessRoutesForReachableRoutes: nexthop %s peer ip not found for path %+v",
-					nextHop, path)
+				l.logger.Errf("ProcessRoutesForReachableRoutes: nexthop %s peer ip not found for path %+v", nextHop,
+					path)
 				continue
 			}
 
@@ -575,6 +574,12 @@ func (l *LocRib) AddRouteToAggregate(ip *packet.IPPrefix, aggIP *packet.IPPrefix
 	updated := make(map[uint32]map[*Path][]*Destination)
 	updatedAddPaths := make([]*Destination, 0)
 
+	nextHop := packet.GetZeroNextHopForFamily(protoFamily)
+	if nextHop == nil {
+		l.logger.Info("AddRouteToAggregate: Did not find next hop for protocol family", protoFamily)
+		return updated, withdrawn, nil
+	}
+
 	l.logger.Infof("LocRib:AddRouteToAggregate - ip %v, aggIP %v", ip, aggIP)
 	if dest, ok = l.GetDest(ip, protoFamily, false); !ok {
 		l.logger.Info("AddRouteToAggregate: routes ip", ip, "not found")
@@ -597,31 +602,16 @@ func (l *LocRib) AddRouteToAggregate(ip *packet.IPPrefix, aggIP *packet.IPPrefix
 		l.logger.Infof("LocRib:AddRouteToAggregate - aggIP %v, agg path NOT found, create new path", aggIP)
 		op = l.stateDBMgr.AddObject
 		pathAttrs := packet.ConstructPathAttrForAggRoutes(path.PathAttrs, bgpAgg.GenerateASSet)
-		if ifaceIP != nil {
-			packet.SetNextHopPathAttrs(pathAttrs, ifaceIP)
-		}
+		packet.SetNextHopPathAttrs(pathAttrs, net.IPv4zero)
 		packet.SetPathAttrAggregator(pathAttrs, l.gConf.AS, l.gConf.RouterId)
-		aggPath = NewPath(path.rib, nil, pathAttrs, nil, RouteTypeAgg)
+		mpReachNLRI := packet.ConstructMPReachNLRIForAggRoutes(protoFamily)
+		aggPath = NewPath(path.rib, nil, pathAttrs, mpReachNLRI, RouteTypeAgg)
 		aggPath.setAggregatedPath(ip.Prefix.String(), path)
 		aggDest, _ := l.GetDest(aggIP, protoFamily, true)
 		aggDest.AddOrUpdatePath(srcIP, AggregatePathId, aggPath)
 		aggDest.addAggregatedDests(ip.Prefix.String(), dest)
-	}
-
-	nextHopStr := aggPath.GetNextHop(protoFamily).String()
-	reachabilityInfo := l.GetReachabilityInfo(nextHopStr)
-	aggPath.SetReachabilityForFamily(protoFamily, reachabilityInfo)
-
-	if reachabilityInfo == nil {
-		l.logger.Infof("ProcessUpdate - next hop %s is not reachable", nextHopStr)
-
-		if _, ok := l.unreachablePaths[nextHopStr]; !ok {
-			l.unreachablePaths[nextHopStr] = make(map[*Path]map[*Destination][]uint32)
-		}
-
-		if _, ok := l.unreachablePaths[nextHopStr][aggPath]; !ok {
-			l.unreachablePaths[nextHopStr][aggPath] = make(map[*Destination][]uint32)
-		}
+		reachabilityInfo := NewReachabilityInfo(nextHop.String(), 0, 0, 0)
+		aggPath.SetReachabilityForFamily(protoFamily, reachabilityInfo)
 	}
 
 	action, addPathsMod, addRoutes, updRoutes, delRoutes := aggDest.SelectRouteForLocRib(addPathCount)
@@ -629,13 +619,6 @@ func (l *LocRib) AddRouteToAggregate(ip *packet.IPPrefix, aggIP *packet.IPPrefix
 		aggDest, updated, withdrawn, updatedAddPaths)
 	if action == RouteActionAdd || action == RouteActionReplace {
 		dest.aggPath = aggPath
-	}
-
-	if reachabilityInfo != nil {
-		l.logger.Infof("ProcessUpdate - next hop %s is reachable, so process previously unreachable routes",
-			nextHopStr)
-		updated, withdrawn, updatedAddPaths = l.ProcessRoutesForReachableRoutes(nextHopStr, reachabilityInfo,
-			addPathCount, updated, withdrawn, updatedAddPaths)
 	}
 
 	op(l.GetRouteStateConfigObj(dest.GetBGPRoute()))

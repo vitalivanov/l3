@@ -13,13 +13,13 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 package vrrpServer
 
@@ -143,8 +143,7 @@ func (svr *VrrpServer) VrrpCreateWriteBuf(eth *layers.Ethernet,
 	return buffer.Bytes()
 }
 
-func (svr *VrrpServer) VrrpCreateSendPkt(gblInfo VrrpGlobalInfo, vrrpEncHdr []byte,
-	hdrLen uint16) []byte {
+func (svr *VrrpServer) VrrpCreateSendPkt(gblInfo VrrpGlobalInfo, vrrpEncHdr []byte, hdrLen uint16) []byte {
 	// Ethernet Layer
 	srcMAC, _ := net.ParseMAC(gblInfo.VirtualRouterMACAddress)
 	dstMAC, _ := net.ParseMAC(VRRP_PROTOCOL_MAC)
@@ -188,8 +187,7 @@ func (svr *VrrpServer) VrrpSendPkt(key string, priority uint16) {
 		gblInfo.IntfConfig.Priority = int32(priority)
 	}
 	vrrpEncHdr, hdrLen := svr.VrrpCreateVrrpHeader(gblInfo)
-	svr.VrrpWritePacket(gblInfo,
-		svr.VrrpCreateSendPkt(gblInfo, vrrpEncHdr, hdrLen))
+	svr.VrrpWritePacket(gblInfo, svr.VrrpCreateSendPkt(gblInfo, vrrpEncHdr, hdrLen))
 	svr.VrrpUpdateMasterTimerStateInfo(&gblInfo)
 	gblInfo.IntfConfig.Priority = configuredPriority
 	svr.vrrpGblInfo[key] = gblInfo

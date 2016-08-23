@@ -497,7 +497,7 @@ func (server *OSPFServer) initIntfStateSlice() {
 		server.IntfSliceRefreshCh <- true
 		msg := <-server.IntfSliceRefreshDoneCh
 		if msg == true {
-			server.logger.Info("Interface slice got refreshed")
+			server.logger.Debug("Interface slice got refreshed")
 		}
 		server.IntfStateTimer.Reset(server.RefreshDuration)
 	}

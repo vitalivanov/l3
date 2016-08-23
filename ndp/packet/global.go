@@ -22,10 +22,59 @@
 //
 package packet
 
+type PACKET_OPERATION byte
+
 const (
-	HOP_LIMIT                    = 255
-	ICMPv6_CODE                  = 0
-	ICMPv6_MIN_LENGTH            = 24
-	ICMP_HDR_LENGTH              = 8
-	ICMP_PSEUDO_NEXT_HEADER byte = 58
+	PACKET_DROP                  PACKET_OPERATION = 1
+	PACKET_PROCESS               PACKET_OPERATION = 2
+	PACKET_FAILED_VALIDATION     PACKET_OPERATION = 3
+	NEIGBOR_SOLICITATED_PACKET   PACKET_OPERATION = 4
+	NEIGBOR_ADVERTISEMENT_PACKET PACKET_OPERATION = 5
+)
+
+const (
+	_ = iota
+	INCOMPLETE
+	REACHABLE
+	STALE
+	DELAY
+	PROBE
+)
+
+type NDOptionType byte
+
+const (
+	NDOptionTypeSourceLinkLayerAddress NDOptionType = 1
+	NDOptionTypeTargetLinkLayerAddress NDOptionType = 2
+	NDOptionTypePrefixInfo             NDOptionType = 3
+	NDOptionTypeRedirectHeader         NDOptionType = 4
+	NDOptionTypeMTU                    NDOptionType = 5
+)
+
+const (
+	HOP_LIMIT                              = 255
+	ICMPV6_CODE                            = 0
+	ICMP_HDR_LENGTH                        = 8
+	UNSPECIFIED_IP_ADDRESS                 = "::"
+	IPV6_ICMPV6_MULTICAST_DST_MAC          = "33:33:00:00:00:00"
+	IPV6_ADDRESS_BYTES                     = 16
+	IPV6_MULTICAST_BYTE             byte   = 0xff
+	IPV6_VERSION                    byte   = 6
+	ICMPV6_MIN_LENGTH               uint16 = 24
+	ICMPV6_NEXT_HEADER              byte   = 58
+	ICMPV6_SOURCE_LINK_LAYER_LENGTH uint16 = 8
+	SOLICITATED_NODE_ADDRESS               = "ff02::1:ff00:0000"
+	SOLICITATED_SRC_IP                     = "::"
+	MAX_UNICAST_SOLICIT             uint8  = 3
+	MAX_MULTICAST_SOLICIT                  = 3
+	MAX_ANYCAST_DELAY_TIMER                = 1
+	MAX_NEIGHBOR_ADVERTISEMENT             = 3
+	DELAY_FIRST_PROBE_TIME                 = 5 // this is in seconds
+	MIN_RANDOM_FACTOR                      = 0.5
+	MAX_RANDOM_FACTOR                      = 1.5
+	RECOMPUTE_BASE_REACHABLE_TIMER         = 1 // this is in hour
+
+	// Router Advertisement Specific Constants
+	ICMPV6_MIN_LENGTH_RA         uint16 = 16
+	ICMPV6_MIN_PAYLOAD_LENGTH_RA        = 8
 )

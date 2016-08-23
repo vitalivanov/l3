@@ -110,11 +110,18 @@ func (i *MPNextHopIP) GetNextHop() net.IP {
 
 func (i *MPNextHopIP) SetNextHop(ip net.IP) error {
 	if len(ip) != 4 && len(ip) != 16 {
-		return errors.New(fmt.Sprintf("Next hop IP address is not 4 bytes or 16 bytes, length =%d", len(ip)))
+		return errors.New(fmt.Sprintf("Next hop IP address is not 4 bytes or 16 bytes, length=%d", len(ip)))
+	}
+
+	if ip.To4() == nil && ip.To16() == nil {
+		return errors.New(fmt.Sprintf("Next hop IP address is NOT IPv4 or IPv6 address, ip=%s", ip))
 	}
 
 	i.Value = ip
-	i.Length = uint8(len(ip))
+	i.Length = uint8(net.IPv6len)
+	if ip.To4() != nil {
+		i.Length = uint8(net.IPv4len)
+	}
 	return nil
 }
 
@@ -157,7 +164,7 @@ func (i *MPNextHopIP6) Decode(pkt []byte) error {
 		return err
 	}
 
-	if i.Length == 16 || i.Length == 32 {
+	if i.Length == 32 {
 		ipLen := net.IPv6len
 		i.LinkLocal = make(net.IP, ipLen)
 		copy(i.LinkLocal, pkt[ipLen+1:])
@@ -349,7 +356,7 @@ func (r *BGPPathAttrMPReachNLRI) Decode(pkt []byte, data interface{}) error {
 
 	r.NLRI = make([]NLRI, 0)
 	length := uint32(r.BGPPathAttrBase.Length) - 4 - uint32(r.NextHop.Len())
-	_, err = decodeNLRI(pkt[idx:], &r.NLRI, length, r.AFI, data)
+	_, err = decodeNLRI(pkt[idx:], &r.NLRI, length, r.AFI, r.SAFI, data)
 	return err
 }
 
@@ -440,7 +447,7 @@ func (u *BGPPathAttrMPUnreachNLRI) Decode(pkt []byte, data interface{}) error {
 
 	u.NLRI = make([]NLRI, 0)
 	length := uint32(u.BGPPathAttrBase.Length) - 3
-	_, err = decodeNLRI(pkt[idx:], &u.NLRI, length, u.AFI, data)
+	_, err = decodeNLRI(pkt[idx:], &u.NLRI, length, u.AFI, u.SAFI, data)
 	return err
 }
 
