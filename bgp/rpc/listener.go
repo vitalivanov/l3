@@ -26,6 +26,7 @@ package rpc
 
 import (
 	"bgpd"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"l3/bgp/config"
@@ -111,7 +112,7 @@ func (h *BGPHandler) handleGlobalConfig() error {
 			h.logger.Err("handleGlobalConfig - Failed to convert Model object BGP Global, error:", err)
 			return err
 		}
-		h.server.GlobalConfigCh <- server.GlobalUpdate{config.GlobalConfig{}, gConf, make([]bool, 0,nil)}
+		h.server.GlobalConfigCh <- server.GlobalUpdate{config.GlobalConfig{}, gConf, make([]bool, 0), nil}
 	}
 	return nil
 }
@@ -559,8 +560,8 @@ func (h *BGPHandler) validateBGPGlobal(bgpGlobal *bgpd.BGPGlobal) (gConf config.
 	return gConf, nil
 }
 func (h *BGPHandler) validateBGPGlobalForPatchUpdate(oldConfig *bgpd.BGPGlobal, newConfig *bgpd.BGPGlobal, op []*bgpd.PatchOpInfo) (gConf config.GlobalConfig, err error) {
-    h.logger.Info("validateBGPGlobalForPatchUpdate")
-		if bgpGlobal == nil {
+	h.logger.Info("validateBGPGlobalForPatchUpdate")
+	if oldConfig == nil || newConfig == nil {
 		return gConf, err
 	}
 	for idx := 0; idx < len(op); idx++ {
@@ -573,47 +574,49 @@ func (h *BGPHandler) validateBGPGlobalForPatchUpdate(oldConfig *bgpd.BGPGlobal, 
 					If redistribution update is trying to update redistribution, non zero value is expected
 				*/
 				h.logger.Err("Must specify sources")
-				return nil, errors.New("Redistribution update list not specified")
+				return gConf, errors.New("Redistribution update list not specified")
 			}
 			h.logger.Debug("value = ", op[idx].Value)
 			valueObjArr := []bgpd.SourcePolicyList{}
 			err = json.Unmarshal([]byte(op[idx].Value), &valueObjArr)
 			if err != nil {
 				h.logger.Err("error unmarshaling value:", err)
-				return nil, errors.New(fmt.Sprintln("error unmarshaling value:", err))
+				return gConf, errors.New(fmt.Sprintln("error unmarshaling value:", err))
 			}
 			h.logger.Debug("Number of redistribution soures:", len(valueObjArr))
-			for _, val := range valueObjArr {
+			for _, _ = range valueObjArr {
 				switch op[idx].Op {
 				case "add":
-					h.logger.Debug("add op"))
+					h.logger.Debug("add op")
 				case "remove":
-					h.logger.Debug("remove op"))
+					h.logger.Debug("remove op")
 				default:
 					h.logger.Err("operation ", op[idx].Op, " not supported")
-					return nil, errors.New(fmt.Sprintln("operation ", op[idx].Op, " not supported"))
+					return gConf, errors.New(fmt.Sprintln("operation ", op[idx].Op, " not supported"))
 				}
 			}
 		default:
-			logger.Err("Patch update for attribute:", op[idx].Path, " not supported")
-			return nil, errors.New("Invalid attribute for patch update")
+			h.logger.Err("Patch update for attribute:", op[idx].Path, " not supported")
+			return gConf, errors.New("Invalid attribute for patch update")
 		}
 	}
+	return gConf, err
 }
 func (h *BGPHandler) SendBGPGlobal(oldConfig *bgpd.BGPGlobal, newConfig *bgpd.BGPGlobal, attrSet []bool, op []*bgpd.PatchOpInfo) (bool, error) {
+	var newGlobal config.GlobalConfig
 	oldGlobal, err := h.validateBGPGlobal(oldConfig)
 	if err != nil {
 		return false, err
 	}
 	if op == nil || len(op) == 0 {
-		newGlobal, err := h.validateBGPGlobal(newConfig)
+		newGlobal, err = h.validateBGPGlobal(newConfig)
 		if err != nil {
 			return false, err
 		}
 	} else {
-		newGlobal, err := h.validateBGPGlobalForPatchUpdate(oldConfig, newConfig, op)
+		newGlobal, err = h.validateBGPGlobalForPatchUpdate(oldConfig, newConfig, op)
 		if err != nil {
-			h.logger.Err("validateBGPGlobalForPatchUpdate failed with err:",err)
+			h.logger.Err("validateBGPGlobalForPatchUpdate failed with err:", err)
 			return false, err
 		}
 	}

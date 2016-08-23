@@ -57,9 +57,9 @@ func (m RIBDServicesHandler) CreatePolicyCondition(cfg *ribd.PolicyCondition) (v
 		logger.Err("PolicyEngine validation failed with err: ", err)
 		return false, err
 	}
-	m.server.PolicyConditionConfCh <- server.RIBdServerConfig{
+	m.server.PolicyConfCh <- server.RIBdServerConfig{
 		OrigConfigObject: cfg,
-		Op:               "add",
+		Op:               "addPolicyCondition",
 	}
 	return true, err
 }
@@ -70,9 +70,9 @@ func (m RIBDServicesHandler) DeletePolicyCondition(cfg *ribd.PolicyCondition) (v
 		logger.Err("PolicyEngine validation failed with err: ", err)
 		return false, err
 	}
-	m.server.PolicyConditionConfCh <- server.RIBdServerConfig{
+	m.server.PolicyConfCh <- server.RIBdServerConfig{
 		OrigConfigObject: cfg,
-		Op:               "del",
+		Op:               "delPolicyCondition",
 	}
 	return true, err
 }

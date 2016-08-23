@@ -122,7 +122,7 @@ func (m RIBDServer) ProcessPolicyStmtConfigDelete(cfg *ribd.PolicyStmt, db *poli
 */
 func (m RIBDServer) ProcessPolicyDefinitionConfigCreate(cfg *ribd.PolicyDefinition, db *policy.PolicyEngineDB) (err error) {
 	logger.Debug("ProcessPolicyDefinitionCreate:CreatePolicyDefinition")
-	newPolicy := policy.PolicyDefinitionConfig{Name: cfg.Name, Precedence: int(cfg.Priority), MatchType: cfg.MatchType}
+	newPolicy := policy.PolicyDefinitionConfig{Name: cfg.Name, Precedence: int(cfg.Priority), MatchType: cfg.MatchType, PolicyType: cfg.PolicyType}
 	newPolicy.PolicyDefinitionStatements = make([]policy.PolicyDefinitionStmtPrecedence, 0)
 	var policyDefinitionStatement policy.PolicyDefinitionStmtPrecedence
 	for i := 0; i < len(cfg.StatementList); i++ {
@@ -392,7 +392,13 @@ func (m RIBDServer) GetBulkPolicyDefinitionState(fromIndex ribd.Int, rcount ribd
                                           Action - what needs to be done on a hit
             apply - type bool - whether to apply the policy
 */
-func (m RIBDServer) UpdateApplyPolicy(info ApplyPolicyInfo, apply bool, db *policy.PolicyEngineDB) {
+func (m *RIBDServer) UpdateApplyPolicyList(applyList []*ribdInt.ApplyPolicyInfo, undoList []*ribdInt.ApplyPolicyInfo, apply bool, db *policy.PolicyEngineDB) {
+	logger.Debug("UpdateApplyPolicyList")
+	for _, applyListInfo := range applyList {
+		m.UpdateApplyPolicy(applyListInfo, apply, db)
+	}
+}
+func (m RIBDServer) UpdateApplyPolicy(info *ribdInt.ApplyPolicyInfo, apply bool, db *policy.PolicyEngineDB) {
 	logger.Debug("UpdateApplyPolicy with apply set to ", apply)
 	var err error
 	conditionName := ""

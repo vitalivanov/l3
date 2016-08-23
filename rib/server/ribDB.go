@@ -70,9 +70,9 @@ func (ribdServiceHandler *RIBDServer) UpdateGlobalPolicyConditionsFromDB(dbHdl *
 				obj := ribd.NewPolicyCondition()
 				dbObj := objList[idx].(objects.PolicyCondition)
 				objects.ConvertribdPolicyConditionObjToThrift(&dbObj, obj)
-				ribdServiceHandler.PolicyConditionConfCh <- RIBdServerConfig{
+				ribdServiceHandler.PolicyConfCh <- RIBdServerConfig{
 					OrigConfigObject: obj,
-					Op:               "add",
+					Op:               "addPolicyCondition",
 				}
 			}
 		} else {
@@ -91,9 +91,9 @@ func (ribdServiceHandler *RIBDServer) UpdateGlobalPolicyStmtsFromDB(dbHdl *dbuti
 				obj := ribd.NewPolicyStmt()
 				dbObj := objList[idx].(objects.PolicyStmt)
 				objects.ConvertribdPolicyStmtObjToThrift(&dbObj, obj)
-				ribdServiceHandler.PolicyStmtConfCh <- RIBdServerConfig{
+				ribdServiceHandler.PolicyConfCh <- RIBdServerConfig{
 					OrigConfigObject: obj,
-					Op:               "add",
+					Op:               "addPolicyStmt",
 				}
 			}
 		} else {
@@ -112,9 +112,9 @@ func (ribdServiceHandler *RIBDServer) UpdateGlobalPolicyFromDB(dbHdl *dbutils.DB
 				obj := ribd.NewPolicyDefinition()
 				dbObj := objList[idx].(objects.PolicyDefinition)
 				objects.ConvertribdPolicyDefinitionObjToThrift(&dbObj, obj)
-				ribdServiceHandler.PolicyDefinitionConfCh <- RIBdServerConfig{
+				ribdServiceHandler.PolicyConfCh <- RIBdServerConfig{
 					OrigConfigObject: obj,
-					Op:               "add",
+					Op:               "addPolicyDefinition",
 				}
 			}
 		} else {

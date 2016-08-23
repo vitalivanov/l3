@@ -1105,47 +1105,58 @@ func (s *BGPServer) SetupRedistribution(gConf config.GlobalConfig) {
 	if s.RedistributionMap == nil {
 		s.RedistributionMap = make(map[string]string)
 	}
-	applyList := make([]config.ApplyPolicyInfo, 0)
-	undoApplyList := make([]config.ApplyPolicyInfo, 0)
+	applyList := make([]*config.ApplyPolicyInfo, 0)
+	undoApplyList := make([]*config.ApplyPolicyInfo, 0)
 	source := ""
-	conditions := make([]*config.ConditionInfo, 0)
 	for i := 0; i < len(gConf.Redistribution); i++ {
 		s.logger.Info("Sources: ", gConf.Redistribution[i].Sources)
 		sources := make([]string, 0)
 		sources = strings.Split(gConf.Redistribution[i].Sources, ",")
 		s.logger.Infof("Setting up %s as redistribution policy for source(s): ", gConf.Redistribution[i].Policy)
 		for j := 0; j < len(sources); j++ {
-			s.logger.Infof("%s ", sources[j])
+			s.logger.Info("source: ", sources[j])
 			if sources[j] == "" {
 				continue
 			}
 			source = sources[j]
-			conditions = append(conditions, &config.ConditionInfo{ConditionType: "MatchProtocol", Protocol: sources[j]})
+			condition := &config.ConditionInfo{ConditionType: "MatchProtocol", Protocol: source}
 			_, ok := s.RedistributionMap[source]
 			if !ok {
+				s.logger.Info("No policy applied for this source so far")
 				s.RedistributionMap[source] = gConf.Redistribution[i].Policy
-				applyList = append(applyList, config.ApplyPolicyInfo{
-					Protocol:   "BGP",
-					Policy:     gConf.Redistribution[i].Policy,
-					Action:     "Redistribution",
-					Conditions: conditions})
+				if len(applyList) == 0 {
+					applyList = append(applyList, &config.ApplyPolicyInfo{
+						Protocol: "BGP",
+						Policy:   gConf.Redistribution[i].Policy,
+						Action:   "Redistribution"})
+				}
+				applyList[0].Conditions = append(applyList[0].Conditions, condition)
+			} else if s.RedistributionMap[source] == gConf.Redistribution[i].Policy {
+				s.logger.Info("Policy unchanged for source ", source)
+				continue
 			} else {
-				applyList = append(applyList, config.ApplyPolicyInfo{
-					Protocol:   "BGP",
-					Policy:     gConf.Redistribution[i].Policy,
-					Action:     "Redistribution",
-					Conditions: conditions})
+				s.logger.Info("Another policy:", s.RedistributionMap[source], " already applied for source :", source)
+				if len(applyList) == 0 {
+					applyList = append(applyList, &config.ApplyPolicyInfo{
+						Protocol: "BGP",
+						Policy:   gConf.Redistribution[i].Policy,
+						Action:   "Redistribution"})
+				}
+				applyList[0].Conditions = append(applyList[0].Conditions, condition)
 
-				undoApplyList = append(undoApplyList, config.ApplyPolicyInfo{
-					Protocol:   "BGP",
-					Policy:     s.RedistributionMap[source],
-					Action:     "Redistribution",
-					Conditions: conditions})
-				s.RedistributionMap[sources] = gConf.Redistribution[i].Policy
+				if len(undoApplyList) == 0 {
+					undoApplyList = append(undoApplyList, &config.ApplyPolicyInfo{
+						Protocol: "BGP",
+						Policy:   gConf.Redistribution[i].Policy,
+						Action:   "Redistribution"})
+				}
+				undoApplyList[0].Conditions = append(undoApplyList[0].Conditions, condition)
+
+				s.RedistributionMap[source] = gConf.Redistribution[i].Policy
 			}
 		}
-		s.routeMgr.ApplyPolicy("BGP", gConf.Redistribution[i].Policy, "Redistribution", conditions)
 	}
+	s.routeMgr.ApplyPolicy(applyList, undoApplyList)
 }
 func (s *BGPServer) SetupRedistributionForPatchUpdate(oldConfig, newConfig config.GlobalConfig, op []*bgpd.PatchOpInfo) {
 
@@ -1389,10 +1400,10 @@ func (s *BGPServer) listenChannelUpdates() {
 			for _, peer := range s.PeerMap {
 				peer.Init()
 			}
-			if op == nil || len(op) == 0 {
+			if globalUpdate.Op == nil || len(globalUpdate.Op) == 0 {
 				s.SetupRedistribution(gConf)
 			} else {
-				s.SetupRedistributionForPatchUpdate(globalUpdate.OldConfig, globalUpdate.NewConfig, op)
+				s.SetupRedistributionForPatchUpdate(globalUpdate.OldConfig, globalUpdate.NewConfig, globalUpdate.Op)
 			}
 
 		case peerUpdate := <-s.AddPeerCh:

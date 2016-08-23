@@ -278,16 +278,41 @@ func (mgr *FSRouteMgr) UpdateRoute(cfg *config.RouteConfig, op string) {
 	}
 }
 
-func (mgr *FSRouteMgr) ApplyPolicy(protocol string, policy string, action string, conditions []*config.ConditionInfo) {
-	temp := make([]ribdInt.ConditionInfo, len(conditions))
-	ribdConditions := make([]*ribdInt.ConditionInfo, 0)
+func (mgr *FSRouteMgr) ApplyPolicy(applyList []*config.ApplyPolicyInfo, undoList []*config.ApplyPolicyInfo) {
+
+	tempApplyList := make([]ribdInt.ApplyPolicyInfo, len(applyList))
 	j := 0
-	for i := 0; i < len(conditions); i++ {
-		temp[j] = ribdInt.ConditionInfo{conditions[i].ConditionType, conditions[i].Protocol, conditions[i].IpPrefix, conditions[i].MasklengthRange}
-		ribdConditions = append(ribdConditions, &temp[j])
+	ribdApplyList := make([]*ribdInt.ApplyPolicyInfo, 0)
+	for i := 0; i < len(applyList); i++ {
+		temp := make([]ribdInt.ConditionInfo, len(applyList[i].Conditions))
+		ribdConditions := make([]*ribdInt.ConditionInfo, 0)
+		j1 := 0
+		for _, conditions := range applyList[i].Conditions {
+			temp[j] = ribdInt.ConditionInfo{conditions.ConditionType, conditions.Protocol, conditions.IpPrefix, conditions.MasklengthRange}
+			ribdConditions = append(ribdConditions, &temp[j1])
+			j1++
+		}
+		tempApplyList[j] = ribdInt.ApplyPolicyInfo{applyList[i].Protocol, applyList[i].Policy, applyList[i].Action, ribdConditions}
+		ribdApplyList = append(ribdApplyList, &tempApplyList[j])
 		j++
 	}
-	mgr.ribdClient.ApplyPolicy(protocol, policy, action, ribdConditions)
+	tempUndoList := make([]ribdInt.ApplyPolicyInfo, len(undoList))
+	k := 0
+	ribdUndoApplyList := make([]*ribdInt.ApplyPolicyInfo, 0)
+	for i := 0; i < len(undoList); i++ {
+		temp := make([]ribdInt.ConditionInfo, len(undoList[i].Conditions))
+		ribdConditions := make([]*ribdInt.ConditionInfo, 0)
+		j1 := 0
+		for _, conditions := range undoList[i].Conditions {
+			temp[j] = ribdInt.ConditionInfo{conditions.ConditionType, conditions.Protocol, conditions.IpPrefix, conditions.MasklengthRange}
+			ribdConditions = append(ribdConditions, &temp[j1])
+			j1++
+		}
+		tempUndoList[k] = ribdInt.ApplyPolicyInfo{undoList[i].Protocol, undoList[i].Policy, undoList[i].Action, ribdConditions}
+		ribdUndoApplyList = append(ribdUndoApplyList, &tempUndoList[k])
+		k++
+	}
+	mgr.ribdClient.ApplyPolicy(ribdApplyList, ribdUndoApplyList)
 }
 
 func (mgr *FSRouteMgr) GetRoutes() ([]*config.RouteInfo, []*config.RouteInfo) {

@@ -47,7 +47,7 @@ type RouteMgrIntf interface {
 	CreateRoute(*RouteConfig)
 	DeleteRoute(*RouteConfig)
 	UpdateRoute(cfg *RouteConfig, op string)
-	ApplyPolicy(protocol string, policy string, action string, conditions []*ConditionInfo)
+	ApplyPolicy(applyList []*ApplyPolicyInfo, undoList []*ApplyPolicyInfo)
 	GetRoutes() ([]*RouteInfo, []*RouteInfo)
 }
 
