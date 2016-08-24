@@ -1341,8 +1341,8 @@ func (h *BGPHandler) DeleteBGPv6PeerGroup(peerGroup *bgpd.BGPv6PeerGroup) (bool,
 	return true, nil
 }
 
-func (h *BGPHandler) GetBGPRouteState(network string, cidrLen int16) (*bgpd.BGPRouteState, error) {
-	bgpRoute := h.server.LocRib.GetBGPRoute(network)
+func (h *BGPHandler) GetBGPv4RouteState(network string, cidrLen int16) (*bgpd.BGPv4RouteState, error) {
+	bgpRoute := h.server.LocRib.GetBGPv4Route(network)
 	var err error = nil
 	if bgpRoute == nil {
 		err = errors.New(fmt.Sprintf("Route not found for destination %s", network))
@@ -1350,15 +1350,35 @@ func (h *BGPHandler) GetBGPRouteState(network string, cidrLen int16) (*bgpd.BGPR
 	return bgpRoute, err
 }
 
-func (h *BGPHandler) GetBulkBGPRouteState(index bgpd.Int,
-	count bgpd.Int) (*bgpd.BGPRouteStateGetInfo, error) {
-	nextIdx, currCount, bgpRoutes := h.server.LocRib.BulkGetBGPRoutes(int(index), int(count))
+func (h *BGPHandler) GetBulkBGPv4RouteState(index bgpd.Int, count bgpd.Int) (*bgpd.BGPv4RouteStateGetInfo, error) {
+	nextIdx, currCount, bgpRoutes := h.server.LocRib.BulkGetBGPv4Routes(int(index), int(count))
 
-	bgpRoutesBulk := bgpd.NewBGPRouteStateGetInfo()
+	bgpRoutesBulk := bgpd.NewBGPv4RouteStateGetInfo()
 	bgpRoutesBulk.EndIdx = bgpd.Int(nextIdx)
 	bgpRoutesBulk.Count = bgpd.Int(currCount)
 	bgpRoutesBulk.More = (nextIdx != 0)
-	bgpRoutesBulk.BGPRouteStateList = bgpRoutes
+	bgpRoutesBulk.BGPv4RouteStateList = bgpRoutes
+
+	return bgpRoutesBulk, nil
+}
+
+func (h *BGPHandler) GetBGPv6RouteState(network string, cidrLen int16) (*bgpd.BGPv6RouteState, error) {
+	bgpRoute := h.server.LocRib.GetBGPv6Route(network)
+	var err error = nil
+	if bgpRoute == nil {
+		err = errors.New(fmt.Sprintf("Route not found for destination %s", network))
+	}
+	return bgpRoute, err
+}
+
+func (h *BGPHandler) GetBulkBGPv6RouteState(index bgpd.Int, count bgpd.Int) (*bgpd.BGPv6RouteStateGetInfo, error) {
+	nextIdx, currCount, bgpRoutes := h.server.LocRib.BulkGetBGPv6Routes(int(index), int(count))
+
+	bgpRoutesBulk := bgpd.NewBGPv6RouteStateGetInfo()
+	bgpRoutesBulk.EndIdx = bgpd.Int(nextIdx)
+	bgpRoutesBulk.Count = bgpd.Int(currCount)
+	bgpRoutesBulk.More = (nextIdx != 0)
+	bgpRoutesBulk.BGPv6RouteStateList = bgpRoutes
 
 	return bgpRoutesBulk, nil
 }
