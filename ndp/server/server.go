@@ -137,7 +137,7 @@ func (svr *NDPServer) EventsListener() {
 		case phyPortStateCh := <-svr.PhyPortStateCh:
 			svr.HandlePhyPortStateNotification(phyPortStateCh)
 		case ipIntfNotify := <-svr.IpIntfCh:
-			svr.HandleCreateIPIntf(ipIntfNotify)
+			svr.HandleIPIntfCreateDelete(ipIntfNotify)
 		case ipStateCh := <-svr.IpStateCh:
 			svr.HandleStateNotification(ipStateCh)
 		case rxChInfo, ok := <-svr.RxPktCh:

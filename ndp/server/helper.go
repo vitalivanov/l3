@@ -172,7 +172,7 @@ func (svr *NDPServer) IsIPv6Addr(ipAddr string) bool {
  *	    2) Delete:
  *		    delete an entry from the map
  */
-func (svr *NDPServer) HandleCreateIPIntf(obj *config.IPIntfNotification) {
+func (svr *NDPServer) HandleIPIntfCreateDelete(obj *config.IPIntfNotification) {
 	ipInfo, exists := svr.L3Port[obj.IfIndex]
 	switch obj.Operation {
 	case config.CONFIG_CREATE:
@@ -195,7 +195,8 @@ func (svr *NDPServer) HandleCreateIPIntf(obj *config.IPIntfNotification) {
 		}
 		// stop rx/tx on the deleted interface
 		debug.Logger.Info("Delete IP interface received for", ipInfo.IntfRef, "ifIndex:", ipInfo.IfIndex)
-		svr.StopRxTx(obj.IfIndex)
+		//ipInfo.DeleteIntf(obj.IpAddr)
+		svr.StopRxTx(obj.IfIndex, obj.IpAddr)
 	}
 }
 
@@ -227,7 +228,7 @@ func (svr *NDPServer) HandlePhyPortStateNotification(msg *config.PortState) {
 		// if the port state is down, then we need to delete all the neighbors for that ifIndex...which
 		// includes deleting neighbor from link local ip address also
 		debug.Logger.Info("Stop receiving frames for", l3Port.IntfRef)
-		svr.StopRxTx(msg.IfIndex)
+		svr.StopRxTx(msg.IfIndex, "ALL")
 	}
 }
 
@@ -247,7 +248,7 @@ func (svr *NDPServer) HandleStateNotification(msg *config.StateNotification) {
 	case config.STATE_DOWN:
 		debug.Logger.Info("Delete pkt handler for", msg.IfIndex, "IpAddr:", msg.IpAddr)
 		// stop pcap handler
-		svr.StopRxTx(msg.IfIndex)
+		svr.StopRxTx(msg.IfIndex, msg.IpAddr)
 	}
 }
 

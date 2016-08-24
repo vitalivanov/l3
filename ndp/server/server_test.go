@@ -31,12 +31,26 @@ import (
 	"log/syslog"
 	"strconv"
 	"testing"
+	asicdmock "utils/asicdClient/mock"
 	"utils/logging"
 )
 
 const (
-	TEST_NBR_ENTRIES = 5
+	TEST_NBR_ENTRIES     = 5
+	testIfIndex          = 100
+	testMyGSIp           = "2192::168:1:1/64"
+	testMyLinkScopeIP    = "fe80::77:9cf8:fcff:fe4a:1615/16"
+	testMyAbsGSIP        = "2192::168:1:1"
+	testMyAbsLinkScopeIP = "fe80::77:9cf8:fcff:fe4a:1615"
 )
+
+var testNdpServer *NDPServer
+var testIpv6GSNotifyObj *config.IPIntfNotification
+var testIpv6LSNotifyObj *config.IPIntfNotification
+var testServerInitdone chan bool
+var testServerQuit chan bool
+
+var testPorts []config.PortInfo
 
 func NDPTestNewLogger(name string, tag string, listenToConfig bool) (*logging.Writer, error) {
 	var err error
@@ -61,6 +75,170 @@ func initServerBasic() {
 		t.Error("creating logger failed")
 	}
 	debug.NDPSetLogger(logger)
+}
+
+func initPhysicalPorts() {
+	port := config.PortInfo{
+		IntfRef:   "lo0",
+		IfIndex:   95,
+		Name:      "Loopback0",
+		OperState: "UP",
+		MacAddr:   "aa:bb:cc:dd:ee:ff",
+	}
+	testNdpServer.PhyPort[port.IfIndex] = port
+	port = config.PortInfo{
+		IntfRef:   "lo1",
+		IfIndex:   96,
+		Name:      "Loopback1",
+		OperState: "UP",
+		MacAddr:   "aa:bb:cc:dd:ee:ff",
+	}
+	testNdpServer.PhyPort[port.IfIndex] = port
+	port = config.PortInfo{
+		IntfRef:   "lo2",
+		IfIndex:   97,
+		Name:      "Loopback2",
+		OperState: "UP",
+		MacAddr:   "aa:bb:cc:dd:ee:ff",
+	}
+	testNdpServer.PhyPort[port.IfIndex] = port
+	port = config.PortInfo{
+		IntfRef:   "lo3",
+		IfIndex:   98,
+		Name:      "Loopback3",
+		OperState: "UP",
+		MacAddr:   "aa:bb:cc:dd:ee:ff",
+	}
+	testNdpServer.PhyPort[port.IfIndex] = port
+	port = config.PortInfo{
+		IntfRef:   "lo4",
+		IfIndex:   99,
+		Name:      "Loopback4",
+		OperState: "UP",
+		MacAddr:   "aa:bb:cc:dd:ee:ff",
+	}
+	testNdpServer.PhyPort[port.IfIndex] = port
+	port = config.PortInfo{
+		IntfRef:   "lo5",
+		IfIndex:   100,
+		Name:      "Loopback5",
+		OperState: "UP",
+		MacAddr:   "aa:bb:cc:dd:ee:ff",
+	}
+	testNdpServer.PhyPort[port.IfIndex] = port
+}
+
+func InitNDPTestServer() {
+	initServerBasic()
+	testServerInitdone = make(chan bool)
+	testServerQuit = make(chan bool)
+	testNdpServer = NDPNewServer(&asicdmock.MockAsicdClientMgr{})
+	testNdpServer.NDPStartServer()
+	initPhysicalPorts()
+	testIpv6GSNotifyObj = &config.IPIntfNotification{
+		IfIndex: testIfIndex,
+		IpAddr:  testMyGSIp,
+	}
+
+	testIpv6LSNotifyObj = &config.IPIntfNotification{
+		IfIndex: testIfIndex,
+		IpAddr:  testMyLinkScopeIP,
+	}
+}
+
+func TestNDPStartServer(t *testing.T) {
+	InitNDPTestServer()
+}
+
+func TestIPv6IntfCreate(t *testing.T) {
+	InitNDPTestServer() // event listener channel is already running
+
+	ipv6Obj := &config.IPIntfNotification{
+		IfIndex:   testIfIndex,
+		IpAddr:    testMyGSIp,
+		Operation: config.CONFIG_CREATE,
+	}
+	t.Log("Ports Created are:", testNdpServer.PhyPort)
+	testNdpServer.HandleIPIntfCreateDelete(ipv6Obj)
+	ipv6Obj.IpAddr = testMyLinkScopeIP
+	testNdpServer.HandleIPIntfCreateDelete(ipv6Obj)
+
+	t.Log(testNdpServer.L3Port)
+	l3Port, exists := testNdpServer.L3Port[testIfIndex]
+	if !exists {
+		t.Error("failed to init interface")
+		return
+	}
+
+	if l3Port.IpAddr != testMyGSIp {
+		t.Error("failed to set l3 port global scope ip address. wanted:", testMyGSIp, "got:", l3Port.IpAddr)
+		return
+	}
+
+	if l3Port.globalScope != testMyAbsGSIP {
+		t.Error("failed to set l3 port global scope ip address. wanted:", testMyAbsGSIP, "got:", l3Port.globalScope)
+		return
+	}
+
+	if l3Port.LinkLocalIp != testMyLinkScopeIP {
+		t.Error("failed to set l3 port global scope ip address. wanted:", testMyLinkScopeIP, "got:", l3Port.LinkLocalIp)
+		return
+	}
+
+	if l3Port.linkScope != testMyAbsLinkScopeIP {
+		t.Error("failed to set l3 port link scope ip address. wanted:", testMyAbsLinkScopeIP, "got:", l3Port.linkScope)
+		return
+	}
+
+	if l3Port.PcapBase.PcapUsers != 0 {
+		t.Error("pcap users added even when we did not received STATE UP Notification", l3Port.PcapBase.PcapUsers)
+		return
+	}
+}
+
+func TestIPv6IntfDelete(t *testing.T) {
+	TestIPv6IntfCreate(t)
+	ipv6Obj := &config.IPIntfNotification{
+		IfIndex:   testIfIndex,
+		IpAddr:    testMyGSIp,
+		Operation: config.CONFIG_DELETE,
+	}
+	testNdpServer.HandleIPIntfCreateDelete(ipv6Obj)
+
+	l3Port, exists := testNdpServer.L3Port[testIfIndex]
+	if !exists {
+		t.Error("Failed to get L3 Port for ifIndex:", testIfIndex)
+		return
+	}
+
+	if l3Port.IpAddr != "" {
+		t.Error("Failed to delete global scope IP Address:", l3Port.IpAddr)
+		return
+	}
+
+	if l3Port.globalScope != "" {
+		t.Error("Failed to delete global scope IP Address:", l3Port.globalScope)
+	}
+
+	ipv6Obj.IpAddr = testMyLinkScopeIP
+
+	testNdpServer.HandleIPIntfCreateDelete(ipv6Obj)
+
+	l3Port, exists = testNdpServer.L3Port[testIfIndex]
+	if !exists {
+		t.Error("Failed to get L3 Port for ifIndex:", testIfIndex)
+		return
+	}
+
+	if l3Port.LinkLocalIp != "" {
+		t.Error("Failed to delete Link Scope Ip Address:", l3Port.LinkLocalIp)
+		return
+	}
+
+	if l3Port.linkScope != "" {
+		t.Error("Failed to delete link scope iP address:", l3Port.linkScope)
+		return
+	}
 }
 
 // _Test ND Solicitation message Decoder
