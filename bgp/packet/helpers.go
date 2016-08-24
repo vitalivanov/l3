@@ -520,11 +520,11 @@ func ConstructIPPrefix(ipStr string, maskStr string) *IPPrefix {
 	ip := net.ParseIP(ipStr)
 	var mask net.IPMask
 	if ip.To4() != nil {
-		utils.Logger.Infof("ConstructIPPrefix IPv6 - mask ip %+v mask ip mask %+v", net.ParseIP(maskStr),
+		utils.Logger.Infof("ConstructIPPrefix IPv4 - mask ip %+v mask ip mask %+v", net.ParseIP(maskStr),
 			net.IPMask(net.ParseIP(maskStr).To4()))
 		mask = net.IPMask(net.ParseIP(maskStr).To4())
 	} else {
-		utils.Logger.Infof("ConstructIPPrefix IPv4 - mask ip %+v mask ip mask %+v", net.ParseIP(maskStr),
+		utils.Logger.Infof("ConstructIPPrefix IPv6 - mask ip %+v mask ip mask %+v", net.ParseIP(maskStr),
 			net.IPMask(net.ParseIP(maskStr).To16()))
 		mask = net.IPMask(net.ParseIP(maskStr).To16())
 	}

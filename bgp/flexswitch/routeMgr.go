@@ -280,6 +280,7 @@ func (mgr *FSRouteMgr) UpdateRoute(cfg *config.RouteConfig, op string) {
 
 func (mgr *FSRouteMgr) ApplyPolicy(applyList []*config.ApplyPolicyInfo, undoList []*config.ApplyPolicyInfo) {
 
+	mgr.logger.Info("RouteMgr:ApplyPolicy, applyList:", applyList)
 	tempApplyList := make([]ribdInt.ApplyPolicyInfo, len(applyList))
 	j := 0
 	ribdApplyList := make([]*ribdInt.ApplyPolicyInfo, 0)
@@ -288,7 +289,7 @@ func (mgr *FSRouteMgr) ApplyPolicy(applyList []*config.ApplyPolicyInfo, undoList
 		ribdConditions := make([]*ribdInt.ConditionInfo, 0)
 		j1 := 0
 		for _, conditions := range applyList[i].Conditions {
-			temp[j] = ribdInt.ConditionInfo{conditions.ConditionType, conditions.Protocol, conditions.IpPrefix, conditions.MasklengthRange}
+			temp[j1] = ribdInt.ConditionInfo{conditions.ConditionType, conditions.Protocol, conditions.IpPrefix, conditions.MasklengthRange}
 			ribdConditions = append(ribdConditions, &temp[j1])
 			j1++
 		}
@@ -304,7 +305,7 @@ func (mgr *FSRouteMgr) ApplyPolicy(applyList []*config.ApplyPolicyInfo, undoList
 		ribdConditions := make([]*ribdInt.ConditionInfo, 0)
 		j1 := 0
 		for _, conditions := range undoList[i].Conditions {
-			temp[j] = ribdInt.ConditionInfo{conditions.ConditionType, conditions.Protocol, conditions.IpPrefix, conditions.MasklengthRange}
+			temp[j1] = ribdInt.ConditionInfo{conditions.ConditionType, conditions.Protocol, conditions.IpPrefix, conditions.MasklengthRange}
 			ribdConditions = append(ribdConditions, &temp[j1])
 			j1++
 		}
