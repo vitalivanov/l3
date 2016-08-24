@@ -140,12 +140,31 @@ func (intf *Interface) InitIntf(obj *commonDefs.IPv6IntfState, pktCh chan config
 }
 
 /*
+ * De-Init Interface will be called during delete ip interface
+ */
+func (intf *Interface) DeInitIntf() []string {
+	deleteEntries, _ := intf.DeleteAll()
+	intf.PcapBase.PcapHandle = nil
+	intf.PcapBase.PcapCtrl = nil
+	intf.PcapBase.PcapUsers = 0
+	intf.removeIP(intf.IpAddr)
+	intf.removeIP(intf.LinkLocalIp)
+	// Timers Value De-Init
+	intf.raTimer = nil
+	// Delete Nbrmap
+	intf.Neighbor = nil
+	return deleteEntries
+}
+
+/*
  * CreateIntf is called during CreateIPInterface notification
  */
-func (intf *Interface) CreateIntf(obj *config.IPIntfNotification, intfRef string, pktCh chan config.PacketData) {
-	intf.IntfRef = intfRef
+func (intf *Interface) CreateIntf(obj *config.IPIntfNotification, pktCh chan config.PacketData) {
+	intf.IntfRef = obj.IntfRef
 	intf.IfIndex = obj.IfIndex
 	intf.commonInit(obj.IpAddr, pktCh)
+	debug.Logger.Info("Created IP inteface", intf.IntfRef, "ifIndex:", intf.IfIndex,
+		"GS:", intf.globalScope, "LS:", intf.linkScope)
 }
 
 /*
@@ -172,8 +191,7 @@ func (intf *Interface) deleteNbrList() ([]string, error) {
  */
 func (intf *Interface) DeleteIntf(ipAddr string) ([]string, error) {
 	debug.Logger.Debug("Deleting Interface:", intf.IntfRef, intf.IpAddr, intf.LinkLocalIp)
-	fmt.Println("Deleting Interface:", intf.IntfRef, intf.IpAddr, intf.LinkLocalIp)
-	intf.removeIP(ipAddr)
+	//intf.removeIP(ipAddr)
 	intf.DeletePcap()
 	return intf.deleteNbrList()
 }
@@ -182,9 +200,9 @@ func (intf *Interface) DeleteIntf(ipAddr string) ([]string, error) {
  * Delete All will delete ip address and then remove entire pcap
  */
 func (intf *Interface) DeleteAll() ([]string, error) {
-	intf.removeIP(intf.LinkLocalIp)
+	//intf.removeIP(intf.LinkLocalIp)
 	intf.DeletePcap()
-	intf.removeIP(intf.IpAddr)
+	//intf.removeIP(intf.IpAddr)
 	intf.DeletePcap()
 	return intf.deleteNbrList()
 }
@@ -208,7 +226,7 @@ func (intf *Interface) CreatePcap() (err error) { //(pHdl *pcap.Handle, err erro
 		name := intf.IntfRef
 		intf.PcapBase.PcapHandle, err = pcap.OpenLive(name, NDP_PCAP_SNAPSHOTlEN, NDP_PCAP_PROMISCUOUS, NDP_PCAP_TIMEOUT)
 		if err != nil {
-			debug.Logger.Err("Creating Pcap Handler failed for", name, "Error:", err)
+			debug.Logger.Err("Creating Pcap Handler failed for interface:", name, "Error:", err)
 			return err
 		}
 		err = intf.PcapBase.PcapHandle.SetBPFFilter(NDP_PCAP_FILTER)

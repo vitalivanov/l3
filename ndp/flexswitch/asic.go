@@ -119,10 +119,10 @@ func (notifyHdl *AsicNotificationHdl) ProcessNotification(msg commonDefs.AsicdNo
 		ipv6Msg := msg.(commonDefs.IPv6IntfNotifyMsg)
 		if ipv6Msg.MsgType == commonDefs.NOTIFY_IPV6INTF_CREATE {
 			debug.Logger.Debug("Received Asicd IPV6 INTF Notfication CREATE")
-			api.SendIPIntfNotfication(ipv6Msg.IfIndex, ipv6Msg.IpAddr, config.CONFIG_CREATE)
+			api.SendIPIntfNotfication(ipv6Msg.IfIndex, ipv6Msg.IpAddr, ipv6Msg.IntfRef, config.CONFIG_CREATE)
 		} else {
 			debug.Logger.Debug("Received Asicd IPV6 INTF Notfication DELETE")
-			api.SendIPIntfNotfication(ipv6Msg.IfIndex, ipv6Msg.IpAddr, config.CONFIG_DELETE)
+			api.SendIPIntfNotfication(ipv6Msg.IfIndex, ipv6Msg.IpAddr, ipv6Msg.IntfRef, config.CONFIG_DELETE)
 		}
 	}
 }
