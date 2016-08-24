@@ -205,13 +205,13 @@ func deleteRoutePolicyStateAll(route *bgprib.Route) {
 }
 
 func deletePolicyRouteMapEntry(route *bgprib.Route, policy string) {
-	utils.Logger.Info("deletePolicyRouteMapEntry for policy ", policy, "route ", route.Dest.BGPRouteState.Network, "/",
-		route.Dest.BGPRouteState.CIDRLen)
+	utils.Logger.Info("deletePolicyRouteMapEntry for policy ", policy, "route ", route.Dest.BGPRouteState.GetNetwork(), "/",
+		route.Dest.BGPRouteState.GetCIDRLen())
 	if PolicyRouteMap == nil {
 		utils.Logger.Info("PolicyRouteMap empty")
 		return
 	}
-	destNetIP := route.Dest.BGPRouteState.Network + "/" + strconv.Itoa(int(route.Dest.BGPRouteState.CIDRLen))
+	destNetIP := route.Dest.BGPRouteState.GetNetwork() + "/" + strconv.Itoa(int(route.Dest.BGPRouteState.GetCIDRLen()))
 	policyRouteIndex := PolicyRouteIndex{DestNetIP: destNetIP, Policy: policy}
 	//PolicyRouteMap[policyRouteIndex].policyStmtMap=nil
 	delete(PolicyRouteMap, policyRouteIndex)
@@ -238,7 +238,7 @@ func (eng *LocRibPolicyEngine) addPolicyRouteMap(route *bgprib.Route, policy str
 	//policy.hitCounter++
 	//ipPrefix, err := getNetowrkPrefixFromStrings(route.Network, route.Mask)
 	var newRoute string
-	newRoute = route.Dest.BGPRouteState.Network + "/" + strconv.Itoa(int(route.Dest.BGPRouteState.CIDRLen))
+	newRoute = route.Dest.BGPRouteState.GetNetwork() + "/" + strconv.Itoa(int(route.Dest.BGPRouteState.GetCIDRLen()))
 	ipPrefix, err := GetNetworkPrefixFromCIDR(newRoute)
 	if err != nil {
 		utils.Logger.Info("Invalid ip prefix")
@@ -271,11 +271,11 @@ func (eng *LocRibPolicyEngine) addPolicyRouteMap(route *bgprib.Route, policy str
 	found = false
 	utils.Logger.Info("routeInfoList details")
 	for i := 0; i < len(policyExtensions.RouteInfoList); i++ {
-		utils.Logger.Info("IP: ", policyExtensions.RouteInfoList[i].Dest.BGPRouteState.Network, "/",
-			policyExtensions.RouteInfoList[i].Dest.BGPRouteState.CIDRLen, " nextHop: ",
+		utils.Logger.Info("IP: ", policyExtensions.RouteInfoList[i].Dest.BGPRouteState.GetNetwork(), "/",
+			policyExtensions.RouteInfoList[i].Dest.BGPRouteState.GetCIDRLen(), " nextHop: ",
 			policyExtensions.RouteInfoList[i].PathInfo.NextHop)
-		if policyExtensions.RouteInfoList[i].Dest.BGPRouteState.Network == route.Dest.BGPRouteState.Network &&
-			policyExtensions.RouteInfoList[i].Dest.BGPRouteState.CIDRLen == route.Dest.BGPRouteState.CIDRLen &&
+		if policyExtensions.RouteInfoList[i].Dest.BGPRouteState.GetNetwork() == route.Dest.BGPRouteState.GetNetwork() &&
+			policyExtensions.RouteInfoList[i].Dest.BGPRouteState.GetCIDRLen() == route.Dest.BGPRouteState.GetCIDRLen() &&
 			policyExtensions.RouteInfoList[i].PathInfo.NextHop == route.PathInfo.NextHop {
 			utils.Logger.Info("route already is a part of ", policy, "'s routeInfolist")
 			found = true

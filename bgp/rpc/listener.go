@@ -33,6 +33,7 @@ import (
 	"l3/bgp/packet"
 	bgppolicy "l3/bgp/policy"
 	"l3/bgp/server"
+	"math"
 	"models/objects"
 	"net"
 	"strconv"
@@ -594,15 +595,16 @@ func (h *BGPHandler) convertStrIPToNetIP(ip string) net.IP {
 	return netIP
 }
 
-func (h *BGPHandler) validateBGPGlobal(bgpGlobal *bgpd.BGPGlobal) (gConf config.GlobalConfig, err error) {
+func (h *BGPHandler) validateBGPGlobal(bgpGlobal *bgpd.BGPGlobal, update bool) (gConf config.GlobalConfig, err error) {
 	if bgpGlobal == nil {
 		return gConf, err
 	}
 
 	asNum := uint32(bgpGlobal.ASNum)
-	if asNum == 0 || asNum == uint32(packet.BGPASTrans) {
+	if (update && asNum == uint32(0)) || asNum == uint32(math.MaxUint16) || asNum == uint32(math.MaxUint32) ||
+		asNum == uint32(packet.BGPASTrans) {
 		err = errors.New(fmt.Sprintf("BGPGlobal: AS number %d is not valid", bgpGlobal.ASNum))
-		h.logger.Info("SendBGPGlobal: AS number", bgpGlobal.ASNum, "is not valid")
+		h.logger.Info("SendBGPGlobal: AS number", bgpGlobal.ASNum, "is a reserved AS number")
 		return gConf, err
 	}
 
@@ -632,12 +634,17 @@ func (h *BGPHandler) validateBGPGlobal(bgpGlobal *bgpd.BGPGlobal) (gConf config.
 }
 
 func (h *BGPHandler) SendBGPGlobal(oldConfig *bgpd.BGPGlobal, newConfig *bgpd.BGPGlobal, attrSet []bool) (bool, error) {
-	oldGlobal, err := h.validateBGPGlobal(oldConfig)
+	oldGlobal, err := h.validateBGPGlobal(oldConfig, false)
 	if err != nil {
 		return false, err
 	}
 
-	newGlobal, err := h.validateBGPGlobal(newConfig)
+	update := false
+	if oldConfig != nil {
+		update = true
+	}
+
+	newGlobal, err := h.validateBGPGlobal(newConfig, update)
 	if err != nil {
 		return false, err
 	}
@@ -685,7 +692,7 @@ func (h *BGPHandler) UpdateBGPGlobal(origG *bgpd.BGPGlobal, updatedG *bgpd.BGPGl
 
 func (h *BGPHandler) DeleteBGPGlobal(bgpGlobal *bgpd.BGPGlobal) (bool, error) {
 	h.logger.Info("Delete global config attrs:", bgpGlobal)
-	return true, nil
+	return false, errors.New(fmt.Sprintf("Can't delete BGP global object"))
 }
 
 func (h *BGPHandler) getIPAndIfIndexForV4Neighbor(neighborIP string, neighborIntfRef string) (ip net.IP, ifIndex int32,
@@ -822,6 +829,11 @@ func (h *BGPHandler) SendBGPv4Neighbor(oldNeigh *bgpd.BGPv4Neighbor, newNeigh *b
 	created := h.server.VerifyBgpGlobalConfig()
 	if !created {
 		return created, errors.New("BGP Global object not created yet")
+	}
+
+	global := h.server.GetBGPGlobalState()
+	if global.AS == 0 {
+		return false, errors.New(fmt.Sprintf("The default BGP AS number 0 is not updated yet."))
 	}
 
 	oldNeighConf, err := h.ValidateV4Neighbor(oldNeigh)
@@ -1059,6 +1071,11 @@ func (h *BGPHandler) SendBGPv6Neighbor(oldNeigh *bgpd.BGPv6Neighbor, newNeigh *b
 	created := h.server.VerifyBgpGlobalConfig()
 	if !created {
 		return created, errors.New("BGP Global object not created yet")
+	}
+
+	global := h.server.GetBGPGlobalState()
+	if global.AS == 0 {
+		return false, errors.New(fmt.Sprintf("The default BGP AS number 0 is not updated yet."))
 	}
 
 	oldNeighConf, err := h.ValidateV6Neighbor(oldNeigh)
@@ -1341,8 +1358,8 @@ func (h *BGPHandler) DeleteBGPv6PeerGroup(peerGroup *bgpd.BGPv6PeerGroup) (bool,
 	return true, nil
 }
 
-func (h *BGPHandler) GetBGPRouteState(network string, cidrLen int16) (*bgpd.BGPRouteState, error) {
-	bgpRoute := h.server.LocRib.GetBGPRoute(network)
+func (h *BGPHandler) GetBGPv4RouteState(network string, cidrLen int16) (*bgpd.BGPv4RouteState, error) {
+	bgpRoute := h.server.LocRib.GetBGPv4Route(network)
 	var err error = nil
 	if bgpRoute == nil {
 		err = errors.New(fmt.Sprintf("Route not found for destination %s", network))
@@ -1350,15 +1367,35 @@ func (h *BGPHandler) GetBGPRouteState(network string, cidrLen int16) (*bgpd.BGPR
 	return bgpRoute, err
 }
 
-func (h *BGPHandler) GetBulkBGPRouteState(index bgpd.Int,
-	count bgpd.Int) (*bgpd.BGPRouteStateGetInfo, error) {
-	nextIdx, currCount, bgpRoutes := h.server.LocRib.BulkGetBGPRoutes(int(index), int(count))
+func (h *BGPHandler) GetBulkBGPv4RouteState(index bgpd.Int, count bgpd.Int) (*bgpd.BGPv4RouteStateGetInfo, error) {
+	nextIdx, currCount, bgpRoutes := h.server.LocRib.BulkGetBGPv4Routes(int(index), int(count))
 
-	bgpRoutesBulk := bgpd.NewBGPRouteStateGetInfo()
+	bgpRoutesBulk := bgpd.NewBGPv4RouteStateGetInfo()
 	bgpRoutesBulk.EndIdx = bgpd.Int(nextIdx)
 	bgpRoutesBulk.Count = bgpd.Int(currCount)
 	bgpRoutesBulk.More = (nextIdx != 0)
-	bgpRoutesBulk.BGPRouteStateList = bgpRoutes
+	bgpRoutesBulk.BGPv4RouteStateList = bgpRoutes
+
+	return bgpRoutesBulk, nil
+}
+
+func (h *BGPHandler) GetBGPv6RouteState(network string, cidrLen int16) (*bgpd.BGPv6RouteState, error) {
+	bgpRoute := h.server.LocRib.GetBGPv6Route(network)
+	var err error = nil
+	if bgpRoute == nil {
+		err = errors.New(fmt.Sprintf("Route not found for destination %s", network))
+	}
+	return bgpRoute, err
+}
+
+func (h *BGPHandler) GetBulkBGPv6RouteState(index bgpd.Int, count bgpd.Int) (*bgpd.BGPv6RouteStateGetInfo, error) {
+	nextIdx, currCount, bgpRoutes := h.server.LocRib.BulkGetBGPv6Routes(int(index), int(count))
+
+	bgpRoutesBulk := bgpd.NewBGPv6RouteStateGetInfo()
+	bgpRoutesBulk.EndIdx = bgpd.Int(nextIdx)
+	bgpRoutesBulk.Count = bgpd.Int(currCount)
+	bgpRoutesBulk.More = (nextIdx != 0)
+	bgpRoutesBulk.BGPv6RouteStateList = bgpRoutes
 
 	return bgpRoutesBulk, nil
 }
