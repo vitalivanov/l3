@@ -82,9 +82,9 @@ func (c *NeighborInfo) DeInit() {
 	// stopping all three timers in accending order
 	c.StopReTransmitTimer()
 	c.StopReachableTimer()
-	c.StopReComputeBaseTimer()
 	c.StopDelayProbeTimer()
 	c.StopInvalidTimer()
+	c.StopReComputeBaseTimer()
 }
 
 /*
