@@ -23,6 +23,11 @@
 
 package config
 
+import (
+	"bgpd"
+	"models/objects"
+)
+
 /*  Port/Interface state change manager.
  */
 type IntfStateMgrIntf interface {
@@ -63,4 +68,19 @@ type BfdMgrIntf interface {
 	Start()
 	CreateBfdSession(ipAddr string, sessionParam string) (bool, error)
 	DeleteBfdSession(ipAddr string) (bool, error)
+}
+
+type ModelRouteIntf interface {
+	GetModelObject() objects.ConfigObj
+	GetThriftObject() interface{}
+	SetNetwork(string)
+	GetNetwork() string
+	SetCIDRLen(int16)
+	GetCIDRLen() int16
+	GetPaths() []*bgpd.PathInfo
+	AppendPath(*bgpd.PathInfo)
+	SetPath(*bgpd.PathInfo, int)
+	GetPath(int) *bgpd.PathInfo
+	GetLastPath() *bgpd.PathInfo
+	RemovePathAndSetLast(int)
 }
