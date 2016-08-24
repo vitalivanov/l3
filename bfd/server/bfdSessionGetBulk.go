@@ -68,6 +68,9 @@ func (server *BFDServer) GetBulkBfdSessionStates(idx int, cnt int) (int, int, []
 		result[i].SentAuthSeq = server.bfdGlobal.Sessions[sessionId].state.SentAuthSeq
 		result[i].NumTxPackets = server.bfdGlobal.Sessions[sessionId].state.NumTxPackets
 		result[i].NumRxPackets = server.bfdGlobal.Sessions[sessionId].state.NumRxPackets
+		result[i].ToDownCount = server.bfdGlobal.Sessions[sessionId].state.ToDownCount
+		result[i].ToUpCount = server.bfdGlobal.Sessions[sessionId].state.ToUpCount
+		result[i].UpTime = server.bfdGlobal.Sessions[sessionId].state.UpTime
 	}
 	return nextIdx, count, result
 }
@@ -104,6 +107,9 @@ func (server *BFDServer) GetBfdSessionState(ipAddr string) *SessionState {
 		sessionState.SentAuthSeq = server.bfdGlobal.Sessions[sessionId].state.SentAuthSeq
 		sessionState.NumTxPackets = server.bfdGlobal.Sessions[sessionId].state.NumTxPackets
 		sessionState.NumRxPackets = server.bfdGlobal.Sessions[sessionId].state.NumRxPackets
+		sessionState.ToDownCount = server.bfdGlobal.Sessions[sessionId].state.ToDownCount
+		sessionState.ToUpCount = server.bfdGlobal.Sessions[sessionId].state.ToUpCount
+		sessionState.UpTime = server.bfdGlobal.Sessions[sessionId].state.UpTime
 	}
 
 	return sessionState
