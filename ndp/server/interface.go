@@ -24,6 +24,7 @@ package server
 
 import (
 	"errors"
+	"fmt"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcap"
@@ -77,10 +78,7 @@ type Interface struct {
 	PktDataCh         chan config.PacketData
 }
 
-/*
- * common init params between InitIntf and CreateIntf
- */
-func (intf *Interface) commonInit(ipAddr string, pktCh chan config.PacketData) {
+func (intf *Interface) addIP(ipAddr string) {
 	if isLinkLocal(ipAddr) {
 		intf.LinkLocalIp = ipAddr
 		ip, _, err := net.ParseCIDR(intf.LinkLocalIp)
@@ -98,6 +96,23 @@ func (intf *Interface) commonInit(ipAddr string, pktCh chan config.PacketData) {
 			intf.globalScope = ip.String()
 		}
 	}
+}
+
+func (intf *Interface) removeIP(ipAddr string) {
+	if isLinkLocal(ipAddr) {
+		intf.LinkLocalIp = ""
+		intf.linkScope = ""
+	} else {
+		intf.IpAddr = ""
+		intf.globalScope = ""
+	}
+}
+
+/*
+ * common init params between InitIntf and CreateIntf
+ */
+func (intf *Interface) commonInit(ipAddr string, pktCh chan config.PacketData) {
+	intf.addIP(ipAddr)
 	// Pcap Init
 	intf.PcapBase.PcapHandle = nil
 	intf.PcapBase.PcapCtrl = nil
@@ -125,41 +140,71 @@ func (intf *Interface) InitIntf(obj *commonDefs.IPv6IntfState, pktCh chan config
 }
 
 /*
- * If Entry Already exists during CreateIPInterface then Update Interface will be called
+ * De-Init Interface will be called during delete ip interface
  */
-func (intf *Interface) UpdateIntf(ipAddr string) {
-	if isLinkLocal(ipAddr) {
-		intf.LinkLocalIp = ipAddr
-	} else {
-		intf.IpAddr = ipAddr
-	}
-	debug.Logger.Err("Received update notification for ifIndex", intf.IfIndex,
-		"when entry already exist in the database. Dumping IpAddr for debugging info.",
-		"Received Ip:", ipAddr, "global scope:", intf.IpAddr, "link scope ip:", intf.LinkLocalIp)
+func (intf *Interface) DeInitIntf() []string {
+	deleteEntries, _ := intf.DeleteAll()
+	intf.PcapBase.PcapHandle = nil
+	intf.PcapBase.PcapCtrl = nil
+	intf.PcapBase.PcapUsers = 0
+	intf.removeIP(intf.IpAddr)
+	intf.removeIP(intf.LinkLocalIp)
+	// Timers Value De-Init
+	intf.raTimer = nil
+	// Delete Nbrmap
+	intf.Neighbor = nil
+	return deleteEntries
 }
 
 /*
  * CreateIntf is called during CreateIPInterface notification
  */
-func (intf *Interface) CreateIntf(obj *config.IPIntfNotification, intfRef string, pktCh chan config.PacketData) {
-	intf.IntfRef = intfRef
+func (intf *Interface) CreateIntf(obj *config.IPIntfNotification, pktCh chan config.PacketData) {
+	intf.IntfRef = obj.IntfRef
 	intf.IfIndex = obj.IfIndex
 	intf.commonInit(obj.IpAddr, pktCh)
+	debug.Logger.Info("Created IP inteface", intf.IntfRef, "ifIndex:", intf.IfIndex,
+		"GS:", intf.globalScope, "LS:", intf.linkScope)
 }
 
 /*
- * DeleteIntf will kill pcap, flush neighbors and then stop all timers
+ * If Entry Already exists during CreateIPInterface then Update Interface will be called
  */
-func (intf *Interface) DeleteIntf() ([]string, error) {
-	debug.Logger.Debug("Deleting Interface:", intf.IntfRef, intf.IpAddr, intf.LinkLocalIp)
-	intf.DeletePcap()
+func (intf *Interface) UpdateIntf(ipAddr string) {
+	intf.addIP(ipAddr)
+	debug.Logger.Debug("Received update notification for ifIndex", intf.IfIndex,
+		"when entry already exist in the database. Received Ip:", ipAddr, "global scope:",
+		intf.IpAddr, "link scope ip:", intf.LinkLocalIp)
+}
+
+func (intf *Interface) deleteNbrList() ([]string, error) {
 	if intf.PcapBase.PcapHandle == nil && intf.PcapBase.PcapUsers == 0 {
 		intf.StopRATimer()
 		deleteEntries, err := intf.FlushNeighbors()
 		return deleteEntries, err
 	}
-
 	return make([]string, 0), nil
+}
+
+/*
+ * DeleteIntf will kill pcap, flush neighbors and then stop all timers
+ */
+func (intf *Interface) DeleteIntf(ipAddr string) ([]string, error) {
+	debug.Logger.Debug("Deleting Interface:", intf.IntfRef, intf.IpAddr, intf.LinkLocalIp)
+	//intf.removeIP(ipAddr)
+	intf.DeletePcap()
+	return intf.deleteNbrList()
+}
+
+/*
+ * Delete All will delete ip address and then remove entire pcap
+ */
+func (intf *Interface) DeleteAll() ([]string, error) {
+	//intf.removeIP(intf.LinkLocalIp)
+	intf.DeletePcap()
+	//intf.removeIP(intf.IpAddr)
+	intf.DeletePcap()
+	return intf.deleteNbrList()
 }
 
 /*
@@ -181,7 +226,7 @@ func (intf *Interface) CreatePcap() (err error) { //(pHdl *pcap.Handle, err erro
 		name := intf.IntfRef
 		intf.PcapBase.PcapHandle, err = pcap.OpenLive(name, NDP_PCAP_SNAPSHOTlEN, NDP_PCAP_PROMISCUOUS, NDP_PCAP_TIMEOUT)
 		if err != nil {
-			debug.Logger.Err("Creating Pcap Handler failed for", name, "Error:", err)
+			debug.Logger.Err("Creating Pcap Handler failed for interface:", name, "Error:", err)
 			return err
 		}
 		err = intf.PcapBase.PcapHandle.SetBPFFilter(NDP_PCAP_FILTER)
@@ -264,7 +309,7 @@ func (intf *Interface) writePkt(pkt []byte) error {
 		}
 	} else {
 		debug.Logger.Warning("Pcap deleted for interface:", intf.IntfRef)
-		return errors.New("Pcap deleted for interface:" + intf.IntfRef)
+		return errors.New(fmt.Sprintln("Pcap deleted for interface:", intf.IntfRef))
 	}
 	return nil
 }
@@ -308,27 +353,6 @@ func (intf *Interface) FlushNeighbors() ([]string, error) {
 		deleteEntries = append(deleteEntries, nbr.IpAddr)
 		delete(intf.Neighbor, nbr.IpAddr)
 	}
-	/*
-			localIp, _, err := net.ParseCIDR(ip)
-			if err != nil {
-				debug.Logger.Err("Parsing ip", ip, "failed with err:", err)
-				return deleteEntries, errors.New(fmt.Sprintln("Parsing ip", ip, "failed with err:", err))
-			}
-			link, exists := p.GetLink(localIp.String())
-			if !exists {
-				debug.Logger.Err("Cannot delete neighbors for", localIp.String(), "as there is no such link entry")
-				return deleteEntries, errors.New(fmt.Sprintln("Cannot delete neighbors for", localIp.String(),
-					"as there is no such link entry"))
-			}
-		for _, cache := range link.NbrCache {
-			key := cache.IpAddr
-			deleteEntries = append(deleteEntries, key)
-			debug.Logger.Debug("Deleting Neighbor", cache.IpAddr)
-			cache.DeInitCache()
-			delete(link.NbrCache, key)
-		}
-		p.SetLink(localIp.String(), link)
-	*/
 	// do not delete link information here... only if IP interface is deleted then we need to delete
 	// link information
 	return deleteEntries, nil
@@ -346,27 +370,6 @@ func (intf *Interface) FlushNeighborPerIp(nbrKey, ipAddr string) ([]string, erro
 	nbr.DeInit()
 	deleteEntries = append(deleteEntries, ipAddr)
 	delete(intf.Neighbor, nbrKey)
-	/*
-		if isLinkLocal(ipAddr) {
-			// delete all neighbors with link scope ip
-			for nbrIp, nbr := range intf.Neighbor {
-				if isLinkLocal(nbr.IpAddr) {
-					nbr.DeInit()
-					deleteEntries = append(deleteEntries, nbrIp)
-					delete(intf.Neighbor, nbrIp)
-				}
-			}
-		} else {
-			// delete all neighbors with global scope ip
-			for nbrIp, nbr := range intf.Neighbor {
-				if !isLinkLocal(nbr.IpAddr) {
-					nbr.DeInit()
-					deleteEntries = append(deleteEntries, nbrIp)
-					delete(intf.Neighbor, nbrIp)
-				}
-			}
-		}
-	*/
 	return deleteEntries, nil
 }
 

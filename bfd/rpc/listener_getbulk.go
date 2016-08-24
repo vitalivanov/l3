@@ -13,13 +13,13 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 package rpc
 
@@ -30,6 +30,7 @@ import (
 	"l3/bfd/bfddCommonDefs"
 	"l3/bfd/server"
 	"strconv"
+	"time"
 )
 
 func (h *BFDHandler) convertGlobalStateToThrift(ent server.GlobalState) *bfdd.BfdGlobalState {
@@ -107,6 +108,13 @@ func (h *BFDHandler) convertSessionStateToThrift(ent server.SessionState) *bfdd.
 	sessionState.SentAuthSeq = int32(ent.SentAuthSeq)
 	sessionState.NumTxPackets = int32(ent.NumTxPackets)
 	sessionState.NumRxPackets = int32(ent.NumRxPackets)
+	sessionState.ToDownCount = int32(ent.ToDownCount)
+	sessionState.ToUpCount = int32(ent.ToUpCount)
+	if ent.SessionState == server.STATE_UP {
+		sessionState.UpDuration = string(time.Since(ent.UpTime).String())
+	} else {
+		sessionState.UpDuration = string("NA")
+	}
 	return sessionState
 }
 

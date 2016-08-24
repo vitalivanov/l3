@@ -50,8 +50,8 @@ func (svr *NDPServer) StartRxTx(ifIndex int32) {
 	if err != nil {
 		return
 	}
-	debug.Logger.Info("Start rx/tx for port:", ipPort.IntfRef, "ifIndex:", ipPort.IfIndex, "ip GS:", ipPort.IpAddr,
-		"LS:", ipPort.LinkLocalIp, "is done")
+	debug.Logger.Info("Start rx/tx for port:", ipPort.IntfRef, "ifIndex:",
+		ipPort.IfIndex, "ip GS:", ipPort.IpAddr, "LS:", ipPort.LinkLocalIp, "is done")
 
 	// Spawn go routines for rx & tx
 	go ipPort.ReceiveNdpPkts(svr.RxPktCh)
@@ -71,7 +71,7 @@ func (svr *NDPServer) StartRxTx(ifIndex int32) {
  *		       c) block until cleanup is going on
  *		       c) delete the entry from up interface slice
  */
-func (svr *NDPServer) StopRxTx(ifIndex int32) {
+func (svr *NDPServer) StopRxTx(ifIndex int32, ipAddr string) {
 	ipPort, exists := svr.L3Port[ifIndex]
 	if !exists {
 		debug.Logger.Err("No entry found for ifIndex:", ifIndex)
@@ -89,16 +89,25 @@ func (svr *NDPServer) StopRxTx(ifIndex int32) {
 	 *		On first Notification NDP will update pcap users and move on. Only when second delete
 	 *		notification comes then NDP will delete pcap
 	 */
-	deleteEntries, err := ipPort.DeleteIntf()
+	var deleteEntries []string
+	var err error
+	if ipAddr == "ALL" {
+		deleteEntries, err = ipPort.DeleteAll()
+	} else {
+		deleteEntries, err = ipPort.DeleteIntf(ipAddr)
+	}
 	if len(deleteEntries) > 0 && err == nil {
 		debug.Logger.Info("Server Got Neigbor Delete for interface:", ipPort.IntfRef)
 		svr.DeleteNeighborInfo(deleteEntries, ifIndex)
 	}
 
 	svr.L3Port[ifIndex] = ipPort
-	debug.Logger.Info("Stop rx/tx for port:", ipPort.IntfRef, "ifIndex:", ipPort.IfIndex, "ip GS:", ipPort.IpAddr,
-		"LS:", ipPort.LinkLocalIp, "is done")
-	// Delete Entry from Slice
+	if len(deleteEntries) == 0 {
+		return // only one ip address got deleted
+	}
+	debug.Logger.Info("Stop rx/tx for port:", ipPort.IntfRef, "ifIndex:",
+		ipPort.IfIndex, "ip GS:", ipPort.IpAddr, "LS:", ipPort.LinkLocalIp, "is done")
+	// Delete Entry from Slice only after all the ip's are deleted
 	svr.DeleteL3IntfFromUpState(ipPort.IfIndex)
 }
 
@@ -215,7 +224,6 @@ func (svr *NDPServer) ProcessRxPkt(ifIndex int32, pkt gopacket.Packet) {
 }
 
 func (svr *NDPServer) ProcessTimerExpiry(pktData config.PacketData) {
-
 	l3Port, exists := svr.L3Port[pktData.IfIndex]
 	if !exists {
 		return

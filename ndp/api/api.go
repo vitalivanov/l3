@@ -73,10 +73,11 @@ func SendVlanNotification(oper string, vlanId int32, vlanName string, untagPorts
 	}
 }
 
-func SendIPIntfNotfication(ifIndex int32, ipaddr, msgType string) {
+func SendIPIntfNotfication(ifIndex int32, ipaddr, intfRef, msgType string) {
 	ndpApi.server.IpIntfCh <- &config.IPIntfNotification{
 		IfIndex:   ifIndex,
 		IpAddr:    ipaddr,
+		IntfRef:   intfRef,
 		Operation: msgType,
 	}
 }
