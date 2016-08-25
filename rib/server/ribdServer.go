@@ -60,27 +60,27 @@ type RIBdServerConfig struct {
 	Op        []*ribd.PatchOpInfo
 }*/
 type RIBDServer struct {
-	Logger                 *logging.Writer
-	PolicyEngineDB         *policy.PolicyEngineDB
-	GlobalPolicyEngineDB   *policy.PolicyEngineDB
-	TrackReachabilityCh    chan TrackReachabilityInfo
-	RouteConfCh            chan RIBdServerConfig
-	AsicdRouteCh           chan RIBdServerConfig
-	ArpdRouteCh            chan RIBdServerConfig
-	NotificationChannel    chan NotificationMsg
-	NextHopInfoMap         map[NextHopInfoKey]NextHopInfo
-	PolicyConditionConfCh  chan RIBdServerConfig
+	Logger               *logging.Writer
+	PolicyEngineDB       *policy.PolicyEngineDB
+	GlobalPolicyEngineDB *policy.PolicyEngineDB
+	TrackReachabilityCh  chan TrackReachabilityInfo
+	RouteConfCh          chan RIBdServerConfig
+	AsicdRouteCh         chan RIBdServerConfig
+	ArpdRouteCh          chan RIBdServerConfig
+	NotificationChannel  chan NotificationMsg
+	NextHopInfoMap       map[NextHopInfoKey]NextHopInfo
+	/*PolicyConditionConfCh  chan RIBdServerConfig
 	PolicyActionConfCh     chan RIBdServerConfig
-	PolicyStmtConfCh       chan RIBdServerConfig
-	PolicyDefinitionConfCh chan RIBdServerConfig
-	PolicyApplyCh          chan ApplyPolicyInfo
-	PolicyUpdateApplyCh    chan ApplyPolicyInfo
-	DBRouteCh              chan RIBdServerConfig
-	AcceptConfig           bool
-	ServerUpCh             chan bool
-	DBReadDone             chan bool
-	DbHdl                  *dbutils.DBUtil
-	Clients                map[string]ClientIf
+	PolicyStmtConfCh       chan RIBdServerConfig*/
+	PolicyConfCh        chan RIBdServerConfig
+	PolicyApplyCh       chan ApplyPolicyList
+	PolicyUpdateApplyCh chan ApplyPolicyList
+	DBRouteCh           chan RIBdServerConfig
+	AcceptConfig        bool
+	ServerUpCh          chan bool
+	DBReadDone          chan bool
+	DbHdl               *dbutils.DBUtil
+	Clients             map[string]ClientIf
 	//RouteInstallCh                 chan RouteParams
 }
 
@@ -428,12 +428,12 @@ func NewRIBDServicesHandler(dbHdl *dbutils.DBUtil, loggerC *logging.Writer) *RIB
 	ribdServicesHandler.AsicdRouteCh = make(chan RIBdServerConfig, 100000)
 	ribdServicesHandler.ArpdRouteCh = make(chan RIBdServerConfig, 5000)
 	ribdServicesHandler.NotificationChannel = make(chan NotificationMsg, 5000)
-	ribdServicesHandler.PolicyConditionConfCh = make(chan RIBdServerConfig, 5000)
-	ribdServicesHandler.PolicyActionConfCh = make(chan RIBdServerConfig, 5000)
-	ribdServicesHandler.PolicyStmtConfCh = make(chan RIBdServerConfig, 5000)
-	ribdServicesHandler.PolicyDefinitionConfCh = make(chan RIBdServerConfig, 5000)
-	ribdServicesHandler.PolicyApplyCh = make(chan ApplyPolicyInfo, 100)
-	ribdServicesHandler.PolicyUpdateApplyCh = make(chan ApplyPolicyInfo, 100)
+	/*	ribdServicesHandler.PolicyConditionConfCh = make(chan RIBdServerConfig, 5000)
+		ribdServicesHandler.PolicyActionConfCh = make(chan RIBdServerConfig, 5000)
+		ribdServicesHandler.PolicyStmtConfCh = make(chan RIBdServerConfig, 5000)*/
+	ribdServicesHandler.PolicyConfCh = make(chan RIBdServerConfig, 5000)
+	ribdServicesHandler.PolicyApplyCh = make(chan ApplyPolicyList, 100)
+	ribdServicesHandler.PolicyUpdateApplyCh = make(chan ApplyPolicyList, 100)
 	ribdServicesHandler.DBRouteCh = make(chan RIBdServerConfig, 100000)
 	ribdServicesHandler.ServerUpCh = make(chan bool)
 	ribdServicesHandler.DBReadDone = make(chan bool)
@@ -481,11 +481,11 @@ func (ribdServiceHandler *RIBDServer) StartServer(paramsDir string) {
 			continue
 		}
 		select {
-		case info := <-ribdServiceHandler.PolicyApplyCh:
-			//logger.Debug("received message on PolicyApplyCh channel")
+		case list := <-ribdServiceHandler.PolicyApplyCh:
+			logger.Debug("received message on PolicyApplyCh channel")
 			//update the local policyEngineDB
-			ribdServiceHandler.UpdateApplyPolicy(info, true, PolicyEngineDB)
-			ribdServiceHandler.PolicyUpdateApplyCh <- info
+			ribdServiceHandler.UpdateApplyPolicyList(list.ApplyList, list.UndoList, true, PolicyEngineDB)
+			ribdServiceHandler.PolicyUpdateApplyCh <- list
 		case info := <-ribdServiceHandler.TrackReachabilityCh:
 			//logger.Debug("received message on TrackReachabilityCh channel")
 			ribdServiceHandler.TrackReachabilityStatus(info.IpAddr, info.Protocol, info.Op)

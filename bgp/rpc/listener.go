@@ -26,6 +26,7 @@ package rpc
 
 import (
 	"bgpd"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"l3/bgp/config"
@@ -36,6 +37,7 @@ import (
 	"math"
 	"models/objects"
 	"net"
+	"reflect"
 	"strconv"
 	"strings"
 	"utils/dbutils"
@@ -112,7 +114,7 @@ func (h *BGPHandler) handleGlobalConfig() error {
 			h.logger.Err("handleGlobalConfig - Failed to convert Model object BGP Global, error:", err)
 			return err
 		}
-		h.server.GlobalConfigCh <- server.GlobalUpdate{config.GlobalConfig{}, gConf, make([]bool, 0)}
+		h.server.GlobalConfigCh <- server.GlobalUpdate{config.GlobalConfig{}, gConf, make([]bool, 0), nil, "create"}
 	}
 	return nil
 }
@@ -595,13 +597,13 @@ func (h *BGPHandler) convertStrIPToNetIP(ip string) net.IP {
 	return netIP
 }
 
-func (h *BGPHandler) validateBGPGlobal(bgpGlobal *bgpd.BGPGlobal, update bool) (gConf config.GlobalConfig, err error) {
+func (h *BGPHandler) validateBGPGlobal(bgpGlobal *bgpd.BGPGlobal) (gConf config.GlobalConfig, err error) {
 	if bgpGlobal == nil {
 		return gConf, err
 	}
 
 	asNum := uint32(bgpGlobal.ASNum)
-	if (update && asNum == uint32(0)) || asNum == uint32(math.MaxUint16) || asNum == uint32(math.MaxUint32) ||
+	if (asNum == uint32(0)) || asNum == uint32(math.MaxUint16) || asNum == uint32(math.MaxUint32) ||
 		asNum == uint32(packet.BGPASTrans) {
 		err = errors.New(fmt.Sprintf("BGPGlobal: AS number %d is not valid", bgpGlobal.ASNum))
 		h.logger.Info("SendBGPGlobal: AS number", bgpGlobal.ASNum, "is a reserved AS number")
@@ -632,30 +634,166 @@ func (h *BGPHandler) validateBGPGlobal(bgpGlobal *bgpd.BGPGlobal, update bool) (
 	}
 	return gConf, nil
 }
+func (h *BGPHandler) validateBGPGlobalForPatchUpdate(oldConfig *bgpd.BGPGlobal, newConfig *bgpd.BGPGlobal, op []*bgpd.PatchOpInfo) (gConf config.GlobalConfig, err error) {
+	h.logger.Info("validateBGPGlobalForPatchUpdate")
+	if oldConfig == nil || newConfig == nil {
+		return gConf, err
+	}
+	ip := h.convertStrIPToNetIP(oldConfig.RouterId)
+	if ip == nil {
+		err = errors.New(fmt.Sprintf("BGPGlobal: Router id %s is not valid", oldConfig.RouterId))
+		h.logger.Info("SendBGPGlobal: Router id", oldConfig.RouterId, "is not valid")
+		return gConf, err
+	}
+	gConf = config.GlobalConfig{
+		AS:                  uint32(oldConfig.ASNum),
+		RouterId:            ip,
+		UseMultiplePaths:    oldConfig.UseMultiplePaths,
+		EBGPMaxPaths:        uint32(oldConfig.EBGPMaxPaths),
+		EBGPAllowMultipleAS: oldConfig.EBGPAllowMultipleAS,
+		IBGPMaxPaths:        uint32(oldConfig.IBGPMaxPaths),
+	}
+	for idx := 0; idx < len(op); idx++ {
+		h.logger.Debug("patch update")
+		switch op[idx].Path {
+		case "Redistribution":
+			h.logger.Debug("Patch update for redistribution")
+			if len(op[idx].Value) == 0 {
+				/*
+					If redistribution update is trying to update redistribution, non zero value is expected
+				*/
+				h.logger.Err("Must specify sources")
+				return gConf, errors.New("Redistribution update list not specified")
+			}
+			h.logger.Debug("value = ", op[idx].Value)
+			valueObjArr := []bgpd.SourcePolicyList{}
+			err = json.Unmarshal([]byte(op[idx].Value), &valueObjArr)
+			if err != nil {
+				h.logger.Err("error unmarshaling value:", err)
+				return gConf, errors.New(fmt.Sprintln("error unmarshaling value:", err))
+			}
+			h.logger.Debug("Number of redistribution soures:", len(valueObjArr))
+			for _, _ = range valueObjArr {
+				switch op[idx].Op {
+				case "add":
+					h.logger.Debug("add op")
+				case "remove":
+					h.logger.Debug("remove op")
+				default:
+					h.logger.Err("operation ", op[idx].Op, " not supported")
+					return gConf, errors.New(fmt.Sprintln("operation ", op[idx].Op, " not supported"))
+				}
+			}
+		default:
+			h.logger.Err("Patch update for attribute:", op[idx].Path, " not supported")
+			return gConf, errors.New("Invalid attribute for patch update")
+		}
+	}
+	return gConf, err
+}
+func (h *BGPHandler) validateBGPGlobalForUpdate(oldConfig *bgpd.BGPGlobal, newConfig *bgpd.BGPGlobal, attrSet []bool) (gConf config.GlobalConfig, err error) {
+	h.logger.Info("validateBGPGlobalForUpdate")
+	if oldConfig == nil || newConfig == nil {
+		return gConf, err
+	}
+	asNum := uint32(oldConfig.ASNum)
+	if (asNum == uint32(0)) || asNum == uint32(math.MaxUint16) || asNum == uint32(math.MaxUint32) ||
+		asNum == uint32(packet.BGPASTrans) {
+		err = errors.New(fmt.Sprintf("BGPGlobal: AS number %d is not valid", oldConfig.ASNum))
+		h.logger.Info("SendBGPGlobal: AS number", oldConfig.ASNum, "is not valid")
+		return gConf, err
+	}
 
-func (h *BGPHandler) SendBGPGlobal(oldConfig *bgpd.BGPGlobal, newConfig *bgpd.BGPGlobal, attrSet []bool) (bool, error) {
-	oldGlobal, err := h.validateBGPGlobal(oldConfig, false)
+	ip := h.convertStrIPToNetIP(oldConfig.RouterId)
+	if ip == nil {
+		err = errors.New(fmt.Sprintf("BGPGlobal: Router id %s is not valid", oldConfig.RouterId))
+		h.logger.Info("SendBGPGlobal: Router id", oldConfig.RouterId, "is not valid")
+		return gConf, err
+	}
+	gConf = config.GlobalConfig{
+		AS:                  uint32(oldConfig.ASNum),
+		RouterId:            ip,
+		UseMultiplePaths:    oldConfig.UseMultiplePaths,
+		EBGPMaxPaths:        uint32(oldConfig.EBGPMaxPaths),
+		EBGPAllowMultipleAS: oldConfig.EBGPAllowMultipleAS,
+		IBGPMaxPaths:        uint32(oldConfig.IBGPMaxPaths),
+	}
+	if oldConfig.Redistribution != nil {
+		gConf.Redistribution = make([]config.SourcePolicyMap, 0)
+		for i := 0; i < len(oldConfig.Redistribution); i++ {
+			redistribution := config.SourcePolicyMap{oldConfig.Redistribution[i].Sources, oldConfig.Redistribution[i].Policy}
+			gConf.Redistribution = append(gConf.Redistribution, redistribution)
+		}
+	}
+	if attrSet != nil {
+		objTyp := reflect.TypeOf(oldConfig)
+		for i := 0; i < objTyp.NumField(); i++ {
+			objName := objTyp.Field(i).Name
+			if attrSet[i] {
+				h.logger.Debug("validateBGPGlobalForUpdate : changed ", objName)
+				if objName == "Redistribution" {
+					if len(newConfig.Redistribution) == 0 {
+						h.logger.Err("Must specify redistribution")
+						return gConf, err
+					}
+				}
+				if objName == "RouterId" {
+					newip := h.convertStrIPToNetIP(newConfig.RouterId)
+					if newip == nil {
+						err = errors.New(fmt.Sprintf("BGPGlobal: Router id %s is not valid", newConfig.RouterId))
+						h.logger.Info("SendBGPGlobal: Router id", newConfig.RouterId, "is not valid")
+						return gConf, err
+					}
+					gConf.RouterId = newip
+				}
+				if objName == "ASNum" {
+					newasNum := uint32(newConfig.ASNum)
+					if newasNum == 0 || newasNum == uint32(packet.BGPASTrans) {
+						err = errors.New(fmt.Sprintf("BGPGlobal: AS number %d is not valid", newConfig.ASNum))
+						h.logger.Info("SendBGPGlobal: AS number", newConfig.ASNum, "is not valid")
+						return gConf, err
+					}
+					gConf.AS = newasNum
+				}
+			}
+		}
+	}
+	return gConf, err
+}
+func (h *BGPHandler) SendBGPGlobal(oldConfig *bgpd.BGPGlobal, newConfig *bgpd.BGPGlobal, attrSet []bool, patchOp []*bgpd.PatchOpInfo, op string) (bool, error) {
+	var newGlobal config.GlobalConfig
+	oldGlobal, err := h.validateBGPGlobal(oldConfig)
 	if err != nil {
 		return false, err
 	}
-
-	update := false
-	if oldConfig != nil {
-		update = true
+	if op != "update" {
+		newGlobal, err = h.validateBGPGlobal(newConfig)
+		if err != nil {
+			return false, err
+		}
+	} else {
+		if patchOp == nil || len(patchOp) == 0 {
+			newGlobal, err = h.validateBGPGlobalForUpdate(oldConfig, newConfig, attrSet)
+			if err != nil {
+				h.logger.Err("validateBGPGlobalForUpdate failed with err:", err)
+				return false, err
+			}
+		} else {
+			newGlobal, err = h.validateBGPGlobalForPatchUpdate(oldConfig, newConfig, patchOp)
+			if err != nil {
+				h.logger.Err("validateBGPGlobalForPatchUpdate failed with err:", err)
+				return false, err
+			}
+		}
 	}
 
-	newGlobal, err := h.validateBGPGlobal(newConfig, update)
-	if err != nil {
-		return false, err
-	}
-
-	h.server.GlobalConfigCh <- server.GlobalUpdate{oldGlobal, newGlobal, attrSet}
+	h.server.GlobalConfigCh <- server.GlobalUpdate{oldGlobal, newGlobal, attrSet, patchOp, op}
 	return true, err
 }
 
 func (h *BGPHandler) CreateBGPGlobal(bgpGlobal *bgpd.BGPGlobal) (bool, error) {
 	h.logger.Info("Create global config attrs:", bgpGlobal)
-	return h.SendBGPGlobal(nil, bgpGlobal, make([]bool, 0))
+	return h.SendBGPGlobal(nil, bgpGlobal, make([]bool, 0), make([]*bgpd.PatchOpInfo, 0), "create")
 }
 
 func (h *BGPHandler) GetBGPGlobalState(rtrId string) (*bgpd.BGPGlobalState, error) {
@@ -686,8 +824,8 @@ func (h *BGPHandler) GetBulkBGPGlobalState(index bgpd.Int,
 
 func (h *BGPHandler) UpdateBGPGlobal(origG *bgpd.BGPGlobal, updatedG *bgpd.BGPGlobal,
 	attrSet []bool, op []*bgpd.PatchOpInfo) (bool, error) {
-	h.logger.Info("Update global config attrs:", updatedG, "old config:", origG)
-	return h.SendBGPGlobal(origG, updatedG, attrSet)
+	h.logger.Info("Update global config attrs:", updatedG, "old config:", origG, " new config:", updatedG)
+	return h.SendBGPGlobal(origG, updatedG, attrSet, op, "update")
 }
 
 func (h *BGPHandler) DeleteBGPGlobal(bgpGlobal *bgpd.BGPGlobal) (bool, error) {
