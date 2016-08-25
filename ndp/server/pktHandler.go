@@ -50,8 +50,8 @@ func (svr *NDPServer) StartRxTx(ifIndex int32) {
 	if err != nil {
 		return
 	}
-	debug.Logger.Info("Start rx/tx for port:", ipPort.IntfRef, "ifIndex:", ipPort.IfIndex, "ip GS:", ipPort.IpAddr,
-		"LS:", ipPort.LinkLocalIp, "is done")
+	debug.Logger.Info("Start rx/tx for port:", ipPort.IntfRef, "ifIndex:",
+		ipPort.IfIndex, "ip GS:", ipPort.IpAddr, "LS:", ipPort.LinkLocalIp, "is done")
 
 	// Spawn go routines for rx & tx
 	go ipPort.ReceiveNdpPkts(svr.RxPktCh)
@@ -105,8 +105,8 @@ func (svr *NDPServer) StopRxTx(ifIndex int32, ipAddr string) {
 	if len(deleteEntries) == 0 {
 		return // only one ip address got deleted
 	}
-	debug.Logger.Info("Stop rx/tx for port:", ipPort.IntfRef, "ifIndex:", ipPort.IfIndex, "ip GS:", ipPort.IpAddr,
-		"LS:", ipPort.LinkLocalIp, "is done")
+	debug.Logger.Info("Stop rx/tx for port:", ipPort.IntfRef, "ifIndex:",
+		ipPort.IfIndex, "ip GS:", ipPort.IpAddr, "LS:", ipPort.LinkLocalIp, "is done")
 	// Delete Entry from Slice only after all the ip's are deleted
 	svr.DeleteL3IntfFromUpState(ipPort.IfIndex)
 }

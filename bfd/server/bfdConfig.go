@@ -26,6 +26,7 @@ package server
 import (
 	"l3/bfd/bfddCommonDefs"
 	"net"
+	"time"
 )
 
 type GlobalConfig struct {
@@ -78,6 +79,9 @@ type SessionState struct {
 	SentAuthSeq               uint32
 	NumTxPackets              uint32
 	NumRxPackets              uint32
+	ToDownCount               uint32
+	ToUpCount                 uint32
+	UpTime                    time.Time
 }
 
 type SessionParamConfig struct {

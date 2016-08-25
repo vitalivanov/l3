@@ -641,8 +641,9 @@ func policyEngineTraverseAndApply(data interface{}, updatefunc policy.PolicyAppl
 	V4RouteInfoMap.VisitAndUpdate(policyEngineApplyForRoute, traverseAndApplyPolicyData)
 	V6RouteInfoMap.VisitAndUpdate(policyEngineApplyForRoute, traverseAndApplyPolicyData)
 }
-func policyEngineTraverseAndReverse(policyItem interface{}) {
-	policy := policyItem.(policy.Policy)
+func policyEngineTraverseAndReverse(applyPolicyItem interface{}) {
+	applyPolicyInfo := applyPolicyItem.(policy.ApplyPolicyInfo)
+	policy := applyPolicyInfo.ApplyPolicy //policyItem.(policy.Policy)
 	logger.Info("PolicyEngineTraverseAndReverse - traverse routing table and inverse policy actions", policy.Name)
 	ext := policy.Extensions.(PolicyExtensions)
 	if ext.routeList == nil {
@@ -664,8 +665,11 @@ func policyEngineTraverseAndReverse(policyItem interface{}) {
 			logger.Err("Error builiding policy entity params")
 			return
 		}
-		PolicyEngineDB.PolicyEngineUndoPolicyForEntity(entity, policy, params)
-		deleteRoutePolicyState(params.ipType, ipPrefix, policy.Name)
-		PolicyEngineDB.DeletePolicyEntityMapEntry(entity, policy.Name)
+		//PolicyEngineDB.PolicyEngineUndoPolicyForEntity(entity, policy, params)
+		success := PolicyEngineDB.PolicyEngineUndoApplyPolicyForEntity(entity, applyPolicyInfo, params)
+		if success {
+			deleteRoutePolicyState(params.ipType, ipPrefix, policy.Name)
+			PolicyEngineDB.DeletePolicyEntityMapEntry(entity, policy.Name)
+		}
 	}
 }

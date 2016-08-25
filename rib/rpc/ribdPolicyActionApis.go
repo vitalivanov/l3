@@ -31,18 +31,18 @@ import (
 
 func (m RIBDServicesHandler) CreatePolicyAction(cfg *ribdInt.PolicyAction) (val bool, err error) {
 	logger.Info("CreatePolicyAction")
-	m.server.PolicyActionConfCh <- server.RIBdServerConfig{
+	m.server.PolicyConfCh <- server.RIBdServerConfig{
 		OrigConfigObject: cfg,
-		Op:               "add",
+		Op:               "addPolicyAction",
 	}
 	return true, err
 }
 
 func (m RIBDServicesHandler) DeletePolicyAction(cfg *ribdInt.PolicyAction) (val bool, err error) {
 	logger.Info("CreatePolicyAction")
-	m.server.PolicyActionConfCh <- server.RIBdServerConfig{
+	m.server.PolicyConfCh <- server.RIBdServerConfig{
 		OrigConfigObject: cfg,
-		Op:               "del",
+		Op:               "delPolicyAction",
 	}
 	return true, err
 }

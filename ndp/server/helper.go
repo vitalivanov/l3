@@ -145,6 +145,7 @@ func (svr *NDPServer) GetIntfRefName(ifIndex int32) string {
 			return vlanInfo.Name
 		}
 	}
+
 	return INTF_REF_NOT_FOUND
 }
 
@@ -163,6 +164,16 @@ func (svr *NDPServer) IsIPv6Addr(ipAddr string) bool {
 	}
 
 	return false
+}
+
+func (svr *NDPServer) DeleteNDPEntryFromState(delifIndex int32) {
+	for _, ifIndex := range svr.ndpUpIntfStateSlice {
+		if delifIndex == ifIndex {
+			//svr.ndpUp = append(svr.lldpUpIntfStateSlice[:idx],
+			//	svr.lldpUpIntfStateSlice[idx+1:]...)
+			break
+		}
+	}
 }
 
 /*  API: will handle IPv6 notifications received from switch/asicd
@@ -184,10 +195,9 @@ func (svr *NDPServer) HandleIPIntfCreateDelete(obj *config.IPIntfNotification) {
 		}
 
 		ipInfo = Interface{}
-		ipInfo.CreateIntf(obj, svr.GetIntfRefName(obj.IfIndex), svr.PktDataCh)
-		debug.Logger.Info("Created IP inteface", ipInfo.IntfRef, "ifIndex:", ipInfo.IfIndex)
+		//ipInfo.CreateIntf(obj, svr.GetIntfRefName(obj.IfIndex), svr.PktDataCh)
+		ipInfo.CreateIntf(obj, svr.PktDataCh)
 		svr.ndpL3IntfStateSlice = append(svr.ndpL3IntfStateSlice, ipInfo.IfIndex)
-		svr.L3Port[ipInfo.IfIndex] = ipInfo
 	case config.CONFIG_DELETE:
 		if !exists {
 			debug.Logger.Err("Got Delete request for non existing l3 port", obj.IfIndex)
@@ -196,8 +206,15 @@ func (svr *NDPServer) HandleIPIntfCreateDelete(obj *config.IPIntfNotification) {
 		// stop rx/tx on the deleted interface
 		debug.Logger.Info("Delete IP interface received for", ipInfo.IntfRef, "ifIndex:", ipInfo.IfIndex)
 		//ipInfo.DeleteIntf(obj.IpAddr)
-		svr.StopRxTx(obj.IfIndex, obj.IpAddr)
+		//svr.StopRxTx(obj.IfIndex, obj.IpAddr)
+		deleteEntries := ipInfo.DeInitIntf()
+		if len(deleteEntries) > 0 {
+			svr.DeleteNeighborInfo(deleteEntries, obj.IfIndex)
+		}
+
+		//@TODO: need to remove ndp l3 interface from up slice
 	}
+	svr.L3Port[ipInfo.IfIndex] = ipInfo
 }
 
 func (svr *NDPServer) findL3Port(ifIndex int32) (Interface, bool) {

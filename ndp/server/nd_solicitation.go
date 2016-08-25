@@ -27,7 +27,7 @@ import (
 	_ "github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"l3/ndp/config"
-	_ "l3/ndp/debug"
+	"l3/ndp/debug"
 	"l3/ndp/packet"
 	_ "net"
 	_ "strings"
@@ -59,6 +59,9 @@ func (intf *Interface) sendUnicastNS(srcMac, nbrMac, nbrIp string) NDP_OPERATION
 	} else {
 		pkt.SrcIp = intf.globalScope
 	}
+
+	debug.Logger.Debug("Sending Unicast NS message with (DMAC, SMAC)", pkt.DstMac, pkt.SrcMac,
+		"and (DIP, SIP)", pkt.DstIp, pkt.SrcIp)
 
 	pktToSend := pkt.Encode()
 	err := intf.writePkt(pktToSend)

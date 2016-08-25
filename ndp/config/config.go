@@ -61,6 +61,7 @@ type IPv6IntfInfo struct {
 type IPIntfNotification struct {
 	IfIndex   int32
 	IpAddr    string
+	IntfRef   string
 	Operation string
 }
 

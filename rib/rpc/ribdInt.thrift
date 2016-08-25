@@ -147,7 +147,12 @@ struct IPv6RouteState {
 	7 : list<string> PolicyList
 	8 : NextBestRouteInfo NextBestRoute
 }
-
+struct ApplyPolicyInfo {
+	1: string Source     
+	2: string Policy     
+	3: string Action     
+	4: list<ConditionInfo>Conditions 
+}
 service RIBDINTServices 
 {
     NextHopInfo getRouteReachabilityInfo(1: string desIPv4MasktNet);
@@ -165,6 +170,8 @@ service RIBDINTServices
 	bool CreatePolicyAction(1: PolicyAction config);
 	bool UpdatePolicyAction(1: PolicyAction origconfig, 2: PolicyAction newconfig, 3: list<bool> attrset, 4: list<PatchOpInfo> op);
 	bool DeletePolicyAction(1: PolicyAction config);
-	void ApplyPolicy(1: string source, 2: string policy, 3: string action, 4: list<ConditionInfo>conditions)
-	void UpdateApplyPolicy(1: string source, 2: string policy, 3: string action, 4: list<ConditionInfo>conditions)
+//	void ApplyPolicy(1: string source, 2: string policy, 3: string action, 4: list<ConditionInfo>conditions)
+    void ApplyPolicy(1:list<ApplyPolicyInfo> applyList, 2: list<ApplyPolicyInfo> undoApplyList)
+//  void UpdateApplyPolicy(1: string source, 2: string policy, 3: string action, 4: list<ConditionInfo>conditions)
+    void UpdateApplyPolicy(1:list<ApplyPolicyInfo> applyList, 2: list<ApplyPolicyInfo> undoApplyList)	
 }
