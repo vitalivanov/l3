@@ -695,14 +695,6 @@ func (h *BGPHandler) validateBGPGlobalForUpdate(oldConfig *bgpd.BGPGlobal, newCo
 	if oldConfig == nil || newConfig == nil {
 		return gConf, err
 	}
-	asNum := uint32(oldConfig.ASNum)
-	if (asNum == uint32(0)) || asNum == uint32(math.MaxUint16) || asNum == uint32(math.MaxUint32) ||
-		asNum == uint32(packet.BGPASTrans) {
-		err = errors.New(fmt.Sprintf("BGPGlobal: AS number %d is not valid", oldConfig.ASNum))
-		h.logger.Info("SendBGPGlobal: AS number", oldConfig.ASNum, "is not valid")
-		return gConf, err
-	}
-
 	ip := h.convertStrIPToNetIP(oldConfig.RouterId)
 	if ip == nil {
 		err = errors.New(fmt.Sprintf("BGPGlobal: Router id %s is not valid", oldConfig.RouterId))
@@ -725,7 +717,7 @@ func (h *BGPHandler) validateBGPGlobalForUpdate(oldConfig *bgpd.BGPGlobal, newCo
 		}
 	}
 	if attrSet != nil {
-		objTyp := reflect.TypeOf(oldConfig)
+		objTyp := reflect.TypeOf(*newConfig)
 		for i := 0; i < objTyp.NumField(); i++ {
 			objName := objTyp.Field(i).Name
 			if attrSet[i] {
@@ -746,13 +738,14 @@ func (h *BGPHandler) validateBGPGlobalForUpdate(oldConfig *bgpd.BGPGlobal, newCo
 					gConf.RouterId = newip
 				}
 				if objName == "ASNum" {
-					newasNum := uint32(newConfig.ASNum)
-					if newasNum == 0 || newasNum == uint32(packet.BGPASTrans) {
+					newASNum := uint32(newConfig.ASNum)
+					if (newASNum == uint32(0)) || newASNum == uint32(math.MaxUint16) ||
+						newASNum == uint32(math.MaxUint32) || newASNum == uint32(packet.BGPASTrans) {
 						err = errors.New(fmt.Sprintf("BGPGlobal: AS number %d is not valid", newConfig.ASNum))
 						h.logger.Info("SendBGPGlobal: AS number", newConfig.ASNum, "is not valid")
 						return gConf, err
 					}
-					gConf.AS = newasNum
+					gConf.AS = newASNum
 				}
 			}
 		}
