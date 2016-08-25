@@ -1281,7 +1281,11 @@ func (h *BGPHandler) UpdateBGPv4PeerGroup(origG *bgpd.BGPv4PeerGroup, updatedG *
 
 func (h *BGPHandler) DeleteBGPv4PeerGroup(peerGroup *bgpd.BGPv4PeerGroup) (bool, error) {
 	h.logger.Info("Delete BGP peer group:", peerGroup.Name)
-	h.server.RemPeerGroupCh <- peerGroup.Name
+	gConf, err := h.ValidateBGPv4PeerGroup(peerGroup)
+	if err != nil {
+		return false, err
+	}
+	h.server.RemPeerGroupCh <- gConf
 	return true, nil
 }
 
@@ -1354,7 +1358,11 @@ func (h *BGPHandler) UpdateBGPv6PeerGroup(origG *bgpd.BGPv6PeerGroup, updatedG *
 
 func (h *BGPHandler) DeleteBGPv6PeerGroup(peerGroup *bgpd.BGPv6PeerGroup) (bool, error) {
 	h.logger.Info("Delete BGP peer group:", peerGroup.Name)
-	h.server.RemPeerGroupCh <- peerGroup.Name
+	gConf, err := h.ValidateBGPv6PeerGroup(peerGroup)
+	if err != nil {
+		return false, err
+	}
+	h.server.RemPeerGroupCh <- gConf
 	return true, nil
 }
 

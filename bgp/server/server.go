@@ -100,7 +100,7 @@ type BGPServer struct {
 	AddPeerCh        chan PeerUpdate
 	RemPeerCh        chan string
 	AddPeerGroupCh   chan PeerGroupUpdate
-	RemPeerGroupCh   chan string
+	RemPeerGroupCh   chan config.PeerGroupConfig
 	AddAggCh         chan AggUpdate
 	RemAggCh         chan config.BGPAggregate
 	PeerFSMConnCh    chan fsm.PeerFSMConn
@@ -146,7 +146,7 @@ func NewBGPServer(logger *logging.Writer, policyManager *bgppolicy.BGPPolicyMana
 	bgpServer.AddPeerCh = make(chan PeerUpdate)
 	bgpServer.RemPeerCh = make(chan string)
 	bgpServer.AddPeerGroupCh = make(chan PeerGroupUpdate)
-	bgpServer.RemPeerGroupCh = make(chan string)
+	bgpServer.RemPeerGroupCh = make(chan config.PeerGroupConfig)
 	bgpServer.AddAggCh = make(chan AggUpdate)
 	bgpServer.RemAggCh = make(chan config.BGPAggregate)
 	bgpServer.PeerFSMConnCh = make(chan fsm.PeerFSMConn, 50)
@@ -272,10 +272,6 @@ func (s *BGPServer) listenForPeers(listener *net.TCPListener, acceptCh chan *net
 		s.logger.Info("Got a peer connection from %s", tcpConn.RemoteAddr())
 		s.acceptCh <- tcpConn
 	}
-}
-
-func (s *BGPServer) IsPeerLocal(peerIp string) bool {
-	return s.PeerMap[peerIp].NeighborConf.RunningConf.PeerAS == s.BgpConfig.Global.Config.AS
 }
 
 func (s *BGPServer) SendUpdate(updated map[uint32]map[*bgprib.Path][]*bgprib.Destination, withdrawn,
@@ -934,7 +930,7 @@ func (s *BGPServer) TraverseAndReverseAdjRIB(policyData interface{}, pe *bgppoli
 		peerIP := route.Neighbor.String()
 		if peer == nil {
 			var ok bool
-			if peer, ok = s.PeerMap[peerIP]; ok {
+			if peer, ok = s.PeerMap[peerIP]; !ok {
 				s.logger.Err("Peer not found for ip", peerIP, "for NLRI", route.NLRI.GetIPPrefix().String())
 				continue
 			}
@@ -1072,10 +1068,11 @@ func (s *BGPServer) removePeerFromList(peer *Peer) {
 	}
 }
 
-func (s *BGPServer) StopPeersByGroup(groupName string) []*Peer {
+func (s *BGPServer) StopPeersByGroup(groupName string, peerAddrType config.PeerAddressType) []*Peer {
 	peers := make([]*Peer, 0)
 	for peerIP, peer := range s.PeerMap {
-		if peer.NeighborConf.Group != nil && peer.NeighborConf.Group.Name == groupName {
+		if peer.NeighborConf.Group != nil && peer.NeighborConf.RunningConf.PeerAddressType == peerAddrType &&
+			peer.NeighborConf.Group.Name == groupName {
 			s.logger.Info("Clean up peer", peerIP)
 			peer.Cleanup()
 			s.ProcessRemoveNeighbor(peerIP, peer)
@@ -1088,8 +1085,9 @@ func (s *BGPServer) StopPeersByGroup(groupName string) []*Peer {
 	return peers
 }
 
-func (s *BGPServer) UpdatePeerGroupInPeers(groupName string, peerGroup *config.PeerGroupConfig) {
-	peers := s.StopPeersByGroup(groupName)
+func (s *BGPServer) UpdatePeerGroupInPeers(groupName string, peerAddrType config.PeerAddressType,
+	peerGroup *config.PeerGroupConfig) {
+	peers := s.StopPeersByGroup(groupName, peerAddrType)
 	for _, peer := range peers {
 		peer.UpdatePeerGroup(peerGroup)
 		peer.Init()
@@ -1398,12 +1396,16 @@ func (s *BGPServer) listenChannelUpdates() {
 
 				var groupConfig *config.PeerGroupConfig
 				if newPeer.PeerGroup != "" {
-					if group, ok :=
-						s.BgpConfig.PeerGroups[newPeer.PeerGroup]; !ok {
-						s.logger.Info("Peer group", newPeer.PeerGroup, "not created yet, creating peer",
-							newPeer.NeighborAddress.String(), "without the group")
+					protoFamily, _ := packet.GetProtocolFamilyFromPeerAddrType(newPeer.PeerAddressType)
+					if _, ok := s.BgpConfig.PeerGroups[protoFamily]; !ok {
+						s.logger.Info("No peer groups with Peer address type", newPeer.PeerAddressType, "exists")
 					} else {
-						groupConfig = &group.Config
+						if group, ok := s.BgpConfig.PeerGroups[protoFamily][newPeer.PeerGroup]; !ok {
+							s.logger.Info("Peer group", newPeer.PeerGroup, "not created yet, creating peer",
+								newPeer.NeighborAddress.String(), "without the group")
+						} else {
+							groupConfig = &group.Config
+						}
 					}
 				}
 				s.logger.Info("Add neighbor, ip:", newPeer.NeighborAddress.String())
@@ -1445,29 +1447,44 @@ func (s *BGPServer) listenChannelUpdates() {
 			var ok bool
 
 			if oldGroupConf.Name != "" {
-				if _, ok = s.BgpConfig.PeerGroups[oldGroupConf.Name]; !ok {
-					s.logger.Err("Could not find peer group", oldGroupConf.Name)
-					break
+				protoFamily, _ := packet.GetProtocolFamilyFromPeerAddrType(oldGroupConf.PeerAddressType)
+				if _, ok = s.BgpConfig.PeerGroups[protoFamily]; ok {
+					if _, ok = s.BgpConfig.PeerGroups[protoFamily][oldGroupConf.Name]; !ok {
+						s.logger.Err("Could not find peer group", oldGroupConf.Name)
+					}
 				}
 			}
 
-			if _, ok = s.BgpConfig.PeerGroups[newGroupConf.Name]; !ok {
+			protoFamily, _ := packet.GetProtocolFamilyFromPeerAddrType(newGroupConf.PeerAddressType)
+			if _, ok = s.BgpConfig.PeerGroups[protoFamily]; !ok {
+				s.BgpConfig.PeerGroups[protoFamily] = make(map[string]*config.PeerGroup)
+			}
+			if _, ok = s.BgpConfig.PeerGroups[protoFamily][newGroupConf.Name]; !ok {
 				s.logger.Info("Add new peer group with name", newGroupConf.Name)
 				peerGroup := config.PeerGroup{
 					Config: newGroupConf,
 				}
-				s.BgpConfig.PeerGroups[newGroupConf.Name] = &peerGroup
+				s.BgpConfig.PeerGroups[protoFamily][newGroupConf.Name] = &peerGroup
+			} else {
+				s.logger.Info("Update peer group", newGroupConf.Name)
+				s.BgpConfig.PeerGroups[protoFamily][newGroupConf.Name].Config = newGroupConf
 			}
-			s.UpdatePeerGroupInPeers(newGroupConf.Name, &newGroupConf)
+			s.UpdatePeerGroupInPeers(newGroupConf.Name, newGroupConf.PeerAddressType, &newGroupConf)
 
-		case groupName := <-s.RemPeerGroupCh:
-			s.logger.Info("Remove Peer group:", groupName)
-			if _, ok := s.BgpConfig.PeerGroups[groupName]; !ok {
-				s.logger.Info("Peer group", groupName, "not found")
+		case group := <-s.RemPeerGroupCh:
+			s.logger.Info("Remove Peer group:", group.Name)
+			protoFamily, _ := packet.GetProtocolFamilyFromPeerAddrType(group.PeerAddressType)
+			if _, ok := s.BgpConfig.PeerGroups[protoFamily]; !ok {
+				s.logger.Err("Peer group address type", group.PeerAddressType, "not found in map")
 				break
 			}
-			delete(s.BgpConfig.PeerGroups, groupName)
-			s.UpdatePeerGroupInPeers(groupName, nil)
+
+			if _, ok := s.BgpConfig.PeerGroups[protoFamily][group.Name]; !ok {
+				s.logger.Err("Peer group", group.Name, "not found in map")
+				break
+			}
+			delete(s.BgpConfig.PeerGroups[protoFamily], group.Name)
+			s.UpdatePeerGroupInPeers(group.Name, group.PeerAddressType, nil)
 
 		case aggUpdate := <-s.AddAggCh:
 			oldAgg := aggUpdate.OldAgg
@@ -1703,7 +1720,7 @@ func (s *BGPServer) StartServer() {
 	s.logger.Info("Recieved global conf:", gConf)
 	s.BgpConfig.Global.Config = gConf
 	s.constructBGPGlobalState(&gConf)
-	s.BgpConfig.PeerGroups = make(map[string]*config.PeerGroup)
+	s.BgpConfig.PeerGroups = make(map[uint32]map[string]*config.PeerGroup)
 
 	pathAttrs := packet.ConstructPathAttrForConnRoutes(gConf.AS)
 	protoFamily := packet.GetProtocolFamily(packet.AfiIP6, packet.SafiUnicast)

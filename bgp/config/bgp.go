@@ -255,7 +255,7 @@ type AddressFamily struct {
 
 type Bgp struct {
 	Global     Global
-	PeerGroups map[string]*PeerGroup
+	PeerGroups map[uint32]map[string]*PeerGroup
 	Neighbors  []Neighbor
 	Afs        map[uint32]*AddressFamily
 }
