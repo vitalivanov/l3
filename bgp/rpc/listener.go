@@ -825,6 +825,20 @@ func (h *BGPHandler) DeleteBGPGlobal(bgpGlobal *bgpd.BGPGlobal) (bool, error) {
 	return false, errors.New(fmt.Sprintf("Can't delete BGP global object"))
 }
 
+func (h *BGPHandler) checkBGPGlobal() error {
+	created := h.server.VerifyBgpGlobalConfig()
+	if !created {
+		return errors.New("BGP Global object not created yet")
+	}
+
+	global := h.server.GetBGPGlobalState()
+	if global.AS == 0 {
+		return errors.New(fmt.Sprintf("The default BGP AS number 0 is not updated yet."))
+	}
+
+	return nil
+}
+
 func (h *BGPHandler) getIPAndIfIndexForV4Neighbor(neighborIP string, neighborIntfRef string) (ip net.IP, ifIndex int32,
 	err error) {
 	if strings.TrimSpace(neighborIP) != "" {
@@ -956,6 +970,10 @@ func (h *BGPHandler) ValidateV4Neighbor(bgpNeighbor *bgpd.BGPv4Neighbor) (pConf 
 
 func (h *BGPHandler) SendBGPv4Neighbor(oldNeigh *bgpd.BGPv4Neighbor, newNeigh *bgpd.BGPv4Neighbor, attrSet []bool) (
 	bool, error) {
+	if err := h.checkBGPGlobal(); err != nil {
+		return false, err
+	}
+
 	created := h.server.VerifyBgpGlobalConfig()
 	if !created {
 		return created, errors.New("BGP Global object not created yet")
@@ -1080,7 +1098,11 @@ func (h *BGPHandler) UpdateBGPv4Neighbor(origN *bgpd.BGPv4Neighbor, updatedN *bg
 }
 
 func (h *BGPHandler) DeleteBGPv4Neighbor(bgpNeighbor *bgpd.BGPv4Neighbor) (bool, error) {
-	h.logger.Info("Delete BGP neighbor:", bgpNeighbor.NeighborAddress)
+	h.logger.Info("Delete BGPv4 neighbor:", bgpNeighbor.NeighborAddress)
+	if err := h.checkBGPGlobal(); err != nil {
+		return false, err
+	}
+
 	ip, _, err := h.getIPAndIfIndexForV4Neighbor(bgpNeighbor.NeighborAddress, bgpNeighbor.IntfRef)
 	if err != nil {
 		h.logger.Info("DeleteBGPv4Neighbor: getIPAndIfIndexForV4Neighbor failed for neighbor address",
@@ -1198,14 +1220,8 @@ func (h *BGPHandler) ValidateV6Neighbor(bgpNeighbor *bgpd.BGPv6Neighbor) (pConf 
 
 func (h *BGPHandler) SendBGPv6Neighbor(oldNeigh *bgpd.BGPv6Neighbor, newNeigh *bgpd.BGPv6Neighbor, attrSet []bool) (
 	bool, error) {
-	created := h.server.VerifyBgpGlobalConfig()
-	if !created {
-		return created, errors.New("BGP Global object not created yet")
-	}
-
-	global := h.server.GetBGPGlobalState()
-	if global.AS == 0 {
-		return false, errors.New(fmt.Sprintf("The default BGP AS number 0 is not updated yet."))
+	if err := h.checkBGPGlobal(); err != nil {
+		return false, err
 	}
 
 	oldNeighConf, err := h.ValidateV6Neighbor(oldNeigh)
@@ -1322,7 +1338,11 @@ func (h *BGPHandler) UpdateBGPv6Neighbor(origN *bgpd.BGPv6Neighbor, updatedN *bg
 }
 
 func (h *BGPHandler) DeleteBGPv6Neighbor(bgpNeighbor *bgpd.BGPv6Neighbor) (bool, error) {
-	h.logger.Info("Delete BGP neighbor:", bgpNeighbor.NeighborAddress)
+	h.logger.Info("Delete BGPv6 neighbor:", bgpNeighbor.NeighborAddress)
+	if err := h.checkBGPGlobal(); err != nil {
+		return false, err
+	}
+
 	ip, _, err := h.getIPAndIfIndexForV6Neighbor(bgpNeighbor.NeighborAddress, bgpNeighbor.IntfRef)
 	if err != nil {
 		h.logger.Info("DeleteBGPv6Neighbor: getIPAndIfIndexForV6Neighbor failed for neighbor address",
@@ -1384,6 +1404,10 @@ func (h *BGPHandler) ValidateBGPv4PeerGroup(peerGroup *bgpd.BGPv4PeerGroup) (gro
 
 func (h *BGPHandler) SendBGPv4PeerGroup(oldGroup *bgpd.BGPv4PeerGroup, newGroup *bgpd.BGPv4PeerGroup, attrSet []bool) (
 	bool, error) {
+	if err := h.checkBGPGlobal(); err != nil {
+		return false, err
+	}
+
 	oldGroupConf, err := h.ValidateBGPv4PeerGroup(oldGroup)
 	if err != nil {
 		return false, err
@@ -1399,18 +1423,22 @@ func (h *BGPHandler) SendBGPv4PeerGroup(oldGroup *bgpd.BGPv4PeerGroup, newGroup 
 }
 
 func (h *BGPHandler) CreateBGPv4PeerGroup(peerGroup *bgpd.BGPv4PeerGroup) (bool, error) {
-	h.logger.Info("Create BGP peer group attrs:", peerGroup)
+	h.logger.Info("Create BGP v4 peer group:", peerGroup)
 	return h.SendBGPv4PeerGroup(nil, peerGroup, make([]bool, 0))
 }
 
 func (h *BGPHandler) UpdateBGPv4PeerGroup(origG *bgpd.BGPv4PeerGroup, updatedG *bgpd.BGPv4PeerGroup, attrSet []bool,
 	op []*bgpd.PatchOpInfo) (bool, error) {
-	h.logger.Info("Update peer attrs:", updatedG)
+	h.logger.Info("Update BGP v4 peer group:", updatedG)
 	return h.SendBGPv4PeerGroup(origG, updatedG, attrSet)
 }
 
 func (h *BGPHandler) DeleteBGPv4PeerGroup(peerGroup *bgpd.BGPv4PeerGroup) (bool, error) {
-	h.logger.Info("Delete BGP peer group:", peerGroup.Name)
+	h.logger.Info("Delete BGP v4 peer group:", peerGroup.Name)
+	if err := h.checkBGPGlobal(); err != nil {
+		return false, err
+	}
+
 	gConf, err := h.ValidateBGPv4PeerGroup(peerGroup)
 	if err != nil {
 		return false, err
@@ -1461,6 +1489,10 @@ func (h *BGPHandler) ValidateBGPv6PeerGroup(peerGroup *bgpd.BGPv6PeerGroup) (gro
 
 func (h *BGPHandler) SendBGPv6PeerGroup(oldGroup *bgpd.BGPv6PeerGroup, newGroup *bgpd.BGPv6PeerGroup, attrSet []bool) (
 	bool, error) {
+	if err := h.checkBGPGlobal(); err != nil {
+		return false, err
+	}
+
 	oldGroupConf, err := h.ValidateBGPv6PeerGroup(oldGroup)
 	if err != nil {
 		return false, err
@@ -1476,18 +1508,22 @@ func (h *BGPHandler) SendBGPv6PeerGroup(oldGroup *bgpd.BGPv6PeerGroup, newGroup 
 }
 
 func (h *BGPHandler) CreateBGPv6PeerGroup(peerGroup *bgpd.BGPv6PeerGroup) (bool, error) {
-	h.logger.Info("Create BGP peer group attrs:", peerGroup)
+	h.logger.Info("Create BGP v6 peer group:", peerGroup)
 	return h.SendBGPv6PeerGroup(nil, peerGroup, make([]bool, 0))
 }
 
 func (h *BGPHandler) UpdateBGPv6PeerGroup(origG *bgpd.BGPv6PeerGroup, updatedG *bgpd.BGPv6PeerGroup, attrSet []bool,
 	op []*bgpd.PatchOpInfo) (bool, error) {
-	h.logger.Info("Update peer attrs:", updatedG)
+	h.logger.Info("Update BGP v6 peer group:", updatedG)
 	return h.SendBGPv6PeerGroup(origG, updatedG, attrSet)
 }
 
 func (h *BGPHandler) DeleteBGPv6PeerGroup(peerGroup *bgpd.BGPv6PeerGroup) (bool, error) {
-	h.logger.Info("Delete BGP peer group:", peerGroup.Name)
+	h.logger.Info("Delete BGP v6 peer group:", peerGroup.Name)
+	if err := h.checkBGPGlobal(); err != nil {
+		return false, err
+	}
+
 	gConf, err := h.ValidateBGPv6PeerGroup(peerGroup)
 	if err != nil {
 		return false, err
@@ -1754,6 +1790,10 @@ func (h *BGPHandler) validateBGPAggregate(bgpAgg *bgpd.BGPv4Aggregate) (aggConf 
 
 func (h *BGPHandler) SendBGPAggregate(oldConfig *bgpd.BGPv4Aggregate, newConfig *bgpd.BGPv4Aggregate, attrSet []bool) (
 	bool, error) {
+	if err := h.checkBGPGlobal(); err != nil {
+		return false, err
+	}
+
 	oldAgg, err := h.validateBGPAggregate(oldConfig)
 	if err != nil {
 		return false, err
@@ -1769,18 +1809,22 @@ func (h *BGPHandler) SendBGPAggregate(oldConfig *bgpd.BGPv4Aggregate, newConfig 
 }
 
 func (h *BGPHandler) CreateBGPv4Aggregate(bgpAgg *bgpd.BGPv4Aggregate) (bool, error) {
-	h.logger.Info("Create aggregate attrs:", bgpAgg)
+	h.logger.Info("Create BGP v4 aggregate:", bgpAgg)
 	return h.SendBGPAggregate(nil, bgpAgg, make([]bool, 0))
 }
 
 func (h *BGPHandler) UpdateBGPv4Aggregate(origA *bgpd.BGPv4Aggregate, updatedA *bgpd.BGPv4Aggregate, attrSet []bool,
 	op []*bgpd.PatchOpInfo) (bool, error) {
-	h.logger.Info("Update aggregate attrs:", updatedA, "old config:", origA)
+	h.logger.Info("Update BGP v4 aggregate:", updatedA, "old:", origA)
 	return h.SendBGPAggregate(origA, updatedA, attrSet)
 }
 
 func (h *BGPHandler) DeleteBGPv4Aggregate(bgpAgg *bgpd.BGPv4Aggregate) (bool, error) {
-	h.logger.Info("Delete aggregate attrs:", bgpAgg)
+	h.logger.Info("Delete BGP v4 aggregate:", bgpAgg)
+	if err := h.checkBGPGlobal(); err != nil {
+		return false, err
+	}
+
 	agg, _ := h.validateBGPAggregate(bgpAgg)
 	h.server.RemAggCh <- agg
 	return true, nil
@@ -1816,6 +1860,10 @@ func (h *BGPHandler) validateBGPv6Aggregate(bgpAgg *bgpd.BGPv6Aggregate) (aggCon
 
 func (h *BGPHandler) SendBGPv6Aggregate(oldConfig *bgpd.BGPv6Aggregate, newConfig *bgpd.BGPv6Aggregate,
 	attrSet []bool) (bool, error) {
+	if err := h.checkBGPGlobal(); err != nil {
+		return false, err
+	}
+
 	oldAgg, err := h.validateBGPv6Aggregate(oldConfig)
 	if err != nil {
 		return false, err
@@ -1831,25 +1879,33 @@ func (h *BGPHandler) SendBGPv6Aggregate(oldConfig *bgpd.BGPv6Aggregate, newConfi
 }
 
 func (h *BGPHandler) CreateBGPv6Aggregate(bgpAgg *bgpd.BGPv6Aggregate) (bool, error) {
-	h.logger.Info("Create IPv6 aggregate attrs:", bgpAgg)
+	h.logger.Info("Create BGP IPv6 aggregate:", bgpAgg)
 	return h.SendBGPv6Aggregate(nil, bgpAgg, make([]bool, 0))
 }
 
 func (h *BGPHandler) UpdateBGPv6Aggregate(origA *bgpd.BGPv6Aggregate, updatedA *bgpd.BGPv6Aggregate, attrSet []bool,
 	op []*bgpd.PatchOpInfo) (bool, error) {
-	h.logger.Info("Update IPv6 aggregate attrs:", updatedA, "old config:", origA)
+	h.logger.Info("Update BGP IPv6 aggregate:", updatedA, "old:", origA)
 	return h.SendBGPv6Aggregate(origA, updatedA, attrSet)
 }
 
 func (h *BGPHandler) DeleteBGPv6Aggregate(bgpAgg *bgpd.BGPv6Aggregate) (bool, error) {
-	h.logger.Info("Delete IPv6 aggregate attrs:", bgpAgg)
+	h.logger.Info("Delete BGP IPv6 aggregate:", bgpAgg)
+	if err := h.checkBGPGlobal(); err != nil {
+		return false, err
+	}
+
 	agg, _ := h.validateBGPv6Aggregate(bgpAgg)
 	h.server.RemAggCh <- agg
 	return true, nil
 }
 
 func (h *BGPHandler) ExecuteActionResetBGPv4NeighborByIPAddr(resetIP *bgpd.ResetBGPv4NeighborByIPAddr) (bool, error) {
-	h.logger.Info("Reset IPv4 neighbor by IP address", resetIP.IPAddr)
+	h.logger.Info("Reset BGP v4 neighbor by IP address", resetIP.IPAddr)
+	if err := h.checkBGPGlobal(); err != nil {
+		return false, err
+	}
+
 	ip := net.ParseIP(strings.TrimSpace(resetIP.IPAddr))
 	if ip == nil {
 		return false, errors.New(fmt.Sprintf("IPv4 Neighbor address %s is not a valid IP", resetIP.IPAddr))
@@ -1860,7 +1916,11 @@ func (h *BGPHandler) ExecuteActionResetBGPv4NeighborByIPAddr(resetIP *bgpd.Reset
 
 func (h *BGPHandler) ExecuteActionResetBGPv4NeighborByInterface(resetIf *bgpd.ResetBGPv4NeighborByInterface) (bool,
 	error) {
-	h.logger.Info("Reset IPv4 neighbor by interface", resetIf.IntfRef)
+	h.logger.Info("Reset BGP v4 neighbor by interface", resetIf.IntfRef)
+	if err := h.checkBGPGlobal(); err != nil {
+		return false, err
+	}
+
 	ifIndexStr, err := h.server.ConvertIntfStrToIfIndexStr(resetIf.IntfRef)
 	if err != nil {
 		h.logger.Err("Invalid intfref:", resetIf.IntfRef)
@@ -1896,7 +1956,11 @@ func (h *BGPHandler) ExecuteActionResetBGPv4NeighborByInterface(resetIf *bgpd.Re
 }
 
 func (h *BGPHandler) ExecuteActionResetBGPv6NeighborByIPAddr(resetIP *bgpd.ResetBGPv6NeighborByIPAddr) (bool, error) {
-	h.logger.Info("Reset IPv6 neighbor by IP address", resetIP.IPAddr)
+	h.logger.Info("Reset BGP v6 neighbor by IP address", resetIP.IPAddr)
+	if err := h.checkBGPGlobal(); err != nil {
+		return false, err
+	}
+
 	ip := net.ParseIP(strings.TrimSpace(resetIP.IPAddr))
 	if ip == nil {
 		return false, errors.New(fmt.Sprintf("IPv6 Neighbor address %s is not a valid IP", resetIP.IPAddr))
@@ -1907,7 +1971,11 @@ func (h *BGPHandler) ExecuteActionResetBGPv6NeighborByIPAddr(resetIP *bgpd.Reset
 
 func (h *BGPHandler) ExecuteActionResetBGPv6NeighborByInterface(resetIf *bgpd.ResetBGPv6NeighborByInterface) (bool,
 	error) {
-	h.logger.Info("Reset IPv6 neighbor by interface", resetIf.IntfRef)
+	h.logger.Info("Reset BGP v6 neighbor by interface", resetIf.IntfRef)
+	if err := h.checkBGPGlobal(); err != nil {
+		return false, err
+	}
+
 	ifIndexStr, err := h.server.ConvertIntfStrToIfIndexStr(resetIf.IntfRef)
 	if err != nil {
 		h.logger.Err("Invalid intfref:", resetIf.IntfRef)
