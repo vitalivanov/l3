@@ -13,18 +13,19 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 package server
 
 import (
 	"asicd/asicdCommonDefs"
+	"errors"
 	"fmt"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
@@ -56,36 +57,21 @@ func (server *ARPServer) StartArpRx(port int) {
 }
 */
 
-func (server *ARPServer) StartArpRxTx(port int) {
-	portEnt, _ := server.portPropMap[port]
-	//filter := fmt.Sprintf("not ether src", portEnt.MacAddr, "and not ether proto 0x8809")
-	filter := fmt.Sprintf(`not ether src %s`, portEnt.MacAddr)
+func (server *ARPServer) StartArpRxTx(ifName string, macAddr string) (*pcap.Handle, error) {
+	filter := fmt.Sprintf(`not ether src %s`, macAddr)
 	filter = filter + " and not ether proto 0x8809"
-	server.logger.Debug(fmt.Sprintln("Port: ", port, "Pcap filter:", filter))
-	pcapHdl, err := pcap.OpenLive(portEnt.IfName, server.snapshotLen, server.promiscuous, server.pcapTimeout)
+	server.logger.Debug(fmt.Sprintln("Port: ", ifName, "Pcap filter:", filter))
+	pcapHdl, err := pcap.OpenLive(ifName, server.snapshotLen, server.promiscuous, server.pcapTimeout)
 	if pcapHdl == nil {
-		server.logger.Err(fmt.Sprintln("Unable to open pcap handler on:", portEnt.IfName, "error:", err))
-		return
+		return nil, errors.New(fmt.Sprintln("Unable to open pcap handler on", ifName, "error:", err))
 	} else {
 		err := pcapHdl.SetBPFFilter(filter)
 		if err != nil {
-			server.logger.Err(fmt.Sprintln("Unable to set filter on port:", port))
+			return nil, errors.New(fmt.Sprintln("Unable to set bpf filter to pcap handler on", ifName, "error:", err))
 		}
 	}
 
-	portEnt.PcapHdl = pcapHdl
-	server.portPropMap[port] = portEnt
-	go server.processRxPkts(port)
-	server.logger.Debug(fmt.Sprintln("Send Arp Probe on port:", port))
-	go server.SendArpProbe(port)
-}
-
-func (server *ARPServer) deinitProcessRxPkt(port int) {
-	portEnt, _ := server.portPropMap[port]
-	portEnt.PcapHdl.Close()
-	portEnt.PcapHdl = nil
-	server.portPropMap[port] = portEnt
-	portEnt.CtrlCh <- true
+	return pcapHdl, nil
 }
 
 func (server *ARPServer) processRxPkts(port int) {
@@ -104,7 +90,8 @@ func (server *ARPServer) processRxPkts(port int) {
 				}
 			}
 		case <-portEnt.CtrlCh:
-			server.deinitProcessRxPkt(port)
+			server.logger.Info("Recevd shutdown for:", port)
+			portEnt.CtrlReplyCh <- true
 			return
 		}
 	}
