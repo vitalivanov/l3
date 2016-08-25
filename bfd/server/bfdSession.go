@@ -81,6 +81,7 @@ func (session *BfdSession) StartSessionClient(server *BFDServer) error {
 	defer session.txConn.Close()
 	session.txTimer = time.AfterFunc(time.Duration(session.txInterval)*time.Millisecond, func() { session.SendPeriodicControlPackets() })
 	session.sessionTimer = time.AfterFunc(time.Duration(session.rxInterval)*time.Millisecond, func() { session.HandleSessionTimeout() })
+	session.isClientActive = true
 	for {
 		select {
 		case <-session.SessionStopClientCh:
@@ -465,6 +466,7 @@ func (session *BfdSession) RemoteAdminDown() error {
 
 func (session *BfdSession) MoveToDownState() error {
 	session.state.SessionState = STATE_DOWN
+	session.state.ToDownCount++
 	session.server.logger.Info(fmt.Sprintln("Session ", session.state.SessionId, " moved to down state at ", time.Now().String()))
 	session.movedToDownState = true
 	session.useDedicatedMac = true
@@ -490,6 +492,8 @@ func (session *BfdSession) MoveToInitState() error {
 
 func (session *BfdSession) MoveToUpState() error {
 	session.state.SessionState = STATE_UP
+	session.state.UpTime = time.Now()
+	session.state.ToUpCount++
 	session.stateChanged = true
 	session.movedToDownState = false
 	session.state.LocalDiagType = DIAG_NONE

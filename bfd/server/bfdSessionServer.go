@@ -150,6 +150,7 @@ func (server *BFDServer) StartBfdSessionRxTx() error {
 				session.SessionStopClientCh = make(chan bool)
 				session.SessionStopServerCh = make(chan bool)
 				session.ReceivedPacketCh = make(chan *BfdControlPacket, PACKET_QUEUE_SIZE)
+				session.isClientActive = false
 				if session.state.PerLinkSession {
 					server.logger.Info(fmt.Sprintln("Starting PerLink server for session ", createdSessionId))
 					go session.StartPerLinkSessionServer(server)
@@ -161,14 +162,12 @@ func (server *BFDServer) StartBfdSessionRxTx() error {
 					server.logger.Info(fmt.Sprintln("Starting client for session ", createdSessionId))
 					go session.StartSessionClient(server)
 				}
-				session.isClientActive = true
 			} else {
 				server.logger.Info(fmt.Sprintln("Bfd session could not be initiated for ", createdSessionId))
 			}
 		case failedClientSessionId := <-server.FailedSessionClientCh:
 			session := server.bfdGlobal.Sessions[failedClientSessionId]
 			if session != nil {
-				session.isClientActive = false
 				server.bfdGlobal.InactiveSessionsIdSlice = append(server.bfdGlobal.InactiveSessionsIdSlice, failedClientSessionId)
 			}
 		}

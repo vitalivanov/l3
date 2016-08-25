@@ -164,7 +164,8 @@ func (c *NeighborInfo) RchTimer() {
 		// This is first time initialization of reachable timer... let set it up
 		var ReachableTimer_func func()
 		ReachableTimer_func = func() {
-			debug.Logger.Debug("Reachable Timer expired for neighbor:", c.IpAddr, "initiating unicast NS")
+			debug.Logger.Debug("Reachable Timer expired for neighbor:", c.IpAddr,
+				"initiating unicast NS for ifIndex:", c.IfIndex)
 			c.ReturnCh <- config.PacketData{
 				SendPktType: layers.ICMPv6TypeNeighborSolicitation,
 				NeighborIp:  c.IpAddr,
