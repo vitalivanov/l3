@@ -83,7 +83,6 @@ func (server *ARPServer) processRxPkts(port int) {
 		case packet, ok := <-in:
 			if ok {
 				arpLayer := packet.Layer(layers.LayerTypeARP)
-				server.logger.Info("Recevd Pkt ...")
 				if arpLayer != nil {
 					server.processArpPkt(arpLayer, port)
 				} else {
