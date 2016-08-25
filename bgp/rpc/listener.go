@@ -603,8 +603,7 @@ func (h *BGPHandler) validateBGPGlobal(bgpGlobal *bgpd.BGPGlobal) (gConf config.
 	}
 
 	asNum := uint32(bgpGlobal.ASNum)
-	if (asNum == uint32(0)) || asNum == uint32(math.MaxUint16) || asNum == uint32(math.MaxUint32) ||
-		asNum == uint32(packet.BGPASTrans) {
+	if asNum == uint32(math.MaxUint16) || asNum == uint32(math.MaxUint32) || asNum == uint32(packet.BGPASTrans) {
 		err = errors.New(fmt.Sprintf("BGPGlobal: AS number %d is not valid", bgpGlobal.ASNum))
 		h.logger.Info("SendBGPGlobal: AS number", bgpGlobal.ASNum, "is a reserved AS number")
 		return gConf, err
