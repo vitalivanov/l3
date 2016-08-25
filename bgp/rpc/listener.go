@@ -603,8 +603,7 @@ func (h *BGPHandler) validateBGPGlobal(bgpGlobal *bgpd.BGPGlobal) (gConf config.
 	}
 
 	asNum := uint32(bgpGlobal.ASNum)
-	if (asNum == uint32(0)) || asNum == uint32(math.MaxUint16) || asNum == uint32(math.MaxUint32) ||
-		asNum == uint32(packet.BGPASTrans) {
+	if asNum == uint32(math.MaxUint16) || asNum == uint32(math.MaxUint32) || asNum == uint32(packet.BGPASTrans) {
 		err = errors.New(fmt.Sprintf("BGPGlobal: AS number %d is not valid", bgpGlobal.ASNum))
 		h.logger.Info("SendBGPGlobal: AS number", bgpGlobal.ASNum, "is a reserved AS number")
 		return gConf, err
@@ -1419,7 +1418,11 @@ func (h *BGPHandler) UpdateBGPv4PeerGroup(origG *bgpd.BGPv4PeerGroup, updatedG *
 
 func (h *BGPHandler) DeleteBGPv4PeerGroup(peerGroup *bgpd.BGPv4PeerGroup) (bool, error) {
 	h.logger.Info("Delete BGP peer group:", peerGroup.Name)
-	h.server.RemPeerGroupCh <- peerGroup.Name
+	gConf, err := h.ValidateBGPv4PeerGroup(peerGroup)
+	if err != nil {
+		return false, err
+	}
+	h.server.RemPeerGroupCh <- gConf
 	return true, nil
 }
 
@@ -1492,7 +1495,11 @@ func (h *BGPHandler) UpdateBGPv6PeerGroup(origG *bgpd.BGPv6PeerGroup, updatedG *
 
 func (h *BGPHandler) DeleteBGPv6PeerGroup(peerGroup *bgpd.BGPv6PeerGroup) (bool, error) {
 	h.logger.Info("Delete BGP peer group:", peerGroup.Name)
-	h.server.RemPeerGroupCh <- peerGroup.Name
+	gConf, err := h.ValidateBGPv6PeerGroup(peerGroup)
+	if err != nil {
+		return false, err
+	}
+	h.server.RemPeerGroupCh <- gConf
 	return true, nil
 }
 
