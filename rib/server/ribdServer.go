@@ -142,7 +142,7 @@ var dbReqCheckCountLimit = 5
 /*
    Handle Interface down event
 */
-func (ribdServiceHandler *RIBDServer) ProcessIPv4IntfDownEvent(ipAddr string) {
+func (ribdServiceHandler *RIBDServer) ProcessIPv4IntfDownEvent(ipAddr string, ifIndex int32) {
 	logger.Debug("processIPv4IntfDownEvent")
 	var ipMask net.IP
 	ip, ipNet, err := net.ParseCIDR(ipAddr)
@@ -156,12 +156,15 @@ func (ribdServiceHandler *RIBDServer) ProcessIPv4IntfDownEvent(ipAddr string) {
 	logger.Info(" processIPv4IntfDownEvent for  ipaddr ", ipAddrStr, " mask ", ipMaskStr)
 	for i := 0; i < len(ConnectedRoutes); i++ {
 		if ConnectedRoutes[i].Ipaddr == ipAddrStr && ConnectedRoutes[i].Mask == ipMaskStr {
-			logger.Info(fmt.Sprintln("Delete this route with destAddress = ", ConnectedRoutes[i].Ipaddr, " nwMask = ", ConnectedRoutes[i].Mask))
-			deleteIPRoute(ConnectedRoutes[i].Ipaddr, ribdCommonDefs.IPv4, ConnectedRoutes[i].Mask, "CONNECTED", ConnectedRoutes[i].NextHopIp, FIBOnly, ribdCommonDefs.RoutePolicyStateChangeNoChange)
+			if ifIndex != -1 && ConnectedRoutes[i].IfIndex != ribdInt.Int(ifIndex) {
+				continue
+			}
+			logger.Info("Delete this route with destAddress = ", ConnectedRoutes[i].Ipaddr, " nwMask = ", ConnectedRoutes[i].Mask, " ifIndex:", ifIndex)
+			deleteIPRoute(ConnectedRoutes[i].Ipaddr, ribdCommonDefs.IPv4, ConnectedRoutes[i].Mask, "CONNECTED", ConnectedRoutes[i].NextHopIp, ribd.Int(ConnectedRoutes[i].IfIndex), FIBOnly, ribdCommonDefs.RoutePolicyStateChangeNoChange)
 		}
 	}
 }
-func (ribdServiceHandler *RIBDServer) ProcessIPv6IntfDownEvent(ipAddr string) {
+func (ribdServiceHandler *RIBDServer) ProcessIPv6IntfDownEvent(ipAddr string, ifIndex int32) {
 	logger.Debug("processIPv6IntfDownEvent")
 	var ipMask net.IP
 	ip, ipNet, err := net.ParseCIDR(ipAddr)
@@ -175,8 +178,11 @@ func (ribdServiceHandler *RIBDServer) ProcessIPv6IntfDownEvent(ipAddr string) {
 	logger.Info(" processIPv6IntfDownEvent for  ipaddr ", ipAddrStr, " mask ", ipMaskStr)
 	for i := 0; i < len(ConnectedRoutes); i++ {
 		if ConnectedRoutes[i].Ipaddr == ipAddrStr && ConnectedRoutes[i].Mask == ipMaskStr {
-			logger.Info(fmt.Sprintln("Delete this route with destAddress = ", ConnectedRoutes[i].Ipaddr, " nwMask = ", ConnectedRoutes[i].Mask))
-			deleteIPRoute(ConnectedRoutes[i].Ipaddr, ribdCommonDefs.IPv6, ConnectedRoutes[i].Mask, "CONNECTED", ConnectedRoutes[i].NextHopIp, FIBOnly, ribdCommonDefs.RoutePolicyStateChangeNoChange)
+			if ifIndex != -1 && ConnectedRoutes[i].IfIndex != ribdInt.Int(ifIndex) {
+				continue
+			}
+			logger.Info("Delete this route with destAddress = ", ConnectedRoutes[i].Ipaddr, " nwMask = ", ConnectedRoutes[i].Mask, " ifIndex:", ifIndex)
+			deleteIPRoute(ConnectedRoutes[i].Ipaddr, ribdCommonDefs.IPv6, ConnectedRoutes[i].Mask, "CONNECTED", ConnectedRoutes[i].NextHopIp, ribd.Int(ConnectedRoutes[i].IfIndex), FIBOnly, ribdCommonDefs.RoutePolicyStateChangeNoChange)
 		}
 	}
 }
@@ -184,7 +190,7 @@ func (ribdServiceHandler *RIBDServer) ProcessIPv6IntfDownEvent(ipAddr string) {
 /*
    Handle Interface up event
 */
-func (ribdServiceHandler *RIBDServer) ProcessIPv4IntfUpEvent(ipAddr string) {
+func (ribdServiceHandler *RIBDServer) ProcessIPv4IntfUpEvent(ipAddr string, ifIndex int32) {
 	logger.Debug("processIPv4IntfUpEvent")
 	var ipMask net.IP
 	ip, ipNet, err := net.ParseCIDR(ipAddr)
@@ -199,6 +205,9 @@ func (ribdServiceHandler *RIBDServer) ProcessIPv4IntfUpEvent(ipAddr string) {
 	for i := 0; i < len(ConnectedRoutes); i++ {
 		logger.Info("Current state of this connected route is ", ConnectedRoutes[i].IsValid)
 		if ConnectedRoutes[i].Ipaddr == ipAddrStr && ConnectedRoutes[i].Mask == ipMaskStr && ConnectedRoutes[i].IsValid == false {
+			if ifIndex != -1 && ConnectedRoutes[i].IfIndex != ribdInt.Int(ifIndex) {
+				continue
+			}
 			logger.Info("Add this route with destAddress = ", ConnectedRoutes[i].Ipaddr, " nwMask = ", ConnectedRoutes[i].Mask)
 
 			ConnectedRoutes[i].IsValid = true
@@ -208,7 +217,7 @@ func (ribdServiceHandler *RIBDServer) ProcessIPv4IntfUpEvent(ipAddr string) {
 		}
 	}
 }
-func (ribdServiceHandler *RIBDServer) ProcessIPv6IntfUpEvent(ipAddr string) {
+func (ribdServiceHandler *RIBDServer) ProcessIPv6IntfUpEvent(ipAddr string, ifIndex int32) {
 	logger.Debug("processIPv6IntfUpEvent")
 	var ipMask net.IP
 	ip, ipNet, err := net.ParseCIDR(ipAddr)
@@ -223,6 +232,9 @@ func (ribdServiceHandler *RIBDServer) ProcessIPv6IntfUpEvent(ipAddr string) {
 	for i := 0; i < len(ConnectedRoutes); i++ {
 		logger.Info("Current state of this connected route is ", ConnectedRoutes[i].IsValid)
 		if ConnectedRoutes[i].Ipaddr == ipAddrStr && ConnectedRoutes[i].Mask == ipMaskStr && ConnectedRoutes[i].IsValid == false {
+			if ifIndex != -1 && ConnectedRoutes[i].IfIndex != ribdInt.Int(ifIndex) {
+				continue
+			}
 			logger.Info("Add this route with destAddress = ", ConnectedRoutes[i].Ipaddr, " nwMask = ", ConnectedRoutes[i].Mask)
 
 			ConnectedRoutes[i].IsValid = true

@@ -1280,7 +1280,7 @@ func (s *BGPServer) handleBfdNotifications(oper config.Operation, DestIp string,
 
 func (s *BGPServer) setInterfaceMapForPeer(peerIP string, peer *Peer) {
 	s.logger.Info("Server: setInterfaceMapForPeer Peer", peer, "calling GetRouteReachabilityInfo")
-	reachInfo, err := s.routeMgr.GetNextHopInfo(peerIP)
+	reachInfo, err := s.routeMgr.GetNextHopInfo(peerIP, -1)
 	s.logger.Info("Server: setInterfaceMapForPeer Peer", peer, "GetRouteReachabilityInfo returned", reachInfo)
 	if err != nil {
 		s.logger.Infof("Server: Peer %s is not reachable", peerIP)
@@ -1703,7 +1703,7 @@ func (s *BGPServer) listenChannelUpdates() {
 				s.logger.Infof("Failed to process FSM connection success, Peer %s does not exist", peerIP)
 				break
 			}
-			reachInfo, err := s.routeMgr.GetNextHopInfo(peerIP)
+			reachInfo, err := s.routeMgr.GetNextHopInfo(peerIP, -1)
 			if err != nil {
 				s.logger.Infof("Server: Peer %s is not reachable", peerIP)
 			} else {
@@ -1754,7 +1754,7 @@ func (s *BGPServer) listenChannelUpdates() {
 		case reachabilityInfo := <-s.ReachabilityCh:
 			s.logger.Info("Server: Reachability info for ip", reachabilityInfo.IP)
 
-			_, err := s.routeMgr.GetNextHopInfo(reachabilityInfo.IP)
+			_, err := s.routeMgr.GetNextHopInfo(reachabilityInfo.IP, reachabilityInfo.IfIndex)
 			if err != nil {
 				reachabilityInfo.ReachableCh <- false
 			} else {

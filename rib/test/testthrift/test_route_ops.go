@@ -59,7 +59,7 @@ func Deletev4Routes(client *ribd.RIBDServicesClient) {
 func CheckRouteReachability(client *ribd.RIBDServicesClient) {
 	fmt.Println("CheckRouteReachability")
 	for _, dest := range reachabilityTestList {
-		nhIntf, err := client.GetRouteReachabilityInfo(dest)
+		nhIntf, err := client.GetRouteReachabilityInfo(dest, -1)
 		fmt.Println("nhIntf info for ", dest, ":", nhIntf, " err:", err)
 	}
 }

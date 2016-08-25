@@ -347,12 +347,22 @@ func BuildPolicyRouteFromribdIPv6Route(cfg *ribd.IPv6Route) (policyRoute ribdInt
 	}
 	return policyRoute
 }
-func findRouteWithNextHop(routeInfoList []RouteInfoRecord, nextHopIpType ribdCommonDefs.IPType, nextHopIP string) (found bool, routeInfoRecord RouteInfoRecord, index int) {
-	logger.Info("findRouteWithNextHop ", nextHopIP, " and type:", nextHopIpType)
+func findRouteWithNextHop(routeInfoList []RouteInfoRecord, nextHopIpType ribdCommonDefs.IPType, nextHopIP string, nextHopIfIndex ribd.Int) (found bool, routeInfoRecord RouteInfoRecord, index int) {
+	logger.Info("findRouteWithNextHop ", nextHopIP, " and type:", nextHopIpType, " and ifIndex:", nextHopIfIndex)
 	index = -1
 	for i := 0; i < len(routeInfoList); i++ {
-		if routeInfoList[i].nextHopIp.String() == nextHopIP && routeInfoList[i].nextHopIpType == nextHopIpType {
+		if routeInfoList[i].nextHopIpType == nextHopIpType {
+			//fmt.Println("Madhavi!! findRouteWithNextHop():same ip type,routeInfoList[i]:", routeInfoList[i])
 			//logger.Info("Next hop IP present")
+			if nextHopIP != "" && routeInfoList[i].nextHopIp.String() != nextHopIP {
+				//fmt.Println("Madhavi|| findRouteWithNextHop(),nextHopIP ", nextHopIP, " not the same as route next hop ip:", routeInfoList[i].nextHopIp.String())
+				continue
+			}
+			if nextHopIfIndex != -1 && routeInfoList[i].nextHopIfIndex != nextHopIfIndex {
+				logger.Info("nextHopIfIndex:", nextHopIfIndex, " routeInfoList[i].nextHopIfIndex:", routeInfoList[i].nextHopIfIndex, " do not match")
+				//fmt.Println("nextHopIfIndex:", nextHopIfIndex, " routeInfoList[i].nextHopIfIndex:", routeInfoList[i].nextHopIfIndex, " do not match")
+				continue
+			}
 			found = true
 			routeInfoRecord = routeInfoList[i]
 			index = i
@@ -361,16 +371,16 @@ func findRouteWithNextHop(routeInfoList []RouteInfoRecord, nextHopIpType ribdCom
 	}
 	return found, routeInfoRecord, index
 }
-func newNextHopIP(ipType ribdCommonDefs.IPType, ip string, routeInfoList []RouteInfoRecord) (isNewNextHopIP bool) {
-	logger.Info("newNextHopIP")
-	isNewNextHopIP = true
+func newNextHop(ipType ribdCommonDefs.IPType, ip string, nextHopIfIndex ribd.Int, routeInfoList []RouteInfoRecord) (isNewNextHop bool) {
+	logger.Info("newNextHop")
+	isNewNextHop = true
 	for i := 0; i < len(routeInfoList); i++ {
-		if routeInfoList[i].nextHopIp.String() == ip && routeInfoList[i].nextHopIpType == ipType {
-			logger.Info("Next hop IP already present")
-			isNewNextHopIP = false
+		if routeInfoList[i].nextHopIp.String() == ip && routeInfoList[i].nextHopIfIndex == nextHopIfIndex && routeInfoList[i].nextHopIpType == ipType {
+			logger.Info("Next hop already present for nexthopIP:", ip, " ipType:", ipType, " ifIndex:", nextHopIfIndex)
+			isNewNextHop = false
 		}
 	}
-	return isNewNextHopIP
+	return isNewNextHop
 }
 func isSameRoute(selectedRoute ribdInt.Routes, route ribdInt.Routes) (same bool) {
 	logger.Info("isSameRoute")

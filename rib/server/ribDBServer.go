@@ -146,6 +146,9 @@ func (m RIBDServer) WriteIPv6RouteStateEntryToDB(dbInfo RouteDBInfo) error {
 	for sel := 0; sel < len(routeInfoList); sel++ {
 		//logger.Info("nextHop ", sel, " weight = ", routeInfoList[sel].weight, " ip ", routeInfoList[sel].nextHopIp, " intref ", routeInfoList[sel].nextHopIfIndex)
 		nextHopInfo[i].NextHopIp = routeInfoList[sel].nextHopIp.String()
+		if nextHopInfo[i].NextHopIp == "0.0.0.0" {
+			nextHopInfo[i].NextHopIp = "::"
+		}
 		nextHopInfo[i].NextHopIntRef = strconv.Itoa(int(routeInfoList[sel].nextHopIfIndex))
 		intfEntry, ok := IntfIdNameMap[int32(routeInfoList[sel].nextHopIfIndex)]
 		if ok {

@@ -79,6 +79,7 @@ func (o *OutTCPConn) Connect(seconds uint32, remote, local string, connCh chan n
 	reachabilityInfo := config.ReachabilityInfo{
 		IP:          o.fsm.pConf.NeighborAddress.String(),
 		ReachableCh: reachableCh,
+		IfIndex:     o.fsm.pConf.IfIndex,
 	}
 	o.fsm.Manager.reachabilityCh <- reachabilityInfo
 	reachable := <-reachableCh
