@@ -35,7 +35,7 @@ import (
 var conditionsList []*ribd.PolicyCondition
 var stmtsList []*ribd.PolicyStmt
 var policyDefinitionsList []*ribd.PolicyDefinition
-var applyPolicyList []ApplyPolicyInfo
+var applyPolicyList []*ribdInt.ApplyPolicyInfo
 
 func InitConditionsList() {
 	conditionsList = make([]*ribd.PolicyCondition, 0)
@@ -148,14 +148,14 @@ func InitPolicyDefinitionsList() {
 	})
 }
 func InitApplyPolicyInfo() {
-	applyPolicyList = make([]ApplyPolicyInfo, 0)
-	applyPolicyList = append(applyPolicyList, ApplyPolicyInfo{
+	applyPolicyList = make([]*ribdInt.ApplyPolicyInfo, 0)
+	applyPolicyList = append(applyPolicyList, &ribdInt.ApplyPolicyInfo{
 		Source:     "BGP",
 		Policy:     "redistConnect",
 		Action:     "Redistribution",
 		Conditions: []*ribdInt.ConditionInfo{},
 	})
-	applyPolicyList = append(applyPolicyList, ApplyPolicyInfo{
+	applyPolicyList = append(applyPolicyList, &ribdInt.ApplyPolicyInfo{
 		Source: "BGP",
 		Policy: "redistNetworkStmt",
 		Action: "Redistribution",
@@ -192,7 +192,7 @@ func PolicyDefinitionConfigDelete(config *ribd.PolicyDefinition) {
 	err := server.ProcessPolicyDefinitionConfigDelete(config, server.GlobalPolicyEngineDB)
 	fmt.Println("err:", err, " for policy:", config)
 }
-func CallUpdateApplyPolicy(config ApplyPolicyInfo, apply bool, db *policy.PolicyEngineDB) {
+func CallUpdateApplyPolicy(config *ribdInt.ApplyPolicyInfo, apply bool, db *policy.PolicyEngineDB) {
 	server.UpdateApplyPolicy(config, apply, db)
 }
 func TestInitPolicyProcessServer(t *testing.T) {
@@ -296,27 +296,27 @@ func TestPolicyServer(t *testing.T) {
 	time.Sleep(1)
 	fmt.Println("**** TestPolicyServer ****")
 	for _, condition := range conditionsList {
-		server.PolicyConditionConfCh <- RIBdServerConfig{
+		server.PolicyConfCh <- RIBdServerConfig{
 			OrigConfigObject: condition,
-			Op:               "add",
+			Op:               "addPolicyCondition",
 		}
 	}
 	fmt.Println("Conditions Created")
 	time.Sleep(1)
 	TestGetBulkPolicyConditionState(t)
 	for _, stmt := range stmtsList {
-		server.PolicyStmtConfCh <- RIBdServerConfig{
+		server.PolicyConfCh <- RIBdServerConfig{
 			OrigConfigObject: stmt,
-			Op:               "add",
+			Op:               "addPolicyStmt",
 		}
 	}
 	fmt.Println("Stmts Created")
 	time.Sleep(1)
 	TestGetBulkPolicyStmtState(t)
 	for _, policy := range policyDefinitionsList {
-		server.PolicyDefinitionConfCh <- RIBdServerConfig{
+		server.PolicyConfCh <- RIBdServerConfig{
 			OrigConfigObject: policy,
-			Op:               "add",
+			Op:               "addPolicyDefinition",
 		}
 	}
 	fmt.Println("Definitions Created")
@@ -325,32 +325,34 @@ func TestPolicyServer(t *testing.T) {
 	TestGetBulkPolicyStmtState(t)
 	TestGetBulkPolicyDefinitionState(t)
 	for _, applyPolicyInfo := range applyPolicyList {
-		server.PolicyApplyCh <- applyPolicyInfo
+		server.PolicyApplyCh <- ApplyPolicyList{
+			[]*ribdInt.ApplyPolicyInfo{applyPolicyInfo},
+			make([]*ribdInt.ApplyPolicyInfo, 0)}
 	}
 	fmt.Println("Policies applied")
 	time.Sleep(1)
 	for _, policy := range policyDefinitionsList {
-		server.PolicyDefinitionConfCh <- RIBdServerConfig{
+		server.PolicyConfCh <- RIBdServerConfig{
 			OrigConfigObject: policy,
-			Op:               "del",
+			Op:               "delPolicyDefinition",
 		}
 	}
 	fmt.Println("Definitions Deleted")
 	time.Sleep(1)
 	TestGetBulkPolicyDefinitionState(t)
 	for _, stmt := range stmtsList {
-		server.PolicyStmtConfCh <- RIBdServerConfig{
+		server.PolicyConfCh <- RIBdServerConfig{
 			OrigConfigObject: stmt,
-			Op:               "del",
+			Op:               "delPolicyStmt",
 		}
 	}
 	fmt.Println("Stmts Deleted")
 	time.Sleep(1)
 	TestGetBulkPolicyStmtState(t)
 	for _, condition := range conditionsList {
-		server.PolicyConditionConfCh <- RIBdServerConfig{
+		server.PolicyConfCh <- RIBdServerConfig{
 			OrigConfigObject: condition,
-			Op:               "del",
+			Op:               "delPolicyCondition",
 		}
 	}
 	fmt.Println("Conditions Deleted")

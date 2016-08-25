@@ -552,12 +552,18 @@ func deleteRoutePolicyState(ipType ribdCommonDefs.IPType, ipPrefix patriciaDB.Pr
 		return
 	}
 	if len(routeInfoRecordList.policyList) <= idx+1 {
-		logger.Info("last element")
+		logger.Info("last element, routeInfoRecordList.policyList:", routeInfoRecordList.policyList)
 		routeInfoRecordList.policyList = routeInfoRecordList.policyList[:idx]
+		logger.Info("routeInfoRecordList.policyList after deleting:", routeInfoRecordList.policyList)
 	} else {
 		routeInfoRecordList.policyList = append(routeInfoRecordList.policyList[:idx], routeInfoRecordList.policyList[idx+1:]...)
 	}
 	RouteInfoMapSet(ipType, ipPrefix, routeInfoRecordList)
+	logger.Debug("Adding to DBRouteCh from deleteRoutePolicyState")
+	RouteServiceHandler.DBRouteCh <- RIBdServerConfig{
+		OrigConfigObject: RouteDBInfo{routeInfoRecordList.routeInfoProtocolMap[routeInfoRecordList.selectedRouteProtocol][0], routeInfoRecordList},
+		Op:               "add",
+	}
 }
 
 func updateRoutePolicyState(route ribdInt.Routes, op int, policy string, policyStmt string) {

@@ -635,7 +635,7 @@ func (l *LocRib) removeRoutesFromRouteList(dest *Destination, protoFamily uint32
 		if !l.activeGet[protoFamily] {
 			l.routeList[protoFamily][idx] = l.routeList[protoFamily][len(l.routeList[protoFamily])-1]
 			l.routeList[protoFamily][idx].routeListIdx = idx
-			l.routeList[protoFamily][len(l.routeList)-1] = nil
+			l.routeList[protoFamily][len(l.routeList[protoFamily])-1] = nil
 			l.routeList[protoFamily] = l.routeList[protoFamily][:len(l.routeList[protoFamily])-1]
 		} else {
 			l.routeList[protoFamily][idx] = nil
