@@ -30,8 +30,8 @@ import (
 func (server *ARPServer) processAsicdNotification(msg commonDefs.AsicdNotifyMsg) {
 	switch msg.(type) {
 	case commonDefs.L2IntfStateNotifyMsg:
-		//l2Msg := msg.(commonDefs.L2IntfStateNotifyMsg)
-		//server.processL2StateChange(l2IntfMsg)
+		l2Msg := msg.(commonDefs.L2IntfStateNotifyMsg)
+		server.processL2StateChange(l2Msg)
 	case commonDefs.L3IntfStateNotifyMsg:
 		l3Msg := msg.(commonDefs.L3IntfStateNotifyMsg)
 		server.processL3StateChange(l3Msg)
