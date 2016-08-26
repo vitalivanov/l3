@@ -88,7 +88,7 @@ func (intf *Interface) StopRATimer() {
  *  stop delay probe Timer
  */
 func (c *NeighborInfo) StopInvalidTimer() {
-	if c.StopInvalidTimer != nil {
+	if c.InvalidationTimer != nil {
 		debug.Logger.Debug("Stopping InvalidationTimer for Neighbor", c.IpAddr)
 		c.InvalidationTimer.Stop()
 		c.InvalidationTimer = nil

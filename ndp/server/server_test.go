@@ -42,6 +42,10 @@ const (
 	testMyLinkScopeIP    = "fe80::77:9cf8:fcff:fe4a:1615/16"
 	testMyAbsGSIP        = "2192::168:1:1"
 	testMyAbsLinkScopeIP = "fe80::77:9cf8:fcff:fe4a:1615"
+	testSrcMac           = "88:1d:fc:cf:15:fc"
+
+	testReachableTimerValue = 30000
+	estReTransmitTimerValue = 1000
 )
 
 var testNdpServer *NDPServer
