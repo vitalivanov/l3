@@ -502,7 +502,7 @@ func policyEngineActionRedistribute(actionInfo interface{}, conditionInfo []inte
 	}
 	testIp := RouteInfo.destNetIp + "/128"
 	logger.Info("Redistribute: route dest ip info:", RouteInfo.destNetIp)
-	inRange := netUtils.CheckIfInRange(testIp, "fe80::/10", -1, -1)
+	inRange := netUtils.CheckIfInRange(testIp, "fe80::/10", 10, 128)
 	if inRange {
 		//link local ip , dont redistribute
 		return
