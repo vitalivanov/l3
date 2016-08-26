@@ -162,7 +162,7 @@ func TestGetRouteReachability(t *testing.T) {
 	fmt.Println("**** Test GetRouteReachability****")
 	for _, ipAddr := range ipv4AddrList {
 		fmt.Println("check route reachability of ipv4Addr:", ipAddr.ipAddr)
-		nh, err := server.GetRouteReachabilityInfo(ipAddr.ipAddr)
+		nh, err := server.GetRouteReachabilityInfo(ipAddr.ipAddr, -1)
 		if err != nil {
 			fmt.Println("error ", err, " getting route reachability for ip:", ipAddr)
 			continue
@@ -170,7 +170,7 @@ func TestGetRouteReachability(t *testing.T) {
 		fmt.Println("getting route reachability for ip:", ipAddr.ipAddr, ": nh:", nh)
 	}
 	for _, ipAddr := range ipv6AddrList {
-		nh, err := server.GetRouteReachabilityInfo(ipAddr.ipAddr)
+		nh, err := server.GetRouteReachabilityInfo(ipAddr.ipAddr, -1)
 		if err != nil {
 			fmt.Println("error ", err, " getting route reachability for ip:", ipAddr)
 			continue
@@ -402,7 +402,7 @@ func TestProcessv4RouteDeleteConfig(t *testing.T) {
 			continue
 		}
 		val, err := server.ProcessV4RouteDeleteConfig(v4Route)
-		fmt.Println("val = ", val, " err: ", err)
+		fmt.Println("val = ", val, " err: ", err, " for v4Route:", v4Route)
 	}
 	TestGetRouteReachability(t)
 	TestGetRoute(t)

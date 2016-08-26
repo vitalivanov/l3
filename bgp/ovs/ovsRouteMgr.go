@@ -54,7 +54,7 @@ func (mgr *OvsRouteMgr) UpdateRoute(cfg *config.RouteConfig, op string) {
 
 }
 
-func (mgr *OvsRouteMgr) GetNextHopInfo(ipAddr string) (*config.NextHopInfo, error) {
+func (mgr *OvsRouteMgr) GetNextHopInfo(ipAddr string, ifIndex int32) (*config.NextHopInfo, error) {
 	return nil, nil
 }
 func (mgr *OvsRouteMgr) ApplyPolicy(applyList []*config.ApplyPolicyInfo, undoList []*config.ApplyPolicyInfo) {

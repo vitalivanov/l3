@@ -110,7 +110,7 @@ func (l *LocRib) GetReachabilityInfo(ipStr string) *ReachabilityInfo {
 	}
 
 	l.logger.Infof("GetReachabilityInfo: Reachability info not cached for Next hop %s", ipStr)
-	ribdReachabilityInfo, err := l.routeMgr.GetNextHopInfo(ipStr)
+	ribdReachabilityInfo, err := l.routeMgr.GetNextHopInfo(ipStr, -1)
 	if err != nil {
 		l.logger.Infof("NEXT_HOP[%s] is not reachable", ipStr)
 		return nil

@@ -470,8 +470,8 @@ func (m RIBDServicesHandler) Getv6Route(destNetIp string) (route *ribdInt.IPv6Ro
 	ret, err := m.server.Getv6Route(destNetIp)
 	return ret, err
 }
-func (m RIBDServicesHandler) GetRouteReachabilityInfo(destNet string) (nextHopIntf *ribdInt.NextHopInfo, err error) {
-	nh, err := m.server.GetRouteReachabilityInfo(destNet)
+func (m RIBDServicesHandler) GetRouteReachabilityInfo(destNet string, ifIndex ribdInt.Int) (nextHopIntf *ribdInt.NextHopInfo, err error) {
+	nh, err := m.server.GetRouteReachabilityInfo(destNet, ifIndex)
 	return nh, err
 }
 func (m RIBDServicesHandler) GetTotalv4RouteCount() (number ribdInt.Int, err error) {

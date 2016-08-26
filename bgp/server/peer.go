@@ -33,6 +33,7 @@ import (
 	bgppolicy "l3/bgp/policy"
 	bgprib "l3/bgp/rib"
 	"net"
+	"runtime"
 	"strconv"
 	"sync/atomic"
 	"utils/logging"
@@ -179,6 +180,7 @@ func (p *Peer) AddAdjRIBFilter(pe *bgppolicy.AdjRibPPolicyEngine, policyName str
 }
 
 func (p *Peer) Init() {
+	var fsmMgr *fsm.FSMManager
 	if p.NeighborConf.RunningConf.AdjRIBInFilter != "" {
 		p.AddAdjRIBFilter(p.server.ribInPE, p.NeighborConf.RunningConf.AdjRIBInFilter, bgprib.AdjRIBDirIn)
 	}
@@ -189,12 +191,17 @@ func (p *Peer) Init() {
 
 	if p.fsmManager == nil {
 		p.logger.Infof("Instantiating new FSM Manager for neighbor %s", p.NeighborConf.Neighbor.NeighborAddress)
-		p.fsmManager = fsm.NewFSMManager(p.logger, p.NeighborConf, p.server.BGPPktSrcCh,
+		fsmMgr = fsm.NewFSMManager(p.logger, p.NeighborConf, p.server.BGPPktSrcCh,
 			p.server.PeerFSMConnCh, p.server.ReachabilityCh)
+	} else {
+		fsmMgr = p.fsmManager
 	}
 
 	p.clearRibOut()
-	go p.fsmManager.Init()
+	go fsmMgr.Init()
+	runtime.Gosched()
+
+	p.fsmManager = fsmMgr
 	p.ProcessBfd(true)
 }
 
@@ -208,11 +215,25 @@ func (p *Peer) Cleanup() {
 	}
 
 	p.ProcessBfd(false)
-	p.fsmManager.CloseCh <- true
+
+	if p.fsmManager == nil {
+		p.logger.Errf("Can't cleanup FSM, FSM Manager is not instantiated for neighbor %s",
+			p.NeighborConf.Neighbor.NeighborAddress)
+		return
+	}
+
+	fsmMgr := p.fsmManager
 	p.fsmManager = nil
+	fsmMgr.CloseCh <- true
 }
 
 func (p *Peer) StopFSM(msg string) {
+	if p.fsmManager == nil {
+		p.logger.Errf("Can't stop FSM, FSM Manager is not instantiated for neighbor %s",
+			p.NeighborConf.Neighbor.NeighborAddress)
+		return
+	}
+
 	p.fsmManager.StopFSMCh <- msg
 }
 
@@ -232,7 +253,7 @@ func (p *Peer) getIfIdx() int32 {
 
 func (p *Peer) AcceptConn(conn *net.TCPConn) {
 	if p.fsmManager == nil {
-		p.logger.Infof("FSM Manager is not instantiated yet for neighbor %s",
+		p.logger.Errf("FSM Manager is not instantiated yet for neighbor %s",
 			p.NeighborConf.Neighbor.NeighborAddress)
 		(*conn).Close()
 		return
@@ -242,7 +263,7 @@ func (p *Peer) AcceptConn(conn *net.TCPConn) {
 
 func (p *Peer) Command(command int, reason int) {
 	if p.fsmManager == nil {
-		p.logger.Infof("FSM Manager is not instantiated yet for neighbor %s",
+		p.logger.Errf("FSM Manager is not instantiated yet for neighbor %s",
 			p.NeighborConf.Neighbor.NeighborAddress)
 		return
 	}
@@ -510,6 +531,12 @@ func (p *Peer) updatePathAttrs(bgpMsg *packet.BGPMessage, path *bgprib.Path) boo
 }
 
 func (p *Peer) sendUpdateMsg(msg *packet.BGPMessage, path *bgprib.Path) {
+	if p.fsmManager == nil {
+		p.logger.Errf("Can't send update, FSM Manager is not instantiated for neighbor %s",
+			p.NeighborConf.Neighbor.NeighborAddress)
+		return
+	}
+
 	if path != nil && path.NeighborConf != nil {
 		if path.NeighborConf.IsInternal() {
 

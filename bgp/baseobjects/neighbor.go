@@ -119,10 +119,13 @@ func (n *NeighborConf) UpdateNeighborConf(nConf config.NeighborConfig, bgp *conf
 	n.Neighbor.Config = nConf
 	n.RunningConf = config.NeighborConfig{}
 	if (n.Group == nil && nConf.PeerGroup != "") || (n.Group != nil && nConf.PeerGroup != n.Group.Name) {
-		if peerGroup, ok := bgp.PeerGroups[nConf.PeerGroup]; ok {
-			n.GetNeighConfFromPeerGroup(&peerGroup.Config, &n.RunningConf)
-		} else {
-			n.logger.Err("Peer group", nConf.PeerGroup, "not found in BGP config")
+		protoFamily, _ := packet.GetProtocolFamilyFromPeerAddrType(nConf.PeerAddressType)
+		if _, ok := bgp.PeerGroups[protoFamily]; ok {
+			if peerGroup, ok := bgp.PeerGroups[protoFamily][nConf.PeerGroup]; ok {
+				n.GetNeighConfFromPeerGroup(&peerGroup.Config, &n.RunningConf)
+			} else {
+				n.logger.Err("Peer group", nConf.PeerGroup, "not found in BGP config")
+			}
 		}
 	}
 	n.GetConfFromNeighbor(&n.Neighbor.Config, &n.RunningConf)
@@ -245,6 +248,7 @@ func (n *NeighborConf) GetConfFromNeighbor(inConf *config.NeighborConfig, outCon
 		outConf.AdjRIBOutFilter = inConf.AdjRIBOutFilter
 	}
 
+	outConf.PeerAddressType = inConf.PeerAddressType
 	outConf.NeighborAddress = inConf.NeighborAddress
 	outConf.IfIndex = inConf.IfIndex
 	outConf.PeerGroup = inConf.PeerGroup

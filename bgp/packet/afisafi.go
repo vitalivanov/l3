@@ -67,6 +67,11 @@ var RIBdAddressTypeToAFI = map[ribdCommonDefs.IPType]AFI{
 	ribdCommonDefs.IPv6: AfiIP6,
 }
 
+var PeerAddrTypeProtoFamilyMap = map[config.PeerAddressType]uint32{
+	config.PeerAddressV4: GetProtocolFamily(AfiIP, SafiUnicast),
+	config.PeerAddressV6: GetProtocolFamily(AfiIP6, SafiUnicast),
+}
+
 func GetProtocolFromConfig(afiSafis *[]config.AfiSafiConfig, neighborAddress net.IP) (map[uint32]bool, bool) {
 	afiSafiMap := make(map[uint32]bool)
 	rv := true
@@ -134,4 +139,12 @@ func GetProtocolFamilyFromAddrType(addrType ribdCommonDefs.IPType) (uint32, erro
 	}
 
 	return 0, errors.New(fmt.Sprintf("Address family not found for address type %d", addrType))
+}
+
+func GetProtocolFamilyFromPeerAddrType(addrType config.PeerAddressType) (uint32, error) {
+	if pf, ok := PeerAddrTypeProtoFamilyMap[addrType]; ok {
+		return pf, nil
+	}
+
+	return 0, errors.New(fmt.Sprintf("Address family not found for peer address type %d", addrType))
 }
