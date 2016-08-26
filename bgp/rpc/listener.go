@@ -977,10 +977,10 @@ func (h *BGPHandler) ValidateV4Neighbor(bgpNeighbor *bgpd.BGPv4Neighbor) (pConf 
 	h.setDefault(&pConf)
 	return pConf, err
 }
-func (h *BGPHandler) ValidateV4NeighborForUpdate(oldNeigh *bgpd.NGPv4Neighbor, oldNeighConfig config.NeighborConfig, newNeigh *bgpd.BGPv4Neighbor, attrSet []bool) (pConf config.NeighborConfig, err error) {
-	pConf, _ = h.ConvertV4NeighborFromThrift(bgpNeighbor, oldNeighConfig.NeighborAddress, oldNeighConfig.IfIndex)
+func (h *BGPHandler) ValidateV4NeighborForUpdate(oldNeigh *bgpd.BGPv4Neighbor, oldNeighConfig config.NeighborConfig, newNeigh *bgpd.BGPv4Neighbor, attrSet []bool) (pConf config.NeighborConfig, err error) {
+	pConf, _ = h.ConvertV4NeighborFromThrift(oldNeigh, oldNeighConfig.NeighborAddress, oldNeighConfig.IfIndex)
 	if attrSet != nil {
-		objTyp := reflect.TypeOf(oldConfig)
+		objTyp := reflect.TypeOf(*oldNeigh)
 		for i := 0; i < objTyp.NumField(); i++ {
 			objName := objTyp.Field(i).Name
 			if attrSet[i] {
@@ -990,24 +990,6 @@ func (h *BGPHandler) ValidateV4NeighborForUpdate(oldNeigh *bgpd.NGPv4Neighbor, o
 						err = errors.New(fmt.Sprintf("Update source %s not a valid IP", newNeigh.UpdateSource))
 						return pConf, err
 					}
-				}
-				if objName == "RouterId" {
-					newip := h.convertStrIPToNetIP(newConfig.RouterId)
-					if newip == nil {
-						err = errors.New(fmt.Sprintf("BGPGlobal: Router id %s is not valid", newConfig.RouterId))
-						h.logger.Info("SendBGPGlobal: Router id", newConfig.RouterId, "is not valid")
-						return gConf, err
-					}
-					gConf.RouterId = newip
-				}
-				if objName == "ASNum" {
-					newasNum := uint32(newConfig.ASNum)
-					if newasNum == 0 || newasNum == uint32(packet.BGPASTrans) {
-						err = errors.New(fmt.Sprintf("BGPGlobal: AS number %d is not valid", newConfig.ASNum))
-						h.logger.Info("SendBGPGlobal: AS number", newConfig.ASNum, "is not valid")
-						return gConf, err
-					}
-					gConf.AS = newasNum
 				}
 			}
 		}
@@ -1034,16 +1016,16 @@ func (h *BGPHandler) SendBGPv4Neighbor(oldNeigh *bgpd.BGPv4Neighbor, newNeigh *b
 	if err != nil {
 		return false, err
 	}
-
+	var newNeighConf config.NeighborConfig
 	if op != "update" {
-		newNeighConf, err := h.ValidateV4Neighbor(newNeigh)
+		newNeighConf, err = h.ValidateV4Neighbor(newNeigh)
 		if err != nil {
 			return false, err
 		}
 	} else if patchOp == nil || len(patchOp) == 0 {
 		//no-op because there are no list objects for neighbor
 	} else {
-		newNeighConf, err := h.ValidateV4NeighborForUpdate(oldNeigh, oldNeighConf, newNeigh, attrSet)
+		newNeighConf, err = h.ValidateV4NeighborForUpdate(oldNeigh, oldNeighConf, newNeigh, attrSet)
 		if err != nil {
 			return false, err
 		}
