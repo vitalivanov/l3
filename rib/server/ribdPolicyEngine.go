@@ -30,6 +30,7 @@ import (
 	"ribdInt"
 	"strconv"
 	"strings"
+	netUtils "utils/netUtils"
 	"utils/patriciaDB"
 	"utils/policy"
 	"utils/policy/policyCommonDefs"
@@ -497,6 +498,13 @@ func policyEngineActionRedistribute(actionInfo interface{}, conditionInfo []inte
 	}
 	if strings.Contains(ReverseRouteProtoTypeMapDB[int(RouteInfo.routeType)], redistributeActionInfo.RedistributeTargetProtocol) {
 		logger.Info("Redistribute target protocol same as route source, do nothing more here")
+		return
+	}
+	testIp := RouteInfo.destNetIp + "/128"
+	logger.Info("Redistribute: route dest ip info:", RouteInfo.destNetIp)
+	inRange := netUtils.CheckIfInRange(testIp, "fe80::/10", -1, -1)
+	if inRange {
+		//link local ip , dont redistribute
 		return
 	}
 	route = ribdInt.Routes{Ipaddr: RouteInfo.destNetIp, Mask: RouteInfo.networkMask, NextHopIp: RouteInfo.nextHopIp, IPAddrType: ribdInt.Int(RouteInfo.ipType), IfIndex: ribdInt.Int(RouteInfo.nextHopIfIndex), Metric: ribdInt.Int(RouteInfo.metric), Prototype: ribdInt.Int(RouteInfo.routeType)}

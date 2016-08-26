@@ -127,7 +127,7 @@ func (intf VXLANSnapClient) processRibdNotification(rxBuf []byte) error {
 // then notify the vtep channel of that ip
 func (intf VXLANSnapClient) GetNextHopInfo(ip net.IP, vtepnexthopchan chan<- vxlan.MachineEvent) {
 	if ribdclnt.ClientHdl != nil {
-		nexthopinfo, err := ribdclnt.ClientHdl.GetRouteReachabilityInfo(ip.String())
+		nexthopinfo, err := ribdclnt.ClientHdl.GetRouteReachabilityInfo(ip.String(), -1)
 		if err == nil {
 			nexthopip := net.ParseIP(nexthopinfo.NextHopIp)
 			// lets let RIB notify us if there is a change in next hop

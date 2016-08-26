@@ -160,10 +160,10 @@ func (mgr *FSRouteMgr) handleRibUpdates(rxBuf []byte) {
 	}
 }
 
-func (mgr *FSRouteMgr) GetNextHopInfo(ipAddr string) (*config.NextHopInfo, error) {
-	info, err := mgr.ribdClient.GetRouteReachabilityInfo(ipAddr)
+func (mgr *FSRouteMgr) GetNextHopInfo(ipAddr string, ifIndex int32) (*config.NextHopInfo, error) {
+	info, err := mgr.ribdClient.GetRouteReachabilityInfo(ipAddr, ribdInt.Int(ifIndex))
 	if err != nil {
-		mgr.logger.Err("Getting route reachability for ", ipAddr, "failed, error:", err)
+		mgr.logger.Err("Getting route reachability for ", ipAddr, " ifIndex:", ifIndex, "failed, error:", err)
 		return nil, err
 	}
 	reachInfo := &config.NextHopInfo{

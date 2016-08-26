@@ -269,7 +269,7 @@ func (server *BFDServer) GetNewSessionId() int32 {
 
 func (server *BFDServer) GetIfIndexFromDestIp(DestIp string) (int32, error) {
 	server.ribdClient.ClientHdl.TrackReachabilityStatus(DestIp, "BFD", "add")
-	reachabilityInfo, err := server.ribdClient.ClientHdl.GetRouteReachabilityInfo(DestIp)
+	reachabilityInfo, err := server.ribdClient.ClientHdl.GetRouteReachabilityInfo(DestIp, -1)
 	server.logger.Info(fmt.Sprintln("Reachability info ", reachabilityInfo))
 	if err != nil || !reachabilityInfo.IsReachable {
 		err = errors.New(fmt.Sprintf("%s is not reachable", DestIp))

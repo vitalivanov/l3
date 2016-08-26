@@ -727,6 +727,13 @@ func (h *BGPHandler) validateBGPGlobalForUpdate(oldConfig *bgpd.BGPGlobal, newCo
 						h.logger.Err("Must specify redistribution")
 						return gConf, err
 					}
+					if newConfig.Redistribution != nil {
+						gConf.Redistribution = make([]config.SourcePolicyMap, 0)
+						for i := 0; i < len(newConfig.Redistribution); i++ {
+							redistribution := config.SourcePolicyMap{newConfig.Redistribution[i].Sources, newConfig.Redistribution[i].Policy}
+							gConf.Redistribution = append(gConf.Redistribution, redistribution)
+						}
+					}
 				}
 				if objName == "RouterId" {
 					newip := h.convertStrIPToNetIP(newConfig.RouterId)
@@ -922,6 +929,7 @@ func (h *BGPHandler) ValidateV4Neighbor(bgpNeighbor *bgpd.BGPv4Neighbor) (pConf 
 
 	var ip net.IP
 	var ifIndex int32
+	ifIndex = -1
 	ip, ifIndex, err = h.getIPAndIfIndexForV4Neighbor(bgpNeighbor.NeighborAddress, bgpNeighbor.IntfRef)
 	if err != nil {
 		h.logger.Info("ValidateBGPNeighbor: getIPAndIfIndexForNeighbor failed for neighbor address",
@@ -1173,6 +1181,7 @@ func (h *BGPHandler) ValidateV6Neighbor(bgpNeighbor *bgpd.BGPv6Neighbor) (pConf 
 
 	var ip net.IP
 	var ifIndex int32
+	ifIndex = -1
 	ip, ifIndex, err = h.getIPAndIfIndexForV6Neighbor(bgpNeighbor.NeighborAddress, bgpNeighbor.IntfRef)
 	if err != nil {
 		h.logger.Info("ValidateV6Neighbor: getIPAndIfIndexForNeighbor failed for neighbor address",
