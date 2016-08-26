@@ -727,6 +727,13 @@ func (h *BGPHandler) validateBGPGlobalForUpdate(oldConfig *bgpd.BGPGlobal, newCo
 						h.logger.Err("Must specify redistribution")
 						return gConf, err
 					}
+					if newConfig.Redistribution != nil {
+						gConf.Redistribution = make([]config.SourcePolicyMap, 0)
+						for i := 0; i < len(newConfig.Redistribution); i++ {
+							redistribution := config.SourcePolicyMap{newConfig.Redistribution[i].Sources, newConfig.Redistribution[i].Policy}
+							gConf.Redistribution = append(gConf.Redistribution, redistribution)
+						}
+					}
 				}
 				if objName == "RouterId" {
 					newip := h.convertStrIPToNetIP(newConfig.RouterId)

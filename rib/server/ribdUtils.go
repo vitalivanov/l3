@@ -351,11 +351,12 @@ func findRouteWithNextHop(routeInfoList []RouteInfoRecord, nextHopIpType ribdCom
 	logger.Info("findRouteWithNextHop ", nextHopIP, " and type:", nextHopIpType, " and ifIndex:", nextHopIfIndex)
 	index = -1
 	for i := 0; i < len(routeInfoList); i++ {
+		logger.Info("findRouteWithNextHop: current route type:", routeInfoList[i].nextHopIpType)
 		if routeInfoList[i].nextHopIpType == nextHopIpType {
-			//fmt.Println("Madhavi!! findRouteWithNextHop():same ip type,routeInfoList[i]:", routeInfoList[i])
+			logger.Info("findRouteWithNextHop():same ip type,routeInfoList[i]:", routeInfoList[i])
 			//logger.Info("Next hop IP present")
 			if nextHopIP != "" && routeInfoList[i].nextHopIp.String() != nextHopIP {
-				//fmt.Println("Madhavi|| findRouteWithNextHop(),nextHopIP ", nextHopIP, " not the same as route next hop ip:", routeInfoList[i].nextHopIp.String())
+				logger.Info("findRouteWithNextHop(),nextHopIP ", nextHopIP, " not the same as route next hop ip:", routeInfoList[i].nextHopIp.String())
 				continue
 			}
 			if nextHopIfIndex != -1 && routeInfoList[i].nextHopIfIndex != nextHopIfIndex {

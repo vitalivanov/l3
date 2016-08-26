@@ -338,7 +338,6 @@ func getPortInfo() {
 		logger.Info("len(bulkInfo.PortStateList)  = ", len(bulkInfo.PortStateList), " num objects returned = ", bulkInfo.Count)
 		for i := 0; i < int(bulkInfo.Count); i++ {
 			ifId := bulkInfo.PortStateList[i].IfIndex
-			logger.Info("ifId = ", ifId)
 			if IntfIdNameMap == nil {
 				IntfIdNameMap = make(map[int32]IntfEntry)
 			}
@@ -348,6 +347,7 @@ func getPortInfo() {
 				IfNameToIfIndex = make(map[string]int32)
 			}
 			IfNameToIfIndex[bulkInfo.PortStateList[i].Name] = ifId
+			logger.Info("ifId = ", ifId, "IntfIdNameMap[", ifId, "] = ", IntfIdNameMap[ifId], "IfNameToIfIndex[", bulkInfo.PortStateList[i].Name, "] = ", IfNameToIfIndex[bulkInfo.PortStateList[i].Name])
 		}
 		if bulkInfo.More == false {
 			logger.Info("more returned as false, so no more get bulks")

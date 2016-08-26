@@ -34,7 +34,7 @@ import (
 	"ribdInt"
 	"strconv"
 	"time"
-	"utils/netUtils"
+	netUtils "utils/netUtils"
 	"utils/patriciaDB"
 	"utils/policy/policyCommonDefs"
 )
@@ -1408,9 +1408,14 @@ func createRoute(routeInfo RouteParams) (rc ribd.Int, err error) {
 		return 0, err
 	}
 	nextHopIpType := ribdCommonDefs.IPv4
-	nextHopIpNet := nextHopIpAddr.To4()
-	if nextHopIpNet == nil {
-		nextHopIpType = ribdCommonDefs.IPv6
+	isZeros, _ := netUtils.IsZerosIPString(nextHopIp)
+	if isZeros {
+		nextHopIpType = ipType
+	} else {
+		nextHopIpNet := nextHopIpAddr.To4()
+		if nextHopIpNet == nil {
+			nextHopIpType = ribdCommonDefs.IPv6
+		}
 	}
 	//logger.Debug("nextHopIP:", nextHopIp, " nextHopIpAddr:", nextHopIpAddr.String(), " nextHopIpType:", nextHopIpType)
 	destNet, nwAddr, err := getNetworkPrefix(destNetIpAddr, networkMaskAddr)
