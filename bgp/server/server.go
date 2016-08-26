@@ -1397,7 +1397,9 @@ func (s *BGPServer) SetupRedistribution(gConf config.GlobalConfig) {
 			}
 		}
 	}
-	s.routeMgr.ApplyPolicy(applyList, undoApplyList)
+	if len(applyList) > 0 || len(undoApplyList) > 0 {
+		s.routeMgr.ApplyPolicy(applyList, undoApplyList)
+	}
 }
 func (s *BGPServer) UpdateGlobalForPatchUpdate(oldConfig, newConfig config.GlobalConfig, op []*bgpd.PatchOpInfo) {
 	s.logger.Info("UpdateGlobalForPatchUpdate")
@@ -1455,7 +1457,9 @@ func (s *BGPServer) UpdateGlobalForPatchUpdate(oldConfig, newConfig config.Globa
 								}
 								applyList[0].Conditions = append(applyList[0].Conditions, condition)
 							}
-							s.routeMgr.ApplyPolicy(applyList, undoApplyList)
+							if len(applyList) > 0 || len(undoApplyList) > 0 {
+								s.routeMgr.ApplyPolicy(applyList, undoApplyList)
+							}
 						} else {
 							s.logger.Err("Cannot add policy for source:", source, " there is already a policy ,", s.RedistributionMap[source], " applied")
 						}
@@ -1480,7 +1484,9 @@ func (s *BGPServer) UpdateGlobalForPatchUpdate(oldConfig, newConfig config.Globa
 								undoApplyList[0].Conditions = append(undoApplyList[0].Conditions, condition)
 							}
 							delete(s.RedistributionMap, source)
-							s.routeMgr.ApplyPolicy(applyList, undoApplyList)
+							if len(applyList) > 0 || len(undoApplyList) > 0 {
+								s.routeMgr.ApplyPolicy(applyList, undoApplyList)
+							}
 						}
 					default:
 						s.logger.Err("operation ", op[idx].Op, " not supported")
@@ -1533,7 +1539,13 @@ func (s *BGPServer) Restart(cfg config.GlobalConfig) {
 	for _, peer := range s.PeerMap {
 		peer.Init()
 	}
-	s.SetupRedistribution(gConf)
+	//s.SetupRedistribution(gConf)
+	// Get routes from the route manager
+	add, remove := s.routeMgr.GetRoutes()
+	if add != nil && remove != nil {
+		s.ProcessConnectedRoutes(add, remove)
+	}
+
 }
 func (s *BGPServer) updateGlobalConfig(oldConfig, newConfig config.GlobalConfig, attrSet []bool, op []*bgpd.PatchOpInfo) {
 	s.logger.Info("updateGlobalConfig")

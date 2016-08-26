@@ -325,9 +325,10 @@ func TestPolicyServer(t *testing.T) {
 	TestGetBulkPolicyStmtState(t)
 	TestGetBulkPolicyDefinitionState(t)
 	for _, applyPolicyInfo := range applyPolicyList {
-		server.PolicyApplyCh <- ApplyPolicyList{
-			[]*ribdInt.ApplyPolicyInfo{applyPolicyInfo},
-			make([]*ribdInt.ApplyPolicyInfo, 0)}
+		server.PolicyConfCh <- RIBdServerConfig{
+			PolicyList: ApplyPolicyList{[]*ribdInt.ApplyPolicyInfo{applyPolicyInfo}, make([]*ribdInt.ApplyPolicyInfo, 0)},
+			Op:         "applyPolicy",
+		}
 	}
 	fmt.Println("Policies applied")
 	time.Sleep(1)

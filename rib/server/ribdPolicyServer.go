@@ -201,6 +201,9 @@ func (ribdServiceHandler *RIBDServer) StartPolicyServer() {
 					ribdServiceHandler.PolicyDefinitionNotificationSend(RIBD_POLICY_PUB, *(conf.OrigConfigObject.(*ribd.PolicyDefinition)), ribdCommonDefs.NOTIFY_POLICY_DEFINITION_DELETED)
 					ribdServiceHandler.ProcessPolicyDefinitionConfigDelete(conf.OrigConfigObject.(*ribd.PolicyDefinition), ribdServiceHandler.PolicyEngineDB)
 				}
+			} else if conf.Op == "applyPolicy" {
+				ribdServiceHandler.UpdateApplyPolicyList(conf.PolicyList.ApplyList, conf.PolicyList.UndoList, true, PolicyEngineDB)
+				ribdServiceHandler.UpdateApplyPolicyList(conf.PolicyList.ApplyList, conf.PolicyList.UndoList, false, GlobalPolicyEngineDB)
 			}
 		case info := <-ribdServiceHandler.PolicyUpdateApplyCh:
 			/*
