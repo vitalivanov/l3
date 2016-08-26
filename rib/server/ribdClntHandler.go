@@ -104,7 +104,7 @@ func deleteV4RoutesOfType(protocol string, destNet string) {
 	for _, protoroute := range testroutes { //protocolRouteList {
 		//logger.Info(len(testroutes), " number of ", protocol, " routes in routemap:", testroutes, " remaining")
 		//logger.Info("protoroute:", protoroute, " nexthop:", protoroute.nextHopIp.String())
-		_, err := deleteIPRoute(protoroute.destNetIp.String(), ribdCommonDefs.IPv4, protoroute.networkMask.String(), protocol, protoroute.nextHopIp.String(), FIBAndRIB, ribdCommonDefs.RoutePolicyStateChangetoInValid)
+		_, err := deleteIPRoute(protoroute.destNetIp.String(), ribdCommonDefs.IPv4, protoroute.networkMask.String(), protocol, protoroute.nextHopIp.String(), protoroute.nextHopIfIndex, FIBAndRIB, ribdCommonDefs.RoutePolicyStateChangetoInValid)
 		logger.Info("err :", err, " while deleting ", protocol, " route with destNet:", protoroute.destNetIp.String(), " nexthopIP:", protoroute.nextHopIp.String())
 	}
 }
@@ -131,7 +131,7 @@ func deleteV6RoutesOfType(protocol string, destNet string) {
 	for _, protoroute := range testroutes { //protocolRouteList {
 		//logger.Info(len(testroutes), " number of ", protocol, " routes in routemap:", testroutes, " remaining")
 		//logger.Info("protoroute:", protoroute, " nexthop:", protoroute.nextHopIp.String())
-		_, err := deleteIPRoute(protoroute.destNetIp.String(), ribdCommonDefs.IPv6, protoroute.networkMask.String(), protocol, protoroute.nextHopIp.String(), FIBAndRIB, ribdCommonDefs.RoutePolicyStateChangetoInValid)
+		_, err := deleteIPRoute(protoroute.destNetIp.String(), ribdCommonDefs.IPv6, protoroute.networkMask.String(), protocol, protoroute.nextHopIp.String(), protoroute.nextHopIfIndex, FIBAndRIB, ribdCommonDefs.RoutePolicyStateChangetoInValid)
 		logger.Info("err :", err, " while deleting ", protocol, " route with destNet:", protoroute.destNetIp.String(), " nexthopIP:", protoroute.nextHopIp.String())
 	}
 }

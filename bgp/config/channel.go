@@ -30,6 +30,7 @@ import (
 
 type ReachabilityInfo struct {
 	IP          string
+	IfIndex     int32
 	ReachableCh chan bool
 }
 

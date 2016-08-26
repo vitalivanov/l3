@@ -48,7 +48,7 @@ type IntfStateMgrIntf interface {
  */
 type RouteMgrIntf interface {
 	Start()
-	GetNextHopInfo(ipAddr string) (*NextHopInfo, error)
+	GetNextHopInfo(ipAddr string, ifIndex int32) (*NextHopInfo, error)
 	CreateRoute(*RouteConfig)
 	DeleteRoute(*RouteConfig)
 	UpdateRoute(cfg *RouteConfig, op string)
