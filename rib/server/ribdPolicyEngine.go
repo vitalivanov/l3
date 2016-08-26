@@ -502,7 +502,7 @@ func policyEngineActionRedistribute(actionInfo interface{}, conditionInfo []inte
 	}
 	testIp := RouteInfo.destNetIp + "/128"
 	logger.Info("Redistribute: route dest ip info:", RouteInfo.destNetIp)
-	inRange := netUtils.CheckIfInRange(testIp, "fe80::/10", -1, -1)
+	inRange := netUtils.CheckIfInRange(testIp, "fe80::/10", 10, 128)
 	if inRange {
 		//link local ip , dont redistribute
 		return
@@ -591,6 +591,13 @@ func PolicyEngineFilter(route ribdInt.Routes, policyPath int, params interface{}
 		return
 	}
 	routeInfo := params.(RouteParams)
+	testIp := routeInfo.destNetIp + "/128"
+	logger.Info("Redistribute: route dest ip info:", routeInfo.destNetIp)
+	inRange := netUtils.CheckIfInRange(testIp, "fe80::/10", 10, 128)
+	if inRange {
+		//link local ip , dont redistribute
+		return
+	}
 	logger.Info("PolicyEngineFilter for policypath ", policyPath_Str, "createType = ", routeInfo.createType, " deleteType = ", routeInfo.deleteType, " route: ", route.Ipaddr, ":", route.Mask, " protocol type: ", route.Prototype)
 	entity, err := buildPolicyEntityFromRoute(route, params)
 	if err != nil {
