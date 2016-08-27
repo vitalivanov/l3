@@ -24,6 +24,8 @@ package server
 
 import (
 	"fmt"
+	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
 	_ "github.com/google/gopacket/pcap"
 	"infra/sysd/sysdCommonDefs"
 	"l3/ndp/config"
@@ -33,6 +35,15 @@ import (
 	asicdmock "utils/asicdClient/mock"
 	"utils/logging"
 )
+
+var nsServerBaseTestPkt = []byte{
+	0x00, 0x1f, 0x16, 0x25, 0x34, 0x31, 0x00, 0x1f, 0x16, 0x25, 0x33, 0xce, 0x86, 0xdd, 0x60, 0x00,
+	0x00, 0x00, 0x00, 0x20, 0x3a, 0xff, 0xfe, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x1f,
+	0x16, 0xff, 0xfe, 0x25, 0x33, 0xce, 0x20, 0x01, 0x0d, 0xb8, 0x00, 0x00, 0xf1, 0x01, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x87, 0x00, 0xa6, 0x86, 0x00, 0x00, 0x00, 0x00, 0x20, 0x01,
+	0x0d, 0xb8, 0x00, 0x00, 0xf1, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x01, 0x01,
+	0x00, 0x1f, 0x16, 0x25, 0x33, 0xce,
+}
 
 const (
 	TEST_NBR_ENTRIES     = 5
@@ -339,7 +350,6 @@ func TestIPv6IntfStateUpDown(t *testing.T) {
 
 func TestFindL3Port(t *testing.T) {
 	TestIPv6IntfCreate(t)
-	t.Log(testNdpServer.L3Port)
 	if _, exists := testNdpServer.findL3Port(testIfIndex); !exists {
 		t.Error("Entry for ifIndex:", testIfIndex, "should exists")
 		return
@@ -347,6 +357,20 @@ func TestFindL3Port(t *testing.T) {
 	invalidIfIndex := int32(123)
 	if _, exists := testNdpServer.findL3Port(invalidIfIndex); exists {
 		t.Error("Entry for ifIndex:", invalidIfIndex, "should not exists")
+		return
+	}
+}
+
+func TestProcessPkt(t *testing.T) {
+	TestIPv6IntfCreate(t)
+	p := gopacket.NewPacket(nsServerBaseTestPkt, layers.LinkTypeEthernet, gopacket.Default)
+	if p.ErrorLayer() != nil {
+		t.Error("Failed to decode packet:", p.ErrorLayer().Error())
+		return
+	}
+	err := testNdpServer.ProcessRxPkt(testIfIndex, p)
+	if err != nil {
+		t.Error("Process RX PKT failed:", err)
 		return
 	}
 }
