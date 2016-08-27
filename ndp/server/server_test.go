@@ -29,7 +29,6 @@ import (
 	"l3/ndp/config"
 	"l3/ndp/debug"
 	"log/syslog"
-	"strconv"
 	"testing"
 	asicdmock "utils/asicdClient/mock"
 	"utils/logging"
@@ -38,6 +37,8 @@ import (
 const (
 	TEST_NBR_ENTRIES     = 5
 	testIfIndex          = 100
+	testIntfRef          = "lo"
+	testSwitchMac        = "c8:1f:66:ea:ae:fc"
 	testMyGSIp           = "2192::168:1:1/64"
 	testMyLinkScopeIP    = "fe80::77:9cf8:fcff:fe4a:1615/16"
 	testMyAbsGSIP        = "2192::168:1:1"
@@ -83,8 +84,8 @@ func initServerBasic() {
 
 func initPhysicalPorts() {
 	port := config.PortInfo{
-		IntfRef:   "lo0",
-		IfIndex:   95,
+		IntfRef:   "lo",
+		IfIndex:   testIfIndex,
 		Name:      "Loopback0",
 		OperState: "UP",
 		MacAddr:   "aa:bb:cc:dd:ee:ff",
@@ -124,7 +125,7 @@ func initPhysicalPorts() {
 	testNdpServer.PhyPort[port.IfIndex] = port
 	port = config.PortInfo{
 		IntfRef:   "lo5",
-		IfIndex:   100,
+		IfIndex:   95,
 		Name:      "Loopback5",
 		OperState: "UP",
 		MacAddr:   "aa:bb:cc:dd:ee:ff",
@@ -148,6 +149,7 @@ func InitNDPTestServer() {
 		IfIndex: testIfIndex,
 		IpAddr:  testMyLinkScopeIP,
 	}
+	testNdpServer.SwitchMac = testSwitchMac
 }
 
 func TestNDPStartServer(t *testing.T) {
@@ -161,6 +163,7 @@ func TestIPv6IntfCreate(t *testing.T) {
 		IfIndex:   testIfIndex,
 		IpAddr:    testMyGSIp,
 		Operation: config.CONFIG_CREATE,
+		IntfRef:   testIntfRef,
 	}
 	t.Log("Ports Created are:", testNdpServer.PhyPort)
 	testNdpServer.HandleIPIntfCreateDelete(ipv6Obj)
@@ -245,115 +248,52 @@ func TestIPv6IntfDelete(t *testing.T) {
 	}
 }
 
-// _Test ND Solicitation message Decoder
-func _TestInvalidInitPortInfo(t *testing.T) {
-	svr := &NDPServer{}
-	svr.InitGlobalDS()
-
-	if len(svr.PhyPort) > 0 {
-		t.Error("There should not be any elements in the system port map", len(svr.PhyPort))
+func TestIPv6IntfStateUpDown(t *testing.T) {
+	TestIPv6IntfCreate(t)
+	stateObj := config.StateNotification{
+		IfIndex: testIfIndex,
+		State:   config.STATE_UP,
+		IpAddr:  testMyLinkScopeIP,
 	}
-	svr.DeInitGlobalDS()
+	t.Log(stateObj)
+	testNdpServer.HandleStateNotification(&stateObj)
 
-	if svr.PhyPort != nil {
-		t.Error("De-Init for ndp port info didn't happen")
-	}
-}
-
-// _Test ND Solicitation message Decoder
-func _TestInvalidInitL3Info(t *testing.T) {
-	svr := &NDPServer{}
-	svr.InitGlobalDS()
-	/*
-		svr.InitSystemIPIntf(nil, nil)
-
-		if len(svr.L3Port) > 0 {
-			t.Error("There should not be any elements in the system ip map", len(svr.L3Port))
-		}
-	*/
-	svr.DeInitGlobalDS()
-
-	if svr.L3Port != nil {
-		t.Error("De-Init for ndp l3 info didn't happen")
-	}
-}
-
-// _Test Pcap Create
-func _TestPcapCreate(t *testing.T) {
-	/*
-		var err error
-		var pcapHdl *pcap.Handle
-		logger, err := NDPTestNewLogger("ndpd", "NDPTEST", true)
-		if err != nil {
-			t.Error("creating logger failed")
-		}
-		debug.NDPSetLogger(logger)
-		svr := NDPNewServer(nil)
-		svr.InitGlobalDS()
-		pcapHdl, err = svr.CreatePcapHandler("lo")
-		if err != nil {
-			t.Error("Pcap Create Failed", err)
-		}
-		svr.DeletePcapHandler(&pcapHdl)
-		if pcapHdl != nil {
-			t.Error("Failed to set nil")
-		}
-	*/
-}
-
-// test src mac
-func _TestCheckSrcMac(t *testing.T) {
-	svr := &NDPServer{}
-	svr.InitGlobalDS()
-	i := int(0)
-	for i = 0; i < TEST_NBR_ENTRIES; i++ {
-		macStr := "aa:bb:cc:dd:ee:0" + strconv.Itoa(i)
-		var temp struct{}
-		svr.SwitchMacMapEntries[macStr] = temp
-	}
-	if !svr.CheckSrcMac("aa:bb:cc:dd:ee:01") {
-		t.Error("failed checking src mac 01")
+	l3Port, _ := testNdpServer.L3Port[testIfIndex]
+	if l3Port.PcapBase.PcapHandle == nil {
+		t.Error("Failed to initialize pcap handler")
+		return
 	}
 
-	if svr.CheckSrcMac("aa:bb:cc:dd:ee:ff") {
-		t.Error("ff src mac entry should not exists")
+	if l3Port.PcapBase.PcapCtrl == nil {
+		t.Error("failed to initialize pcap ctrl")
+		return
 	}
-	svr.DeInitGlobalDS()
-}
 
-// test populate vlan
-func _TestPopulateVlanIfIndexInfo(t *testing.T) {
-	svr := &NDPServer{}
-	svr.InitGlobalDS()
-	nbrInfo := &config.NeighborConfig{}
-	svr.PopulateVlanInfo(nbrInfo, 1)
-	if nbrInfo.VlanId != -1 {
-		t.Error("Vlan Id", nbrInfo.VlanId, "should not be present")
+	if l3Port.PcapBase.PcapUsers != 1 {
+		t.Error("Failed to add first pcap user")
+		return
 	}
-	svr.DeInitGlobalDS()
-}
 
-func _TestIpV6Addr(t *testing.T) {
-	svr := &NDPServer{}
-	if svr.IsIPv6Addr("192.168.1.1/31") {
-		t.Error("Failed check for ipv6 adddress when ipv4 is passed as arg")
-	}
-	if !svr.IsIPv6Addr("2002::1/64") {
-		t.Error("failed check for ipv6 addr when ipv6 is passed as arg")
-	}
-}
+	stateObj.State = config.STATE_UP
+	stateObj.IpAddr = testMyGSIp
 
-func _TestLinkLocalAddr(t *testing.T) {
-	/*
-		svr := &NDPServer{}
-		if svr.IsLinkLocal("192.168.1.1/31") {
-			t.Error("ipv6 adddress is not link local ip address")
-		}
-		if svr.IsLinkLocal("2002::1/64") {
-			t.Error("ipv6 adddress is not link local ip address")
-		}
-		if !svr.IsLinkLocal("fe80::c000:54ff:fef5:0/64") {
-			t.Error("ipv6 address is link local ip address")
-		}
-	*/
+	t.Log(stateObj)
+
+	testNdpServer.HandleStateNotification(&stateObj)
+	l3Port, _ = testNdpServer.L3Port[testIfIndex]
+	if l3Port.PcapBase.PcapHandle == nil {
+		t.Error("Failed to initialize pcap handler")
+		return
+	}
+
+	if l3Port.PcapBase.PcapCtrl == nil {
+		t.Error("failed to initialize pcap ctrl")
+		return
+	}
+
+	if l3Port.PcapBase.PcapUsers != 2 {
+		t.Error("Failed to add second pcap user")
+		return
+	}
+
 }

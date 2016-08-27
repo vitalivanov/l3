@@ -23,6 +23,7 @@
 package server
 
 import (
+	_ "fmt"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"l3/ndp/config"
@@ -48,6 +49,7 @@ func (svr *NDPServer) StartRxTx(ifIndex int32) {
 	// create pcap handler if there is none created right now
 	err := ipPort.CreatePcap()
 	if err != nil {
+		debug.Logger.Err("Failed Creating Pcap Handler, err:", err, "for interface:", ipPort.IntfRef)
 		return
 	}
 	debug.Logger.Info("Start rx/tx for port:", ipPort.IntfRef, "ifIndex:",
