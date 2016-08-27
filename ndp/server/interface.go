@@ -273,12 +273,11 @@ func (intf *Interface) DeletePcap() {
 		// create ip interface but state down will not have pcap handler created
 		return
 	}
-	if intf.PcapBase.PcapUsers > 1 {
+	if intf.PcapBase.PcapUsers > 0 {
 		debug.Logger.Info("Updating total pcap user for", intf.IntfRef, "to", intf.PcapBase.PcapUsers)
 		debug.Logger.Info("Stop receiving packets for ip:", intf.IpAddr, "on Port", intf.IntfRef)
 		intf.deletePcapUser()
 	}
-
 	if intf.PcapBase.PcapUsers != 0 {
 		// there are still some pcap users and hence we should not delete
 		return
