@@ -444,6 +444,9 @@ func (p *Peer) ReceiveUpdate(pktInfo *packet.BGPPktSrc) (map[uint32]map[*bgprib.
 	updatedAddPaths := make([]*bgprib.Destination, 0)
 	addedAllPrefixes := true
 
+	atomic.AddUint32(&p.NeighborConf.Neighbor.State.Queues.Input, ^uint32(0))
+	p.NeighborConf.Neighbor.State.Messages.Received.Update++
+
 	updateMsg := pktInfo.Msg.Body.(*packet.BGPUpdate)
 	if packet.HasASLoop(updateMsg.PathAttributes, p.NeighborConf.RunningConf.LocalAS) {
 		p.logger.Infof("Neighbor %s: Recived Update message has AS loop", p.NeighborConf.Neighbor.NeighborAddress)
@@ -465,8 +468,6 @@ func (p *Peer) ReceiveUpdate(pktInfo *packet.BGPPktSrc) (map[uint32]map[*bgprib.
 		p.processUpdates(protoFamily, &(mpReach.NLRI), path)
 	}
 
-	atomic.AddUint32(&p.NeighborConf.Neighbor.State.Queues.Input, ^uint32(0))
-	p.NeighborConf.Neighbor.State.Messages.Received.Update++
 	updated, withdrawn, updatedAddPaths, addedAllPrefixes = p.locRib.ProcessUpdate(p.NeighborConf, pktInfo,
 		p.server.AddPathCount)
 	if !addedAllPrefixes {
