@@ -1527,8 +1527,8 @@ func (s *BGPServer) UpdateGlobal(bgpGlobal *bgpd.BGPGlobal, oldConfig, newConfig
 						return
 					}
 					s.SetupRedistribution(newConfig)
-				}
-				if objName == "RouterId" || objName == "ASNum" {
+				} else {
+					//if objName == "RouterId" || objName == "ASNum" {
 					s.Restart(newConfig)
 				}
 			}

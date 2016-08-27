@@ -695,26 +695,19 @@ func (h *BGPHandler) validateBGPGlobalForUpdate(oldConfig *bgpd.BGPGlobal, newCo
 	if oldConfig == nil || newConfig == nil {
 		return gConf, err
 	}
-	ip := h.convertStrIPToNetIP(oldConfig.RouterId)
+	ip := h.convertStrIPToNetIP(newConfig.RouterId)
 	if ip == nil {
 		err = errors.New(fmt.Sprintf("BGPGlobal: Router id %s is not valid", oldConfig.RouterId))
 		h.logger.Info("SendBGPGlobal: Router id", oldConfig.RouterId, "is not valid")
 		return gConf, err
 	}
 	gConf = config.GlobalConfig{
-		AS:                  uint32(oldConfig.ASNum),
+		AS:                  uint32(newConfig.ASNum),
 		RouterId:            ip,
-		UseMultiplePaths:    oldConfig.UseMultiplePaths,
-		EBGPMaxPaths:        uint32(oldConfig.EBGPMaxPaths),
-		EBGPAllowMultipleAS: oldConfig.EBGPAllowMultipleAS,
-		IBGPMaxPaths:        uint32(oldConfig.IBGPMaxPaths),
-	}
-	if oldConfig.Redistribution != nil {
-		gConf.Redistribution = make([]config.SourcePolicyMap, 0)
-		for i := 0; i < len(oldConfig.Redistribution); i++ {
-			redistribution := config.SourcePolicyMap{oldConfig.Redistribution[i].Sources, oldConfig.Redistribution[i].Policy}
-			gConf.Redistribution = append(gConf.Redistribution, redistribution)
-		}
+		UseMultiplePaths:    newConfig.UseMultiplePaths,
+		EBGPMaxPaths:        uint32(newConfig.EBGPMaxPaths),
+		EBGPAllowMultipleAS: newConfig.EBGPAllowMultipleAS,
+		IBGPMaxPaths:        uint32(newConfig.IBGPMaxPaths),
 	}
 	if attrSet != nil {
 		objTyp := reflect.TypeOf(*newConfig)
