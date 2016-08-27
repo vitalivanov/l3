@@ -52,6 +52,7 @@ type RIBdServerConfig struct {
 	AttrSet                   []bool
 	Op                        string //"add"/"del"/"update/get"
 	PatchOp                   []*ribd.PatchOpInfo
+	PolicyList                ApplyPolicyList
 }
 
 /*type PatchUpdateRouteInfo struct {
@@ -72,8 +73,8 @@ type RIBDServer struct {
 	/*PolicyConditionConfCh  chan RIBdServerConfig
 	PolicyActionConfCh     chan RIBdServerConfig
 	PolicyStmtConfCh       chan RIBdServerConfig*/
-	PolicyConfCh        chan RIBdServerConfig
-	PolicyApplyCh       chan ApplyPolicyList
+	PolicyConfCh chan RIBdServerConfig
+	//PolicyApplyCh       chan ApplyPolicyList
 	PolicyUpdateApplyCh chan ApplyPolicyList
 	DBRouteCh           chan RIBdServerConfig
 	AcceptConfig        bool
@@ -203,7 +204,7 @@ func (ribdServiceHandler *RIBDServer) ProcessIPv4IntfUpEvent(ipAddr string, ifIn
 	ipMaskStr := net.IP(ipMask).String()
 	logger.Info(" processIPv4IntfUpEvent for  ipaddr ", ipAddrStr, " mask ", ipMaskStr)
 	for i := 0; i < len(ConnectedRoutes); i++ {
-		logger.Info("Current state of this connected route is ", ConnectedRoutes[i].IsValid)
+		//logger.Info("Current state of this connected route is ", ConnectedRoutes[i].IsValid)
 		if ConnectedRoutes[i].Ipaddr == ipAddrStr && ConnectedRoutes[i].Mask == ipMaskStr && ConnectedRoutes[i].IsValid == false {
 			if ifIndex != -1 && ConnectedRoutes[i].IfIndex != ribdInt.Int(ifIndex) {
 				continue
@@ -230,7 +231,7 @@ func (ribdServiceHandler *RIBDServer) ProcessIPv6IntfUpEvent(ipAddr string, ifIn
 	ipMaskStr := net.IP(ipMask).String()
 	logger.Info(" processIPv6IntfUpEvent for  ipaddr ", ipAddrStr, " mask ", ipMaskStr)
 	for i := 0; i < len(ConnectedRoutes); i++ {
-		logger.Info("Current state of this connected route is ", ConnectedRoutes[i].IsValid)
+		//logger.Info("Current state of this connected route is ", ConnectedRoutes[i].IsValid)
 		if ConnectedRoutes[i].Ipaddr == ipAddrStr && ConnectedRoutes[i].Mask == ipMaskStr && ConnectedRoutes[i].IsValid == false {
 			if ifIndex != -1 && ConnectedRoutes[i].IfIndex != ribdInt.Int(ifIndex) {
 				continue
@@ -396,6 +397,7 @@ func (ribdServiceHandler *RIBDServer) InitializeGlobalPolicyDB() *policy.PolicyE
 	ribdServiceHandler.GlobalPolicyEngineDB.SetTraverseAndApplyPolicyFunc(policyEngineTraverseAndApply)
 	ribdServiceHandler.GlobalPolicyEngineDB.SetTraverseAndReversePolicyFunc(policyEngineTraverseAndReverse)
 	ribdServiceHandler.GlobalPolicyEngineDB.SetGetPolicyEntityMapIndexFunc(getPolicyRouteMapIndex)
+	ribdServiceHandler.GlobalPolicyEngineDB.Global = true //this policy engine does not apply the policies
 	return ribdServiceHandler.GlobalPolicyEngineDB
 }
 
@@ -444,7 +446,7 @@ func NewRIBDServicesHandler(dbHdl *dbutils.DBUtil, loggerC *logging.Writer) *RIB
 		ribdServicesHandler.PolicyActionConfCh = make(chan RIBdServerConfig, 5000)
 		ribdServicesHandler.PolicyStmtConfCh = make(chan RIBdServerConfig, 5000)*/
 	ribdServicesHandler.PolicyConfCh = make(chan RIBdServerConfig, 5000)
-	ribdServicesHandler.PolicyApplyCh = make(chan ApplyPolicyList, 100)
+	//ribdServicesHandler.PolicyApplyCh = make(chan ApplyPolicyList, 100)
 	ribdServicesHandler.PolicyUpdateApplyCh = make(chan ApplyPolicyList, 100)
 	ribdServicesHandler.DBRouteCh = make(chan RIBdServerConfig, 100000)
 	ribdServicesHandler.ServerUpCh = make(chan bool)
@@ -487,17 +489,17 @@ func (ribdServiceHandler *RIBDServer) StartServer(paramsDir string) {
 	for {
 		if !RouteServiceHandler.AcceptConfig {
 			if count%10000 == 0 {
-				logger.Debug("RIBD not ready to accept config")
+				//				logger.Debug("RIBD not ready to accept config")
 			}
 			count++
 			continue
 		}
 		select {
-		case list := <-ribdServiceHandler.PolicyApplyCh:
-			logger.Debug("received message on PolicyApplyCh channel")
-			//update the local policyEngineDB
-			ribdServiceHandler.UpdateApplyPolicyList(list.ApplyList, list.UndoList, true, PolicyEngineDB)
-			ribdServiceHandler.PolicyUpdateApplyCh <- list
+		/*case list := <-ribdServiceHandler.PolicyApplyCh:
+		logger.Debug("received message on PolicyApplyCh channel")
+		//update the local policyEngineDB
+		ribdServiceHandler.UpdateApplyPolicyList(list.ApplyList, list.UndoList, true, PolicyEngineDB)
+		ribdServiceHandler.PolicyUpdateApplyCh <- list)*/
 		case info := <-ribdServiceHandler.TrackReachabilityCh:
 			//logger.Debug("received message on TrackReachabilityCh channel")
 			ribdServiceHandler.TrackReachabilityStatus(info.IpAddr, info.Protocol, info.Op)

@@ -478,12 +478,15 @@ func (m RIBDServer) UpdateApplyPolicy(info *ribdInt.ApplyPolicyInfo, apply bool,
 	policyDB := db.PolicyDB
 	policyConditionsDB := db.PolicyConditionsDB
 
+	var node policy.Policy
+	node.Name = policyName
 	nodeGet := policyDB.Get(patriciaDB.Prefix(policyName))
 	if nodeGet == nil {
 		logger.Err("Policy ", policyName, " not defined")
-		return
+		//return
+	} else {
+		node = nodeGet.(policy.Policy)
 	}
-	node := nodeGet.(policy.Policy)
 	//if apply {
 	conditions := make([]ribdInt.ConditionInfo, 0)
 	for i := 0; i < len(info.Conditions); i++ {
