@@ -90,7 +90,6 @@ func (p *Peer) UpdatePeerGroup(peerGroup *config.PeerGroupConfig) {
 func (p *Peer) UpdateNeighborConf(nConf config.NeighborConfig, bgp *config.Bgp) {
 	p.NeighborConf.UpdateNeighborConf(nConf, bgp)
 }
-
 func (p *Peer) initAdjRIBTables() {
 	for protoFamily, ok := range p.NeighborConf.AfiSafiMap {
 		if ok {
@@ -134,7 +133,24 @@ func (p *Peer) RemoveAdjRIBFilter(pe *bgppolicy.AdjRibPPolicyEngine, policyName 
 		p.logger.Err("Policy ", policyName, " not created yet")
 		return
 	}
-	//node := nodeGet.(utilspolicy.Policy)
+	node := nodeGet.(utilspolicy.Policy)
+	actionType, ok := p.GetActionType(adjRIBDir)
+	if !ok {
+		p.logger.Err("Action type not found for Adj RIB direction", adjRIBDir)
+		return
+	}
+
+	neighborIP := p.NeighborConf.RunningConf.NeighborAddress.String()
+	conditionNameList := make([]string, 1)
+	conditionNameList[0] = neighborIP
+
+	policyAction := utilspolicy.PolicyAction{
+		Name:       neighborIP,
+		ActionType: actionType,
+	}
+
+	p.logger.Debug("Calling applypolicy with conditionNameList: ", conditionNameList)
+	pe.UpdateUndoApplyPolicy(utilspolicy.ApplyPolicyInfo{node, policyAction, conditionNameList}, true)
 }
 
 func (p *Peer) AddAdjRIBFilter(pe *bgppolicy.AdjRibPPolicyEngine, policyName string, adjRIBDir bgprib.AdjRIBDir) {
@@ -178,7 +194,6 @@ func (p *Peer) AddAdjRIBFilter(pe *bgppolicy.AdjRibPPolicyEngine, policyName str
 	p.logger.Debug("Calling applypolicy with conditionNameList: ", conditionNameList)
 	pe.UpdateApplyPolicy(utilspolicy.ApplyPolicyInfo{node, policyAction, conditionNameList}, true)
 }
-
 func (p *Peer) Init() {
 	var fsmMgr *fsm.FSMManager
 	if p.NeighborConf.RunningConf.AdjRIBInFilter != "" {
