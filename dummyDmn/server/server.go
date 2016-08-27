@@ -84,7 +84,7 @@ func (d *DummyServer) InitServer() {
 	}
 	if d.Dmn.Ribdclnt.IsConnected {
 		d.Dmn.Logger.Info("Connected to RIBD")
-		nh, _ := d.Dmn.Ribdclnt.ClientHdl.GetRouteReachabilityInfo("40.1.1.2")
+		nh, _ := d.Dmn.Ribdclnt.ClientHdl.GetRouteReachabilityInfo("40.1.1.2", -1)
 		d.Dmn.Logger.Info(fmt.Sprintln("nh: ", nh))
 	}
 
