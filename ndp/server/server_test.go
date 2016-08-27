@@ -335,5 +335,18 @@ func TestIPv6IntfStateUpDown(t *testing.T) {
 		t.Error("Pcap users count should be zero when all ipaddress from interfaces are removed")
 		return
 	}
+}
 
+func TestFindL3Port(t *testing.T) {
+	TestIPv6IntfCreate(t)
+	t.Log(testNdpServer.L3Port)
+	if _, exists := testNdpServer.findL3Port(testIfIndex); !exists {
+		t.Error("Entry for ifIndex:", testIfIndex, "should exists")
+		return
+	}
+	invalidIfIndex := int32(123)
+	if _, exists := testNdpServer.findL3Port(invalidIfIndex); exists {
+		t.Error("Entry for ifIndex:", invalidIfIndex, "should not exists")
+		return
+	}
 }
