@@ -227,10 +227,11 @@ func (svr *NDPServer) ProcessRxPkt(ifIndex int32, pkt gopacket.Packet) error {
 	return nil
 }
 
-func (svr *NDPServer) ProcessTimerExpiry(pktData config.PacketData) {
+func (svr *NDPServer) ProcessTimerExpiry(pktData config.PacketData) error {
 	l3Port, exists := svr.L3Port[pktData.IfIndex]
 	if !exists {
-		return
+		return errors.New(fmt.Sprintln("Entry for ifIndex:", pktData.IfIndex,
+			"doesn't exists and hence cannot process timer expiry event for neighbor:", pktData))
 	}
 	// fix this when we have per port mac addresses
 	operation := l3Port.SendND(pktData, svr.SwitchMac)
@@ -238,4 +239,5 @@ func (svr *NDPServer) ProcessTimerExpiry(pktData config.PacketData) {
 		svr.deleteNeighbor(pktData.NeighborIp, pktData.IfIndex)
 	}
 	svr.L3Port[pktData.IfIndex] = l3Port
+	return nil
 }

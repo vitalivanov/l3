@@ -74,6 +74,11 @@ const (
 	testMyAbsLinkScopeIP = "fe80::77:9cf8:fcff:fe4a:1615"
 	testSrcMac           = "88:1d:fc:cf:15:fc"
 
+	testServerNSSrcMac = "00:1f:16:25:33:ce"
+	testServerNSDstMac = "00:1f:16:25:34:31"
+	testServerNSSrcIp  = "fe80::21f:16ff:fe25:33ce"
+	testServerNSDstIp  = "2001:db8:0:f101::1"
+
 	testReachableTimerValue = 30000
 	estReTransmitTimerValue = 1000
 )
@@ -414,6 +419,22 @@ func TestProcessPkt(t *testing.T) {
 	err = testNdpServer.ProcessRxPkt(testIfIndex, p)
 	if err != nil {
 		t.Error("Process RX PKT failed:", err)
+		return
+	}
+}
+
+func TestProcessTimerExpiry(t *testing.T) {
+	TestIPv6IntfCreate(t)
+	pktData := config.PacketData{
+		SendPktType: layers.ICMPv6TypeNeighborSolicitation,
+		NeighborIp:  testServerNSDstIp,
+		NeighborMac: testServerNSDstMac,
+		IfIndex:     testIfIndex,
+	}
+
+	err := testNdpServer.ProcessTimerExpiry(pktData)
+	if err != nil {
+		t.Error("Processing Timer expiry failed:", err)
 		return
 	}
 }
