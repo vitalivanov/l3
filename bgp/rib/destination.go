@@ -541,6 +541,9 @@ func (d *Destination) SelectRouteForLocRib(addPathCount int) (RouteAction, bool,
 					}
 					updatedRoutes = append(updatedRoutes, route)
 					route.setAction(RouteActionReplace)
+					if idx != 0 {
+						route.ResetBestPath()
+					}
 					break
 				}
 			}
