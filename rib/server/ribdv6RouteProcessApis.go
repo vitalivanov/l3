@@ -652,7 +652,7 @@ func (m RIBDServer) Getv6Route(destNetIp string) (route *ribdInt.IPv6RouteState,
 	return route, err
 }
 
-func (m RIBDServer) ProcessV6RouteCreateConfig(cfg *ribd.IPv6Route) (val bool, err error) {
+func (m RIBDServer) ProcessV6RouteCreateConfig(cfg *ribd.IPv6Route, addType int) (val bool, err error) {
 	logger.Debug("ProcessV6RouteCreate: Received create route request for ip: ", cfg.DestinationNw, " mask ", cfg.NetworkMask, " number of next hops: ", len(cfg.NextHop))
 	newCfg := ribd.IPv6Route{
 		DestinationNw: cfg.DestinationNw,
@@ -673,7 +673,7 @@ func (m RIBDServer) ProcessV6RouteCreateConfig(cfg *ribd.IPv6Route) (val bool, e
 	}
 
 	//	policyRoute := BuildPolicyRouteFromribdIPv6Route(&newCfg)
-	params := BuildRouteParamsFromribdIPv6Route(&newCfg, FIBAndRIB, Invalid, len(destNetSlice))
+	params := BuildRouteParamsFromribdIPv6Route(&newCfg, addType, Invalid, len(destNetSlice))
 
 	logger.Debug("createType = ", params.createType, "deleteType = ", params.deleteType)
 	//	PolicyEngineFilter(policyRoute, policyCommonDefs.PolicyPath_Import, params)
@@ -682,7 +682,7 @@ func (m RIBDServer) ProcessV6RouteCreateConfig(cfg *ribd.IPv6Route) (val bool, e
 	return true, err
 }
 
-func (m RIBDServer) ProcessV6RouteDeleteConfig(cfg *ribd.IPv6Route) (val bool, err error) {
+func (m RIBDServer) ProcessV6RouteDeleteConfig(cfg *ribd.IPv6Route, delType int) (val bool, err error) {
 	logger.Debug("ProcessRoutev6DeleteConfig:Received Route Delete request for ", cfg.DestinationNw, ":", cfg.NetworkMask, "number of nextHops:", len(cfg.NextHop), "Protocol ", cfg.Protocol)
 	if !RouteServiceHandler.AcceptConfig {
 		logger.Debug("Not ready to accept config")
@@ -701,7 +701,7 @@ func (m RIBDServer) ProcessV6RouteDeleteConfig(cfg *ribd.IPv6Route) (val bool, e
 		}
 		nextHopIntRef, _ := strconv.Atoi(cfg.NextHop[i].NextHopIntRef)
 		nextHopIfIndex = ribd.Int(nextHopIntRef)
-		_, err = deleteIPRoute(cfg.DestinationNw, ribdCommonDefs.IPv6, cfg.NetworkMask, cfg.Protocol, cfg.NextHop[i].NextHopIp, nextHopIfIndex, FIBAndRIB, ribdCommonDefs.RoutePolicyStateChangetoInValid)
+		_, err = deleteIPRoute(cfg.DestinationNw, ribdCommonDefs.IPv6, cfg.NetworkMask, cfg.Protocol, cfg.NextHop[i].NextHopIp, nextHopIfIndex, ribd.Int(delType), ribdCommonDefs.RoutePolicyStateChangetoInValid)
 	}
 	return true, err
 }
@@ -765,9 +765,9 @@ func (m RIBDServer) Processv6RoutePatchUpdateConfig(origconfig *ribd.IPv6Route, 
 			}
 			switch op[idx].Op {
 			case "add":
-				m.ProcessV6RouteCreateConfig(newconfig)
+				m.ProcessV6RouteCreateConfig(newconfig, FIBAndRIB)
 			case "remove":
-				m.ProcessV6RouteDeleteConfig(newconfig)
+				m.ProcessV6RouteDeleteConfig(newconfig, FIBAndRIB)
 			default:
 				logger.Err("Operation ", op[idx].Op, " not supported")
 			}
