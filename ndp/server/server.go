@@ -92,6 +92,9 @@ func (svr *NDPServer) InitGlobalDS() {
 	svr.NeigborEntryLock = &sync.RWMutex{}
 	svr.Packet = packet.Init()
 
+	//configuration channels
+	svr.GlobalCfg = make(chan NdpConfig)
+
 	// init publisher
 	pub := publisher.NewPublisher()
 	pub.InitPublisher()
@@ -156,6 +159,12 @@ func (svr *NDPServer) EventsListener() {
 				continue
 			}
 			debug.Logger.Debug("Need to support vlan Notifications:", vlanInfo)
+
+		case globalCfg, ok := <-svr.GlobalCfg:
+			if !ok {
+				continue
+			}
+			svr.NdpConfig.Create(globalCfg)
 		}
 	}
 }

@@ -111,17 +111,17 @@ func (intf *Interface) removeIP(ipAddr string) {
 /*
  * common init params between InitIntf and CreateIntf
  */
-func (intf *Interface) commonInit(ipAddr string, pktCh chan config.PacketData) {
+func (intf *Interface) commonInit(ipAddr string, pktCh chan config.PacketData, gCfg NdpConfig) {
 	intf.addIP(ipAddr)
 	// Pcap Init
 	intf.PcapBase.PcapHandle = nil
 	intf.PcapBase.PcapCtrl = nil
 	intf.PcapBase.PcapUsers = 0
 	// Timers Value Init
-	intf.retransTime = 1       // config value ms
-	intf.reachableTime = 30000 // config value ms
-	intf.routerLifeTime = 1800 // config value s
-	intf.raRestransmitTime = 5 // config value s ADAM asked for 5 seconds :)
+	intf.retransTime = gCfg.RetransTime             //1       // config value ms
+	intf.reachableTime = gCfg.ReachableTime         //30000 // config value ms
+	intf.raRestransmitTime = gCfg.RaRestransmitTime //5 // config value s ADAM asked for 5 seconds :)
+	intf.routerLifeTime = 1800                      // config value s
 	intf.initialRASend = 0
 	intf.raTimer = nil
 	// Neighbor Init
@@ -132,11 +132,11 @@ func (intf *Interface) commonInit(ipAddr string, pktCh chan config.PacketData) {
 /*
  * Init Interface will be called during bootup when we do Get ALL ipv6 intfs
  */
-func (intf *Interface) InitIntf(obj *commonDefs.IPv6IntfState, pktCh chan config.PacketData) {
+func (intf *Interface) InitIntf(obj *commonDefs.IPv6IntfState, pktCh chan config.PacketData, gCfg NdpConfig) {
 	intf.IntfRef = obj.IntfRef
 	intf.IfIndex = obj.IfIndex
 	intf.OperState = obj.OperState
-	intf.commonInit(obj.IpAddr, pktCh)
+	intf.commonInit(obj.IpAddr, pktCh, gCfg)
 }
 
 /*
@@ -159,10 +159,10 @@ func (intf *Interface) DeInitIntf() []string {
 /*
  * CreateIntf is called during CreateIPInterface notification
  */
-func (intf *Interface) CreateIntf(obj *config.IPIntfNotification, pktCh chan config.PacketData) {
+func (intf *Interface) CreateIntf(obj *config.IPIntfNotification, pktCh chan config.PacketData, gCfg NdpConfig) {
 	intf.IntfRef = obj.IntfRef
 	intf.IfIndex = obj.IfIndex
-	intf.commonInit(obj.IpAddr, pktCh)
+	intf.commonInit(obj.IpAddr, pktCh, gCfg)
 	debug.Logger.Info("Created IP inteface", intf.IntfRef, "ifIndex:", intf.IfIndex,
 		"GS:", intf.globalScope, "LS:", intf.linkScope)
 }

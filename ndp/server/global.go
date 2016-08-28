@@ -36,7 +36,15 @@ type RxPktInfo struct {
 	ifIndex int32
 }
 
+type NdpConfig struct {
+	Vrf               string
+	ReachableTime     uint32
+	RetransTime       uint32
+	RaRestransmitTime uint8
+}
+
 type NDPServer struct {
+	NdpConfig
 	SwitchPlugin asicdClient.AsicdClientIntf
 
 	// System Ports information, key is IntfRef
@@ -48,6 +56,8 @@ type NDPServer struct {
 	NeighborInfo        map[string]config.NeighborConfig // neighbor created by NDP used for STATE
 	neighborKey         []string                         // keys for all neighbor entries is stored here for GET calls
 
+	//Configuration Channels
+	GlobalCfg chan NdpConfig
 	// Lock for reading/writing NeighorInfo
 	// We need this lock because getbulk/getentry is not requested on the main entry point channel, rather it's a
 	// direct call to server. So to avoid updating the Neighbor Runtime Info during read
