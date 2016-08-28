@@ -7,11 +7,11 @@
 //
 //    http://www.apache.org/licenses/LICENSE-2.0
 //
-//	 Unless required by applicable law or agreed to in writing, software
-//	 distributed under the License is distributed on an "AS IS" BASIS,
-//	 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-//	 See the License for the specific language governing permissions and
-//	 limitations under the License.
+//       Unless required by applicable law or agreed to in writing, software
+//       distributed under the License is distributed on an "AS IS" BASIS,
+//       WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//       See the License for the specific language governing permissions and
+//       limitations under the License.
 //
 // _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
 // |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
@@ -20,18 +20,20 @@
 // |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
 // |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
 //
-package server
+package api
 
 import (
+	"l3/ndp/server"
 	"testing"
+	asicdmock "utils/asicdClient/mock"
 )
 
-var testLinkScopeIp = "fe80::8a1d:fcff:fecf:15fc"
+func baseApiTest() *server.NDPServer {
+	testServer := server.NDPNewServer(&asicdmock.MockAsicdClientMgr{})
+	testServer.NDPStartServer()
+	return testServer
+}
 
-func TestSendRA(t *testing.T) {
-	initServerBasic()
-	intf := Interface{
-		linkScope: testLinkScopeIp,
-	}
-	intf.SendRA(testSrcMac)
+func TestApiInit(t *testing.T) {
+	//Init(baseApiTest())
 }
