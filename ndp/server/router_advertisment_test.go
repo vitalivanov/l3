@@ -26,7 +26,6 @@ import (
 	"testing"
 )
 
-var testSrcMac = "88:1d:fc:cf:15:fc"
 var testLinkScopeIp = "fe80::8a1d:fcff:fecf:15fc"
 
 func TestSendRA(t *testing.T) {

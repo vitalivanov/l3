@@ -213,10 +213,9 @@ func (intf *Interface) DeleteAll() ([]string, error) {
  *		2) if no pcap users then check for PcapHandler and then create a new pcap handler
  *		3) Check if PcapCtrl is created or not..
  */
-func (intf *Interface) CreatePcap() (err error) { //(pHdl *pcap.Handle, err error) {
+func (intf *Interface) CreatePcap() (err error) {
 	if intf.PcapBase.PcapUsers != 0 {
 		// update pcap user and move on
-		//intf.PcapBase.PcapUsers += 1
 		intf.addPcapUser()
 		debug.Logger.Info("Updating total pcap user for", intf.IntfRef, "to", intf.PcapBase.PcapUsers)
 		debug.Logger.Info("Start receiving packets for ip:", intf.IpAddr, "on Port", intf.IntfRef)
@@ -274,12 +273,11 @@ func (intf *Interface) DeletePcap() {
 		// create ip interface but state down will not have pcap handler created
 		return
 	}
-	if intf.PcapBase.PcapUsers > 1 {
+	if intf.PcapBase.PcapUsers > 0 {
 		debug.Logger.Info("Updating total pcap user for", intf.IntfRef, "to", intf.PcapBase.PcapUsers)
 		debug.Logger.Info("Stop receiving packets for ip:", intf.IpAddr, "on Port", intf.IntfRef)
 		intf.deletePcapUser()
 	}
-
 	if intf.PcapBase.PcapUsers != 0 {
 		// there are still some pcap users and hence we should not delete
 		return
