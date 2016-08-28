@@ -41,7 +41,7 @@ func (r *RouteMgr) Start() {
 	r.t.Log("RouteMgr:Start")
 }
 
-func (r *RouteMgr) GetNextHopInfo(ipAddr string) (*config.NextHopInfo, error) {
+func (r *RouteMgr) GetNextHopInfo(ipAddr string, ifIndex int32) (*config.NextHopInfo, error) {
 	nh := config.NextHopInfo{}
 	nh.Metric = 0
 	nh.NextHopIp = "30.1.1.1"
@@ -60,7 +60,8 @@ func (r *RouteMgr) DeleteRoute(route *config.RouteConfig) {
 func (r *RouteMgr) UpdateRoute(cfg *config.RouteConfig, op string) {
 	r.t.Log("RouteMgr:UpdateRoute:", cfg, "operation:", op)
 }
-func (r *RouteMgr) ApplyPolicy(protocol string, policy string, action string, conditions []*config.ConditionInfo) {
+
+func (r *RouteMgr) ApplyPolicy(policy, conditions []*config.ApplyPolicyInfo) {
 	r.t.Log("RouteMgr:ApplyPolicy")
 }
 func (r *RouteMgr) GetRoutes() (ri1 []*config.RouteInfo, ri2 []*config.RouteInfo) {
