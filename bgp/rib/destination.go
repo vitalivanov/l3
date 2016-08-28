@@ -237,6 +237,11 @@ func (d *Destination) AddOrUpdatePath(peerIp string, pathId uint32, path *Path) 
 
 	if oldPath, ok := pathMap[pathId]; ok {
 		d.logger.Infof("Destination %s Update path from %s, id %d", d.NLRI.GetPrefix(), peerIp, pathId)
+		if oldPath == path {
+			d.logger.Infof("Destination %s new path from %s, id %d is the same as the old path", d.NLRI.GetPrefix(),
+				peerIp, pathId)
+			return added
+		}
 		if route, ok := d.pathRouteMap[oldPath]; ok {
 			idx = route.routeListIdx
 			delete(d.PathInfoRouteMap, route.PathInfo)
@@ -541,6 +546,9 @@ func (d *Destination) SelectRouteForLocRib(addPathCount int) (RouteAction, bool,
 					}
 					updatedRoutes = append(updatedRoutes, route)
 					route.setAction(RouteActionReplace)
+					if idx != 0 {
+						route.ResetBestPath()
+					}
 					break
 				}
 			}
