@@ -29,13 +29,14 @@ import (
 	//	"database/sql"
 	"fmt"
 	"github.com/op/go-nanomsg"
-	"l3/rib/ribdCommonDefs"
+	//"l3/rib/ribdCommonDefs"
 	"net"
 	//	"os"
 	//	"os/signal"
 	"ribd"
 	"ribdInt"
 	//	"syscall"
+	"strconv"
 	"utils/dbutils"
 	"utils/logging"
 	"utils/patriciaDB"
@@ -155,15 +156,48 @@ func (ribdServiceHandler *RIBDServer) ProcessIPv4IntfDownEvent(ipAddr string, if
 	ipAddrStr := ip.String()
 	ipMaskStr := net.IP(ipMask).String()
 	logger.Info(" processIPv4IntfDownEvent for  ipaddr ", ipAddrStr, " mask ", ipMaskStr)
-	for i := 0; i < len(ConnectedRoutes); i++ {
+	//deleteIPRoute(ConnectedRoutes[i].Ipaddr, ribdCommonDefs.IPv4, ConnectedRoutes[i].Mask, "CONNECTED", ConnectedRoutes[i].NextHopIp, ribd.Int(ConnectedRoutes[i].IfIndex), FIBOnly, ribdCommonDefs.RoutePolicyStateChangeNoChange)
+	cfg := ribd.IPv4Route{
+		DestinationNw: ipAddrStr,
+		Protocol:      "CONNECTED",
+		Cost:          0,
+		NetworkMask:   ipMaskStr,
+	}
+	nextHop := ribd.NextHopInfo{
+		NextHopIp:     "0.0.0.0",
+		NextHopIntRef: strconv.Itoa(int(ifIndex)),
+	}
+	cfg.NextHop = make([]*ribd.NextHopInfo, 0)
+	cfg.NextHop = append(cfg.NextHop, &nextHop)
+	ribdServiceHandler.RouteConfCh <- RIBdServerConfig{
+		OrigConfigObject: &cfg,
+		Op:               "delFIBOnly",
+	}
+	/*	for i := 0; i < len(ConnectedRoutes); i++ {
 		if ConnectedRoutes[i].Ipaddr == ipAddrStr && ConnectedRoutes[i].Mask == ipMaskStr {
 			if ifIndex != -1 && ConnectedRoutes[i].IfIndex != ribdInt.Int(ifIndex) {
 				continue
 			}
 			logger.Info("Delete this route with destAddress = ", ConnectedRoutes[i].Ipaddr, " nwMask = ", ConnectedRoutes[i].Mask, " ifIndex:", ifIndex)
-			deleteIPRoute(ConnectedRoutes[i].Ipaddr, ribdCommonDefs.IPv4, ConnectedRoutes[i].Mask, "CONNECTED", ConnectedRoutes[i].NextHopIp, ribd.Int(ConnectedRoutes[i].IfIndex), FIBOnly, ribdCommonDefs.RoutePolicyStateChangeNoChange)
+			//deleteIPRoute(ConnectedRoutes[i].Ipaddr, ribdCommonDefs.IPv4, ConnectedRoutes[i].Mask, "CONNECTED", ConnectedRoutes[i].NextHopIp, ribd.Int(ConnectedRoutes[i].IfIndex), FIBOnly, ribdCommonDefs.RoutePolicyStateChangeNoChange)
+			cfg := ribd.IPv4Route{
+				DestinationNw: ipAddrStr,
+				Protocol:      "CONNECTED",
+				Cost:          0,
+				NetworkMask:   ipMaskStr,
+			}
+			nextHop := ribd.NextHopInfo{
+				NextHopIp:     "0.0.0.0",
+				NextHopIntRef: strconv.Itoa(int(ifIndex)),
+			}
+			cfg.NextHop = make([]*ribd.NextHopInfo, 0)
+			cfg.NextHop = append(cfg.NextHop, &nextHop)
+			ribdServiceHandler.RouteConfCh <- RIBdServerConfig{
+				OrigConfigObject: &cfg,
+				Op:               "delFIBOnly",
+			}
 		}
-	}
+	}*/
 }
 func (ribdServiceHandler *RIBDServer) ProcessIPv6IntfDownEvent(ipAddr string, ifIndex int32) {
 	logger.Debug("processIPv6IntfDownEvent")
@@ -177,15 +211,47 @@ func (ribdServiceHandler *RIBDServer) ProcessIPv6IntfDownEvent(ipAddr string, if
 	ipAddrStr := ip.String()
 	ipMaskStr := net.IP(ipMask).String()
 	logger.Info(" processIPv6IntfDownEvent for  ipaddr ", ipAddrStr, " mask ", ipMaskStr)
-	for i := 0; i < len(ConnectedRoutes); i++ {
+	cfg := ribd.IPv6Route{
+		DestinationNw: ipAddrStr,
+		Protocol:      "CONNECTED",
+		Cost:          0,
+		NetworkMask:   ipMaskStr,
+	}
+	nextHop := ribd.NextHopInfo{
+		NextHopIp:     "0.0.0.0",
+		NextHopIntRef: strconv.Itoa(int(ifIndex)),
+	}
+	cfg.NextHop = make([]*ribd.NextHopInfo, 0)
+	cfg.NextHop = append(cfg.NextHop, &nextHop)
+	ribdServiceHandler.RouteConfCh <- RIBdServerConfig{
+		OrigConfigObject: &cfg,
+		Op:               "delv6FIBOnly",
+	}
+	/*	for i := 0; i < len(ConnectedRoutes); i++ {
 		if ConnectedRoutes[i].Ipaddr == ipAddrStr && ConnectedRoutes[i].Mask == ipMaskStr {
 			if ifIndex != -1 && ConnectedRoutes[i].IfIndex != ribdInt.Int(ifIndex) {
 				continue
 			}
 			logger.Info("Delete this route with destAddress = ", ConnectedRoutes[i].Ipaddr, " nwMask = ", ConnectedRoutes[i].Mask, " ifIndex:", ifIndex)
-			deleteIPRoute(ConnectedRoutes[i].Ipaddr, ribdCommonDefs.IPv6, ConnectedRoutes[i].Mask, "CONNECTED", ConnectedRoutes[i].NextHopIp, ribd.Int(ConnectedRoutes[i].IfIndex), FIBOnly, ribdCommonDefs.RoutePolicyStateChangeNoChange)
+			//deleteIPRoute(ConnectedRoutes[i].Ipaddr, ribdCommonDefs.IPv6, ConnectedRoutes[i].Mask, "CONNECTED", ConnectedRoutes[i].NextHopIp, ribd.Int(ConnectedRoutes[i].IfIndex), FIBOnly, ribdCommonDefs.RoutePolicyStateChangeNoChange)
+			cfg := ribd.IPv6Route{
+				DestinationNw: ipAddrStr,
+				Protocol:      "CONNECTED",
+				Cost:          0,
+				NetworkMask:   ipMaskStr,
+			}
+			nextHop := ribd.NextHopInfo{
+				NextHopIp:     "0.0.0.0",
+				NextHopIntRef: strconv.Itoa(int(ifIndex)),
+			}
+			cfg.NextHop = make([]*ribd.NextHopInfo, 0)
+			cfg.NextHop = append(cfg.NextHop, &nextHop)
+			ribdServiceHandler.RouteConfCh <- RIBdServerConfig{
+				OrigConfigObject: &cfg,
+				Op:               "delv6FIBOnly",
+			}
 		}
-	}
+	}*/
 }
 
 /*
@@ -212,9 +278,26 @@ func (ribdServiceHandler *RIBDServer) ProcessIPv4IntfUpEvent(ipAddr string, ifIn
 			logger.Info("Add this route with destAddress = ", ConnectedRoutes[i].Ipaddr, " nwMask = ", ConnectedRoutes[i].Mask)
 
 			ConnectedRoutes[i].IsValid = true
-			policyRoute := ribdInt.Routes{Ipaddr: ConnectedRoutes[i].Ipaddr, IPAddrType: ribdInt.Int(ribdCommonDefs.IPv4), Mask: ConnectedRoutes[i].Mask, NextHopIp: ConnectedRoutes[i].NextHopIp, IfIndex: ConnectedRoutes[i].IfIndex, Metric: ConnectedRoutes[i].Metric, Prototype: ConnectedRoutes[i].Prototype}
-			params := RouteParams{destNetIp: ConnectedRoutes[i].Ipaddr, ipType: ribdCommonDefs.IPv4, networkMask: ConnectedRoutes[i].Mask, nextHopIp: ConnectedRoutes[i].NextHopIp, nextHopIfIndex: ribd.Int(ConnectedRoutes[i].IfIndex), metric: ribd.Int(ConnectedRoutes[i].Metric), routeType: ribd.Int(ConnectedRoutes[i].Prototype), sliceIdx: ribd.Int(ConnectedRoutes[i].SliceIdx), createType: FIBOnly, deleteType: Invalid}
-			PolicyEngineFilter(policyRoute, policyCommonDefs.PolicyPath_Import, params)
+			//			policyRoute := ribdInt.Routes{Ipaddr: ConnectedRoutes[i].Ipaddr, IPAddrType: ribdInt.Int(ribdCommonDefs.IPv4), Mask: ConnectedRoutes[i].Mask, NextHopIp: ConnectedRoutes[i].NextHopIp, IfIndex: ConnectedRoutes[i].IfIndex, Metric: ConnectedRoutes[i].Metric, Prototype: ConnectedRoutes[i].Prototype}
+			//			params := RouteParams{destNetIp: ConnectedRoutes[i].Ipaddr, ipType: ribdCommonDefs.IPv4, networkMask: ConnectedRoutes[i].Mask, nextHopIp: ConnectedRoutes[i].NextHopIp, nextHopIfIndex: ribd.Int(ConnectedRoutes[i].IfIndex), metric: ribd.Int(ConnectedRoutes[i].Metric), routeType: ribd.Int(ConnectedRoutes[i].Prototype), sliceIdx: ribd.Int(ConnectedRoutes[i].SliceIdx), createType: FIBOnly, deleteType: Invalid}
+			//			PolicyEngineFilter(policyRoute, policyCommonDefs.PolicyPath_Import, params)
+			cfg := ribd.IPv4Route{
+				DestinationNw: ipAddrStr,
+				Protocol:      "CONNECTED",
+				Cost:          0,
+				NetworkMask:   ipMaskStr,
+			}
+			nextHop := ribd.NextHopInfo{
+				NextHopIp:     "0.0.0.0",
+				NextHopIntRef: strconv.Itoa(int(ifIndex)),
+			}
+			cfg.NextHop = make([]*ribd.NextHopInfo, 0)
+			cfg.NextHop = append(cfg.NextHop, &nextHop)
+
+			ribdServiceHandler.RouteConfCh <- RIBdServerConfig{
+				OrigConfigObject: &cfg,
+				Op:               "addFIBOnly",
+			}
 		}
 	}
 }
@@ -239,9 +322,26 @@ func (ribdServiceHandler *RIBDServer) ProcessIPv6IntfUpEvent(ipAddr string, ifIn
 			logger.Info("Add this route with destAddress = ", ConnectedRoutes[i].Ipaddr, " nwMask = ", ConnectedRoutes[i].Mask)
 
 			ConnectedRoutes[i].IsValid = true
-			policyRoute := ribdInt.Routes{Ipaddr: ConnectedRoutes[i].Ipaddr, IPAddrType: ribdInt.Int(ribdCommonDefs.IPv6), Mask: ConnectedRoutes[i].Mask, NextHopIp: ConnectedRoutes[i].NextHopIp, IfIndex: ConnectedRoutes[i].IfIndex, Metric: ConnectedRoutes[i].Metric, Prototype: ConnectedRoutes[i].Prototype}
-			params := RouteParams{destNetIp: ConnectedRoutes[i].Ipaddr, ipType: ribdCommonDefs.IPv6, networkMask: ConnectedRoutes[i].Mask, nextHopIp: ConnectedRoutes[i].NextHopIp, nextHopIfIndex: ribd.Int(ConnectedRoutes[i].IfIndex), metric: ribd.Int(ConnectedRoutes[i].Metric), routeType: ribd.Int(ConnectedRoutes[i].Prototype), sliceIdx: ribd.Int(ConnectedRoutes[i].SliceIdx), createType: FIBOnly, deleteType: Invalid}
-			PolicyEngineFilter(policyRoute, policyCommonDefs.PolicyPath_Import, params)
+			//			policyRoute := ribdInt.Routes{Ipaddr: ConnectedRoutes[i].Ipaddr, IPAddrType: ribdInt.Int(ribdCommonDefs.IPv6), Mask: ConnectedRoutes[i].Mask, NextHopIp: ConnectedRoutes[i].NextHopIp, IfIndex: ConnectedRoutes[i].IfIndex, Metric: ConnectedRoutes[i].Metric, Prototype: ConnectedRoutes[i].Prototype}
+			//			params := RouteParams{destNetIp: ConnectedRoutes[i].Ipaddr, ipType: ribdCommonDefs.IPv6, networkMask: ConnectedRoutes[i].Mask, nextHopIp: ConnectedRoutes[i].NextHopIp, nextHopIfIndex: ribd.Int(ConnectedRoutes[i].IfIndex), metric: ribd.Int(ConnectedRoutes[i].Metric), routeType: ribd.Int(ConnectedRoutes[i].Prototype), sliceIdx: ribd.Int(ConnectedRoutes[i].SliceIdx), createType: FIBOnly, deleteType: Invalid}
+			//			PolicyEngineFilter(policyRoute, policyCommonDefs.PolicyPath_Import, params)
+			cfg := ribd.IPv6Route{
+				DestinationNw: ipAddrStr,
+				Protocol:      "CONNECTED",
+				Cost:          0,
+				NetworkMask:   ipMaskStr,
+			}
+			nextHop := ribd.NextHopInfo{
+				NextHopIp:     "0.0.0.0",
+				NextHopIntRef: strconv.Itoa(int(ifIndex)),
+			}
+			cfg.NextHop = make([]*ribd.NextHopInfo, 0)
+			cfg.NextHop = append(cfg.NextHop, &nextHop)
+
+			ribdServiceHandler.RouteConfCh <- RIBdServerConfig{
+				OrigConfigObject: &cfg,
+				Op:               "addv6FIBOnly",
+			}
 		}
 	}
 }
