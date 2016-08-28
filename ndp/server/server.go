@@ -150,6 +150,12 @@ func (svr *NDPServer) EventsListener() {
 				continue
 			}
 			svr.ProcessTimerExpiry(pktData)
+
+		case vlanInfo, ok := <-svr.VlanCh:
+			if !ok {
+				continue
+			}
+			debug.Logger.Debug("Need to support vlan Notifications:", vlanInfo)
 		}
 	}
 }

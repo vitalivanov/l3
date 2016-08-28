@@ -23,17 +23,94 @@
 package api
 
 import (
+	"fmt"
+	"infra/sysd/sysdCommonDefs"
+	"l3/ndp/debug"
 	"l3/ndp/server"
+	"log/syslog"
 	"testing"
+	"time"
 	asicdmock "utils/asicdClient/mock"
+	"utils/logging"
 )
 
+var testApiIfIndex = int32(100)
+var testApiState = "UP"
+var testApiIpAddr = "2192::1/64"
+var testVlanId = int32(1234)
+var testVlanName = "vlan1234"
+
+func initApiBasic() {
+	t := &testing.T{}
+	logger, err := NDPTestNewLogger("ndpd", "NDPTEST", true)
+	if err != nil {
+		t.Error("creating logger failed")
+	}
+	debug.NDPSetLogger(logger)
+}
+
+func NDPTestNewLogger(name string, tag string, listenToConfig bool) (*logging.Writer, error) {
+	var err error
+	srLogger := new(logging.Writer)
+	srLogger.MyComponentName = name
+
+	srLogger.SysLogger, err = syslog.New(syslog.LOG_DEBUG|syslog.LOG_DAEMON, tag)
+	if err != nil {
+		fmt.Println("Failed to initialize syslog - ", err)
+		return srLogger, err
+	}
+
+	srLogger.GlobalLogging = true
+	srLogger.MyLogLevel = sysdCommonDefs.INFO
+	return srLogger, err
+}
+
 func baseApiTest() *server.NDPServer {
+	time.Sleep(1)
+	initApiBasic()
 	testServer := server.NDPNewServer(&asicdmock.MockAsicdClientMgr{})
 	testServer.NDPStartServer()
 	return testServer
 }
 
 func TestApiInit(t *testing.T) {
-	//Init(baseApiTest())
+	Init(baseApiTest())
+}
+
+func TestL2PortNotification(t *testing.T) {
+	TestApiInit(t)
+	SendL2PortNotification(testApiIfIndex, testApiState)
+}
+
+func TestL3PortNotification(t *testing.T) {
+	TestApiInit(t)
+	SendL3PortNotification(testApiIfIndex, testApiState, testApiIpAddr)
+}
+
+func TestIpNotification(t *testing.T) {
+	TestApiInit(t)
+	SendIPIntfNotfication(testApiIfIndex, testApiIpAddr, testVlanName, testApiState)
+}
+
+func TestGetBulkNeigbhorEntries(t *testing.T) {
+	TestApiInit(t)
+	_, _, result := GetAllNeigborEntries(0, 100)
+	if len(result) > 0 {
+		t.Error("There should not be any neigbhor Entries")
+		return
+	}
+}
+
+func TestGetNeighborEntry(t *testing.T) {
+	TestApiInit(t)
+	result := GetNeighborEntry(testApiIpAddr)
+	if result != nil {
+		t.Error("There should not be any neigbhor Entries")
+		return
+	}
+}
+
+func TestVlanNotification(t *testing.T) {
+	TestApiInit(t)
+	SendVlanNotification(testApiState, testVlanId, testVlanName, make([]int32, 0))
 }
