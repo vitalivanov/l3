@@ -260,6 +260,7 @@ func buildPolicyEntityFromRoute(route ribdInt.Routes, params interface{}) (entit
 }
 func BuildRouteParamsFromRouteInoRecord(routeInfoRecord RouteInfoRecord) RouteParams {
 	var params RouteParams
+	params.ipType = routeInfoRecord.ipType
 	params.routeType = ribd.Int(routeInfoRecord.protocol)
 	params.destNetIp = routeInfoRecord.destNetIp.String()
 	params.sliceIdx = ribd.Int(routeInfoRecord.sliceIdx)
@@ -494,7 +495,7 @@ func deleteRoutePolicyStateAll(route ribdInt.Routes) {
 	return
 }
 func addRoutePolicyState(route ribdInt.Routes, policy string, policyStmt string) {
-	logger.Info("addRoutePolicyState")
+	logger.Info("addRoutePolicyState for ", route.Ipaddr, ":", route.Mask, " ipType:", route.IPAddrType)
 	destNet, err := getNetowrkPrefixFromStrings(route.Ipaddr, route.Mask)
 	if err != nil {
 		return
@@ -502,7 +503,7 @@ func addRoutePolicyState(route ribdInt.Routes, policy string, policyStmt string)
 
 	routeInfoRecordListItem := RouteInfoMapGet(ribdCommonDefs.IPType(route.IPAddrType), destNet)
 	if routeInfoRecordListItem == nil {
-		logger.Info("Unexpected - entry not found for prefix %v", destNet)
+		logger.Info("Unexpected - entry not found for prefix ", destNet)
 		return
 	}
 	logger.Info("Adding policy ", policy, " to route ", destNet)

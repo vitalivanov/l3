@@ -781,7 +781,7 @@ func (m RIBDServer) Getv4RouteCreatedTime(number int) (time string, err error) {
 	return v4routeCreatedTimeMap[number], err
 }
 
-func (m RIBDServer) ProcessV4RouteCreateConfig(cfg *ribd.IPv4Route) (val bool, err error) {
+func (m RIBDServer) ProcessV4RouteCreateConfig(cfg *ribd.IPv4Route, addType int) (val bool, err error) {
 	logger.Debug("ProcessV4RouteCreateConfig: Received create route request for ip ", cfg.DestinationNw, " mask ", cfg.NetworkMask, " number of next hops: ", len(cfg.NextHop))
 	newCfg := ribd.IPv4Route{
 		DestinationNw: cfg.DestinationNw,
@@ -800,7 +800,7 @@ func (m RIBDServer) ProcessV4RouteCreateConfig(cfg *ribd.IPv4Route) (val bool, e
 		newCfg.NextHop = make([]*ribd.NextHopInfo, 0)
 		newCfg.NextHop = append(newCfg.NextHop, &nh)
 		//policyRoute := BuildPolicyRouteFromribdIPv4Route(&newCfg)
-		params := BuildRouteParamsFromribdIPv4Route(&newCfg, FIBAndRIB, Invalid, len(destNetSlice))
+		params := BuildRouteParamsFromribdIPv4Route(&newCfg, addType, Invalid, len(destNetSlice))
 		_, err = createRoute(params)
 		//PolicyEngineFilter(policyRoute, policyCommonDefs.PolicyPath_Import, params)
 		//policyEngineActionAcceptRoute(params)
@@ -865,7 +865,7 @@ func (m RIBDServer) ProcessBulkRouteCreateConfig(bulkCfg []*ribdInt.IPv4RouteCon
 	return true, err
 }
 
-func (m RIBDServer) ProcessV4RouteDeleteConfig(cfg *ribd.IPv4Route) (val bool, err error) {
+func (m RIBDServer) ProcessV4RouteDeleteConfig(cfg *ribd.IPv4Route, delType int) (val bool, err error) {
 	logger.Debug("ProcessV4RouteDeleteConfig:Received Route Delete request for ", cfg.DestinationNw, ":", cfg.NetworkMask, "number of nextHops:", len(cfg.NextHop), "Protocol ", cfg.Protocol)
 	if !RouteServiceHandler.AcceptConfig {
 		logger.Debug("Not ready to accept config")
@@ -884,7 +884,7 @@ func (m RIBDServer) ProcessV4RouteDeleteConfig(cfg *ribd.IPv4Route) (val bool, e
 		}
 		nextHopIntRef, _ := strconv.Atoi(cfg.NextHop[i].NextHopIntRef)
 		nextHopIfIndex = ribd.Int(nextHopIntRef)
-		_, err = deleteIPRoute(cfg.DestinationNw, ribdCommonDefs.IPv4, cfg.NetworkMask, cfg.Protocol, cfg.NextHop[i].NextHopIp, nextHopIfIndex, FIBAndRIB, ribdCommonDefs.RoutePolicyStateChangetoInValid)
+		_, err = deleteIPRoute(cfg.DestinationNw, ribdCommonDefs.IPv4, cfg.NetworkMask, cfg.Protocol, cfg.NextHop[i].NextHopIp, nextHopIfIndex, ribd.Int(delType), ribdCommonDefs.RoutePolicyStateChangetoInValid)
 	}
 	return true, err
 }
@@ -938,9 +938,9 @@ func (m RIBDServer) Processv4RoutePatchUpdateConfig(origconfig *ribd.IPv4Route, 
 			}
 			switch op[idx].Op {
 			case "add":
-				m.ProcessV4RouteCreateConfig(newconfig)
+				m.ProcessV4RouteCreateConfig(newconfig, FIBAndRIB)
 			case "remove":
-				m.ProcessV4RouteDeleteConfig(newconfig)
+				m.ProcessV4RouteDeleteConfig(newconfig, FIBAndRIB)
 			default:
 				logger.Err("Operation ", op[idx].Op, " not supported")
 			}

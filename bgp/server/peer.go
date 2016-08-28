@@ -355,13 +355,21 @@ func (p *Peer) processWithdraws(protoFamily uint32, nlris *[]packet.NLRI) {
 	for i := 0; i < total; i++ {
 		nlri := (*nlris)[idx]
 		if nlri == nil {
+			if idx >= last {
+				break
+			}
+			(*nlris)[idx] = (*nlris)[last]
+			(*nlris)[last] = nil
+			last--
 			continue
 		}
 
 		ip := nlri.GetPrefix().String()
+		p.logger.Infof("Neighbor %s: Withdraw Prefix %s protocol family=%d RIB-In=%+v",
+			p.NeighborConf.Neighbor.NeighborAddress, ip, protoFamily, p.ribIn[protoFamily])
 		if route, ok = p.ribIn[protoFamily][ip]; !ok {
-			p.logger.Errf("Neighbor %s: Withdraw Prefix %s not found in RIB-In",
-				p.NeighborConf.Neighbor.NeighborAddress, ip)
+			p.logger.Errf("Neighbor %s: Withdraw Prefix %s not found in RIB-In, protocol family=%d",
+				p.NeighborConf.Neighbor.NeighborAddress, ip, protoFamily)
 			(*nlris)[idx] = (*nlris)[last]
 			(*nlris)[last] = nil
 			last--
@@ -369,8 +377,8 @@ func (p *Peer) processWithdraws(protoFamily uint32, nlris *[]packet.NLRI) {
 		}
 
 		if route.GetPath(nlri.GetPathId()) == nil {
-			p.logger.Errf("Neighbor %s: Withdraw Prefix %s Path id %d not found in RIB-In",
-				p.NeighborConf.Neighbor.NeighborAddress, ip, nlri.GetPathId())
+			p.logger.Errf("Neighbor %s: Withdraw Prefix %s Path id %d not found in RIB-In, protocol family=%d",
+				p.NeighborConf.Neighbor.NeighborAddress, ip, nlri.GetPathId(), protoFamily)
 			(*nlris)[idx] = (*nlris)[last]
 			(*nlris)[last] = nil
 			last--
@@ -378,8 +386,12 @@ func (p *Peer) processWithdraws(protoFamily uint32, nlris *[]packet.NLRI) {
 		}
 
 		idx++
+		p.logger.Infof("Neighbor %s: Remove path id %d for nlri %s protocol family %d from RIB-In",
+			p.NeighborConf.RunningConf.NeighborAddress, nlri.GetPathId(), ip, protoFamily)
 		route.RemovePath(nlri.GetPathId())
-		if route.DoesPathsExist() {
+		if !route.DoesPathsExist() {
+			p.logger.Infof("Neighbor %s: remove nlri %s protocol family %s from RIB-In",
+				p.NeighborConf.RunningConf.NeighborAddress, ip, protoFamily)
 			delete(p.ribIn[protoFamily], ip)
 		}
 	}
@@ -388,7 +400,7 @@ func (p *Peer) processWithdraws(protoFamily uint32, nlris *[]packet.NLRI) {
 
 func (p *Peer) checkRIBInFilter(nlri packet.NLRI, route *bgprib.AdjRIBRoute) bool {
 	if p.NeighborConf.Neighbor.Config.AdjRIBInFilter == "" {
-		p.logger.Debugf("Peer %s - RIB In filter is not set", p.NeighborConf.Neighbor.NeighborAddress)
+		p.logger.Debugf("Neighbor %s: RIB In filter is not set", p.NeighborConf.Neighbor.NeighborAddress)
 		return true
 	}
 
@@ -421,6 +433,12 @@ func (p *Peer) processUpdates(protoFamily uint32, nlris *[]packet.NLRI, path *bg
 	for i := 0; i < total; i++ {
 		nlri := (*nlris)[idx]
 		if nlri == nil {
+			if idx >= last {
+				break
+			}
+			(*nlris)[idx] = (*nlris)[last]
+			(*nlris)[last] = nil
+			last--
 			continue
 		}
 
@@ -428,22 +446,26 @@ func (p *Peer) processUpdates(protoFamily uint32, nlris *[]packet.NLRI, path *bg
 		if route, ok = p.ribIn[protoFamily][ip]; !ok {
 			route = bgprib.NewAdjRIBRoute(p.NeighborConf.Neighbor.NeighborAddress, protoFamily, nlri)
 			p.ribIn[protoFamily][ip] = route
+			p.logger.Infof("Neighbor %s: add nlri %s protocol family %d",
+				p.NeighborConf.RunningConf.NeighborAddress, ip, protoFamily)
 		}
 		route.AddPath(nlri.GetPathId(), path)
+		p.logger.Infof("Neighbor %s: add path id %d for nlri %s protocol family %d to RIB-In %+v",
+			p.NeighborConf.RunningConf.NeighborAddress, nlri.GetPathId(), ip, protoFamily, p.ribIn[protoFamily])
 
 		if len(route.PolicyList) != 0 {
-			p.logger.Info("Peer", p.NeighborConf.RunningConf.NeighborAddress, "nlri", nlri.GetIPPrefix().String(),
-				"is already filtered")
+			p.logger.Infof("Neighbor %s: nlri %s is already filtered", p.NeighborConf.RunningConf.NeighborAddress, ip)
 			(*nlris)[idx] = (*nlris)[last]
+			(*nlris)[last] = nil
 			last--
 			continue
 		}
 
 		accept := p.checkRIBInFilter(nlri, route)
 		if !accept {
-			p.logger.Info("Peer", p.NeighborConf.RunningConf.NeighborAddress, "filter nlri",
-				nlri.GetIPPrefix().String())
+			p.logger.Infof("Neighbor %s: filter nlri %s", p.NeighborConf.RunningConf.NeighborAddress, ip)
 			(*nlris)[idx] = (*nlris)[last]
+			(*nlris)[last] = nil
 			last--
 			continue
 		}
@@ -462,25 +484,35 @@ func (p *Peer) ReceiveUpdate(pktInfo *packet.BGPPktSrc) (map[uint32]map[*bgprib.
 	atomic.AddUint32(&p.NeighborConf.Neighbor.State.Queues.Input, ^uint32(0))
 	p.NeighborConf.Neighbor.State.Messages.Received.Update++
 
+	asLoop := false
 	updateMsg := pktInfo.Msg.Body.(*packet.BGPUpdate)
 	if packet.HasASLoop(updateMsg.PathAttributes, p.NeighborConf.RunningConf.LocalAS) {
 		p.logger.Infof("Neighbor %s: Recived Update message has AS loop", p.NeighborConf.Neighbor.NeighborAddress)
-		return updated, withdrawn, updatedAddPaths
+		asLoop = true
 	}
 
 	protoFamily := packet.GetProtocolFamily(packet.AfiIP, packet.SafiUnicast)
 	mpReach, mpUnreach := packet.GetMPAttrs(updateMsg.PathAttributes)
 	path := bgprib.NewPath(p.locRib, p.NeighborConf, updateMsg.PathAttributes, mpReach, bgprib.RouteTypeEGP)
 	p.processWithdraws(protoFamily, &updateMsg.WithdrawnRoutes)
-	p.processUpdates(protoFamily, &updateMsg.NLRI, path)
+	if asLoop {
+		updateMsg.NLRI = make([]packet.NLRI, 0)
+	} else {
+		p.processUpdates(protoFamily, &updateMsg.NLRI, path)
+	}
 
 	if mpUnreach != nil {
 		protoFamily = packet.GetProtocolFamily(mpUnreach.AFI, mpUnreach.SAFI)
 		p.processWithdraws(protoFamily, &(mpUnreach.NLRI))
 	}
+
 	if mpReach != nil {
-		protoFamily = packet.GetProtocolFamily(mpReach.AFI, mpReach.SAFI)
-		p.processUpdates(protoFamily, &(mpReach.NLRI), path)
+		if asLoop {
+			mpReach.NLRI = make([]packet.NLRI, 0)
+		} else {
+			protoFamily = packet.GetProtocolFamily(mpReach.AFI, mpReach.SAFI)
+			p.processUpdates(protoFamily, &(mpReach.NLRI), path)
+		}
 	}
 
 	updated, withdrawn, updatedAddPaths, addedAllPrefixes = p.locRib.ProcessUpdate(p.NeighborConf, pktInfo,
@@ -579,7 +611,6 @@ func (p *Peer) sendUpdateMsg(msg *packet.BGPMessage, path *bgprib.Path) {
 func (p *Peer) isAdvertisable(path *bgprib.Path) bool {
 	if path != nil && path.NeighborConf != nil {
 		if path.NeighborConf.IsInternal() {
-
 			if p.NeighborConf.IsInternal() && !path.NeighborConf.IsRouteReflectorClient() &&
 				!p.NeighborConf.IsRouteReflectorClient() {
 				return false
@@ -591,6 +622,11 @@ func (p *Peer) isAdvertisable(path *bgprib.Path) bool {
 			path.NeighborConf.RunningConf.NeighborAddress.String() {
 			return false
 		}
+
+		if packet.HasASLoop(path.PathAttrs, p.NeighborConf.RunningConf.PeerAS) {
+			return false
+		}
+
 	}
 
 	return true

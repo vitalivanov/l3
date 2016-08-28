@@ -1064,7 +1064,7 @@ func addNewRoute(destNetPrefix patriciaDB.Prefix,
 		Op:               "add",
 	}
 
-	policyRoute := ribdInt.Routes{Ipaddr: routeInfoRecord.destNetIp.String(), Mask: routeInfoRecord.networkMask.String(), NextHopIp: routeInfoRecord.nextHopIp.String(), IfIndex: ribdInt.Int(routeInfoRecord.nextHopIfIndex), Metric: ribdInt.Int(routeInfoRecord.metric), Prototype: ribdInt.Int(routeInfoRecord.protocol), IsPolicyBasedStateValid: routeInfoRecordList.isPolicyBasedStateValid}
+	policyRoute := ribdInt.Routes{Ipaddr: routeInfoRecord.destNetIp.String(), Mask: routeInfoRecord.networkMask.String(), IPAddrType: ribdInt.Int(routeInfoRecord.ipType), NextHopIp: routeInfoRecord.nextHopIp.String(), IfIndex: ribdInt.Int(routeInfoRecord.nextHopIfIndex), Metric: ribdInt.Int(routeInfoRecord.metric), Prototype: ribdInt.Int(routeInfoRecord.protocol), IsPolicyBasedStateValid: routeInfoRecordList.isPolicyBasedStateValid}
 	var params RouteParams
 	params = BuildRouteParamsFromRouteInoRecord(routeInfoRecord)
 	if policyPath == policyCommonDefs.PolicyPath_Export {
@@ -1268,7 +1268,7 @@ func deleteRoute(destNetPrefix patriciaDB.Prefix, //route prefix of the route be
 		logger.Debug("This is not the selected protocol, nothing more to do here")
 		return
 	}
-	policyRoute := ribdInt.Routes{Ipaddr: routeInfoRecord.destNetIp.String(), Mask: routeInfoRecord.networkMask.String(), NextHopIp: routeInfoRecord.nextHopIp.String(), IfIndex: ribdInt.Int(routeInfoRecord.nextHopIfIndex), Metric: ribdInt.Int(routeInfoRecord.metric), Prototype: ribdInt.Int(routeInfoRecord.protocol), IsPolicyBasedStateValid: routeInfoRecordList.isPolicyBasedStateValid}
+	policyRoute := ribdInt.Routes{Ipaddr: routeInfoRecord.destNetIp.String(), Mask: routeInfoRecord.networkMask.String(), IPAddrType: ribdInt.Int(routeInfoRecord.ipType), NextHopIp: routeInfoRecord.nextHopIp.String(), IfIndex: ribdInt.Int(routeInfoRecord.nextHopIfIndex), Metric: ribdInt.Int(routeInfoRecord.metric), Prototype: ribdInt.Int(routeInfoRecord.protocol), IsPolicyBasedStateValid: routeInfoRecordList.isPolicyBasedStateValid}
 	if policyPath != policyCommonDefs.PolicyPath_Export {
 		//logger.Debug("Expected export path for delete op")
 		return
@@ -1438,7 +1438,8 @@ func createRoute(routeInfo RouteParams) (rc ribd.Int, err error) {
 		weight:         weight,
 	}
 
-	policyRoute := ribdInt.Routes{Ipaddr: destNetIp, Mask: networkMask, NextHopIp: nextHopIp, IfIndex: ribdInt.Int(nextHopIfIndex), Metric: ribdInt.Int(metric), Prototype: ribdInt.Int(routeType), Weight: ribdInt.Int(weight)}
+	policyRoute := ribdInt.Routes{Ipaddr: destNetIp, IPAddrType: ribdInt.Int(ipType), Mask: networkMask, NextHopIp: nextHopIp, IfIndex: ribdInt.Int(nextHopIfIndex), Metric: ribdInt.Int(metric), Prototype: ribdInt.Int(routeType), Weight: ribdInt.Int(weight)}
+	logger.Info("createroute:,setting ipaddrtype to :", policyRoute.IPAddrType, " from iptype:", ipType)
 	routeInfoRecord.resolvedNextHopIpIntf.NextHopIp = routeInfoRecord.nextHopIp.String()
 	routeInfoRecord.resolvedNextHopIpIntf.NextHopIfIndex = ribdInt.Int(routeInfoRecord.nextHopIfIndex)
 
@@ -1539,6 +1540,7 @@ func createRoute(routeInfo RouteParams) (rc ribd.Int, err error) {
 		params.createType = addType
 		params.deleteType = Invalid
 		policyRoute.IsPolicyBasedStateValid = newRouteInfoRecordList.isPolicyBasedStateValid
+		logger.Info("Createroute:policy route addr type:", policyRoute.IPAddrType)
 		PolicyEngineFilter(policyRoute, policyCommonDefs.PolicyPath_Export, params)
 	} else {
 		logger.Debug("routeInfoRecordListItem not nil")
@@ -1625,9 +1627,14 @@ func deleteIPRoute(destNetIp string,
 		return 0, err
 	}
 	nextHopIpType := ribdCommonDefs.IPv4
-	nextHopIpNet := nextHopIpAddr.To4()
-	if nextHopIpNet == nil {
-		nextHopIpType = ribdCommonDefs.IPv6
+	isZeros, _ := netUtils.IsZerosIPString(nextHopIP)
+	if isZeros {
+		nextHopIpType = ipType
+	} else {
+		nextHopIpNet := nextHopIpAddr.To4()
+		if nextHopIpNet == nil {
+			nextHopIpType = ribdCommonDefs.IPv6
+		}
 	}
 	//logger.Debug("destNet = ", destNet)
 	routeInfoRecordListItem := RouteInfoMapGet(ipType, destNet)
