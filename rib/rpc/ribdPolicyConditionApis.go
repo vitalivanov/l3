@@ -31,16 +31,47 @@ import (
 )
 
 func (m RIBDServicesHandler) CreatePolicyPrefixSet(cfg *ribd.PolicyPrefixSet) (val bool, err error) {
-	return val, err
+	logger.Debug("CreatePolicyPrefixSet: ", cfg.Name)
+	prefixList := make([]policy.PolicyPrefix, 0)
+	for _, ribdPrefix := range cfg.PrefixList {
+		prefix := policy.PolicyPrefix{
+			IpPrefix:        ribdPrefix.Prefix,
+			MasklengthRange: ribdPrefix.MaskLengthRange,
+		}
+		prefixList = append(prefixList, prefix)
+	}
+	newPolicyPrefixSet := policy.PolicyPrefixSetConfig{Name: cfg.Name, PrefixList: prefixList}
+	err = m.server.GlobalPolicyEngineDB.ValidatePolicyPrefixSetCreate(newPolicyPrefixSet)
+	if err != nil {
+		logger.Err("PolicyEngine validation failed for prefix Set ", cfg.Name, " with err:", err)
+		return false, err
+	}
+	m.server.PolicyConfCh <- server.RIBdServerConfig{
+		OrigConfigObject: cfg,
+		Op:               "addPolicyPrefixSet",
+	}
+	return true, err
 }
 func (m RIBDServicesHandler) UpdatePolicyPrefixSet(origconfig *ribd.PolicyPrefixSet, newconfig *ribd.PolicyPrefixSet, attrset []bool, op []*ribd.PatchOpInfo) (val bool, err error) {
 	return val, err
 }
 func (m RIBDServicesHandler) DeletePolicyPrefixSet(cfg *ribd.PolicyPrefixSet) (val bool, err error) {
-	return val, err
+	logger.Debug("DeletePolicyPrefixSet: ", cfg.Name)
+	err = m.server.GlobalPolicyEngineDB.ValidatePolicyPrefixSetDelete(policy.PolicyPrefixSetConfig{Name: cfg.Name})
+	if err != nil {
+		logger.Err("PolicyEngine validation for prefix set delete failed with err: ", err)
+		return false, err
+	}
+	m.server.PolicyConfCh <- server.RIBdServerConfig{
+		OrigConfigObject: cfg,
+		Op:               "delPolicyPrefixSet",
+	}
+	return true, err
 }
 func (m RIBDServicesHandler) GetBulkPolicyPrefixSetState(fromIndex ribd.Int, count ribd.Int) (state *ribd.PolicyPrefixSetStateGetInfo, err error) {
-	return state, err
+	logger.Debug("GetBulkPolicyPrefixSetState")
+	ret, err := m.server.GetBulkPolicyPrefixSetState(fromIndex, count, m.server.GlobalPolicyEngineDB)
+	return ret, err
 }
 func (m RIBDServicesHandler) GetPolicyPrefixSetState(name string) (state *ribd.PolicyPrefixSetState, err error) {
 	state = ribd.NewPolicyPrefixSetState()

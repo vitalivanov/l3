@@ -48,6 +48,30 @@ type Policy struct {
 }
 
 /*
+   Function to create policy prefix set in the policyEngineDB
+*/
+func (m RIBDServer) ProcessPolicyPrefixSetConfigCreate(cfg *ribd.PolicyPrefixSet, db *policy.PolicyEngineDB) (val bool, err error) {
+	logger.Debug("ProcessPolicyConditionConfigCreate:CreatePolicyConditioncfg: ", cfg.Name)
+	prefixList := make([]policy.PolicyPrefix, 0)
+	for _, prefix := range cfg.PrefixList {
+		prefixList = append(prefixList, policy.PolicyPrefix{IpPrefix: prefix.Prefix, MasklengthRange: prefix.MaskLengthRange})
+	}
+	newCfg := policy.PolicyPrefixSetConfig{Name: cfg.Name, PrefixList: prefixList}
+	val, err = db.CreatePolicyPrefixSet(newCfg)
+	return val, err
+}
+
+/*
+   Function to delete policy prefix set in the policyEngineDB
+*/
+func (m RIBDServer) ProcessPolicyPrefixSetConfigDelete(cfg *ribd.PolicyPrefixSet, db *policy.PolicyEngineDB) (val bool, err error) {
+	logger.Debug("ProcessPolicyPrefixSetConfigDelete: ", cfg.Name)
+	newCfg := policy.PolicyPrefixSetConfig{Name: cfg.Name}
+	val, err = db.DeletePolicyPrefixSet(newCfg)
+	return val, err
+}
+
+/*
    Function to create policy condition in the policyEngineDB
 */
 func (m RIBDServer) ProcessPolicyConditionConfigCreate(cfg *ribd.PolicyCondition, db *policy.PolicyEngineDB) (val bool, err error) {
@@ -143,6 +167,68 @@ func (m RIBDServer) ProcessPolicyDefinitionConfigDelete(cfg *ribd.PolicyDefiniti
 	policy := policy.PolicyDefinitionConfig{Name: cfg.Name}
 	err = db.DeletePolicyDefinition(policy)
 	return err
+}
+
+func (m RIBDServer) GetBulkPolicyPrefixSetState(fromIndex ribd.Int, rcount ribd.Int, db *policy.PolicyEngineDB) (policyPrefixSets *ribd.PolicyPrefixSetStateGetInfo, err error) { //(routes []*ribd.Routes, err error) {
+	logger.Debug("GetBulkPolicyPrefixSetState")
+	PolicyPrefixSetDB := db.PolicyPrefixSetDB
+	localPolicyPrefixSetDB := *db.LocalPolicyPrefixSetDB
+	var i, validCount, toIndex ribd.Int
+	var tempNode []ribd.PolicyPrefixSetState = make([]ribd.PolicyPrefixSetState, rcount)
+	var nextNode *ribd.PolicyPrefixSetState
+	var returnNodes []*ribd.PolicyPrefixSetState
+	var returnGetInfo ribd.PolicyPrefixSetStateGetInfo
+	i = 0
+	policyPrefixSets = &returnGetInfo
+	more := true
+	if localPolicyPrefixSetDB == nil {
+		logger.Debug("localPolicyPrefixSetDB not initialized")
+		return policyPrefixSets, err
+	}
+	for ; ; i++ {
+		if i+fromIndex >= ribd.Int(len(localPolicyPrefixSetDB)) {
+			logger.Debug("All the policy prefix sets fetched")
+			more = false
+			break
+		}
+		if localPolicyPrefixSetDB[i+fromIndex].IsValid == false {
+			logger.Debug("Invalid policy prefix set")
+			continue
+		}
+		if validCount == rcount {
+			logger.Debug("Enough policy prefix sets fetched")
+			break
+		}
+		prefixNodeGet := PolicyPrefixSetDB.Get(localPolicyPrefixSetDB[i+fromIndex].Prefix)
+		if prefixNodeGet != nil {
+			prefixNode := prefixNodeGet.(policy.PolicyPrefixSet)
+			nextNode = &tempNode[validCount]
+			nextNode.Name = prefixNode.Name
+			nextNode.PrefixList = make([]*ribd.PolicyPrefix, 0)
+			for _, prefix := range prefixNode.PrefixList {
+				nextNode.PrefixList = append(nextNode.PrefixList, &ribd.PolicyPrefix{prefix.IpPrefix, prefix.MasklengthRange})
+			}
+			logger.Info("len(nextNode.PrefixList):", len(nextNode.PrefixList), " len(prefixNode.PrefixList:", len(prefixNode.PrefixList))
+			if prefixNode.PolicyConditionList != nil {
+				nextNode.PolicyConditionList = make([]string, 0)
+			}
+			for idx := 0; idx < len(prefixNode.PolicyConditionList); idx++ {
+				nextNode.PolicyConditionList = append(nextNode.PolicyConditionList, prefixNode.PolicyConditionList[idx])
+			}
+			toIndex = ribd.Int(prefixNode.LocalDBSliceIdx)
+			if len(returnNodes) == 0 {
+				returnNodes = make([]*ribd.PolicyPrefixSetState, 0)
+			}
+			returnNodes = append(returnNodes, nextNode)
+			validCount++
+		}
+	}
+	policyPrefixSets.PolicyPrefixSetStateList = returnNodes
+	policyPrefixSets.StartIdx = fromIndex
+	policyPrefixSets.EndIdx = toIndex + 1
+	policyPrefixSets.More = more
+	policyPrefixSets.Count = validCount
+	return policyPrefixSets, err
 }
 
 func (m RIBDServer) GetBulkPolicyConditionState(fromIndex ribd.Int, rcount ribd.Int, db *policy.PolicyEngineDB) (policyConditions *ribd.PolicyConditionStateGetInfo, err error) { //(routes []*ribd.Routes, err error) {
