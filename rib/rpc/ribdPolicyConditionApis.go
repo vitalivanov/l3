@@ -82,7 +82,8 @@ func (m RIBDServicesHandler) CreatePolicyCondition(cfg *ribd.PolicyCondition) (v
 	logger.Debug("CreatePolicyConditioncfg: ", cfg.Name)
 	newPolicy := policy.PolicyConditionConfig{Name: cfg.Name, ConditionType: cfg.ConditionType, MatchProtocolConditionInfo: cfg.Protocol}
 	matchPrefix := policy.PolicyPrefix{IpPrefix: cfg.IpPrefix, MasklengthRange: cfg.MaskLengthRange}
-	newPolicy.MatchDstIpPrefixConditionInfo = policy.PolicyDstIpMatchPrefixSetCondition{Prefix: matchPrefix}
+	logger.Info("CreatePolicyCondition:,cfg.PrefixSet:", cfg.PrefixSet)
+	newPolicy.MatchDstIpPrefixConditionInfo = policy.PolicyDstIpMatchPrefixSetCondition{Prefix: matchPrefix, PrefixSet: cfg.PrefixSet}
 	err = m.server.GlobalPolicyEngineDB.ValidateConditionConfigCreate(newPolicy)
 	if err != nil {
 		logger.Err("PolicyEngine validation failed with err: ", err)

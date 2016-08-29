@@ -78,7 +78,7 @@ func (m RIBDServer) ProcessPolicyConditionConfigCreate(cfg *ribd.PolicyCondition
 	logger.Debug("ProcessPolicyConditionConfigCreate:CreatePolicyConditioncfg: ", cfg.Name)
 	newPolicy := policy.PolicyConditionConfig{Name: cfg.Name, ConditionType: cfg.ConditionType, MatchProtocolConditionInfo: cfg.Protocol}
 	matchPrefix := policy.PolicyPrefix{IpPrefix: cfg.IpPrefix, MasklengthRange: cfg.MaskLengthRange}
-	newPolicy.MatchDstIpPrefixConditionInfo = policy.PolicyDstIpMatchPrefixSetCondition{Prefix: matchPrefix}
+	newPolicy.MatchDstIpPrefixConditionInfo = policy.PolicyDstIpMatchPrefixSetCondition{Prefix: matchPrefix, PrefixSet: cfg.PrefixSet}
 	val, err = db.CreatePolicyCondition(newPolicy)
 	return val, err
 }
