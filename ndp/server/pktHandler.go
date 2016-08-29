@@ -214,7 +214,7 @@ func (svr *NDPServer) ProcessRxPkt(ifIndex int32, pkt gopacket.Packet) error {
 	}
 	nbrInfo, operation := ipPort.ProcessND(ndInfo)
 	if nbrInfo == nil || operation == DELETE {
-		debug.Logger.Warning("nbrInfo:", nbrInfo, "operation:", operation)
+		//debug.Logger.Warning("nbrInfo:", nbrInfo, "operation:", operation)
 		return nil
 	}
 	switch operation {
