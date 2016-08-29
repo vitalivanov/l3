@@ -63,7 +63,8 @@ func (session *BfdSession) StartSessionClient(server *BFDServer) error {
 		server.FailedSessionClientCh <- session.state.SessionId
 		return err
 	}
-	localAddr := net.JoinHostPort("", strconv.Itoa(int(SRC_PORT+session.state.SessionId)))
+	//localAddr := net.JoinHostPort("", strconv.Itoa(int(SRC_PORT+session.state.SessionId)))
+	localAddr := ""
 	ClientAddr, err := net.ResolveUDPAddr("udp", localAddr)
 	if err != nil {
 		server.logger.Info(fmt.Sprintln("Failed ResolveUDPAddr ", localAddr, err))
