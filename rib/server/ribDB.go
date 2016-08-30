@@ -59,6 +59,27 @@ func (ribdServiceHandler *RIBDServer) UpdateRoutesFromDB() (err error) {
 		}*/
 	return err
 }
+func (ribdServiceHandler *RIBDServer) UpdateGlobalPolicyPrefixSetsFromDB(dbHdl *dbutils.DBUtil) (err error) {
+	logger.Debug("UpdateGlobalPolicyPrefixSetsFromDB")
+	if dbHdl != nil {
+		var dbObjCfg objects.PolicyPrefixSet
+		objList, err := dbHdl.GetAllObjFromDb(dbObjCfg)
+		if err == nil {
+			for idx := 0; idx < len(objList); idx++ {
+				obj := ribd.NewPolicyPrefixSet()
+				dbObj := objList[idx].(objects.PolicyPrefixSet)
+				objects.ConvertribdPolicyPrefixSetObjToThrift(&dbObj, obj)
+				ribdServiceHandler.PolicyConfCh <- RIBdServerConfig{
+					OrigConfigObject: obj,
+					Op:               "addPolicyPrefixSet",
+				}
+			}
+		} else {
+			logger.Err("DB Query failed during PolicyPrefixSet query: RIBd init")
+		}
+	}
+	return err
+}
 
 func (ribdServiceHandler *RIBDServer) UpdateGlobalPolicyConditionsFromDB(dbHdl *dbutils.DBUtil) (err error) {
 	logger.Debug("UpdateGlobalPolicyConditionsFromDB")
@@ -126,6 +147,7 @@ func (ribdServiceHandler *RIBDServer) UpdateGlobalPolicyFromDB(dbHdl *dbutils.DB
 func (ribdServiceHandler *RIBDServer) UpdatePolicyObjectsFromDB() { //(paramsDir string) (err error) {
 	logger.Debug("UpdateFromDB")
 	dbHdl := ribdServiceHandler.DbHdl
+	ribdServiceHandler.UpdateGlobalPolicyPrefixSetsFromDB(dbHdl) //paramsDir, dbHdl)
 	ribdServiceHandler.UpdateGlobalPolicyConditionsFromDB(dbHdl) //paramsDir, dbHdl)
 	ribdServiceHandler.UpdateGlobalPolicyStmtsFromDB(dbHdl)
 	ribdServiceHandler.UpdateGlobalPolicyFromDB(dbHdl)

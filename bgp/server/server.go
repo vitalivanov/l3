@@ -1389,18 +1389,19 @@ func (s *BGPServer) SetupRedistribution(gConf config.GlobalConfig) {
 					applyList[applyIndex].Conditions = append(applyList[applyIndex].Conditions, condition)
 				}
 				applyIndex++
-
-				undoApplyList = append(undoApplyList, &config.ApplyPolicyInfo{
-					Protocol: "BGP",
-					Policy:   gConf.Redistribution[i].Policy,
-					Action:   "Redistribution"})
-				if condition != nil {
-					if undoApplyList[undoIndex].Conditions == nil {
-						undoApplyList[undoIndex].Conditions = make([]*config.ConditionInfo, 0)
+				if s.RedistributionMap[source] != "" {
+					undoApplyList = append(undoApplyList, &config.ApplyPolicyInfo{
+						Protocol: "BGP",
+						Policy:   s.RedistributionMap[source],
+						Action:   "Redistribution"})
+					if condition != nil {
+						if undoApplyList[undoIndex].Conditions == nil {
+							undoApplyList[undoIndex].Conditions = make([]*config.ConditionInfo, 0)
+						}
+						undoApplyList[undoIndex].Conditions = append(undoApplyList[undoIndex].Conditions, condition)
 					}
-					undoApplyList[undoIndex].Conditions = append(undoApplyList[undoIndex].Conditions, condition)
+					undoIndex++
 				}
-				undoIndex++
 
 				s.RedistributionMap[source] = gConf.Redistribution[i].Policy
 			}
