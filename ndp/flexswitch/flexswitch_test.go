@@ -23,11 +23,17 @@
 package flexswitch
 
 import (
+	"l3/ndp/api"
 	"ndpd"
 	"testing"
 )
 
+func baseNdpFSInit() {
+	api.Init(nil)
+}
+
 func TestCreateNDPGlobal(t *testing.T) {
+	baseNdpFSInit()
 	h := NewConfigHandler()
 	config := &ndpd.NDPGlobal{}
 	h.CreateNDPGlobal(config)

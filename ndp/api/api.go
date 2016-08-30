@@ -23,6 +23,7 @@
 package api
 
 import (
+	"errors"
 	"l3/ndp/config"
 	"l3/ndp/server"
 	"sync"
@@ -89,4 +90,16 @@ func GetAllNeigborEntries(from, count int) (int, int, []config.NeighborConfig) {
 
 func GetNeighborEntry(ipAddr string) *config.NeighborConfig {
 	return ndpApi.server.GetNeighborEntry(ipAddr)
+}
+
+func CreateGlobalConfig(vrf string, rt uint32, reachableTime uint32, raTime uint8) (bool, error) {
+	if ndpApi.server == nil {
+		return false, errors.New("Server is not initialized")
+	}
+	rv, err := ndpApi.server.NdpConfig.Validate(vrf, rt, reachableTime, raTime)
+	if err != nil {
+		return rv, err
+	}
+	ndpApi.server.GlobalCfg <- server.NdpConfig{vrf, rt, reachableTime, raTime}
+	return true, nil
 }

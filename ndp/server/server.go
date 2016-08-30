@@ -35,11 +35,13 @@ import (
 	"syscall"
 	"time"
 	"utils/asicdClient"
+	"utils/dmnBase"
 )
 
-func NDPNewServer(sPlugin asicdClient.AsicdClientIntf) *NDPServer {
+func NDPNewServer(sPlugin asicdClient.AsicdClientIntf, dmnBase *dmnBase.FSBaseDmn) *NDPServer {
 	svr := &NDPServer{}
 	svr.SwitchPlugin = sPlugin
+	svr.dmnBase = dmnBase
 	return svr
 }
 
@@ -91,6 +93,9 @@ func (svr *NDPServer) InitGlobalDS() {
 	svr.Timeout = 1 * time.Second
 	svr.NeigborEntryLock = &sync.RWMutex{}
 	svr.Packet = packet.Init()
+
+	//configuration channels
+	svr.GlobalCfg = make(chan NdpConfig)
 
 	// init publisher
 	pub := publisher.NewPublisher()
@@ -156,6 +161,12 @@ func (svr *NDPServer) EventsListener() {
 				continue
 			}
 			debug.Logger.Debug("Need to support vlan Notifications:", vlanInfo)
+
+		case globalCfg, ok := <-svr.GlobalCfg:
+			if !ok {
+				continue
+			}
+			svr.NdpConfig.Create(globalCfg)
 		}
 	}
 }
