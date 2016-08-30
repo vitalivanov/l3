@@ -1163,8 +1163,8 @@ func (h *BGPHandler) DeleteBGPv4Neighbor(bgpNeighbor *bgpd.BGPv4Neighbor) (bool,
 func (h *BGPHandler) getIPAndIfIndexForV6Neighbor(neighborIP string, neighborIntfRef string) (ip net.IP, ifIndex int32,
 	err error) {
 	if strings.TrimSpace(neighborIP) != "" {
+		ifIndex = -1
 		ip = net.ParseIP(strings.TrimSpace(neighborIP))
-		ifIndex = 0
 		if ip == nil {
 			err = errors.New(fmt.Sprintf("v6Neighbor address %s not valid", neighborIP))
 		}
@@ -1267,6 +1267,7 @@ func (h *BGPHandler) ValidateV6Neighbor(bgpNeighbor *bgpd.BGPv6Neighbor) (pConf 
 	h.setDefault(&pConf)
 	return pConf, err
 }
+
 func (h *BGPHandler) ValidateV6NeighborForUpdate(oldNeigh *bgpd.BGPv6Neighbor, oldNeighConfig config.NeighborConfig, newNeigh *bgpd.BGPv6Neighbor, attrSet []bool) (pConf config.NeighborConfig, err error) {
 	pConf, _ = h.ConvertV6NeighborFromThrift(oldNeigh, oldNeighConfig.NeighborAddress, oldNeighConfig.IfIndex)
 	if attrSet != nil {

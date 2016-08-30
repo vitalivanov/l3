@@ -171,7 +171,7 @@ func InitNDPTestServer() {
 	initServerBasic()
 	testServerInitdone = make(chan bool)
 	testServerQuit = make(chan bool)
-	testNdpServer = NDPNewServer(&asicdmock.MockAsicdClientMgr{})
+	testNdpServer = NDPNewServer(&asicdmock.MockAsicdClientMgr{}, nil)
 	testNdpServer.NDPStartServer()
 	initPhysicalPorts()
 	testIpv6GSNotifyObj = &config.IPIntfNotification{

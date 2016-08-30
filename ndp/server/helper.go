@@ -121,7 +121,7 @@ func (svr *NDPServer) GetIPIntf() {
 	}
 	for _, obj := range ipsInfo {
 		ipInfo := Interface{}
-		ipInfo.InitIntf(obj, svr.PktDataCh)
+		ipInfo.InitIntf(obj, svr.PktDataCh, svr.NdpConfig)
 		svr.L3Port[ipInfo.IfIndex] = ipInfo
 		svr.ndpL3IntfStateSlice = append(svr.ndpL3IntfStateSlice, ipInfo.IfIndex)
 	}
@@ -196,7 +196,7 @@ func (svr *NDPServer) HandleIPIntfCreateDelete(obj *config.IPIntfNotification) {
 
 		ipInfo = Interface{}
 		//ipInfo.CreateIntf(obj, svr.GetIntfRefName(obj.IfIndex), svr.PktDataCh)
-		ipInfo.CreateIntf(obj, svr.PktDataCh)
+		ipInfo.CreateIntf(obj, svr.PktDataCh, svr.NdpConfig)
 		svr.ndpL3IntfStateSlice = append(svr.ndpL3IntfStateSlice, ipInfo.IfIndex)
 	case config.CONFIG_DELETE:
 		if !exists {

@@ -22,6 +22,39 @@
 //
 package server
 
-func (svr *NDPServer) ReadDB() error {
-	return nil
+import (
+	"l3/ndp/debug"
+	"models/objects"
+	"utils/dbutils"
+)
+
+func (svr *NDPServer) readNdpGblCfg(dbHdl *dbutils.DBUtil) {
+	var dbGblObj objects.NDPGlobal
+	objList, err := dbHdl.GetAllObjFromDb(dbGblObj)
+	if err != nil {
+		debug.Logger.Err("DB Querry failed for NDPGlobal Config", err)
+		return
+	}
+	debug.Logger.Info("Global Object reterived from DB are", objList)
+	for _, obj := range objList {
+		dbEntry := obj.(objects.NDPGlobal)
+		svr.NdpConfig.Vrf = dbEntry.Vrf
+		svr.NdpConfig.RaRestransmitTime = uint8(dbEntry.RouterAdvertisementInterval)
+		svr.NdpConfig.ReachableTime = uint32(dbEntry.ReachableTime)
+		svr.NdpConfig.RetransTime = uint32(dbEntry.RetransmitInterval)
+		debug.Logger.Info("Done with reading NDPGlobal config from DB")
+	}
+}
+
+func (svr *NDPServer) ReadDB() {
+	if svr.dmnBase == nil {
+		return
+	}
+	dbHdl := svr.dmnBase.GetDbHdl()
+	if dbHdl == nil {
+		debug.Logger.Err("DB Handler is nil and hence cannot read anything from DATABASE")
+		return
+	}
+	debug.Logger.Info("Reading Config from DB")
+	svr.readNdpGblCfg(dbHdl)
 }
