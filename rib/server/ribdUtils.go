@@ -794,6 +794,10 @@ func validateNetworkPrefix(ipAddr string, mask string) (destNet patriciaDB.Prefi
 	}
 	vdestMask := net.IPMask(networkMask) //net.IPv4Mask(networkMask[0], networkMask[1], networkMask[2], networkMask[3])
 	netIp := destNetIp.Mask(vdestMask)
+	if netIp == nil {
+		logger.Err("netIp nil for ipAddr:", ipAddr, " mask:", mask)
+		return destNet, errors.New("netIp nil")
+	}
 	//logger.Debug("netIP: ", netIp, " destNetIp ", destNetIp)
 	if !(bytes.Equal(destNetIp, netIp)) {
 		logger.Err("Cannot have ip : ", destNetIp, " more specific than mask ")
@@ -831,8 +835,12 @@ func getNetworkPrefix(destNetIp net.IP, networkMask net.IP) (destNet patriciaDB.
 		logger.Debug("ipv6 case, netIp = ", netIp, " vdestMask:", vdestMask, " nwAddr:", nwAddr)
 	}
 	logger.Debug("getNetworkPrefix: prefixLen  = ", prefixLen, " netIp:", netIp, " numbytes:", numbytes, " len(netIp):", len(netIp))
+	if netIp == nil {
+		logger.Err("netIp nil ")
+		return destNet, nwAddr, errors.New("netIp nil")
+	}
 	destNet = make([]byte, numbytes)
-	for i := 0; i < numbytes; i++ {
+	for i := 0; i < numbytes && i < len(netIp); i++ {
 		destNet[i] = netIp[i]
 		logger.Debug("destnet[", i, "]:", destNet[i], " netIp[", i, "]:", netIp[i])
 	}
@@ -840,7 +848,7 @@ func getNetworkPrefix(destNetIp net.IP, networkMask net.IP) (destNet patriciaDB.
 	return destNet, nwAddr, err
 }
 func getNetowrkPrefixFromStrings(ipAddr string, mask string) (prefix patriciaDB.Prefix, err error) {
-	//logger.Debug("getNetowrkPrefixFromStrings for ip ", ipAddr, " mask: ", mask)
+	logger.Debug("getNetowrkPrefixFromStrings for ip ", ipAddr, " mask: ", mask)
 	destNetIpAddr, err := getIP(ipAddr)
 	if err != nil {
 		logger.Info("destNetIpAddr ", ipAddr, " invalid")
@@ -869,6 +877,7 @@ func getNetworkPrefixFromCIDR(ipAddr string) (ipPrefix patriciaDB.Prefix, err er
 	copy(ipMask, ipNet.Mask)
 	ipAddrStr := ip.String()
 	//ipMaskStr := net.IP(ipMask).String()
+	logger.Debug("getNetowrkPrefixFromStrings for ip ", ipAddr, " calling getNetowrkPrefixFromStrings(", ipAddrStr, ",", (net.IP(ipNet.Mask)).String(), ")")
 	ipPrefix, err = getNetowrkPrefixFromStrings(ipAddrStr, (net.IP(ipNet.Mask)).String()) //ipMaskStr)
 	return ipPrefix, err
 }
