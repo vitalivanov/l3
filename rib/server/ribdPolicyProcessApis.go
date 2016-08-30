@@ -24,6 +24,9 @@
 package server
 
 import (
+	"encoding/json"
+	"errors"
+	"fmt"
 	"ribd"
 	"ribdInt"
 	"utils/patriciaDB"
@@ -169,6 +172,71 @@ func (m RIBDServer) ProcessPolicyDefinitionConfigDelete(cfg *ribd.PolicyDefiniti
 	return err
 }
 
+/*
+   Function to patch update policy definition in the policyEngineDB
+*/
+func (m RIBDServer) ProcessPolicyDefinitionConfigPatchUpdate(origCfg *ribd.PolicyDefinition, newCfg *ribd.PolicyDefinition, op []*ribd.PatchOpInfo, db *policy.PolicyEngineDB) (err error) {
+	logger.Debug("ProcessPolicyDefinitionConfigUpdate:", origCfg.Name)
+	if origCfg.Name != newCfg.Name {
+		logger.Err("Update for a different policy")
+		return errors.New("Policy to be updated is different than the original one")
+	}
+	for idx := 0; idx < len(op); idx++ {
+		switch op[idx].Path {
+		case "StatementList":
+			logger.Debug("Patch update for StatementList")
+			/*newconfig should only have the next hops that have to be added or deleted*/
+			newPolicy := policy.PolicyDefinitionConfig{
+				Name:       origCfg.Name,
+				Precedence: int(origCfg.Priority),
+				MatchType:  origCfg.MatchType,
+				PolicyType: origCfg.PolicyType,
+			}
+			newPolicy.PolicyDefinitionStatements = make([]policy.PolicyDefinitionStmtPrecedence, 0)
+			newPolicy.Extensions = PolicyExtensions{}
+			//logger.Debug("value = ", op[idx].Value)
+			valueObjArr := []ribd.PolicyDefinitionStmtPriority{}
+			err = json.Unmarshal([]byte(op[idx].Value), &valueObjArr)
+			if err != nil {
+				//logger.Debug("error unmarshaling value:", err))
+				return errors.New(fmt.Sprintln("error unmarshaling value:", err))
+			}
+			logger.Debug("Number of statements:", len(valueObjArr))
+			for _, val := range valueObjArr {
+				logger.Debug("stmtInfo: pri - ", val.Priority, " stmt: ", val.Statement)
+				newPolicy.PolicyDefinitionStatements = append(newPolicy.PolicyDefinitionStatements, policy.PolicyDefinitionStmtPrecedence{
+					Precedence: int(val.Priority),
+					Statement:  val.Statement,
+				})
+			}
+			switch op[idx].Op {
+			case "add":
+				//db.UpdateAddPolicyDefinition(newPolicy)
+			case "remove":
+				//db.UpdateRemovePolicyDefinition(newconfig)
+			default:
+				logger.Err("Operation ", op[idx].Op, " not supported")
+			}
+		default:
+			logger.Err("Patch update for attribute:", op[idx].Path, " not supported")
+			err = errors.New(fmt.Sprintln("Operation ", op[idx].Op, " not supported"))
+		}
+	}
+	return err
+}
+
+/*
+   Function to update policy definition in the policyEngineDB
+*/
+func (m RIBDServer) ProcessPolicyDefinitionConfigUpdate(origCfg *ribd.PolicyDefinition, newCfg *ribd.PolicyDefinition, attrset []bool, db *policy.PolicyEngineDB) (err error) {
+	logger.Debug("ProcessPolicyDefinitionConfigUpdate:", origCfg.Name)
+	if origCfg.Name != newCfg.Name {
+		logger.Err("Update for a different policy")
+		return errors.New("Policy to be updated is different than the original one")
+	}
+	return err
+}
+
 func (m RIBDServer) GetBulkPolicyPrefixSetState(fromIndex ribd.Int, rcount ribd.Int, db *policy.PolicyEngineDB) (policyPrefixSets *ribd.PolicyPrefixSetStateGetInfo, err error) { //(routes []*ribd.Routes, err error) {
 	logger.Debug("GetBulkPolicyPrefixSetState")
 	PolicyPrefixSetDB := db.PolicyPrefixSetDB
@@ -289,68 +357,6 @@ func (m RIBDServer) GetBulkPolicyConditionState(fromIndex ribd.Int, rcount ribd.
 	return policyConditions, err
 }
 
-/*
-func (m RIBDServer) GetBulkPolicyActionState(fromIndex ribd.Int, rcount ribd.Int) (policyActions *ribdInt.PolicyActionStateGetInfo, err error) { //(routes []*ribd.Routes, err error) {
-	logger.Debug("GetBulkPolicyActionState"))
-	PolicyActionsDB := PolicyEngineDB.PolicyActionsDB
-	localPolicyActionsDB := *PolicyEngineDB.LocalPolicyActionsDB
-	var i, validCount, toIndex ribd.Int
-	var tempNode []ribdInt.PolicyActionState = make([]ribdInt.PolicyActionState, rcount)
-	var nextNode *ribdInt.PolicyActionState
-	var returnNodes []*ribdInt.PolicyActionState
-	var returnGetInfo ribdInt.PolicyActionStateGetInfo
-	i = 0
-	policyActions = &returnGetInfo
-	more := true
-	if localPolicyActionsDB == nil {
-		logger.Debug("PolicyDefinitionStmtMatchProtocolActionGetInfo not initialized"))
-		return policyActions, err
-	}
-	for ; ; i++ {
-		logger.Debug(fmt.Sprintf("Fetching trie record for index %d\n", i+fromIndex))
-		if i+fromIndex >= ribd.Int(len(localPolicyActionsDB)) {
-			logger.Debug("All the policy Actions fetched"))
-			more = false
-			break
-		}
-		if localPolicyActionsDB[i+fromIndex].IsValid == false {
-			logger.Debug("Invalid policy Action statement"))
-			continue
-		}
-		if validCount == rcount {
-			logger.Debug("Enough policy Actions fetched"))
-			break
-		}
-		logger.Debug(fmt.Sprintf("Fetching trie record for index %d and prefix %v\n", i+fromIndex, (localPolicyActionsDB[i+fromIndex].Prefix)))
-		prefixNodeGet := PolicyActionsDB.Get(localPolicyActionsDB[i+fromIndex].Prefix)
-		if prefixNodeGet != nil {
-			prefixNode := prefixNodeGet.(policy.PolicyAction)
-			nextNode = &tempNode[validCount]
-			nextNode.Name = prefixNode.Name
-			nextNode.ActionInfo = prefixNode.ActionGetBulkInfo
-			if prefixNode.PolicyStmtList != nil {
-				nextNode.PolicyStmtList = make([]string, 0)
-			}
-			for idx := 0; idx < len(prefixNode.PolicyStmtList); idx++ {
-				nextNode.PolicyStmtList = append(nextNode.PolicyStmtList, prefixNode.PolicyStmtList[idx])
-			}
-			toIndex = ribd.Int(prefixNode.LocalDBSliceIdx)
-			if len(returnNodes) == 0 {
-				returnNodes = make([]*ribdInt.PolicyActionState, 0)
-			}
-			returnNodes = append(returnNodes, nextNode)
-			validCount++
-		}
-	}
-	logger.Debug(fmt.Sprintf("Returning %d list of policyActions", validCount))
-	policyActions.PolicyActionStateList = returnNodes
-	policyActions.StartIdx = fromIndex
-	policyActions.EndIdx = toIndex + 1
-	policyActions.More = more
-	policyActions.Count = validCount
-	return policyActions, err
-}
-*/
 func (m RIBDServer) GetBulkPolicyStmtState(fromIndex ribd.Int, rcount ribd.Int, db *policy.PolicyEngineDB) (policyStmts *ribd.PolicyStmtStateGetInfo, err error) { //(routes []*ribd.Routes, err error) {
 	logger.Debug("GetBulkPolicyStmtState")
 	PolicyStmtDB := db.PolicyStmtDB

@@ -238,8 +238,24 @@ func (ribdServiceHandler *RIBDServer) StartPolicyServer() {
 					ribdServiceHandler.PolicyDefinitionNotificationSend(RIBD_POLICY_PUB, *(conf.OrigConfigObject.(*ribd.PolicyDefinition)), ribdCommonDefs.NOTIFY_POLICY_DEFINITION_DELETED)
 					ribdServiceHandler.ProcessPolicyDefinitionConfigDelete(conf.OrigConfigObject.(*ribd.PolicyDefinition), ribdServiceHandler.PolicyEngineDB)
 				}
+			} else if conf.Op == "updatePolicyDefinition" {
+				logger.Debug("Received updatePolicyDefinition on policy server channel")
+				var err error
+				if conf.PatchOp == nil || len(conf.PatchOp) == 0 {
+					err = ribdServiceHandler.ProcessPolicyDefinitionConfigUpdate(conf.OrigConfigObject.(*ribd.PolicyDefinition), conf.NewConfigObject.(*ribd.PolicyDefinition), conf.AttrSet, GlobalPolicyEngineDB)
+					if err == nil {
+						ribdServiceHandler.PolicyDefinitionNotificationSend(RIBD_POLICY_PUB, *(conf.OrigConfigObject.(*ribd.PolicyDefinition)), ribdCommonDefs.NOTIFY_POLICY_DEFINITION_UPDATED)
+						ribdServiceHandler.ProcessPolicyDefinitionConfigUpdate(conf.OrigConfigObject.(*ribd.PolicyDefinition), conf.NewConfigObject.(*ribd.PolicyDefinition), conf.AttrSet, ribdServiceHandler.PolicyEngineDB)
+					}
+				} else {
+					err = ribdServiceHandler.ProcessPolicyDefinitionConfigPatchUpdate(conf.OrigConfigObject.(*ribd.PolicyDefinition), conf.NewConfigObject.(*ribd.PolicyDefinition), conf.PatchOp, GlobalPolicyEngineDB)
+					if err == nil {
+						ribdServiceHandler.PolicyDefinitionNotificationSend(RIBD_POLICY_PUB, *(conf.OrigConfigObject.(*ribd.PolicyDefinition)), ribdCommonDefs.NOTIFY_POLICY_DEFINITION_UPDATED)
+						ribdServiceHandler.ProcessPolicyDefinitionConfigPatchUpdate(conf.OrigConfigObject.(*ribd.PolicyDefinition), conf.NewConfigObject.(*ribd.PolicyDefinition), conf.PatchOp, ribdServiceHandler.PolicyEngineDB)
+					}
+				}
 			} else if conf.Op == "applyPolicy" {
-				ribdServiceHandler.UpdateApplyPolicyList(conf.PolicyList.ApplyList, conf.PolicyList.UndoList, true, PolicyEngineDB)
+				ribdServiceHandler.UpdateApplyPolicyList(conf.PolicyList.ApplyList, conf.PolicyList.UndoList, true, ribdServiceHandler.PolicyEngineDB)
 				ribdServiceHandler.UpdateApplyPolicyList(conf.PolicyList.ApplyList, conf.PolicyList.UndoList, false, GlobalPolicyEngineDB)
 			}
 		case info := <-ribdServiceHandler.PolicyUpdateApplyCh:

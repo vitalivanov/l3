@@ -63,6 +63,7 @@ const (
 	NOTIFY_POLICY_DEFINITION_UPDATED        = 13
 	NOTIFY_POLICY_PREFIX_SET_CREATED        = 14
 	NOTIFY_POLICY_PREFIX_SET_DELETED        = 15
+	NOTIFY_POLICY_PREFIX_SET_UPDATED        = 15
 	DEFAULT_NOTIFICATION_SIZE               = 128
 	RoutePolicyStateChangetoValid           = 1
 	RoutePolicyStateChangetoInValid         = 2
