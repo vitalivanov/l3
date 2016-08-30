@@ -1201,7 +1201,7 @@ func (s *BGPServer) AddOrUpdateAgg(oldConf config.BGPAggregate, newConf config.B
 		}
 
 		precedence := pe.GetNextId()
-		def := utilspolicy.PolicyDefinitionConfig{Name: name, Precedence: int(precedence), MatchType: "any"}
+		def := utilspolicy.PolicyDefinitionConfig{Name: name, Precedence: int(precedence), MatchType: "any", PolicyType: "BGP"}
 		def.PolicyDefinitionStatements = make([]utilspolicy.PolicyDefinitionStmtPrecedence, 1)
 		policyDefinitionStatement := utilspolicy.PolicyDefinitionStmtPrecedence{
 			Precedence: 1,
