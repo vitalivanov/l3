@@ -66,7 +66,7 @@ func main() {
 		lPlugin := flexswitch.NewConfigPlugin(flexswitch.NewConfigHandler(), ndpBase.ParamsDir)
 		// create new ndp server and cache the information for switch/asicd plugin
 		debug.Logger.Info("Creating NDP Server")
-		ndpServer := server.NDPNewServer(switchPlugin)
+		ndpServer := server.NDPNewServer(switchPlugin, ndpBase)
 		// Init API layer after server is created
 		debug.Logger.Info("Starting API Layer for NDP server")
 		api.Init(ndpServer)

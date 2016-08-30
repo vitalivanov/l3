@@ -29,6 +29,7 @@ import (
 	"sync"
 	"time"
 	"utils/asicdClient" // this is switch plugin need to change the name
+	"utils/dmnBase"
 )
 
 type RxPktInfo struct {
@@ -44,8 +45,9 @@ type NdpConfig struct {
 }
 
 type NDPServer struct {
-	NdpConfig
-	SwitchPlugin asicdClient.AsicdClientIntf
+	NdpConfig                                // base config
+	dmnBase      *dmnBase.FSBaseDmn          // base Daemon
+	SwitchPlugin asicdClient.AsicdClientIntf // asicd plugin
 
 	// System Ports information, key is IntfRef
 	PhyPort             map[int32]config.PortInfo        // key is l2 ifIndex

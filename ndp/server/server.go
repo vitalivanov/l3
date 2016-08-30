@@ -35,11 +35,13 @@ import (
 	"syscall"
 	"time"
 	"utils/asicdClient"
+	"utils/dmnBase"
 )
 
-func NDPNewServer(sPlugin asicdClient.AsicdClientIntf) *NDPServer {
+func NDPNewServer(sPlugin asicdClient.AsicdClientIntf, dmnBase *dmnBase.FSBaseDmn) *NDPServer {
 	svr := &NDPServer{}
 	svr.SwitchPlugin = sPlugin
+	svr.dmnBase = dmnBase
 	return svr
 }
 

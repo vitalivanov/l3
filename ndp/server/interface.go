@@ -118,10 +118,10 @@ func (intf *Interface) commonInit(ipAddr string, pktCh chan config.PacketData, g
 	intf.PcapBase.PcapCtrl = nil
 	intf.PcapBase.PcapUsers = 0
 	// Timers Value Init
-	intf.retransTime = 1       // gCfg.RetransTime             //1       // config value ms
-	intf.reachableTime = 30000 //gCfg.ReachableTime         //30000 // config value ms
-	intf.raRestransmitTime = 5 //gCfg.RaRestransmitTime //5 // config value s ADAM asked for 5 seconds :)
-	intf.routerLifeTime = 1800 // config value s
+	intf.retransTime = gCfg.RetransTime             //1       // config value ms
+	intf.reachableTime = gCfg.ReachableTime         //30000 // config value ms
+	intf.raRestransmitTime = gCfg.RaRestransmitTime //5 // config value s ADAM asked for 5 seconds :)
+	intf.routerLifeTime = 1800                      // config value s
 	intf.initialRASend = 0
 	intf.raTimer = nil
 	// Neighbor Init
