@@ -138,7 +138,11 @@ func (m RIBDServicesHandler) GetBulkPolicyDefinitionState(fromIndex ribd.Int, rc
 //this API is called by applications when user applies a policy to a entity and RIBD applies the policy/runs the policyEngine
 func (m RIBDServicesHandler) ApplyPolicy(applyList []*ribdInt.ApplyPolicyInfo, undoList []*ribdInt.ApplyPolicyInfo) (err error) {
 	logger.Debug(fmt.Sprintln("RIB handler ApplyPolicy applyList:", applyList, " undoList:", undoList))
-	m.server.PolicyApplyCh <- server.ApplyPolicyList{applyList, undoList} //source, policy, action, conditions}
+	m.server.PolicyConfCh <- server.RIBdServerConfig{
+		PolicyList: server.ApplyPolicyList{applyList, undoList},
+		Op:         "applyPolicy",
+	}
+	//m.server.PolicyApplyCh <- server.ApplyPolicyList{applyList, undoList} //source, policy, action, conditions}
 	return nil
 }
 

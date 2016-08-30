@@ -83,7 +83,7 @@ func policyEngineActionRejectRoute(params interface{}) {
 	}
 	cfg.NextHop = make([]*ribd.NextHopInfo, 0)
 	cfg.NextHop = append(cfg.NextHop, &nextHop)
-	_, err := RouteServiceHandler.ProcessV4RouteDeleteConfig(&cfg) //routeInfo.destNetIp, routeInfo.networkMask, ReverseRouteProtoTypeMapDB[int(routeInfo.routeType)], routeInfo.nextHopIp) // FIBAndRIB)//,ribdCommonDefs.RoutePolicyStateChangetoInValid)
+	_, err := RouteServiceHandler.ProcessV4RouteDeleteConfig(&cfg, FIBAndRIB) //routeInfo.destNetIp, routeInfo.networkMask, ReverseRouteProtoTypeMapDB[int(routeInfo.routeType)], routeInfo.nextHopIp) // FIBAndRIB)//,ribdCommonDefs.RoutePolicyStateChangetoInValid)
 	if err != nil {
 		logger.Info("deleting v4 route failed with err ", err)
 		return
@@ -502,7 +502,7 @@ func policyEngineActionRedistribute(actionInfo interface{}, conditionInfo []inte
 	}
 	testIp := RouteInfo.destNetIp + "/128"
 	logger.Info("Redistribute: route dest ip info:", RouteInfo.destNetIp)
-	inRange := netUtils.CheckIfInRange(testIp, "fe80::/10", -1, -1)
+	inRange := netUtils.CheckIfInRange(testIp, "fe80::/10", 10, 128)
 	if inRange {
 		//link local ip , dont redistribute
 		return
@@ -521,7 +521,7 @@ func policyEngineActionRedistribute(actionInfo interface{}, conditionInfo []inte
 
 func UpdateRouteAndPolicyDB(policyDetails policy.PolicyDetails, params interface{}) {
 	routeInfo := params.(RouteParams)
-	route := ribdInt.Routes{Ipaddr: routeInfo.destNetIp, Mask: routeInfo.networkMask, NextHopIp: routeInfo.nextHopIp, IfIndex: ribdInt.Int(routeInfo.nextHopIfIndex), Metric: ribdInt.Int(routeInfo.metric), Prototype: ribdInt.Int(routeInfo.routeType)}
+	route := ribdInt.Routes{Ipaddr: routeInfo.destNetIp, Mask: routeInfo.networkMask, IPAddrType: ribdInt.Int(routeInfo.ipType), NextHopIp: routeInfo.nextHopIp, IfIndex: ribdInt.Int(routeInfo.nextHopIfIndex), Metric: ribdInt.Int(routeInfo.metric), Prototype: ribdInt.Int(routeInfo.routeType)}
 	var op int
 	if routeInfo.deleteType != Invalid {
 		op = del
@@ -547,7 +547,7 @@ func DoesRouteExist(params interface{}) (exists bool) {
 	}
 	routeInfoRecordList := RouteInfoMapGet(routeInfo.ipType, ipPrefix)
 	if routeInfoRecordList == nil {
-		logger.Info("Route for this prefix no longer exists")
+		logger.Info("Route for type ", routeInfo.ipType, " and prefix", ipPrefix, " no longer exists")
 		routeDeleted = true
 	} else {
 		if routeInfoRecordList.(RouteInfoRecordList).selectedRouteProtocol != ReverseRouteProtoTypeMapDB[int(routeInfo.routeType)] {
@@ -591,7 +591,18 @@ func PolicyEngineFilter(route ribdInt.Routes, policyPath int, params interface{}
 		return
 	}
 	routeInfo := params.(RouteParams)
-	logger.Info("PolicyEngineFilter for policypath ", policyPath_Str, "createType = ", routeInfo.createType, " deleteType = ", routeInfo.deleteType, " route: ", route.Ipaddr, ":", route.Mask, " protocol type: ", route.Prototype)
+	testIp := routeInfo.destNetIp + "/128"
+	logger.Info("Redistribute: route dest ip info:", routeInfo.destNetIp)
+	inRange := netUtils.CheckIfInRange(testIp, "fe80::/10", 10, 128)
+	if inRange {
+		//link local ip , dont redistribute
+		return
+	}
+	if destNetSlice[routeInfo.sliceIdx].isValid == false && routeInfo.createType != Invalid && policyPath == policyCommonDefs.PolicyPath_Export {
+		logger.Info("route down, return from policyenginefilter for deletetype and export path")
+		return
+	}
+	logger.Info("PolicyEngineFilter for policypath ", policyPath_Str, "createType = ", routeInfo.createType, " deleteType = ", routeInfo.deleteType, " route: ", route.Ipaddr, ":", route.Mask, " protocol type: ", route.Prototype, " addrtype:", route.IPAddrType)
 	entity, err := buildPolicyEntityFromRoute(route, params)
 	if err != nil {
 		logger.Info(("Error building policy params"))

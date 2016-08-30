@@ -31,7 +31,8 @@ import (
 )
 
 func (h *ConfigHandler) CreateNDPGlobal(config *ndpd.NDPGlobal) (bool, error) {
-	return true, nil
+	return api.CreateGlobalConfig(config.Vrf, uint32(config.RetransmitInterval), uint32(config.ReachableTime),
+		uint8(config.RouterAdvertisementInterval))
 }
 
 func (h *ConfigHandler) UpdateNDPGlobal(orgCfg *ndpd.NDPGlobal, newCfg *ndpd.NDPGlobal, attrset []bool, op []*ndpd.PatchOpInfo) (bool, error) {
@@ -39,7 +40,7 @@ func (h *ConfigHandler) UpdateNDPGlobal(orgCfg *ndpd.NDPGlobal, newCfg *ndpd.NDP
 }
 
 func (h *ConfigHandler) DeleteNDPGlobal(config *ndpd.NDPGlobal) (bool, error) {
-	return true, nil
+	return false, errors.New("Delete of Global Object is not supported")
 }
 
 /*

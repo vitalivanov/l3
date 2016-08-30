@@ -46,6 +46,31 @@ type ApplyPolicyList struct {
 }
 
 /*
+   Function to send PolicyPrefixSet Notification
+*/
+func (ribdServiceHandler *RIBDServer) PolicyPrefixSetNotificationSend(PUB *nanomsg.PubSocket, cfg ribd.PolicyPrefixSet, evt int) {
+	logger.Info("PolicyPrefixSetNotificationSend")
+	msgBuf := objects.PolicyPrefixSet{}
+	objects.ConvertThriftToribdPolicyPrefixSetObj(&cfg, &msgBuf)
+	msgbufbytes, err := json.Marshal(msgBuf)
+	msg := ribdCommonDefs.RibdNotifyMsg{MsgType: uint16(evt), MsgBuf: msgbufbytes}
+	buf, err := json.Marshal(msg)
+	if err != nil {
+		logger.Err("Error in marshalling Json")
+		return
+	}
+	var evtStr string
+	if evt == ribdCommonDefs.NOTIFY_POLICY_PREFIX_SET_CREATED {
+		evtStr = " POLICY_PREFIX_SET_CREATED "
+	} else if evt == ribdCommonDefs.NOTIFY_POLICY_PREFIX_SET_DELETED {
+		evtStr = " POLICY_PREFIX_SET_DELETED "
+	}
+	eventInfo := evtStr + " for prefix set " + cfg.Name
+	logger.Debug("Adding ", evtStr, " to notification channel")
+	ribdServiceHandler.NotificationChannel <- NotificationMsg{PUB, buf, eventInfo}
+}
+
+/*
    Function to send PolicyCondition Notification
 */
 func (ribdServiceHandler *RIBDServer) PolicyConditionNotificationSend(PUB *nanomsg.PubSocket, cfg ribd.PolicyCondition, evt int) {
@@ -177,6 +202,18 @@ func (ribdServiceHandler *RIBDServer) StartPolicyServer() {
 					ribdServiceHandler.PolicyConditionNotificationSend(RIBD_POLICY_PUB, *(conf.OrigConfigObject.(*ribd.PolicyCondition)), ribdCommonDefs.NOTIFY_POLICY_CONDITION_DELETED)
 					ribdServiceHandler.ProcessPolicyConditionConfigDelete(conf.OrigConfigObject.(*ribd.PolicyCondition), ribdServiceHandler.PolicyEngineDB)
 				}
+			} else if conf.Op == "addPolicyPrefixSet" {
+				_, err := ribdServiceHandler.ProcessPolicyPrefixSetConfigCreate(conf.OrigConfigObject.(*ribd.PolicyPrefixSet), GlobalPolicyEngineDB)
+				if err == nil {
+					ribdServiceHandler.PolicyPrefixSetNotificationSend(RIBD_POLICY_PUB, *(conf.OrigConfigObject.(*ribd.PolicyPrefixSet)), ribdCommonDefs.NOTIFY_POLICY_PREFIX_SET_CREATED)
+					ribdServiceHandler.ProcessPolicyPrefixSetConfigCreate(conf.OrigConfigObject.(*ribd.PolicyPrefixSet), ribdServiceHandler.PolicyEngineDB)
+				}
+			} else if conf.Op == "delPolicyPrefixSet" {
+				_, err := ribdServiceHandler.ProcessPolicyPrefixSetConfigDelete(conf.OrigConfigObject.(*ribd.PolicyPrefixSet), GlobalPolicyEngineDB)
+				if err == nil {
+					ribdServiceHandler.PolicyPrefixSetNotificationSend(RIBD_POLICY_PUB, *(conf.OrigConfigObject.(*ribd.PolicyPrefixSet)), ribdCommonDefs.NOTIFY_POLICY_PREFIX_SET_DELETED)
+					ribdServiceHandler.ProcessPolicyPrefixSetConfigDelete(conf.OrigConfigObject.(*ribd.PolicyPrefixSet), ribdServiceHandler.PolicyEngineDB)
+				}
 			} else if conf.Op == "addPolicyStmt" {
 				err := ribdServiceHandler.ProcessPolicyStmtConfigCreate(conf.OrigConfigObject.(*ribd.PolicyStmt), GlobalPolicyEngineDB)
 				if err == nil {
@@ -201,6 +238,9 @@ func (ribdServiceHandler *RIBDServer) StartPolicyServer() {
 					ribdServiceHandler.PolicyDefinitionNotificationSend(RIBD_POLICY_PUB, *(conf.OrigConfigObject.(*ribd.PolicyDefinition)), ribdCommonDefs.NOTIFY_POLICY_DEFINITION_DELETED)
 					ribdServiceHandler.ProcessPolicyDefinitionConfigDelete(conf.OrigConfigObject.(*ribd.PolicyDefinition), ribdServiceHandler.PolicyEngineDB)
 				}
+			} else if conf.Op == "applyPolicy" {
+				ribdServiceHandler.UpdateApplyPolicyList(conf.PolicyList.ApplyList, conf.PolicyList.UndoList, true, PolicyEngineDB)
+				ribdServiceHandler.UpdateApplyPolicyList(conf.PolicyList.ApplyList, conf.PolicyList.UndoList, false, GlobalPolicyEngineDB)
 			}
 		case info := <-ribdServiceHandler.PolicyUpdateApplyCh:
 			/*
