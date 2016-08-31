@@ -90,6 +90,7 @@ func (p *Peer) UpdatePeerGroup(peerGroup *config.PeerGroupConfig) {
 func (p *Peer) UpdateNeighborConf(nConf config.NeighborConfig, bgp *config.Bgp) {
 	p.NeighborConf.UpdateNeighborConf(nConf, bgp)
 }
+
 func (p *Peer) initAdjRIBTables() {
 	for protoFamily, ok := range p.NeighborConf.AfiSafiMap {
 		if ok {
@@ -194,6 +195,7 @@ func (p *Peer) AddAdjRIBFilter(pe *bgppolicy.AdjRibPPolicyEngine, policyName str
 	p.logger.Debug("Calling applypolicy with conditionNameList: ", conditionNameList)
 	pe.UpdateApplyPolicy(utilspolicy.ApplyPolicyInfo{node, policyAction, conditionNameList}, true)
 }
+
 func (p *Peer) Init() {
 	var fsmMgr *fsm.FSMManager
 	if p.NeighborConf.RunningConf.AdjRIBInFilter != "" {
@@ -283,6 +285,16 @@ func (p *Peer) Command(command int, reason int) {
 		return
 	}
 	p.fsmManager.CommandCh <- fsm.PeerFSMCommand{command, reason}
+}
+
+func (p *Peer) BfdFaultSet() {
+	p.NeighborConf.BfdFaultSet()
+	p.fsmManager.BfdStatusCh <- false
+}
+
+func (p *Peer) BfdFaultCleared() {
+	p.NeighborConf.BfdFaultCleared()
+	p.fsmManager.BfdStatusCh <- true
 }
 
 func (p *Peer) getAddPathsMaxTx() int {
