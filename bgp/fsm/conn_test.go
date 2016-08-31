@@ -56,7 +56,7 @@ func TestDecodeMessageBGPOpen(t *testing.T) {
 	fsmMgr := NewFSMManager(logger, nConf, make(chan *packet.BGPPktSrc), make(chan PeerFSMConn),
 		make(chan config.ReachabilityInfo))
 	stateMachine := NewFSM(fsmMgr, 0, nConf)
-	peerConn := NewPeerConn(stateMachine, config.ConnDirOut, nil)
+	peerConn := NewPeerConn(stateMachine, config.ConnDirOut, nil, 1)
 
 	for _, strPkt := range strPkts {
 		hexPkt, err := hex.DecodeString(strPkt)
