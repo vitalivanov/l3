@@ -82,16 +82,16 @@ func (mgr *FSRouteMgr) setupSubSocket(address string) (*nanomsg.SubSocket, error
 	}
 
 	if err = socket.Subscribe(""); err != nil {
-		mgr.logger.Err("Failed to subscribe to \"\" on subscribe socket %s, error:%s", address, err)
+		mgr.logger.Errf("Failed to subscribe to \"\" on subscribe socket %s, error:%s", address, err)
 		return nil, err
 	}
 
 	if _, err = socket.Connect(address); err != nil {
-		mgr.logger.Err("Failed to connect to publisher socket %s, error:%s", address, err)
+		mgr.logger.Errf("Failed to connect to publisher socket %s, error:%s", address, err)
 		return nil, err
 	}
 
-	mgr.logger.Info("Connected to publisher socket %s", address)
+	mgr.logger.Infof("Connected to publisher socket %s", address)
 	if err = socket.SetRecvBuffer(1024 * 1024); err != nil {
 		mgr.logger.Err("Failed to set the buffer size for subsriber socket %s, error:", address, err)
 		return nil, err

@@ -81,6 +81,7 @@ type FSMManager struct {
 	StopFSMCh      chan string
 	acceptConn     bool
 	CommandCh      chan PeerFSMCommand
+	BfdStatusCh    chan bool
 	activeFSM      uint8
 	newConnCh      chan PeerFSMConnState
 	fsmMutex       sync.RWMutex
@@ -104,6 +105,7 @@ func NewFSMManager(logger *logging.Writer, neighborConf *base.NeighborConf, bgpP
 	mgr.CloseCh = make(chan bool)
 	mgr.StopFSMCh = make(chan string)
 	mgr.CommandCh = make(chan PeerFSMCommand, 5)
+	mgr.BfdStatusCh = make(chan bool, 4)
 	mgr.activeFSM = uint8(config.ConnDirInvalid)
 	mgr.newConnCh = make(chan PeerFSMConnState, 2)
 	mgr.fsmMutex = sync.RWMutex{}
@@ -177,6 +179,21 @@ func (mgr *FSMManager) Init() {
 					}
 				}
 			}
+
+		case bfdStatus := <-mgr.BfdStatusCh:
+			mgr.handleBfdStatusChange(bfdStatus)
+		}
+	}
+}
+
+func (mgr *FSMManager) handleBfdStatusChange(status bool) {
+	defer mgr.fsmMutex.Unlock()
+	mgr.fsmMutex.Lock()
+
+	for id, fsm := range mgr.fsms {
+		if fsm != nil {
+			mgr.logger.Infof("FSMManager: Neighbor %s: FSM %d Bfd status %d", mgr.pConf.NeighborAddress, id, status)
+			fsm.bfdStatusCh <- status
 		}
 	}
 }

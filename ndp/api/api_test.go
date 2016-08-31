@@ -68,7 +68,7 @@ func NDPTestNewLogger(name string, tag string, listenToConfig bool) (*logging.Wr
 func baseApiTest() *server.NDPServer {
 	time.Sleep(1)
 	initApiBasic()
-	testServer := server.NDPNewServer(&asicdmock.MockAsicdClientMgr{})
+	testServer := server.NDPNewServer(&asicdmock.MockAsicdClientMgr{}, nil)
 	testServer.NDPStartServer()
 	return testServer
 }

@@ -45,12 +45,12 @@ type OutTCPConn struct {
 	logger       *logging.Writer
 	ifaceMgr     *utils.InterfaceMgr
 	fsmConnCh    chan net.Conn
-	fsmConnErrCh chan error
+	fsmConnErrCh chan PeerConnErr
 	StopConnCh   chan bool
 	id           uint32
 }
 
-func NewOutTCPConn(fsm *FSM, fsmConnCh chan net.Conn, fsmConnErrCh chan error) *OutTCPConn {
+func NewOutTCPConn(fsm *FSM, fsmConnCh chan net.Conn, fsmConnErrCh chan PeerConnErr) *OutTCPConn {
 	outConn := OutTCPConn{
 		fsm:          fsm,
 		logger:       fsm.logger,
@@ -164,10 +164,13 @@ func (o *OutTCPConn) Connect(seconds uint32, remote, local string, connCh chan n
 			ttl = int(o.fsm.pConf.MultiHopTTL)
 		}
 		if err = packetConn.SetTTL(ttl); err != nil {
+			packetConn.Close()
 			conn.Close()
+			netUtils.CloseSocket(socket)
 			errCh <- err
 			return
 		}
+		netUtils.CloseSocket(socket)
 		connCh <- conn
 	}
 }
@@ -213,7 +216,7 @@ func (o *OutTCPConn) ConnectToPeer(seconds uint32, remote, local string) {
 			} else if _, ok := err.(config.AddressNotResolvedError); ok {
 				go o.Connect(3, remote, local, connCh, errCh)
 			} else {
-				o.fsmConnErrCh <- err
+				o.fsmConnErrCh <- PeerConnErr{0, err}
 			}
 
 		case <-o.StopConnCh:
@@ -229,6 +232,7 @@ type PeerConn struct {
 	logger    *logging.Writer
 	dir       config.ConnDir
 	conn      *net.Conn
+	id        uint32
 	peerAttrs packet.BGPPeerAttrs
 
 	readCh chan bool
@@ -236,12 +240,13 @@ type PeerConn struct {
 	exitCh chan bool
 }
 
-func NewPeerConn(fsm *FSM, dir config.ConnDir, conn *net.Conn) *PeerConn {
+func NewPeerConn(fsm *FSM, dir config.ConnDir, conn *net.Conn, id uint32) *PeerConn {
 	peerConn := PeerConn{
 		fsm:    fsm,
 		logger: fsm.logger,
 		dir:    dir,
 		conn:   conn,
+		id:     id,
 		peerAttrs: packet.BGPPeerAttrs{
 			ASSize:           2,
 			AddPathsRxActual: false,
@@ -277,6 +282,7 @@ func (p *PeerConn) StartReading() {
 
 		case <-exitCh:
 			p.logger.Info("Neighbor:", p.fsm.pConf.NeighborAddress, "FSM", p.fsm.id, "conn: exit channel")
+			(*p.conn).Close()
 			p.exitCh <- true
 
 		case readOk := <-doneReadingCh:
@@ -367,7 +373,7 @@ func (p *PeerConn) ReadPkt(doneCh chan bool, stopCh chan bool, exitCh chan bool)
 				} else {
 					p.logger.Info("Neighbor:", p.fsm.pConf.NeighborAddress, "FSM", p.fsm.id,
 						"readPartialPkt DID NOT time out, returned err:", err, "nerr:", nerr)
-					p.fsm.outConnErrCh <- err
+					p.fsm.outConnErrCh <- PeerConnErr{p.id, err}
 					doneCh <- false
 					break
 				}
@@ -394,7 +400,7 @@ func (p *PeerConn) ReadPkt(doneCh chan bool, stopCh chan bool, exitCh chan bool)
 			if header.Len() > packet.BGPMsgHeaderLen {
 				buf, err = p.readPartialPkt(int(header.Len() - packet.BGPMsgHeaderLen))
 				if err != nil {
-					p.fsm.outConnErrCh <- err
+					p.fsm.outConnErrCh <- PeerConnErr{p.id, err}
 					doneCh <- false
 					break
 				}
