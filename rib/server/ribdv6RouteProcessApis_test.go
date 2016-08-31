@@ -75,10 +75,10 @@ func TestProcessV6RouteCreateConfig(t *testing.T) {
 			fmt.Println("Validation failed for route:", ipv6RouteList[0], " with error:", val_err)
 			continue
 		}
-		val, err := server.ProcessV6RouteCreateConfig(v6route)
+		val, err := server.ProcessV6RouteCreateConfig(v6route, FIBAndRIB)
 		fmt.Println("val = ", val, " err: ", err, " for route:", v6route)
 	}
-	val, err := server.ProcessV6RouteCreateConfig(ipv6RouteList[0])
+	val, err := server.ProcessV6RouteCreateConfig(ipv6RouteList[0], FIBAndRIB)
 	fmt.Println("val = ", val, " err: ", err, " for route:", ipv6RouteList[0])
 	TestGetRouteReachability(t)
 	TestResolveNextHop(t)
@@ -139,7 +139,7 @@ func TestProcessv6RouteDeleteConfig(t *testing.T) {
 			fmt.Println("Validation failed for route:", v6Route, " with error:", val_err)
 			continue
 		}
-		val, err := server.ProcessV6RouteDeleteConfig(v6Route)
+		val, err := server.ProcessV6RouteDeleteConfig(v6Route, FIBAndRIB)
 		fmt.Println("val = ", val, " err: ", err)
 	}
 	TestGetRouteReachability(t)
