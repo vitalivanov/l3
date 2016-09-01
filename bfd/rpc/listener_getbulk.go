@@ -83,9 +83,8 @@ func (h *BFDHandler) convertSessionStateToThrift(ent server.SessionState) *bfdd.
 	sessionState.SessionId = int32(ent.SessionId)
 	sessionState.IpAddr = string(ent.IpAddr)
 	sessionState.ParamName = string(ent.ParamName)
-	sessionState.IfIndex = int32(ent.InterfaceId)
+	sessionState.IntfRef = string(ent.Interface)
 	sessionState.InterfaceSpecific = ent.InterfaceSpecific
-	sessionState.IfName = ent.InterfaceName
 	sessionState.PerLinkSession = ent.PerLinkSession
 	sessionState.LocalMacAddr = string(ent.LocalMacAddr.String())
 	sessionState.RemoteMacAddr = string(ent.RemoteMacAddr.String())
