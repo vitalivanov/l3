@@ -43,9 +43,8 @@ func (server *BFDServer) GetBulkBfdSessionStates(idx int, cnt int) (int, int, []
 		result[i].SessionId = server.bfdGlobal.Sessions[sessionId].state.SessionId
 		result[i].IpAddr = server.bfdGlobal.Sessions[sessionId].state.IpAddr
 		result[i].ParamName = server.bfdGlobal.Sessions[sessionId].state.ParamName
-		result[i].InterfaceId = server.bfdGlobal.Sessions[sessionId].state.InterfaceId
+		result[i].Interface = server.bfdGlobal.Sessions[sessionId].state.Interface
 		result[i].InterfaceSpecific = server.bfdGlobal.Sessions[sessionId].state.InterfaceSpecific
-		result[i].InterfaceName = server.bfdGlobal.Sessions[sessionId].state.InterfaceName
 		result[i].PerLinkSession = server.bfdGlobal.Sessions[sessionId].state.PerLinkSession
 		result[i].LocalMacAddr = server.bfdGlobal.Sessions[sessionId].state.LocalMacAddr
 		result[i].RemoteMacAddr = server.bfdGlobal.Sessions[sessionId].state.RemoteMacAddr
@@ -82,8 +81,8 @@ func (server *BFDServer) GetBfdSessionState(ipAddr string) *SessionState {
 		sessionState.SessionId = server.bfdGlobal.Sessions[sessionId].state.SessionId
 		sessionState.IpAddr = server.bfdGlobal.Sessions[sessionId].state.IpAddr
 		sessionState.ParamName = server.bfdGlobal.Sessions[sessionId].state.ParamName
-		sessionState.InterfaceId = server.bfdGlobal.Sessions[sessionId].state.InterfaceId
-		sessionState.InterfaceId = server.bfdGlobal.Sessions[sessionId].state.InterfaceId
+		sessionState.Interface = server.bfdGlobal.Sessions[sessionId].state.Interface
+		sessionState.Interface = server.bfdGlobal.Sessions[sessionId].state.Interface
 		sessionState.InterfaceSpecific = server.bfdGlobal.Sessions[sessionId].state.InterfaceSpecific
 		sessionState.PerLinkSession = server.bfdGlobal.Sessions[sessionId].state.PerLinkSession
 		sessionState.LocalMacAddr = server.bfdGlobal.Sessions[sessionId].state.LocalMacAddr

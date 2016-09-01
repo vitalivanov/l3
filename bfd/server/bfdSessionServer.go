@@ -268,16 +268,17 @@ func (server *BFDServer) GetNewSessionId() int32 {
 }
 
 func (server *BFDServer) GetIfIndexFromDestIp(DestIp string) (int32, error) {
+	var ifIndex int32
 	server.ribdClient.ClientHdl.TrackReachabilityStatus(DestIp, "BFD", "add")
 	reachabilityInfo, err := server.ribdClient.ClientHdl.GetRouteReachabilityInfo(DestIp, -1)
 	server.logger.Info(fmt.Sprintln("Reachability info ", reachabilityInfo))
 	if err != nil || !reachabilityInfo.IsReachable {
 		err = errors.New(fmt.Sprintf("%s is not reachable", DestIp))
-		return int32(0), err
+	} else {
+		ifIndex = int32(reachabilityInfo.NextHopIfIndex)
+		server.logger.Info(fmt.Sprintln("GetIfIndexFromDestIp: DestIp: ", DestIp, "IfIndex: ", ifIndex))
 	}
-	ifIndex := int32(reachabilityInfo.NextHopIfIndex)
-	server.logger.Info(fmt.Sprintln("GetIfIndexFromDestIp: DestIp: ", DestIp, "IfIndex: ", ifIndex))
-	return ifIndex, nil
+	return ifIndex, err
 }
 
 func (server *BFDServer) GetTxJitter() int32 {
@@ -287,7 +288,7 @@ func (server *BFDServer) GetTxJitter() int32 {
 	return jitter
 }
 
-func (server *BFDServer) NewNormalBfdSession(IfIndex int32, DestIp string, ParamName string, PerLink bool, Protocol bfddCommonDefs.BfdSessionOwner) *BfdSession {
+func (server *BFDServer) NewNormalBfdSession(Interface string, DestIp string, ParamName string, PerLink bool, Protocol bfddCommonDefs.BfdSessionOwner) *BfdSession {
 	bfdSession := &BfdSession{}
 	sessionId := server.GetNewSessionId()
 	if sessionId == 0 {
@@ -296,11 +297,10 @@ func (server *BFDServer) NewNormalBfdSession(IfIndex int32, DestIp string, Param
 	}
 	bfdSession.state.SessionId = sessionId
 	bfdSession.state.IpAddr = DestIp
-	bfdSession.state.InterfaceId = IfIndex
+	bfdSession.state.Interface = Interface
 	bfdSession.state.PerLinkSession = PerLink
 	if PerLink {
-		IfName, _ := server.getLinuxIntfName(IfIndex)
-		bfdSession.state.LocalMacAddr, _ = server.getMacAddrFromIntfName(IfName)
+		bfdSession.state.LocalMacAddr, _ = server.getMacAddrFromIntfName(Interface)
 		bfdSession.state.RemoteMacAddr, _ = net.ParseMAC(bfdDedicatedMac)
 		bfdSession.useDedicatedMac = true
 	}
@@ -337,7 +337,7 @@ func (server *BFDServer) NewNormalBfdSession(IfIndex int32, DestIp string, Param
 	server.bfdGlobal.SessionsByIp[DestIp] = bfdSession
 	server.bfdGlobal.NumSessions++
 	server.bfdGlobal.SessionsIdSlice = append(server.bfdGlobal.SessionsIdSlice, sessionId)
-	server.logger.Info(fmt.Sprintln("New session : ", sessionId, " created on : ", IfIndex))
+	server.logger.Info(fmt.Sprintln("New session : ", sessionId, " created on : ", Interface))
 	server.CreatedSessionCh <- sessionId
 	return bfdSession
 }
@@ -346,7 +346,8 @@ func (server *BFDServer) NewPerLinkBfdSessions(IfIndex int32, DestIp string, Par
 	lag, exist := server.lagPropertyMap[IfIndex]
 	if exist {
 		for _, link := range lag.Links {
-			bfdSession := server.NewNormalBfdSession(IfIndex, DestIp, ParamName, true, Protocol)
+			IfName, _ := server.getLinuxIntfName(IfIndex)
+			bfdSession := server.NewNormalBfdSession(IfName, DestIp, ParamName, true, Protocol)
 			if bfdSession == nil {
 				server.logger.Info(fmt.Sprintln("Failed to create perlink session on ", link))
 			}
@@ -366,21 +367,19 @@ func (server *BFDServer) NewBfdSession(DestIp string, ParamName string, Interfac
 	IfIndex, err := server.GetIfIndexFromDestIp(DestIp)
 	if err != nil {
 		server.logger.Err(err.Error())
-		return nil
 	} else {
 		IfType = asicdCommonDefs.GetIntfTypeFromIfIndex(IfIndex)
 		IfName, err := server.getLinuxIntfName(IfIndex)
 		if err == nil {
 			if interfaceSpecific && IfName != Interface {
 				server.logger.Info(fmt.Sprintln("Bfd session to ", DestIp, " cannot be created on interface ", Interface))
-				return nil
 			}
 		}
 	}
 	if IfType == commonDefs.IfTypeLag && PerLink {
 		server.NewPerLinkBfdSessions(IfIndex, DestIp, ParamName, Protocol)
 	} else {
-		bfdSession := server.NewNormalBfdSession(IfIndex, DestIp, ParamName, false, Protocol)
+		bfdSession := server.NewNormalBfdSession(Interface, DestIp, ParamName, false, Protocol)
 		bfdSession.state.InterfaceSpecific = interfaceSpecific
 		return bfdSession
 	}

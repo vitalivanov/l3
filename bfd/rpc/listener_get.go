@@ -38,7 +38,7 @@ func (h *BFDHandler) GetBfdGlobalState(bfd string) (*bfdd.BfdGlobalState, error)
 }
 
 func (h *BFDHandler) GetBfdSessionState(ipAddr string) (*bfdd.BfdSessionState, error) {
-	h.logger.Info(fmt.Sprintln("Get Session attrs for neighbor ", ipAddr))
+	h.logger.Info(fmt.Sprintln("Get Session attrs for neighbor", ipAddr))
 	bfdSessionStateResponse := bfdd.NewBfdSessionState()
 	sessionState := h.server.GetBfdSessionState(ipAddr)
 	bfdSessionState := h.convertSessionStateToThrift(*sessionState)
@@ -47,7 +47,7 @@ func (h *BFDHandler) GetBfdSessionState(ipAddr string) (*bfdd.BfdSessionState, e
 }
 
 func (h *BFDHandler) GetBfdSessionParamState(paramName string) (*bfdd.BfdSessionParamState, error) {
-	h.logger.Info(fmt.Sprintln("Get Session Params attrs for ", paramName))
+	h.logger.Info(fmt.Sprintln("Get Session Params attrs for", paramName))
 	bfdSessionParamStateResponse := bfdd.NewBfdSessionParamState()
 	sessionParamState := h.server.GetBfdSessionParamState(paramName)
 	bfdSessionParamState := h.convertSessionParamStateToThrift(*sessionParamState)
