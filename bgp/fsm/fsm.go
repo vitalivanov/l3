@@ -1348,6 +1348,15 @@ func (fsm *FSM) InitiateConnToPeer() {
 		fsm.logger.Info("Unknown neighbor address")
 		return
 	}
+	ip := fsm.pConf.NeighborAddress.String()
+	fsm.logger.Info("Neighbor:", fsm.pConf.NeighborAddress, "FSM", fsm.id, "InitiateConnToPeer islinklocal",
+		fsm.pConf.NeighborAddress.IsLinkLocalUnicast(), "ifName:", fsm.pConf.IfName)
+	if fsm.pConf.NeighborAddress.IsLinkLocalUnicast() && fsm.pConf.IfName != "" {
+		fsm.logger.Info("Neighbor:", fsm.pConf.NeighborAddress, "FSM", fsm.id, "InitiateConnToPeer add ifName",
+			fsm.pConf.IfName, "to ip")
+		ip += "%"
+		ip += fsm.pConf.IfName
+	}
 	remote := net.JoinHostPort(fsm.pConf.NeighborAddress.String(), config.BGPPort)
 	local := ""
 

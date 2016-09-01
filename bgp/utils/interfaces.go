@@ -167,7 +167,7 @@ func (i *InterfaceMgr) RemoveV6Iface(ifIndex int32, addr string) {
 func (i *InterfaceMgr) RemoveLinkLocalIface(ifIndex int32, addr string) {
 	i.rwMutex.Lock()
 	defer i.rwMutex.Unlock()
-	i.logger.Info("RemoveIface: ifIndex", ifIndex, "ip", addr, "ifIndexToIP", i.ifIndexToIP, "ipToIfIndex",
+	i.logger.Info("RemoveLinkLocalIface: ifIndex", ifIndex, "ip", addr, "ifIndexToIP", i.ifIndexToIP, "ipToIfIndex",
 		i.ipToIfIndex)
 
 	if oldIP, ok := i.ifIndexToIP[ifIndex]; ok {
