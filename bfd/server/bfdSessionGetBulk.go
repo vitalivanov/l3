@@ -43,9 +43,8 @@ func (server *BFDServer) GetBulkBfdSessionStates(idx int, cnt int) (int, int, []
 		result[i].SessionId = server.bfdGlobal.Sessions[sessionId].state.SessionId
 		result[i].IpAddr = server.bfdGlobal.Sessions[sessionId].state.IpAddr
 		result[i].ParamName = server.bfdGlobal.Sessions[sessionId].state.ParamName
-		result[i].InterfaceId = server.bfdGlobal.Sessions[sessionId].state.InterfaceId
+		result[i].Interface = server.bfdGlobal.Sessions[sessionId].state.Interface
 		result[i].InterfaceSpecific = server.bfdGlobal.Sessions[sessionId].state.InterfaceSpecific
-		result[i].InterfaceName = server.bfdGlobal.Sessions[sessionId].state.InterfaceName
 		result[i].PerLinkSession = server.bfdGlobal.Sessions[sessionId].state.PerLinkSession
 		result[i].LocalMacAddr = server.bfdGlobal.Sessions[sessionId].state.LocalMacAddr
 		result[i].RemoteMacAddr = server.bfdGlobal.Sessions[sessionId].state.RemoteMacAddr
@@ -75,15 +74,15 @@ func (server *BFDServer) GetBulkBfdSessionStates(idx int, cnt int) (int, int, []
 	return nextIdx, count, result
 }
 
-func (server *BFDServer) GetBfdSessionState(ipAddr string) *SessionState {
+func (server *BFDServer) GetBfdSessionState(ipAddr string) (*SessionState, bool) {
 	sessionState := new(SessionState)
 	sessionId, found := server.FindBfdSession(ipAddr)
 	if found {
 		sessionState.SessionId = server.bfdGlobal.Sessions[sessionId].state.SessionId
 		sessionState.IpAddr = server.bfdGlobal.Sessions[sessionId].state.IpAddr
 		sessionState.ParamName = server.bfdGlobal.Sessions[sessionId].state.ParamName
-		sessionState.InterfaceId = server.bfdGlobal.Sessions[sessionId].state.InterfaceId
-		sessionState.InterfaceId = server.bfdGlobal.Sessions[sessionId].state.InterfaceId
+		sessionState.Interface = server.bfdGlobal.Sessions[sessionId].state.Interface
+		sessionState.Interface = server.bfdGlobal.Sessions[sessionId].state.Interface
 		sessionState.InterfaceSpecific = server.bfdGlobal.Sessions[sessionId].state.InterfaceSpecific
 		sessionState.PerLinkSession = server.bfdGlobal.Sessions[sessionId].state.PerLinkSession
 		sessionState.LocalMacAddr = server.bfdGlobal.Sessions[sessionId].state.LocalMacAddr
@@ -112,7 +111,7 @@ func (server *BFDServer) GetBfdSessionState(ipAddr string) *SessionState {
 		sessionState.UpTime = server.bfdGlobal.Sessions[sessionId].state.UpTime
 	}
 
-	return sessionState
+	return sessionState, found
 }
 
 func (server *BFDServer) GetBulkBfdSessionParamStates(idx int, cnt int) (int, int, []SessionParamState) {
@@ -139,18 +138,21 @@ func (server *BFDServer) GetBulkBfdSessionParamStates(idx int, cnt int) (int, in
 	return nextIdx, count, result
 }
 
-func (server *BFDServer) GetBfdSessionParamState(paramName string) *SessionParamState {
+func (server *BFDServer) GetBfdSessionParamState(paramName string) (*SessionParamState, bool) {
 	sessionParamState := new(SessionParamState)
-	sessionParamState.Name = server.bfdGlobal.SessionParams[paramName].state.Name
-	sessionParamState.NumSessions = server.bfdGlobal.SessionParams[paramName].state.NumSessions
-	sessionParamState.LocalMultiplier = server.bfdGlobal.SessionParams[paramName].state.LocalMultiplier
-	sessionParamState.DesiredMinTxInterval = server.bfdGlobal.SessionParams[paramName].state.DesiredMinTxInterval
-	sessionParamState.RequiredMinRxInterval = server.bfdGlobal.SessionParams[paramName].state.RequiredMinRxInterval
-	sessionParamState.RequiredMinEchoRxInterval = server.bfdGlobal.SessionParams[paramName].state.RequiredMinEchoRxInterval
-	sessionParamState.DemandEnabled = server.bfdGlobal.SessionParams[paramName].state.DemandEnabled
-	sessionParamState.AuthenticationEnabled = server.bfdGlobal.SessionParams[paramName].state.AuthenticationEnabled
-	sessionParamState.AuthenticationType = server.bfdGlobal.SessionParams[paramName].state.AuthenticationType
-	sessionParamState.AuthenticationKeyId = server.bfdGlobal.SessionParams[paramName].state.AuthenticationKeyId
-	sessionParamState.AuthenticationData = server.bfdGlobal.SessionParams[paramName].state.AuthenticationData
-	return sessionParamState
+	_, found := server.bfdGlobal.SessionParams[paramName]
+	if found {
+		sessionParamState.Name = server.bfdGlobal.SessionParams[paramName].state.Name
+		sessionParamState.NumSessions = server.bfdGlobal.SessionParams[paramName].state.NumSessions
+		sessionParamState.LocalMultiplier = server.bfdGlobal.SessionParams[paramName].state.LocalMultiplier
+		sessionParamState.DesiredMinTxInterval = server.bfdGlobal.SessionParams[paramName].state.DesiredMinTxInterval
+		sessionParamState.RequiredMinRxInterval = server.bfdGlobal.SessionParams[paramName].state.RequiredMinRxInterval
+		sessionParamState.RequiredMinEchoRxInterval = server.bfdGlobal.SessionParams[paramName].state.RequiredMinEchoRxInterval
+		sessionParamState.DemandEnabled = server.bfdGlobal.SessionParams[paramName].state.DemandEnabled
+		sessionParamState.AuthenticationEnabled = server.bfdGlobal.SessionParams[paramName].state.AuthenticationEnabled
+		sessionParamState.AuthenticationType = server.bfdGlobal.SessionParams[paramName].state.AuthenticationType
+		sessionParamState.AuthenticationKeyId = server.bfdGlobal.SessionParams[paramName].state.AuthenticationKeyId
+		sessionParamState.AuthenticationData = server.bfdGlobal.SessionParams[paramName].state.AuthenticationData
+	}
+	return sessionParamState, found
 }

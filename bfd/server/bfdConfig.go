@@ -54,9 +54,8 @@ type SessionState struct {
 	IpAddr                    string
 	SessionId                 int32
 	ParamName                 string
-	InterfaceId               int32
+	Interface                 string
 	InterfaceSpecific         bool
-	InterfaceName             string
 	PerLinkSession            bool
 	LocalMacAddr              net.HardwareAddr
 	RemoteMacAddr             net.HardwareAddr

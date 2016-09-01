@@ -55,15 +55,28 @@ func (session *BfdSession) StartSessionServer() error {
 
 func (session *BfdSession) StartSessionClient(server *BFDServer) error {
 	var err error
+	var remoteAddr string
 	server.logger.Info(fmt.Sprintln("Starting session client for ", session.state.SessionId))
-	destAddr := net.JoinHostPort(session.state.IpAddr, strconv.Itoa(DEST_PORT))
+	ipAddr := net.ParseIP(session.state.IpAddr)
+	zone := ""
+	if ipAddr.To4() == nil {
+		if ipAddr.IsLinkLocalUnicast() {
+			zone = session.state.Interface
+		}
+	}
+	remoteAddr = session.state.IpAddr
+	if zone != "" {
+		remoteAddr = remoteAddr + "%" + zone
+	}
+	destAddr := net.JoinHostPort(remoteAddr, strconv.Itoa(DEST_PORT))
 	ServerAddr, err := net.ResolveUDPAddr("udp", destAddr)
 	if err != nil {
 		server.logger.Info(fmt.Sprintln("Failed ResolveUDPAddr ", destAddr, err))
 		server.FailedSessionClientCh <- session.state.SessionId
 		return err
 	}
-	localAddr := net.JoinHostPort("", strconv.Itoa(int(SRC_PORT+session.state.SessionId)))
+	//localAddr := net.JoinHostPort("", strconv.Itoa(int(SRC_PORT+session.state.SessionId)))
+	localAddr := ""
 	ClientAddr, err := net.ResolveUDPAddr("udp", localAddr)
 	if err != nil {
 		server.logger.Info(fmt.Sprintln("Failed ResolveUDPAddr ", localAddr, err))
