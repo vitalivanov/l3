@@ -29,10 +29,21 @@ import (
 )
 
 func (cfg *NdpConfig) Validate(vrf string, rt uint32, reachableTime uint32, raTime uint8) (bool, error) {
+	if rt == 0 {
+		return false, errors.New(fmt.Sprintln("Invalid Re-Transmit Time", rt))
+	}
+	if reachableTime == 0 {
+		return false, errors.New(fmt.Sprintln("Invalid ReachableTime", reachableTime))
+	}
+
+	if raTime == 0 {
+		return false, errors.New(fmt.Sprintln("Invalid Router Advertisement Interval", raTime))
+	}
 
 	if cfg.Vrf != "" {
 		return false, errors.New(fmt.Sprintln("Global Config is already created for", cfg.Vrf))
 	}
+
 	return true, nil
 }
 
