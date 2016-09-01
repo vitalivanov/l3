@@ -26,7 +26,6 @@ package server
 import (
 	"asicd/asicdCommonDefs"
 	"errors"
-	"fmt"
 	//"github.com/google/gopacket"
 	//"github.com/google/gopacket/layers"
 	//"github.com/google/gopacket/pcap"
@@ -86,7 +85,7 @@ func (server *BFDServer) DispatchReceivedBfdPacket(ipAddr string, bfdPacket *Bfd
 	} else {
 		/*
 			// Create a session as discovered. This can be enabled for active mode of bfd.
-			server.logger.Info(fmt.Sprintln("No session found for ", ipAddr, " creating a session"))
+			server.logger.Info("No session found for ", ipAddr, " creating a session")
 			sessionMgmt := BfdSessionMgmt{
 				DestIp:   ipAddr,
 				Protocol: bfddCommonDefs.DISC,
@@ -102,21 +101,21 @@ func (server *BFDServer) StartBfdSesionServer() error {
 	destAddr := net.JoinHostPort("", strconv.Itoa(DEST_PORT))
 	ServerAddr, err := net.ResolveUDPAddr("udp", destAddr)
 	if err != nil {
-		server.logger.Info(fmt.Sprintln("Failed ResolveUDPAddr ", destAddr, err))
+		server.logger.Info("Failed ResolveUDPAddr ", destAddr, err)
 		return err
 	}
 	ServerConn, err := net.ListenUDP("udp", ServerAddr)
 	if err != nil {
-		server.logger.Info(fmt.Sprintln("Failed ListenUDP ", err))
+		server.logger.Info("Failed ListenUDP ", err)
 		return err
 	}
 	defer ServerConn.Close()
 	buf := make([]byte, 1024)
-	server.logger.Info(fmt.Sprintln("Started BFD session server on ", destAddr))
+	server.logger.Info("Started BFD session server on ", destAddr)
 	for {
 		length, udpAddr, err := ServerConn.ReadFromUDP(buf)
 		if err != nil {
-			server.logger.Info(fmt.Sprintln("Failed to read from ", ServerAddr))
+			server.logger.Info("Failed to read from ", ServerAddr)
 		} else {
 			ipAddr := udpAddr.IP.String()
 			session, exist := server.bfdGlobal.SessionsByIp[ipAddr]
@@ -127,11 +126,11 @@ func (server *BFDServer) StartBfdSesionServer() error {
 				if length >= DEFAULT_CONTROL_PACKET_LEN {
 					bfdPacket, err := DecodeBfdControlPacket(buf[0:length])
 					if err != nil {
-						server.logger.Info(fmt.Sprintln("Failed to decode packet - ", err))
+						server.logger.Info("Failed to decode packet - ", err)
 					} else {
 						err = server.DispatchReceivedBfdPacket(ipAddr, bfdPacket)
 						if err != nil {
-							server.logger.Info(fmt.Sprintln("Failed to dispatch received packet"))
+							server.logger.Info("Failed to dispatch received packet")
 						}
 					}
 				}
@@ -152,18 +151,18 @@ func (server *BFDServer) StartBfdSessionRxTx() error {
 				session.ReceivedPacketCh = make(chan *BfdControlPacket, PACKET_QUEUE_SIZE)
 				session.isClientActive = false
 				if session.state.PerLinkSession {
-					server.logger.Info(fmt.Sprintln("Starting PerLink server for session ", createdSessionId))
+					server.logger.Info("Starting PerLink server for session ", createdSessionId)
 					go session.StartPerLinkSessionServer(server)
-					server.logger.Info(fmt.Sprintln("Starting PerLink client for session ", createdSessionId))
+					server.logger.Info("Starting PerLink client for session ", createdSessionId)
 					go session.StartPerLinkSessionClient(server)
 				} else {
-					server.logger.Info(fmt.Sprintln("Starting server for session ", createdSessionId))
+					server.logger.Info("Starting server for session ", createdSessionId)
 					go session.StartSessionServer()
-					server.logger.Info(fmt.Sprintln("Starting client for session ", createdSessionId))
+					server.logger.Info("Starting client for session ", createdSessionId)
 					go session.StartSessionClient(server)
 				}
 			} else {
-				server.logger.Info(fmt.Sprintln("Bfd session could not be initiated for ", createdSessionId))
+				server.logger.Info("Bfd session could not be initiated for ", createdSessionId)
 			}
 		case failedClientSessionId := <-server.FailedSessionClientCh:
 			session := server.bfdGlobal.Sessions[failedClientSessionId]
@@ -186,10 +185,10 @@ func (server *BFDServer) StartSessionRetryHandler() error {
 			if session != nil {
 				if session.isClientActive == false {
 					if session.state.PerLinkSession {
-						server.logger.Info(fmt.Sprintln("Starting PerLink client for inactive session ", sessionId))
+						server.logger.Info("Starting PerLink client for inactive session ", sessionId)
 						go session.StartPerLinkSessionClient(server)
 					} else {
-						server.logger.Info(fmt.Sprintln("Starting client for inactive session ", sessionId))
+						server.logger.Info("Starting client for inactive session ", sessionId)
 						go session.StartSessionClient(server)
 					}
 					session.isClientActive = true
@@ -256,7 +255,7 @@ func (server *BFDServer) GetNewSessionId() int32 {
 		for sessionIdUsed {
 			sessionId = r1.Int31n(MAX_NUM_SESSIONS)
 			if _, exist := server.bfdGlobal.Sessions[sessionId]; exist {
-				server.logger.Info(fmt.Sprintln("GetNewSessionId: sessionId ", sessionId, " is in use, Generating a new one"))
+				server.logger.Info("GetNewSessionId: sessionId ", sessionId, " is in use, Generating a new one")
 			} else {
 				if sessionId != 0 {
 					sessionIdUsed = false
@@ -271,12 +270,12 @@ func (server *BFDServer) GetIfIndexFromDestIp(DestIp string) (int32, error) {
 	var ifIndex int32
 	server.ribdClient.ClientHdl.TrackReachabilityStatus(DestIp, "BFD", "add")
 	reachabilityInfo, err := server.ribdClient.ClientHdl.GetRouteReachabilityInfo(DestIp, -1)
-	server.logger.Info(fmt.Sprintln("Reachability info ", reachabilityInfo))
+	server.logger.Info("Reachability info ", reachabilityInfo)
 	if err != nil || !reachabilityInfo.IsReachable {
-		err = errors.New(fmt.Sprintf("%s is not reachable", DestIp))
+		err = errors.New(DestIp + " is not reachable")
 	} else {
 		ifIndex = int32(reachabilityInfo.NextHopIfIndex)
-		server.logger.Info(fmt.Sprintln("GetIfIndexFromDestIp: DestIp: ", DestIp, "IfIndex: ", ifIndex))
+		server.logger.Info("GetIfIndexFromDestIp: DestIp: ", DestIp, "IfIndex: ", ifIndex)
 	}
 	return ifIndex, err
 }
@@ -337,7 +336,7 @@ func (server *BFDServer) NewNormalBfdSession(Interface string, DestIp string, Pa
 	server.bfdGlobal.SessionsByIp[DestIp] = bfdSession
 	server.bfdGlobal.NumSessions++
 	server.bfdGlobal.SessionsIdSlice = append(server.bfdGlobal.SessionsIdSlice, sessionId)
-	server.logger.Info(fmt.Sprintln("New session : ", sessionId, " created on : ", Interface))
+	server.logger.Info("New session : ", sessionId, " created on : ", Interface)
 	server.CreatedSessionCh <- sessionId
 	return bfdSession
 }
@@ -349,11 +348,11 @@ func (server *BFDServer) NewPerLinkBfdSessions(IfIndex int32, DestIp string, Par
 			IfName, _ := server.getLinuxIntfName(IfIndex)
 			bfdSession := server.NewNormalBfdSession(IfName, DestIp, ParamName, true, Protocol)
 			if bfdSession == nil {
-				server.logger.Info(fmt.Sprintln("Failed to create perlink session on ", link))
+				server.logger.Info("Failed to create perlink session on ", link)
 			}
 		}
 	} else {
-		server.logger.Info(fmt.Sprintln("Unknown lag ", IfIndex, " can not create perlink sessions"))
+		server.logger.Info("Unknown lag ", IfIndex, " can not create perlink sessions")
 	}
 	return nil
 }
@@ -372,7 +371,7 @@ func (server *BFDServer) NewBfdSession(DestIp string, ParamName string, Interfac
 		IfName, err := server.getLinuxIntfName(IfIndex)
 		if err == nil {
 			if interfaceSpecific && IfName != Interface {
-				server.logger.Info(fmt.Sprintln("Bfd session to ", DestIp, " cannot be created on interface ", Interface))
+				server.logger.Info("Bfd session to ", DestIp, " cannot be created on interface ", Interface)
 			}
 		}
 	}
@@ -457,21 +456,21 @@ func (server *BFDServer) CreateBfdSession(sessionMgmt BfdSessionMgmt) (*BfdSessi
 	PerLink := sessionMgmt.PerLink
 	sessionId, found := server.FindBfdSession(DestIp)
 	if !found {
-		server.logger.Info(fmt.Sprintln("CreateSession ", DestIp, ParamName, Interface, Protocol, PerLink))
+		server.logger.Info("CreateSession ", DestIp, ParamName, Interface, Protocol, PerLink)
 		bfdSession = server.NewBfdSession(DestIp, ParamName, Interface, Protocol, PerLink)
 		if bfdSession != nil {
-			server.logger.Info(fmt.Sprintln("Bfd session created ", bfdSession.state.SessionId, bfdSession.state.IpAddr))
+			server.logger.Info("Bfd session created ", bfdSession.state.SessionId, bfdSession.state.IpAddr)
 		} else {
-			server.logger.Info(fmt.Sprintln("CreateSession failed for ", DestIp, Protocol))
+			server.logger.Info("CreateSession failed for ", DestIp, Protocol)
 			// Store the session config in tobeCrearedSessions map.
 			if _, exist := server.tobeCreatedSessions[DestIp]; !exist {
 				server.tobeCreatedSessions[DestIp] = sessionMgmt
-				server.logger.Info(fmt.Sprintln("Stored session config for ", DestIp, " waiting for reachability"))
+				server.logger.Info("Stored session config for ", DestIp, " waiting for reachability")
 			}
-			err = errors.New(fmt.Sprintf("Failed to create session to %s", DestIp))
+			err = errors.New("Failed to create session to " + DestIp)
 		}
 	} else {
-		server.logger.Info(fmt.Sprintln("Bfd session already exists ", DestIp, Protocol, sessionId))
+		server.logger.Info("Bfd session already exists ", DestIp, Protocol, sessionId)
 		bfdSession = server.bfdGlobal.Sessions[sessionId]
 		if !bfdSession.state.RegisteredProtocols[Protocol] {
 			bfdSession.state.RegisteredProtocols[Protocol] = true
@@ -499,7 +498,7 @@ func (server *BFDServer) SessionDeleteHandler(session *BfdSession, Protocol bfdd
 			}
 		}
 		server.bfdGlobal.SessionsIdSlice = append(server.bfdGlobal.SessionsIdSlice[:i], server.bfdGlobal.SessionsIdSlice[i+1:]...)
-		server.logger.Info(fmt.Sprintln("Deleted session ", sessionId))
+		server.logger.Info("Deleted session ", sessionId)
 	}
 	return nil
 }
@@ -520,7 +519,7 @@ func (server *BFDServer) DeleteBfdSession(sessionMgmt BfdSessionMgmt) error {
 	DestIp := sessionMgmt.DestIp
 	Protocol := sessionMgmt.Protocol
 	ForceDel := sessionMgmt.ForceDel
-	server.logger.Info(fmt.Sprintln("DeleteSession ", DestIp, Protocol))
+	server.logger.Info("DeleteSession ", DestIp, Protocol)
 	sessionId, found := server.FindBfdSession(DestIp)
 	if found {
 		session := server.bfdGlobal.Sessions[sessionId]
@@ -531,7 +530,7 @@ func (server *BFDServer) DeleteBfdSession(sessionMgmt BfdSessionMgmt) error {
 		}
 		server.ribdClient.ClientHdl.TrackReachabilityStatus(DestIp, "BFD", "del")
 	} else {
-		server.logger.Info(fmt.Sprintln("Bfd session not found ", sessionId))
+		server.logger.Info("Bfd session not found ", sessionId)
 	}
 	return nil
 }
@@ -549,7 +548,7 @@ func (server *BFDServer) AdminUpPerLinkBfdSessions(DestIp string) error {
 func (server *BFDServer) AdminUpBfdSession(sessionMgmt BfdSessionMgmt) error {
 	DestIp := sessionMgmt.DestIp
 	Protocol := sessionMgmt.Protocol
-	server.logger.Info(fmt.Sprintln("AdminDownSession ", DestIp, Protocol))
+	server.logger.Info("AdminDownSession ", DestIp, Protocol)
 	sessionId, found := server.FindBfdSession(DestIp)
 	if found {
 		session := server.bfdGlobal.Sessions[sessionId]
@@ -559,7 +558,7 @@ func (server *BFDServer) AdminUpBfdSession(sessionMgmt BfdSessionMgmt) error {
 			server.bfdGlobal.Sessions[sessionId].StartBfdSession()
 		}
 	} else {
-		server.logger.Info(fmt.Sprintln("Bfd session not found ", sessionId))
+		server.logger.Info("Bfd session not found ", sessionId)
 	}
 	return nil
 }
@@ -577,7 +576,7 @@ func (server *BFDServer) AdminDownPerLinkBfdSessions(DestIp string) error {
 func (server *BFDServer) AdminDownBfdSession(sessionMgmt BfdSessionMgmt) error {
 	DestIp := sessionMgmt.DestIp
 	Protocol := sessionMgmt.Protocol
-	server.logger.Info(fmt.Sprintln("AdminDownSession ", DestIp, Protocol))
+	server.logger.Info("AdminDownSession ", DestIp, Protocol)
 	sessionId, found := server.FindBfdSession(DestIp)
 	if found {
 		session := server.bfdGlobal.Sessions[sessionId]
@@ -587,7 +586,7 @@ func (server *BFDServer) AdminDownBfdSession(sessionMgmt BfdSessionMgmt) error {
 			server.bfdGlobal.Sessions[sessionId].StopBfdSession()
 		}
 	} else {
-		server.logger.Info(fmt.Sprintln("Bfd session not found ", sessionId))
+		server.logger.Info("Bfd session not found ", sessionId)
 	}
 	return nil
 }

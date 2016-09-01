@@ -13,13 +13,13 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 package server
 
@@ -27,7 +27,6 @@ import (
 	"asicd/asicdCommonDefs"
 	"asicdServices"
 	"errors"
-	"fmt"
 	"net"
 	"utils/commonDefs"
 )
@@ -84,7 +83,7 @@ func (server *BFDServer) BuildPortPropertyMap() error {
 		server.logger.Info("Calling asicd for port property")
 		count := 10
 		for {
-			server.logger.Info(fmt.Sprintln("Calling bulkget port ", currMarker, count))
+			server.logger.Info("Calling bulkget port ", currMarker, count)
 			bulkInfo, _ := server.asicdClient.ClientHdl.GetBulkPortState(asicdServices.Int(currMarker), asicdServices.Int(count))
 			if bulkInfo == nil {
 				server.logger.Info("Bulkget port got nothing")
@@ -92,7 +91,7 @@ func (server *BFDServer) BuildPortPropertyMap() error {
 			}
 			objCount := int(bulkInfo.Count)
 			more := bool(bulkInfo.More)
-			server.logger.Info(fmt.Sprintln("Bulkget port got ", objCount, more))
+			server.logger.Info("Bulkget port got ", objCount, more)
 			currMarker = asicdServices.Int(bulkInfo.EndIdx)
 			for i := 0; i < objCount; i++ {
 				ifIndex := bulkInfo.PortStateList[i].IfIndex
@@ -119,9 +118,9 @@ func (server *BFDServer) updateLagPropertyMap(msg asicdCommonDefs.LagNotifyMsg, 
 	_, exists := server.lagPropertyMap[msg.IfIndex]
 	if msgType == asicdCommonDefs.NOTIFY_LAG_CREATE { // Create LAG
 		if exists {
-			server.logger.Info(fmt.Sprintln("CreateLag: already exists", msg.IfIndex))
+			server.logger.Info("CreateLag: already exists", msg.IfIndex)
 		} else {
-			server.logger.Info(fmt.Sprintln("Creating lag ", msg.IfIndex))
+			server.logger.Info("Creating lag ", msg.IfIndex)
 			lagEntry := LagProperty{}
 			lagEntry.Links = make([]int32, 0)
 			for _, linkNum := range msg.IfIndexList {
@@ -131,10 +130,10 @@ func (server *BFDServer) updateLagPropertyMap(msg asicdCommonDefs.LagNotifyMsg, 
 		}
 	} else if msgType == asicdCommonDefs.NOTIFY_LAG_DELETE { // Delete Lag
 		if exists {
-			server.logger.Info(fmt.Sprintln("Deleting lag ", msg.IfIndex))
+			server.logger.Info("Deleting lag ", msg.IfIndex)
 			delete(server.lagPropertyMap, msg.IfIndex)
 		} else {
-			server.logger.Info(fmt.Sprintln("DeleteLag: Does not exist ", msg.IfIndex))
+			server.logger.Info("DeleteLag: Does not exist ", msg.IfIndex)
 		}
 	}
 }
