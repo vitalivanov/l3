@@ -34,6 +34,7 @@ import (
 	"l3/bgp/packet"
 	bgppolicy "l3/bgp/policy"
 	"l3/bgp/server"
+	bgputils "l3/bgp/utils"
 	"math"
 	"models/objects"
 	"net"
@@ -71,10 +72,14 @@ func NewBGPHandler(server *server.BGPServer, policyMgr *bgppolicy.BGPPolicyManag
 	return h
 }
 
-func (h *BGPHandler) convertModelToBGPGlobalConfig(obj objects.BGPGlobal) (config.GlobalConfig, error) {
-	var err error
-	gConf := config.GlobalConfig{
-		AS:                  obj.ASNum,
+func (h *BGPHandler) convertModelToBGPGlobalConfig(obj objects.BGPGlobal) (gConf config.GlobalConfig, err error) {
+	asnum, err := bgputils.GetAsNum(obj.ASNum)
+	if err != nil {
+		h.logger.Err("Invalid asnum")
+		return gConf, err
+	}
+	gConf = config.GlobalConfig{
+		AS:                  uint32(asnum),
 		RouterId:            h.convertStrIPToNetIP(obj.RouterId),
 		UseMultiplePaths:    obj.UseMultiplePaths,
 		EBGPMaxPaths:        obj.EBGPMaxPaths,
@@ -120,10 +125,20 @@ func (h *BGPHandler) handleGlobalConfig() error {
 
 func (h *BGPHandler) convertModelToBGPv4PeerGroup(obj objects.BGPv4PeerGroup) (group config.PeerGroupConfig,
 	err error) {
+	peerAS, err := bgputils.GetAsNum(obj.PeerAS)
+	if err != nil {
+		h.logger.Err("Invalid peer asnum")
+		return group, err
+	}
+	localAS, err := bgputils.GetAsNum(obj.LocalAS)
+	if err != nil {
+		h.logger.Err("Invalid local asnum")
+		return group, err
+	}
 	group = config.PeerGroupConfig{
 		BaseConfig: config.BaseConfig{
-			PeerAS:                  uint32(obj.PeerAS),
-			LocalAS:                 uint32(obj.LocalAS),
+			PeerAS:                  uint32(peerAS),
+			LocalAS:                 uint32(localAS),
 			PeerAddressType:         config.PeerAddressV4,
 			UpdateSource:            obj.UpdateSource,
 			AuthPassword:            obj.AuthPassword,
@@ -172,10 +187,20 @@ func (h *BGPHandler) handleV4PeerGroup() error {
 
 func (h *BGPHandler) convertModelToBGPv6PeerGroup(obj objects.BGPv6PeerGroup) (group config.PeerGroupConfig,
 	err error) {
+	peerAS, err := bgputils.GetAsNum(obj.PeerAS)
+	if err != nil {
+		h.logger.Err("Invalid peer asnum")
+		return group, err
+	}
+	localAS, err := bgputils.GetAsNum(obj.LocalAS)
+	if err != nil {
+		h.logger.Err("Invalid local asnum")
+		return group, err
+	}
 	group = config.PeerGroupConfig{
 		BaseConfig: config.BaseConfig{
-			PeerAS:                  uint32(obj.PeerAS),
-			LocalAS:                 uint32(obj.LocalAS),
+			PeerAS:                  uint32(peerAS),
+			LocalAS:                 uint32(localAS),
 			PeerAddressType:         config.PeerAddressV6,
 			UpdateSource:            obj.UpdateSource,
 			Description:             obj.Description,
@@ -232,10 +257,20 @@ func (h *BGPHandler) convertModelToBGPv4Neighbor(obj objects.BGPv4Neighbor) (nei
 		return neighbor, err
 	}
 
+	peerAS, err := bgputils.GetAsNum(obj.PeerAS)
+	if err != nil {
+		h.logger.Err("Invalid peer asnum")
+		return neighbor, err
+	}
+	localAS, err := bgputils.GetAsNum(obj.LocalAS)
+	if err != nil {
+		h.logger.Err("Invalid local asnum")
+		return neighbor, err
+	}
 	neighbor = config.NeighborConfig{
 		BaseConfig: config.BaseConfig{
-			PeerAS:                  uint32(obj.PeerAS),
-			LocalAS:                 uint32(obj.LocalAS),
+			PeerAS:                  uint32(peerAS),
+			LocalAS:                 uint32(localAS),
 			PeerAddressType:         config.PeerAddressV4,
 			UpdateSource:            obj.UpdateSource,
 			AuthPassword:            obj.AuthPassword,
@@ -297,11 +332,21 @@ func (h *BGPHandler) convertModelToBGPv6Neighbor(obj objects.BGPv6Neighbor) (nei
 			"failed for neighbor address", obj.NeighborAddress, "and ifIndex", obj.IntfRef)
 		return neighbor, err
 	}
+	peerAS, err := bgputils.GetAsNum(obj.PeerAS)
+	if err != nil {
+		h.logger.Err("Invalid peer asnum")
+		return neighbor, err
+	}
+	localAS, err := bgputils.GetAsNum(obj.LocalAS)
+	if err != nil {
+		h.logger.Err("Invalid local asnum")
+		return neighbor, err
+	}
 
 	neighbor = config.NeighborConfig{
 		BaseConfig: config.BaseConfig{
-			PeerAS:                  uint32(obj.PeerAS),
-			LocalAS:                 uint32(obj.LocalAS),
+			PeerAS:                  uint32(peerAS),
+			LocalAS:                 uint32(localAS),
 			PeerAddressType:         config.PeerAddressV6,
 			UpdateSource:            obj.UpdateSource,
 			Description:             obj.Description,
@@ -603,8 +648,11 @@ func (h *BGPHandler) validateBGPGlobal(bgpGlobal *bgpd.BGPGlobal) (gConf config.
 		return gConf, err
 	}
 
-	asNum := uint32(bgpGlobal.ASNum)
-	if asNum == uint32(math.MaxUint16) || asNum == uint32(math.MaxUint32) || asNum == uint32(packet.BGPASTrans) {
+	asNum, err := bgputils.GetAsNum(bgpGlobal.ASNum) //uint32(bgpGlobal.ASNum)
+	if err != nil {
+		return gConf, err
+	}
+	if asNum == (math.MaxUint16) || asNum == (math.MaxUint32) || asNum == int(packet.BGPASTrans) {
 		err = errors.New(fmt.Sprintf("BGPGlobal: AS number %d is not valid", bgpGlobal.ASNum))
 		h.logger.Info("SendBGPGlobal: AS number", bgpGlobal.ASNum, "is a reserved AS number")
 		return gConf, err
@@ -618,7 +666,7 @@ func (h *BGPHandler) validateBGPGlobal(bgpGlobal *bgpd.BGPGlobal) (gConf config.
 	}
 
 	gConf = config.GlobalConfig{
-		AS:                  uint32(bgpGlobal.ASNum),
+		AS:                  uint32(asNum),
 		RouterId:            ip,
 		UseMultiplePaths:    bgpGlobal.UseMultiplePaths,
 		EBGPMaxPaths:        uint32(bgpGlobal.EBGPMaxPaths),
@@ -645,8 +693,12 @@ func (h *BGPHandler) validateBGPGlobalForPatchUpdate(oldConfig *bgpd.BGPGlobal, 
 		h.logger.Info("SendBGPGlobal: Router id", oldConfig.RouterId, "is not valid")
 		return gConf, err
 	}
+	oldAsnum, err := bgputils.GetAsNum(oldConfig.ASNum)
+	if err != nil {
+		return gConf, err
+	}
 	gConf = config.GlobalConfig{
-		AS:                  uint32(oldConfig.ASNum),
+		AS:                  uint32(oldAsnum),
 		RouterId:            ip,
 		UseMultiplePaths:    oldConfig.UseMultiplePaths,
 		EBGPMaxPaths:        uint32(oldConfig.EBGPMaxPaths),
@@ -702,8 +754,12 @@ func (h *BGPHandler) validateBGPGlobalForUpdate(oldConfig *bgpd.BGPGlobal, newCo
 		h.logger.Info("SendBGPGlobal: Router id", oldConfig.RouterId, "is not valid")
 		return gConf, err
 	}
+	newASNum, err := bgputils.GetAsNum(newConfig.ASNum)
+	if err != nil {
+		return gConf, err
+	}
 	gConf = config.GlobalConfig{
-		AS:                  uint32(newConfig.ASNum),
+		AS:                  uint32(newASNum),
 		RouterId:            ip,
 		UseMultiplePaths:    newConfig.UseMultiplePaths,
 		EBGPMaxPaths:        uint32(newConfig.EBGPMaxPaths),
@@ -739,14 +795,13 @@ func (h *BGPHandler) validateBGPGlobalForUpdate(oldConfig *bgpd.BGPGlobal, newCo
 					gConf.RouterId = newip
 				}
 				if objName == "ASNum" {
-					newASNum := uint32(newConfig.ASNum)
-					if (newASNum == uint32(0)) || newASNum == uint32(math.MaxUint16) ||
-						newASNum == uint32(math.MaxUint32) || newASNum == uint32(packet.BGPASTrans) {
+					if (newASNum == (0)) || newASNum == (math.MaxUint16) ||
+						newASNum == (math.MaxUint32) || newASNum == int(packet.BGPASTrans) {
 						err = errors.New(fmt.Sprintf("BGPGlobal: AS number %d is not valid", newConfig.ASNum))
 						h.logger.Info("SendBGPGlobal: AS number", newConfig.ASNum, "is not valid")
 						return gConf, err
 					}
-					gConf.AS = newASNum
+					gConf.AS = uint32(newASNum)
 				}
 			}
 		}
@@ -792,7 +847,7 @@ func (h *BGPHandler) CreateBGPGlobal(bgpGlobal *bgpd.BGPGlobal) (bool, error) {
 func (h *BGPHandler) GetBGPGlobalState(rtrId string) (*bgpd.BGPGlobalState, error) {
 	bgpGlobal := h.server.GetBGPGlobalState()
 	bgpGlobalResponse := bgpd.NewBGPGlobalState()
-	bgpGlobalResponse.AS = int32(bgpGlobal.AS)
+	bgpGlobalResponse.AS, _ = bgputils.GetAsDot(int(bgpGlobal.AS)) //int32(bgpGlobal.AS)
 	bgpGlobalResponse.RouterId = bgpGlobal.RouterId.String()
 	bgpGlobalResponse.UseMultiplePaths = bgpGlobal.UseMultiplePaths
 	bgpGlobalResponse.EBGPMaxPaths = int32(bgpGlobal.EBGPMaxPaths)
@@ -903,10 +958,20 @@ func (h *BGPHandler) setDefault(pconf *config.NeighborConfig) {
 
 func (h *BGPHandler) ConvertV4NeighborFromThrift(bgpNeighbor *bgpd.BGPv4Neighbor, ip net.IP, ifIndex int32) (pConf config.NeighborConfig, err error) {
 
+	peerAS, err := bgputils.GetAsNum(bgpNeighbor.PeerAS)
+	if err != nil {
+		h.logger.Err("peer AS invalid, err:", err)
+		return pConf, err
+	}
+	localAS, err := bgputils.GetAsNum(bgpNeighbor.LocalAS)
+	if err != nil {
+		h.logger.Err("local AS invalid, err:", err)
+		return pConf, err
+	}
 	pConf = config.NeighborConfig{
 		BaseConfig: config.BaseConfig{
-			PeerAS:                  uint32(bgpNeighbor.PeerAS),
-			LocalAS:                 uint32(bgpNeighbor.LocalAS),
+			PeerAS:                  uint32(peerAS),
+			LocalAS:                 uint32(localAS),
 			PeerAddressType:         config.PeerAddressV4,
 			UpdateSource:            bgpNeighbor.UpdateSource,
 			AuthPassword:            bgpNeighbor.AuthPassword,
@@ -1049,8 +1114,18 @@ func (h *BGPHandler) convertToThriftV4Neighbor(neighborState *config.NeighborSta
 		h.logger.Info("Map foud for ifndex : ", neighborState.IfIndex, "Name = ", intfEntry.Name)
 		bgpNeighborResponse.IntfRef = intfEntry.Name
 	}
-	bgpNeighborResponse.PeerAS = int32(neighborState.PeerAS)
-	bgpNeighborResponse.LocalAS = int32(neighborState.LocalAS)
+	peerAS, err := bgputils.GetAsDot(int(neighborState.PeerAS))
+	if err != nil {
+		h.logger.Err("peer AS invalid, err:", err)
+		return bgpNeighborResponse
+	}
+	localAS, err := bgputils.GetAsDot(int(neighborState.LocalAS))
+	if err != nil {
+		h.logger.Err("local AS invalid, err:", err)
+		return bgpNeighborResponse
+	}
+	bgpNeighborResponse.PeerAS = peerAS   //int32(neighborState.PeerAS)
+	bgpNeighborResponse.LocalAS = localAS //int32(neighborState.LocalAS)
 	bgpNeighborResponse.UpdateSource = neighborState.UpdateSource
 	bgpNeighborResponse.AuthPassword = neighborState.AuthPassword
 	bgpNeighborResponse.PeerType = int8(neighborState.PeerType)
@@ -1179,10 +1254,20 @@ func (h *BGPHandler) getIPAndIfIndexForV6Neighbor(neighborIP string, neighborInt
 
 func (h *BGPHandler) ConvertV6NeighborFromThrift(bgpNeighbor *bgpd.BGPv6Neighbor, ip net.IP, ifIndex int32,
 	ifName string) (pConf config.NeighborConfig, err error) {
+	peerAS, err := bgputils.GetAsNum(bgpNeighbor.PeerAS)
+	if err != nil {
+		h.logger.Err("peer AS invalid, err:", err)
+		return pConf, err
+	}
+	localAS, err := bgputils.GetAsNum(bgpNeighbor.LocalAS)
+	if err != nil {
+		h.logger.Err("local AS invalid, err:", err)
+		return pConf, err
+	}
 	pConf = config.NeighborConfig{
 		BaseConfig: config.BaseConfig{
-			PeerAS:                  uint32(bgpNeighbor.PeerAS),
-			LocalAS:                 uint32(bgpNeighbor.LocalAS),
+			PeerAS:                  uint32(peerAS),
+			LocalAS:                 uint32(localAS),
 			PeerAddressType:         config.PeerAddressV6,
 			UpdateSource:            bgpNeighbor.UpdateSource,
 			Description:             bgpNeighbor.Description,
@@ -1307,8 +1392,18 @@ func (h *BGPHandler) convertToThriftV6Neighbor(neighborState *config.NeighborSta
 		h.logger.Info("Map foud for ifndex : ", neighborState.IfIndex, "Name = ", intfEntry.Name)
 		bgpNeighborResponse.IntfRef = intfEntry.Name
 	}
-	bgpNeighborResponse.PeerAS = int32(neighborState.PeerAS)
-	bgpNeighborResponse.LocalAS = int32(neighborState.LocalAS)
+	peerAS, err := bgputils.GetAsDot(int(neighborState.PeerAS))
+	if err != nil {
+		h.logger.Err("peer AS invalid, err:", err)
+		return bgpNeighborResponse
+	}
+	localAS, err := bgputils.GetAsDot(int(neighborState.LocalAS))
+	if err != nil {
+		h.logger.Err("local AS invalid, err:", err)
+		return bgpNeighborResponse
+	}
+	bgpNeighborResponse.PeerAS = peerAS   // int32(neighborState.PeerAS)
+	bgpNeighborResponse.LocalAS = localAS //int32(neighborState.LocalAS)
 	bgpNeighborResponse.UpdateSource = neighborState.UpdateSource
 	bgpNeighborResponse.PeerType = int8(neighborState.PeerType)
 	bgpNeighborResponse.Description = neighborState.Description
@@ -1423,11 +1518,21 @@ func (h *BGPHandler) ValidateBGPv4PeerGroup(peerGroup *bgpd.BGPv4PeerGroup) (gro
 		err = errors.New(fmt.Sprintf("Update source %s not a valid IP", peerGroup.UpdateSource))
 		return group, err
 	}
+	peerAS, err := bgputils.GetAsNum(peerGroup.PeerAS)
+	if err != nil {
+		h.logger.Err("peer AS invalid, err:", err)
+		return group, err
+	}
+	localAS, err := bgputils.GetAsNum(peerGroup.LocalAS)
+	if err != nil {
+		h.logger.Err("local AS invalid, err:", err)
+		return group, err
+	}
 
 	group = config.PeerGroupConfig{
 		BaseConfig: config.BaseConfig{
-			PeerAS:                  uint32(peerGroup.PeerAS),
-			LocalAS:                 uint32(peerGroup.LocalAS),
+			PeerAS:                  uint32(peerAS),
+			LocalAS:                 uint32(localAS),
 			PeerAddressType:         config.PeerAddressV4,
 			UpdateSource:            peerGroup.UpdateSource,
 			AuthPassword:            peerGroup.AuthPassword,
@@ -1509,11 +1614,21 @@ func (h *BGPHandler) ValidateBGPv6PeerGroup(peerGroup *bgpd.BGPv6PeerGroup) (gro
 		err = errors.New(fmt.Sprintf("Update source %s not a valid IP", peerGroup.UpdateSource))
 		return group, err
 	}
+	peerAS, err := bgputils.GetAsNum(peerGroup.PeerAS)
+	if err != nil {
+		h.logger.Err("peer AS invalid, err:", err)
+		return group, err
+	}
+	localAS, err := bgputils.GetAsNum(peerGroup.LocalAS)
+	if err != nil {
+		h.logger.Err("local AS invalid, err:", err)
+		return group, err
+	}
 
 	group = config.PeerGroupConfig{
 		BaseConfig: config.BaseConfig{
-			PeerAS:                  uint32(peerGroup.PeerAS),
-			LocalAS:                 uint32(peerGroup.LocalAS),
+			PeerAS:                  uint32(peerAS),
+			LocalAS:                 uint32(localAS),
 			PeerAddressType:         config.PeerAddressV6,
 			UpdateSource:            peerGroup.UpdateSource,
 			Description:             peerGroup.Description,
