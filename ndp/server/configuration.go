@@ -7,11 +7,11 @@
 //
 //    http://www.apache.org/licenses/LICENSE-2.0
 //
-//	 Unless required by applicable law or agreed to in writing, software
-//	 distributed under the License is distributed on an "AS IS" BASIS,
-//	 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-//	 See the License for the specific language governing permissions and
-//	 limitations under the License.
+//       Unless required by applicable law or agreed to in writing, software
+//       distributed under the License is distributed on an "AS IS" BASIS,
+//       WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//       See the License for the specific language governing permissions and
+//       limitations under the License.
 //
 // _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
 // |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
@@ -23,15 +23,23 @@
 package server
 
 import (
-	"testing"
+	"errors"
+	"fmt"
+	"l3/ndp/debug"
 )
 
-var testLinkScopeIp = "fe80::8a1d:fcff:fecf:15fc"
+func (cfg *NdpConfig) Validate(vrf string, rt uint32, reachableTime uint32, raTime uint8) (bool, error) {
 
-func TestSendRA(t *testing.T) {
-	initServerBasic()
-	intf := Interface{
-		linkScope: testLinkScopeIp,
+	if cfg.Vrf != "" {
+		return false, errors.New(fmt.Sprintln("Global Config is already created for", cfg.Vrf))
 	}
-	intf.SendRA(testSrcMac)
+	return true, nil
+}
+
+func (cfg *NdpConfig) Create(gCfg NdpConfig) {
+	debug.Logger.Info("Received Global Config Create for NDP:", gCfg)
+	cfg.Vrf = gCfg.Vrf
+	cfg.RetransTime = gCfg.RetransTime
+	cfg.RaRestransmitTime = gCfg.RaRestransmitTime
+	cfg.ReachableTime = gCfg.ReachableTime
 }

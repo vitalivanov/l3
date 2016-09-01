@@ -222,10 +222,10 @@ func TestProcessV4RouteCreateConfig(t *testing.T) {
 			fmt.Println("Validation failed for route:", ipv4RouteList[0], " with error:", val_err)
 			continue
 		}
-		val, err := server.ProcessV4RouteCreateConfig(v4route)
+		val, err := server.ProcessV4RouteCreateConfig(v4route, FIBAndRIB)
 		fmt.Println("val = ", val, " err: ", err, " for route:", v4route)
 	}
-	val, err := server.ProcessV4RouteCreateConfig(ipv4RouteList[0])
+	val, err := server.ProcessV4RouteCreateConfig(ipv4RouteList[0], FIBAndRIB)
 	fmt.Println("val = ", val, " err: ", err, " for route:", ipv4RouteList[0])
 	TestGetRouteReachability(t)
 	TestResolveNextHop(t)
@@ -401,7 +401,7 @@ func TestProcessv4RouteDeleteConfig(t *testing.T) {
 			fmt.Println("Validation failed for route:", v4Route, " with error:", val_err)
 			continue
 		}
-		val, err := server.ProcessV4RouteDeleteConfig(v4Route)
+		val, err := server.ProcessV4RouteDeleteConfig(v4Route, FIBAndRIB)
 		fmt.Println("val = ", val, " err: ", err, " for v4Route:", v4Route)
 	}
 	TestGetRouteReachability(t)

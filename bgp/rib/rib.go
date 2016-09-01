@@ -326,31 +326,35 @@ func (l *LocRib) ProcessRoutesForReachableRoutes(nextHop string, reachabilityInf
 func (l *LocRib) TestNHAndProcessRoutes(peerIP string, add, remove []packet.NLRI, addPath, remPath *Path,
 	addPathCount int, protoFamily uint32, updated map[uint32]map[*Path][]*Destination, withdrawn,
 	updatedAddPaths []*Destination) (map[uint32]map[*Path][]*Destination, []*Destination, []*Destination, bool) {
-	nextHop := addPath.GetNextHop(protoFamily)
-	if nextHop == nil {
-		l.logger.Errf("RIB - Next hop not found for protocol family %d", protoFamily)
-		return updated, withdrawn, updatedAddPaths, true
-	}
-	nextHopStr := nextHop.String()
-	reachabilityInfo := l.GetReachabilityInfo(nextHopStr)
-	addPath.SetReachabilityForFamily(protoFamily, reachabilityInfo)
+	var reachabilityInfo *ReachabilityInfo
+	nextHopStr := ""
+	if len(add) > 0 {
+		nextHop := addPath.GetNextHop(protoFamily)
+		if nextHop == nil {
+			l.logger.Errf("RIB - Next hop not found for protocol family %d", protoFamily)
+			return updated, withdrawn, updatedAddPaths, true
+		}
+		nextHopStr = nextHop.String()
+		reachabilityInfo = l.GetReachabilityInfo(nextHopStr)
+		addPath.SetReachabilityForFamily(protoFamily, reachabilityInfo)
 
-	//addPath.GetReachabilityInfo()
-	if !addPath.IsValid() {
-		l.logger.Infof("Received a update with our cluster id %d, Discarding the update.",
-			addPath.NeighborConf.RunningConf.RouteReflectorClusterId)
-		return updated, withdrawn, updatedAddPaths, true
-	}
-
-	if reachabilityInfo == nil {
-		l.logger.Infof("ProcessUpdate - next hop %s is not reachable", nextHopStr)
-
-		if _, ok := l.unreachablePaths[nextHopStr]; !ok {
-			l.unreachablePaths[nextHopStr] = make(map[*Path]map[*Destination][]uint32)
+		//addPath.GetReachabilityInfo()
+		if !addPath.IsValid() {
+			l.logger.Infof("Received a update with our cluster id %d, Discarding the update.",
+				addPath.NeighborConf.RunningConf.RouteReflectorClusterId)
+			return updated, withdrawn, updatedAddPaths, true
 		}
 
-		if _, ok := l.unreachablePaths[nextHopStr][addPath]; !ok {
-			l.unreachablePaths[nextHopStr][addPath] = make(map[*Destination][]uint32)
+		if reachabilityInfo == nil {
+			l.logger.Infof("ProcessUpdate - next hop %s is not reachable", nextHopStr)
+
+			if _, ok := l.unreachablePaths[nextHopStr]; !ok {
+				l.unreachablePaths[nextHopStr] = make(map[*Path]map[*Destination][]uint32)
+			}
+
+			if _, ok := l.unreachablePaths[nextHopStr][addPath]; !ok {
+				l.unreachablePaths[nextHopStr][addPath] = make(map[*Destination][]uint32)
+			}
 		}
 	}
 

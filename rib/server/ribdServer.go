@@ -218,7 +218,7 @@ func (ribdServiceHandler *RIBDServer) ProcessIPv6IntfDownEvent(ipAddr string, if
 		NetworkMask:   ipMaskStr,
 	}
 	nextHop := ribd.NextHopInfo{
-		NextHopIp:     "0.0.0.0",
+		NextHopIp:     "::",
 		NextHopIntRef: strconv.Itoa(int(ifIndex)),
 	}
 	cfg.NextHop = make([]*ribd.NextHopInfo, 0)
@@ -332,7 +332,7 @@ func (ribdServiceHandler *RIBDServer) ProcessIPv6IntfUpEvent(ipAddr string, ifIn
 				NetworkMask:   ipMaskStr,
 			}
 			nextHop := ribd.NextHopInfo{
-				NextHopIp:     "0.0.0.0",
+				NextHopIp:     "::",
 				NextHopIntRef: strconv.Itoa(int(ifIndex)),
 			}
 			cfg.NextHop = make([]*ribd.NextHopInfo, 0)

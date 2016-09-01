@@ -34,16 +34,11 @@ import (
 )
 
 func (session *BfdSession) StartPerLinkSessionServer(bfdServer *BFDServer) error {
-	var ifName string
 	var err error
 	var myMacAddr net.HardwareAddr
+	ifName := session.state.Interface
 	bfdServer.logger.Info(fmt.Sprintln("Starting perlink session ", session.state.SessionId, " on ", ifName))
 	sessionId := session.state.SessionId
-	ifName, err = bfdServer.getLinuxIntfName(session.state.InterfaceId)
-	if err != nil {
-		bfdServer.logger.Info(fmt.Sprintln("Failed to get ifname for ", session.state.InterfaceId))
-		return err
-	}
 	myMacAddr, err = bfdServer.getMacAddrFromIntfName(ifName)
 	if err != nil {
 		bfdServer.logger.Info(fmt.Sprintln("Unable to get the MAC addr of ", ifName, err))
@@ -112,16 +107,10 @@ func (session *BfdSession) StartPerLinkSessionServer(bfdServer *BFDServer) error
 }
 
 func (session *BfdSession) StartPerLinkSessionClient(bfdServer *BFDServer) error {
-	var ifName string
 	var err error
 	var myMacAddr net.HardwareAddr
+	ifName := session.state.Interface
 	bfdServer.logger.Info(fmt.Sprintln("Starting perlink session ", session.state.SessionId, " on ", ifName))
-	ifName, err = bfdServer.getLinuxIntfName(session.state.InterfaceId)
-	if err != nil {
-		bfdServer.logger.Info(fmt.Sprintln("Failed to get ifname for ", session.state.InterfaceId))
-		bfdServer.FailedSessionClientCh <- session.state.SessionId
-		return err
-	}
 	myMacAddr, err = bfdServer.getMacAddrFromIntfName(ifName)
 	if err != nil {
 		bfdServer.logger.Info(fmt.Sprintln("Unable to get the MAC addr of ", ifName, err))

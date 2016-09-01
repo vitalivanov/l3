@@ -111,7 +111,7 @@ func (ribdServiceHandler *RIBDServer) ProcessIPv6IntfCreateEvent(msg asicdCommon
 		NetworkMask:   ipMaskStr,
 	}
 	nextHop := ribd.NextHopInfo{
-		NextHopIp:     "0.0.0.0",
+		NextHopIp:     "::",
 		NextHopIntRef: strconv.Itoa(int(msg.IfIndex)),
 	}
 	cfg.NextHop = make([]*ribd.NextHopInfo, 0)
@@ -169,7 +169,7 @@ func (ribdServiceHandler *RIBDServer) ProcessIPv6IntfDeleteEvent(msg asicdCommon
 		NetworkMask:   ipMaskStr,
 	}
 	nextHop := ribd.NextHopInfo{
-		NextHopIp:     "0.0.0.0",
+		NextHopIp:     "::",
 		NextHopIntRef: strconv.Itoa(int(msg.IfIndex)),
 	}
 	cfg.NextHop = make([]*ribd.NextHopInfo, 0)
