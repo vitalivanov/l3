@@ -26,7 +26,6 @@ package rpc
 import (
 	"bfdd"
 	"errors"
-	"fmt"
 	"l3/bfd/bfddCommonDefs"
 	"l3/bfd/server"
 	"strconv"
@@ -43,7 +42,7 @@ func (h *BFDHandler) convertGlobalStateToThrift(ent server.GlobalState) *bfdd.Bf
 }
 
 func (h *BFDHandler) GetBulkBfdGlobalState(fromIdx bfdd.Int, count bfdd.Int) (*bfdd.BfdGlobalStateGetInfo, error) {
-	h.logger.Info(fmt.Sprintln("Get BFD global state"))
+	h.logger.Info("Get BFD global state")
 
 	if fromIdx != 0 {
 		err := errors.New("Invalid range")
@@ -134,7 +133,7 @@ func (h *BFDHandler) convertSessionParamStateToThrift(ent server.SessionParamSta
 }
 
 func (h *BFDHandler) GetBulkBfdSessionState(fromIdx bfdd.Int, count bfdd.Int) (*bfdd.BfdSessionStateGetInfo, error) {
-	h.logger.Info(fmt.Sprintln("Get session states"))
+	h.logger.Info("Get session states")
 	nextIdx, currCount, bfdSessionStates := h.server.GetBulkBfdSessionStates(int(fromIdx), int(count))
 	if bfdSessionStates == nil {
 		err := errors.New("Bfd server is busy")
@@ -154,7 +153,7 @@ func (h *BFDHandler) GetBulkBfdSessionState(fromIdx bfdd.Int, count bfdd.Int) (*
 }
 
 func (h *BFDHandler) GetBulkBfdSessionParamState(fromIdx bfdd.Int, count bfdd.Int) (*bfdd.BfdSessionParamStateGetInfo, error) {
-	h.logger.Info(fmt.Sprintln("Get session param states"))
+	h.logger.Info("Get session param states")
 	nextIdx, currCount, bfdSessionParamStates := h.server.GetBulkBfdSessionParamStates(int(fromIdx), int(count))
 	if bfdSessionParamStates == nil {
 		err := errors.New("Bfd server is busy")

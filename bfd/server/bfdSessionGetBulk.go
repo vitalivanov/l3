@@ -23,10 +23,6 @@
 
 package server
 
-import (
-//"fmt"
-)
-
 func (server *BFDServer) GetBulkBfdSessionStates(idx int, cnt int) (int, int, []SessionState) {
 	var nextIdx int
 	var count int

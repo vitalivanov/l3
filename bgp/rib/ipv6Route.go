@@ -26,7 +26,9 @@ package rib
 
 import (
 	"bgpd"
+	bgputils "l3/bgp/utils"
 	"models/objects"
+	"strconv"
 )
 
 type IPv6Route struct {
@@ -89,6 +91,13 @@ func (i *IPv6Route) RemovePathAndSetLast(idx int) {
 func (i *IPv6Route) GetModelObject() objects.ConfigObj {
 	var dbObj objects.BGPv6RouteState
 	objects.ConvertThriftTobgpdBGPv6RouteStateObj(i.BGPv6RouteState, &dbObj)
+	for idx1 := 0; idx1 < len(dbObj.Paths); idx1++ {
+		for idx2 := 0; idx2 < len(dbObj.Paths[idx1].Path); idx2++ {
+			asdoPlain, _ := strconv.Atoi(dbObj.Paths[idx1].Path[idx2])
+			asdotPath, _ := bgputils.GetAsDot(asdoPlain)
+			dbObj.Paths[idx1].Path[idx2] = asdotPath
+		}
+	}
 	return &dbObj
 }
 
