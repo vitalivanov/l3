@@ -26,11 +26,10 @@ package rpc
 import (
 	"bfdd"
 	"errors"
-	"fmt"
 )
 
 func (h *BFDHandler) GetBfdGlobalState(vrf string) (*bfdd.BfdGlobalState, error) {
-	h.logger.Info(fmt.Sprintln("Get Global attrs"))
+	h.logger.Info("Get Global attrs")
 	bfdGlobalStateResponse := bfdd.NewBfdGlobalState()
 	gState := h.server.GetBfdGlobalState()
 	bfdGlobalState := h.convertGlobalStateToThrift(*gState)
@@ -40,7 +39,7 @@ func (h *BFDHandler) GetBfdGlobalState(vrf string) (*bfdd.BfdGlobalState, error)
 
 func (h *BFDHandler) GetBfdSessionState(ipAddr string) (*bfdd.BfdSessionState, error) {
 	var err error
-	h.logger.Info(fmt.Sprintln("Get Session attrs for neighbor", ipAddr))
+	h.logger.Info("Get Session attrs for neighbor", ipAddr)
 	bfdSessionStateResponse := bfdd.NewBfdSessionState()
 	sessionState, found := h.server.GetBfdSessionState(ipAddr)
 	if found {
@@ -54,7 +53,7 @@ func (h *BFDHandler) GetBfdSessionState(ipAddr string) (*bfdd.BfdSessionState, e
 
 func (h *BFDHandler) GetBfdSessionParamState(paramName string) (*bfdd.BfdSessionParamState, error) {
 	var err error
-	h.logger.Info(fmt.Sprintln("Get Session Params attrs for", paramName))
+	h.logger.Info("Get Session Params attrs for", paramName)
 	bfdSessionParamStateResponse := bfdd.NewBfdSessionParamState()
 	sessionParamState, found := h.server.GetBfdSessionParamState(paramName)
 	if found {

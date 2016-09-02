@@ -13,20 +13,19 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 package rpc
 
 import (
 	"bfdd"
 	"encoding/json"
-	"fmt"
 	"git.apache.org/thrift.git/lib/go/thrift"
 	"io/ioutil"
 	"strconv"
@@ -43,7 +42,7 @@ func getClient(logger *logging.Writer, fileName string, process string) (*Client
 
 	data, err := ioutil.ReadFile(fileName)
 	if err != nil {
-		logger.Err(fmt.Sprintf("Failed to open BFDd config file:%s, err:%s", fileName, err))
+		logger.Err("Failed to open BFDd config file:%s, err:%s", fileName, err)
 		return nil, err
 	}
 
@@ -54,7 +53,7 @@ func getClient(logger *logging.Writer, fileName string, process string) (*Client
 		}
 	}
 
-	logger.Err(fmt.Sprintf("Did not find port for %s in config file:%s", process, fileName))
+	logger.Err("Did not find port for %s in config file:%s", process, fileName)
 	return nil, nil
 }
 
@@ -68,17 +67,17 @@ func StartServer(logger *logging.Writer, handler *BFDHandler, fileName string) {
 	transportFactory := thrift.NewTBufferedTransportFactory(8192)
 	serverTransport, err := thrift.NewTServerSocket("localhost:" + strconv.Itoa(clientJson.Port))
 	if err != nil {
-		logger.Info(fmt.Sprintln("StartServer: NewTServerSocket failed with error:", err))
+		logger.Info("StartServer: NewTServerSocket failed with error:", err)
 		return
 	}
 	processor := bfdd.NewBFDDServicesProcessor(handler)
 	server := thrift.NewTSimpleServer4(processor, serverTransport, transportFactory, protocolFactory)
-	logger.Info(fmt.Sprintln("StartServer: Starting"))
+	logger.Info("StartServer: Starting")
 	err = server.Serve()
-	logger.Info(fmt.Sprintln("StartServer: Started"))
+	logger.Info("StartServer: Started")
 	if err != nil {
-		logger.Info(fmt.Sprintln("Failed to start the listener, err:", err))
+		logger.Info("Failed to start the listener, err:", err)
 	}
-	logger.Info(fmt.Sprintln("Started the listener successfully"))
+	logger.Info("Started the listener successfully")
 	return
 }
