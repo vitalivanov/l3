@@ -13,13 +13,13 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 package main
 
@@ -58,7 +58,7 @@ func main() {
 
 	clientsFileName := fileName + "clients.json"
 
-	logger.Info(fmt.Sprintln("Starting BFD Server..."))
+	logger.Info("Starting BFD Server...")
 	bfdServer := server.NewBFDServer(logger)
 	// Start signal handler
 	go bfdServer.SigHandler(dbHdl)
@@ -66,7 +66,7 @@ func main() {
 	go bfdServer.StartServer(clientsFileName, dbHdl)
 
 	<-bfdServer.ServerStartedCh
-	logger.Info(fmt.Sprintln("BFD Server started"))
+	logger.Info("BFD Server started")
 
 	// Start keepalive routine
 	go keepalive.InitKeepAlive("bfdd", fileName)

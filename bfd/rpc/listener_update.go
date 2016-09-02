@@ -26,12 +26,11 @@ package rpc
 import (
 	"bfdd"
 	"errors"
-	"fmt"
 )
 
 func (h *BFDHandler) UpdateBfdGlobal(origConf *bfdd.BfdGlobal, newConf *bfdd.BfdGlobal, attrset []bool, op []*bfdd.PatchOpInfo) (bool, error) {
-	h.logger.Info(fmt.Sprintln("Original global config attrs:", origConf))
-	h.logger.Info(fmt.Sprintln("New global config attrs:", newConf))
+	h.logger.Info("Original global config attrs:", origConf)
+	h.logger.Info("New global config attrs:", newConf)
 	return h.SendBfdGlobalConfig(newConf), nil
 }
 
@@ -40,7 +39,7 @@ func (h *BFDHandler) UpdateBfdSession(origConf *bfdd.BfdSession, newConf *bfdd.B
 		err := errors.New("Invalid Session Configuration")
 		return false, err
 	}
-	h.logger.Info(fmt.Sprintln("Update session config attrs:", newConf))
+	h.logger.Info("Update session config attrs:", newConf)
 	return h.SendBfdSessionConfig(newConf), nil
 }
 
@@ -49,6 +48,6 @@ func (h *BFDHandler) UpdateBfdSessionParam(origConf *bfdd.BfdSessionParam, newCo
 		err := errors.New("Invalid Session Param Configuration")
 		return false, err
 	}
-	h.logger.Info(fmt.Sprintln("Update session Param config attrs:", newConf))
+	h.logger.Info("Update session Param config attrs:", newConf)
 	return h.SendBfdSessionParamConfig(newConf), nil
 }

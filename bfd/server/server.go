@@ -26,7 +26,6 @@ package server
 import (
 	"asicdServices"
 	"encoding/json"
-	"fmt"
 	"github.com/google/gopacket/pcap"
 	nanomsg "github.com/op/go-nanomsg"
 	"io/ioutil"
@@ -229,11 +228,11 @@ func (server *BFDServer) ConnectToServers(paramsFile string) {
 
 	for _, client := range clientsList {
 		if client.Name == "asicd" {
-			server.logger.Info(fmt.Sprintln("found asicd at port", client.Port))
+			server.logger.Info("found asicd at port", client.Port)
 			server.asicdClient.Address = "localhost:" + strconv.Itoa(client.Port)
 			server.asicdClient.TTransport, server.asicdClient.PtrProtocolFactory, err = ipcutils.CreateIPCHandles(server.asicdClient.Address)
 			if err != nil {
-				server.logger.Info(fmt.Sprintf("Failed to connect to Asicd, retrying until connection is successful"))
+				server.logger.Info("Failed to connect to Asicd, retrying until connection is successful")
 				count := 0
 				ticker := time.NewTicker(time.Duration(1000) * time.Millisecond)
 				for _ = range ticker.C {
@@ -254,11 +253,11 @@ func (server *BFDServer) ConnectToServers(paramsFile string) {
 				server.logger.Info("Bfdd is connected to Asicd")
 			}
 		} else if client.Name == "ribd" {
-			server.logger.Info(fmt.Sprintln("found ribd at port", client.Port))
+			server.logger.Info("found ribd at port", client.Port)
 			server.ribdClient.Address = "localhost:" + strconv.Itoa(client.Port)
 			server.ribdClient.TTransport, server.ribdClient.PtrProtocolFactory, err = ipcutils.CreateIPCHandles(server.ribdClient.Address)
 			if err != nil {
-				server.logger.Info(fmt.Sprintf("Failed to connect to Ribd, retrying until connection is successful"))
+				server.logger.Info("Failed to connect to Ribd, retrying until connection is successful")
 				count := 0
 				ticker := time.NewTicker(time.Duration(1000) * time.Millisecond)
 				for _ = range ticker.C {
@@ -283,20 +282,20 @@ func (server *BFDServer) ConnectToServers(paramsFile string) {
 }
 
 func (server *BFDServer) InitPublisher(pub_str string) (pub *nanomsg.PubSocket) {
-	server.logger.Info(fmt.Sprintln("Setting up ", pub_str, "publisher"))
+	server.logger.Info("Setting up ", pub_str, "publisher")
 	pub, err := nanomsg.NewPubSocket()
 	if err != nil {
-		server.logger.Info(fmt.Sprintln("Failed to open pub socket"))
+		server.logger.Info("Failed to open pub socket")
 		return nil
 	}
 	ep, err := pub.Bind(pub_str)
 	if err != nil {
-		server.logger.Info(fmt.Sprintln("Failed to bind pub socket - ", ep))
+		server.logger.Info("Failed to bind pub socket - ", ep)
 		return nil
 	}
 	err = pub.SetSendBuffer(1024)
 	if err != nil {
-		server.logger.Info(fmt.Sprintln("Failed to set send buffer size"))
+		server.logger.Info("Failed to set send buffer size")
 		return nil
 	}
 	return pub
@@ -309,14 +308,14 @@ func (server *BFDServer) PublishSessionNotifications() {
 		case event := <-server.notificationCh:
 			_, err := server.bfddPubSocket.Send(event, nanomsg.DontWait)
 			if err == syscall.EAGAIN {
-				server.logger.Err(fmt.Sprintln("Failed to publish event"))
+				server.logger.Err("Failed to publish event")
 			}
 		}
 	}
 }
 
 func (server *BFDServer) InitServer(paramFile string) {
-	server.logger.Info(fmt.Sprintln("Starting Bfd Server"))
+	server.logger.Info("Starting Bfd Server")
 	server.ConnectToServers(paramFile)
 	server.initBfdGlobalConfDefault()
 	server.BuildPortPropertyMap()
@@ -342,7 +341,7 @@ func (server *BFDServer) StartServer(paramFile string, dbHdl *dbutils.DBUtil) {
 	for {
 		select {
 		case gConf := <-server.GlobalConfigCh:
-			server.logger.Info(fmt.Sprintln("Received call for performing Global Configuration", gConf))
+			server.logger.Info("Received call for performing Global Configuration", gConf)
 			server.processGlobalConfig(gConf)
 		case asicdrxBuf := <-server.asicdSubSocketCh:
 			server.processAsicdNotification(asicdrxBuf)
@@ -351,13 +350,13 @@ func (server *BFDServer) StartServer(paramFile string, dbHdl *dbutils.DBUtil) {
 			server.processRibdNotification(ribdrxBuf)
 		case <-server.ribdSubSocketErrCh:
 		case sessionConfig := <-server.SessionConfigCh:
-			server.logger.Info(fmt.Sprintln("Received call for performing Session Configuration", sessionConfig))
+			server.logger.Info("Received call for performing Session Configuration", sessionConfig)
 			server.processSessionConfig(sessionConfig)
 		case sessionParamConfig := <-server.SessionParamConfigCh:
-			server.logger.Info(fmt.Sprintln("Received call for performing Session Param Configuration", sessionParamConfig))
+			server.logger.Info("Received call for performing Session Param Configuration", sessionParamConfig)
 			server.processSessionParamConfig(sessionParamConfig)
 		case paramName := <-server.SessionParamDeleteCh:
-			server.logger.Info(fmt.Sprintln("Received call for performing Session Param Delete", paramName))
+			server.logger.Info("Received call for performing Session Param Delete", paramName)
 			server.processSessionParamDelete(paramName)
 		}
 	}
