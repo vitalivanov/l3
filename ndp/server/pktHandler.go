@@ -213,7 +213,7 @@ func (svr *NDPServer) ProcessRxPkt(ifIndex int32, pkt gopacket.Packet) error {
 		return errors.New(fmt.Sprintln("Failed decoding ND packet, error:", err))
 	}
 	nbrInfo, operation := ipPort.ProcessND(ndInfo)
-	if nbrInfo == nil || operation == DELETE {
+	if nbrInfo == nil || operation == IGNORE {
 		//debug.Logger.Warning("nbrInfo:", nbrInfo, "operation:", operation)
 		return nil
 	}
