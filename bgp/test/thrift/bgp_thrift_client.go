@@ -54,7 +54,7 @@ func main() {
 	client := bgpd.NewBGPDServicesClientFactory(clientTransport, protocolFactory)
 
 	globalConfigArgs := bgpd.NewBGPGlobal()
-	globalConfigArgs.ASNum = 5000
+	globalConfigArgs.ASNum = "5000"
 	globalConfigArgs.RouterId = "localhost"
 	fmt.Println("calling CreateBgpGlobal with attr:", globalConfigArgs)
 	ret, err := client.CreateBGPGlobal(globalConfigArgs)
@@ -65,8 +65,8 @@ func main() {
 
 	peerConfigArgs := bgpd.NewBGPv4Neighbor()
 	peerConfigArgs.NeighborAddress = "11.1.11.203"
-	peerConfigArgs.LocalAS = 5000
-	peerConfigArgs.PeerAS = 5000
+	peerConfigArgs.LocalAS = "5000"
+	peerConfigArgs.PeerAS = "5000"
 	peerConfigArgs.Description = "IBGP Peer"
 	fmt.Println("calling CreateBgpPeer with attr:", peerConfigArgs)
 	ret, err = client.CreateBGPv4Neighbor(peerConfigArgs)

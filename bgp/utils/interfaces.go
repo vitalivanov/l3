@@ -95,6 +95,7 @@ func (i *InterfaceMgr) GetIfaceIfIdx(ipAddr string) (idx int32, err error) {
 
 	return idx, err
 }
+
 func (i *InterfaceMgr) AddIface(ifIndex int32, addr string) {
 	i.rwMutex.Lock()
 	defer i.rwMutex.Unlock()
@@ -120,16 +121,29 @@ func (i *InterfaceMgr) AddIface(ifIndex int32, addr string) {
 	i.ifIndexToIP[ifIndex] = ipInfo //ip.String()
 	i.ipToIfIndex[ip.String()] = ifIndex
 }
+
 func (i *InterfaceMgr) AddV6Iface(ifIndex int32, addr string) {
 }
+
 func (i *InterfaceMgr) AddLinkLocalIface(ifIndex int32, addr string) {
 	i.rwMutex.Lock()
 	defer i.rwMutex.Unlock()
 	i.logger.Info("AddLinkLocalIface: ifIndex", ifIndex, "ip", addr, "ifIndexToIP", i.ifIndexToIP, "ipToIfIndex", i.ipToIfIndex)
 
+	netIP := net.ParseIP(addr)
+	if netIP == nil || !netIP.IsLinkLocalUnicast() {
+		i.logger.Err("AddLinkLocalIface: ifIndex", ifIndex, "ip", addr, "is not a link local unicast address")
+		return
+	}
+
 	var ipAddr net.IP
 	var ipMask net.IPMask
 	if oldIP, ok := i.ifIndexToIP[ifIndex]; ok {
+		if oldIP.LinklocalIpAddr != "" {
+			i.logger.Err("AddLinkLocalIface: ifIndex", ifIndex, "ip", addr, "link local ip", oldIP.LinklocalIpAddr,
+				"is already set on the interface")
+			return
+		}
 		//delete(i.ifIndexToIP, ifIndex)
 		//delete(i.ipToIfIndex, oldIP)
 		ipAddr = oldIP.IpAddr
@@ -162,13 +176,21 @@ func (i *InterfaceMgr) RemoveIface(ifIndex int32, addr string) {
 		i.ifIndexToIP[ifIndex] = ipInfo
 	}
 }
+
 func (i *InterfaceMgr) RemoveV6Iface(ifIndex int32, addr string) {
 }
+
 func (i *InterfaceMgr) RemoveLinkLocalIface(ifIndex int32, addr string) {
 	i.rwMutex.Lock()
 	defer i.rwMutex.Unlock()
-	i.logger.Info("RemoveIface: ifIndex", ifIndex, "ip", addr, "ifIndexToIP", i.ifIndexToIP, "ipToIfIndex",
+	i.logger.Info("RemoveLinkLocalIface: ifIndex", ifIndex, "ip", addr, "ifIndexToIP", i.ifIndexToIP, "ipToIfIndex",
 		i.ipToIfIndex)
+
+	netIP := net.ParseIP(addr)
+	if netIP == nil || !netIP.IsLinkLocalUnicast() {
+		i.logger.Err("RemoveLinkLocalIface: ifIndex", ifIndex, "ip", addr, "is not a link local unicast address")
+		return
+	}
 
 	if oldIP, ok := i.ifIndexToIP[ifIndex]; ok {
 		if netutils.IsZeros(oldIP.IpAddr) {
