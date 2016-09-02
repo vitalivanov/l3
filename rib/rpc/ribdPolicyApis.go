@@ -70,6 +70,21 @@ func (m RIBDServicesHandler) DeletePolicyStmt(cfg *ribd.PolicyStmt) (val bool, e
 }
 
 func (m RIBDServicesHandler) UpdatePolicyStmt(origconfig *ribd.PolicyStmt, newconfig *ribd.PolicyStmt, attrset []bool, op []*ribd.PatchOpInfo) (val bool, err error) {
+	if op == nil || len(op) == 0 {
+		//update op
+		logger.Info("Update op for policy stmt definition")
+
+	} else {
+		//patch op
+		logger.Info("patch op:", op, " for policy stmt definition")
+	}
+	m.server.PolicyConfCh <- server.RIBdServerConfig{
+		OrigConfigObject: origconfig,
+		NewConfigObject:  newconfig,
+		AttrSet:          attrset,
+		PatchOp:          op,
+		Op:               "updatePolicyStmt",
+	}
 	return true, err
 }
 func (m RIBDServicesHandler) GetPolicyStmtState(name string) (*ribd.PolicyStmtState, error) {
