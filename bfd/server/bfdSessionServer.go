@@ -484,9 +484,11 @@ func (server *BFDServer) SessionDeleteHandler(session *BfdSession, Protocol bfdd
 	sessionId := session.state.SessionId
 	session.state.RegisteredProtocols[Protocol] = false
 	if ForceDel || session.CheckIfAnyProtocolRegistered() == false {
-		session.txTimer.Stop()
-		session.SessionStopClientCh <- true
-		session.sessionTimer.Stop()
+		if session.IsSessionActive() {
+			session.txTimer.Stop()
+			session.sessionTimer.Stop()
+			session.SessionStopClientCh <- true
+		}
 		session.SessionStopServerCh <- true
 		server.bfdGlobal.SessionParams[session.state.ParamName].state.NumSessions--
 		server.bfdGlobal.NumSessions--
