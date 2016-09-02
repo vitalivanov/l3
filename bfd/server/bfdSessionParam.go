@@ -13,19 +13,15 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 package server
-
-import (
-	"fmt"
-)
 
 func (server *BFDServer) createDefaultSessionParam() error {
 	paramName := "default"
@@ -43,18 +39,18 @@ func (server *BFDServer) createDefaultSessionParam() error {
 		server.bfdGlobal.NumSessionParams++
 		server.UpdateBfdSessionsUsingParam(sessionParam.state.Name)
 	}
-	server.logger.Info(fmt.Sprintln("Created default session param"))
+	server.logger.Info("Created default session param")
 	return nil
 }
 
 func (server *BFDServer) processSessionParamConfig(paramConfig SessionParamConfig) error {
 	sessionParam, exist := server.bfdGlobal.SessionParams[paramConfig.Name]
 	if !exist {
-		server.logger.Info(fmt.Sprintln("Creating session param: ", paramConfig.Name))
+		server.logger.Info("Creating session param: ", paramConfig.Name)
 		sessionParam = &BfdSessionParam{}
 		server.bfdGlobal.SessionParams[paramConfig.Name] = sessionParam
 	} else {
-		server.logger.Info(fmt.Sprintln("Updating session param: ", paramConfig.Name))
+		server.logger.Info("Updating session param: ", paramConfig.Name)
 	}
 	sessionParam.state.Name = paramConfig.Name
 	sessionParam.state.LocalMultiplier = paramConfig.LocalMultiplier
@@ -76,7 +72,7 @@ func (server *BFDServer) processSessionParamConfig(paramConfig SessionParamConfi
 func (server *BFDServer) processSessionParamDelete(paramName string) error {
 	_, exist := server.bfdGlobal.SessionParams[paramName]
 	if exist {
-		server.logger.Info(fmt.Sprintln("Deleting session param: ", paramName))
+		server.logger.Info("Deleting session param: ", paramName)
 		delete(server.bfdGlobal.SessionParams, paramName)
 		server.bfdGlobal.NumSessionParams--
 		server.UpdateBfdSessionsUsingParam(paramName)
