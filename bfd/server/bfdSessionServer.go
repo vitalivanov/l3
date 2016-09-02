@@ -26,13 +26,11 @@ package server
 import (
 	"asicd/asicdCommonDefs"
 	"errors"
-	//"github.com/google/gopacket"
-	//"github.com/google/gopacket/layers"
-	//"github.com/google/gopacket/pcap"
 	"l3/bfd/bfddCommonDefs"
 	"math/rand"
 	"net"
 	"strconv"
+	"strings"
 	"time"
 	"utils/commonDefs"
 )
@@ -419,6 +417,16 @@ func (server *BFDServer) FindBfdSession(DestIp string) (sessionId int32, found b
 	found = false
 	for sessionId, session := range server.bfdGlobal.Sessions {
 		if session.state.IpAddr == DestIp {
+			return sessionId, true
+		}
+	}
+	return sessionId, found
+}
+
+func (server *BFDServer) FindBfdSessionContainingAddr(DestIp string) (sessionId int32, found bool) {
+	found = false
+	for sessionId, session := range server.bfdGlobal.Sessions {
+		if strings.HasPrefix(session.state.IpAddr, DestIp) {
 			return sessionId, true
 		}
 	}
