@@ -265,11 +265,28 @@ func (n *NeighborConf) GetConfFromNeighbor(inConf *config.NeighborConfig, outCon
 		outConf.AdjRIBOutFilter = inConf.AdjRIBOutFilter
 	}
 
+	n.setDefaults(outConf)
 	outConf.PeerAddressType = inConf.PeerAddressType
 	outConf.NeighborAddress = inConf.NeighborAddress
 	outConf.IfIndex = inConf.IfIndex
 	outConf.IfName = inConf.IfName
 	outConf.PeerGroup = inConf.PeerGroup
+}
+
+func (n *NeighborConf) setDefaults(nConf *config.NeighborConfig) {
+	if nConf.ConnectRetryTime == 0 {
+		nConf.ConnectRetryTime = config.BGPConnectRetryTime
+	}
+
+	if nConf.HoldTime == 0 { // default hold time is 180 seconds
+		nConf.HoldTime = config.BGPHoldTimeDefault
+	} else if nConf.HoldTime < 3 {
+		nConf.HoldTime = 3
+	}
+
+	if nConf.KeepaliveTime == 0 { // default keep alive time is 60 seconds
+		nConf.KeepaliveTime = nConf.HoldTime / 3
+	}
 }
 
 func (n *NeighborConf) IsInternal() bool {

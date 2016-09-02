@@ -38,8 +38,6 @@ import (
 	"utils/logging"
 )
 
-const BGPConnectRetryTime uint16 = 120  // seconds
-const BGPHoldTimeDefault uint16 = 9     // 240 seconds
 const BGPIdleHoldTimeDefault uint16 = 5 // 240 seconds
 const BGPRestartTimeDefault uint32 = 1  // 240 seconds
 
