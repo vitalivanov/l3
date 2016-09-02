@@ -125,6 +125,12 @@ func (p *Peer) GetActionType(adjRIBDir bgprib.AdjRIBDir) (int, bool) {
 
 func (p *Peer) RemoveAdjRIBFilter(pe *bgppolicy.AdjRibPPolicyEngine, policyName string, adjRIBDir bgprib.AdjRIBDir) {
 	p.logger.Debug("RemoveAdjRIBFilter")
+	if !p.IsConfigured() {
+		p.logger.Infof("RemoveAdjRIBFilter - Neighbor is not ready to be started, ip:",
+			p.NeighborConf.Neighbor.NeighborAddress, "ifIndex:", p.NeighborConf.Neighbor.Config.IfIndex)
+		return
+	}
+
 	policyEngine := pe.GetPolicyEngine()
 	policyDB := policyEngine.PolicyDB
 	//neighborIP := p.NeighborConf.RunningConf.NeighborAddress.String()
@@ -156,6 +162,12 @@ func (p *Peer) RemoveAdjRIBFilter(pe *bgppolicy.AdjRibPPolicyEngine, policyName 
 
 func (p *Peer) AddAdjRIBFilter(pe *bgppolicy.AdjRibPPolicyEngine, policyName string, adjRIBDir bgprib.AdjRIBDir) {
 	p.logger.Debug("AddAdjRIBFilter")
+	if !p.IsConfigured() {
+		p.logger.Infof("AddAdjRIBFilter - Neighbor is not ready to be started, ip:",
+			p.NeighborConf.Neighbor.NeighborAddress, "ifIndex:", p.NeighborConf.Neighbor.Config.IfIndex)
+		return
+	}
+
 	policyEngine := pe.GetPolicyEngine()
 	policyDB := policyEngine.PolicyDB
 	nodeGet := policyDB.Get(patriciaDB.Prefix(policyName))
@@ -196,8 +208,26 @@ func (p *Peer) AddAdjRIBFilter(pe *bgppolicy.AdjRibPPolicyEngine, policyName str
 	pe.UpdateApplyPolicy(utilspolicy.ApplyPolicyInfo{node, policyAction, conditionNameList}, true)
 }
 
+func (p *Peer) IsConfigured() bool {
+	return p.NeighborConf.RunningConf.NeighborAddress != nil
+}
+
+func (p *Peer) SetNeighborAddress(ip net.IP) {
+	p.NeighborConf.SetNeighborAddress(ip)
+}
+
+func (p *Peer) ResetNeighborAddress() {
+	p.NeighborConf.ResetNeighborAddress()
+}
+
 func (p *Peer) Init() {
 	var fsmMgr *fsm.FSMManager
+	if !p.IsConfigured() {
+		p.logger.Info("Init - Neighbor is not ready to be started, ip:",
+			p.NeighborConf.Neighbor.NeighborAddress, "ifIndex:", p.NeighborConf.Neighbor.Config.IfIndex)
+		return
+	}
+
 	if p.NeighborConf.RunningConf.AdjRIBInFilter != "" {
 		p.AddAdjRIBFilter(p.server.ribInPE, p.NeighborConf.RunningConf.AdjRIBInFilter, bgprib.AdjRIBDirIn)
 	}
@@ -223,6 +253,12 @@ func (p *Peer) Init() {
 }
 
 func (p *Peer) Cleanup() {
+	if !p.IsConfigured() {
+		p.logger.Infof("Cleanup - Neighbor is not started yet, ip:",
+			p.NeighborConf.Neighbor.NeighborAddress, "ifIndex:", p.NeighborConf.Neighbor.Config.IfIndex)
+		return
+	}
+
 	if p.NeighborConf.RunningConf.AdjRIBInFilter != "" {
 		p.RemoveAdjRIBFilter(p.server.ribInPE, p.NeighborConf.RunningConf.AdjRIBInFilter, bgprib.AdjRIBDirIn)
 	}
@@ -311,10 +347,11 @@ func (p *Peer) clearRibOut() {
 
 func (p *Peer) ProcessBfd(add bool) {
 	ipAddr := p.NeighborConf.Neighbor.NeighborAddress.String()
+	iface := p.NeighborConf.RunningConf.IfName
 	sessionParam := p.NeighborConf.RunningConf.BfdSessionParam
 	if add && p.NeighborConf.RunningConf.BfdEnable {
 		p.logger.Info("Bfd enabled on", p.NeighborConf.Neighbor.NeighborAddress)
-		ret, err := p.server.bfdMgr.CreateBfdSession(ipAddr, sessionParam)
+		ret, err := p.server.bfdMgr.CreateBfdSession(ipAddr, iface, sessionParam)
 		if !ret {
 			p.logger.Info("BfdSessionConfig FAILED, ret:", ret, "err:", err)
 		} else {
@@ -324,7 +361,7 @@ func (p *Peer) ProcessBfd(add bool) {
 	} else {
 		if p.NeighborConf.Neighbor.State.BfdNeighborState != "" {
 			p.logger.Info("Bfd disabled on", p.NeighborConf.Neighbor.NeighborAddress)
-			ret, err := p.server.bfdMgr.DeleteBfdSession(ipAddr)
+			ret, err := p.server.bfdMgr.DeleteBfdSession(ipAddr, iface)
 			if !ret {
 				p.logger.Info("BfdSessionConfig FAILED, ret:", ret, "err:", err)
 			} else {

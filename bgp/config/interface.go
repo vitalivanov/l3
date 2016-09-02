@@ -66,8 +66,8 @@ type PolicyMgrIntf interface {
  */
 type BfdMgrIntf interface {
 	Start()
-	CreateBfdSession(ipAddr string, sessionParam string) (bool, error)
-	DeleteBfdSession(ipAddr string) (bool, error)
+	CreateBfdSession(ipAddr string, iface string, sessionParam string) (bool, error)
+	DeleteBfdSession(ipAddr string, iface string) (bool, error)
 }
 
 type ModelRouteIntf interface {
