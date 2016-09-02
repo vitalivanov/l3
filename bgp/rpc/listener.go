@@ -905,30 +905,31 @@ func (h *BGPHandler) getIPAndIfIndexForV4Neighbor(neighborIP string, neighborInt
 		}
 	} else if neighborIntfRef != "" {
 		//neighbor address is a intfRef
-		neighborIfIndex, _, err := h.server.ConvertIntfStrToIfIndex(neighborIntfRef)
+		ifIndex, _, err = h.server.ConvertIntfStrToIfIndex(neighborIntfRef)
 		if err != nil {
 			h.logger.Err("Invalid intfref:", neighborIntfRef)
 			return ip, ifIndex, ifName, err
 		}
-		ipInfo, err := h.server.GetIfaceIP(neighborIfIndex)
+
+		var ipInfo bgputils.IPInfo
+		ipInfo, err = h.server.GetIfaceIP(ifIndex)
 		h.logger.Info("getIPAndIfIndexForV4Neighbor - ipInfo:", ipInfo, " err:", err)
 		if err == nil {
 			ifIP := make(net.IP, len(ipInfo.IpAddr))
 			copy(ifIP, ipInfo.IpAddr)
 			ipMask := ipInfo.IpMask
 			if ipMask[len(ipMask)-1] < 252 {
-				h.logger.Err("IPv4Addr", ifIP, "of the interface", neighborIfIndex, "is not /30 or /31 address")
-				err = errors.New(fmt.Sprintln("IPv4Addr", ifIP, "of the interface", neighborIfIndex,
+				h.logger.Err("IPv4Addr", ifIP, "of the interface", ifIndex, "is not /30 or /31 address")
+				err = errors.New(fmt.Sprintln("IPv4Addr", ifIP, "of the interface", ifIndex,
 					"is not /30 or /31 address"))
 				return ip, ifIndex, ifName, err
 			}
-			h.logger.Info("IPv4Addr of the v4Neighbor local interface", neighborIfIndex, "is", ifIP)
+			h.logger.Info("IPv4Addr of the v4Neighbor local interface", ifIndex, "is", ifIP)
 			ifIP[len(ifIP)-1] = ifIP[len(ifIP)-1] ^ (^ipMask[len(ipMask)-1])
 			h.logger.Info("IPv4Addr of the v4Neighbor peer interface is", ifIP)
 			ip = ifIP
-			ifIndex = neighborIfIndex
 		} else {
-			h.logger.Err("v4Neighbor IP", neighborIP, "or interface", neighborIfIndex, "not configured ")
+			h.logger.Err("v4Neighbor IP", neighborIP, "or interface", ifIndex, "not configured ")
 		}
 	}
 	return ip, ifIndex, ifName, err
@@ -956,7 +957,8 @@ func (h *BGPHandler) setDefault(pconf *config.NeighborConfig) {
 	}
 }
 
-func (h *BGPHandler) ConvertV4NeighborFromThrift(bgpNeighbor *bgpd.BGPv4Neighbor, ip net.IP, ifIndex int32) (pConf config.NeighborConfig, err error) {
+func (h *BGPHandler) ConvertV4NeighborFromThrift(bgpNeighbor *bgpd.BGPv4Neighbor, ip net.IP, ifIndex int32) (
+	pConf config.NeighborConfig, err error) {
 
 	peerAS, err := bgputils.GetAsNum(bgpNeighbor.PeerAS)
 	if err != nil {
@@ -1014,6 +1016,7 @@ func (h *BGPHandler) ValidateV4Neighbor(bgpNeighbor *bgpd.BGPv4Neighbor) (pConf 
 			bgpNeighbor.NeighborAddress, "and ifIndex", bgpNeighbor.IntfRef)
 		return pConf, err
 	}
+	h.logger.Info("ValidateV4Neighbor: getIPAndIfIndexForNeighbor returned ip", ip, "ifIndex", ifIndex)
 
 	if !h.isValidIP(bgpNeighbor.UpdateSource) {
 		err = errors.New(fmt.Sprintf("Update source %s not a valid IP", bgpNeighbor.UpdateSource))
@@ -1024,7 +1027,8 @@ func (h *BGPHandler) ValidateV4Neighbor(bgpNeighbor *bgpd.BGPv4Neighbor) (pConf 
 	return pConf, err
 }
 
-func (h *BGPHandler) ValidateV4NeighborForUpdate(oldNeigh *bgpd.BGPv4Neighbor, oldNeighConfig config.NeighborConfig, newNeigh *bgpd.BGPv4Neighbor, attrSet []bool) (pConf config.NeighborConfig, err error) {
+func (h *BGPHandler) ValidateV4NeighborForUpdate(oldNeigh *bgpd.BGPv4Neighbor, oldNeighConfig config.NeighborConfig,
+	newNeigh *bgpd.BGPv4Neighbor, attrSet []bool) (pConf config.NeighborConfig, err error) {
 	pConf, _ = h.ConvertV4NeighborFromThrift(oldNeigh, oldNeighConfig.NeighborAddress, oldNeighConfig.IfIndex)
 	h.logger.Info("ValidateV4NeighborForUpdate: AttrSet", attrSet)
 	if attrSet != nil {
@@ -1050,7 +1054,8 @@ func (h *BGPHandler) ValidateV4NeighborForUpdate(oldNeigh *bgpd.BGPv4Neighbor, o
 	return pConf, err
 }
 
-func (h *BGPHandler) SendBGPv4Neighbor(oldNeigh *bgpd.BGPv4Neighbor, newNeigh *bgpd.BGPv4Neighbor, attrSet []bool, patchOp []*bgpd.PatchOpInfo, op string) (
+func (h *BGPHandler) SendBGPv4Neighbor(oldNeigh *bgpd.BGPv4Neighbor, newNeigh *bgpd.BGPv4Neighbor, attrSet []bool,
+	patchOp []*bgpd.PatchOpInfo, op string) (
 	bool, error) {
 	h.logger.Info("SendBGPv4Neighbor, op:", op)
 	if err := h.checkBGPGlobal(); err != nil {
@@ -1235,18 +1240,20 @@ func (h *BGPHandler) getIPAndIfIndexForV6Neighbor(neighborIP string, neighborInt
 		}
 	} else if neighborIntfRef != "" {
 		//neighbor address is a intfRef
-		neighborIfIndex, ifName, err := h.server.ConvertIntfStrToIfIndex(neighborIntfRef)
+		ifIndex, ifName, err = h.server.ConvertIntfStrToIfIndex(neighborIntfRef)
+		h.logger.Info("getIPAndIfIndexForV6Neighbor - ifIndex:", ifIndex, "ifName:", ifName)
+
 		if err != nil {
 			h.logger.Err("Invalid intfref:", neighborIntfRef)
 			return ip, ifIndex, ifName, err
 		}
-		ipInfo, err := h.server.GetIfaceIP(neighborIfIndex)
-		h.logger.Info("ipInfo:", ipInfo, " err:", err)
-		if err == nil {
+
+		ipInfo, err1 := h.server.GetIfaceIP(ifIndex)
+		h.logger.Info("ipInfo:", ipInfo, " err:", err1)
+		if err1 == nil {
 			h.logger.Info("getIPAndIfIndexForV6Neighbor - ipInfo.LinkLocalIpAddr:", ipInfo.LinklocalIpAddr,
-				"after GetIfaceIP of neighborIfIndex:", neighborIfIndex)
+				"after GetIfaceIP of neighborIfIndex:", ifIndex)
 			ip = net.ParseIP(ipInfo.LinklocalIpAddr)
-			ifIndex = neighborIfIndex
 		}
 	}
 	return ip, ifIndex, ifName, err
@@ -1312,6 +1319,7 @@ func (h *BGPHandler) ValidateV6Neighbor(bgpNeighbor *bgpd.BGPv6Neighbor) (pConf 
 			bgpNeighbor.NeighborAddress, "and ifIndex", bgpNeighbor.IntfRef)
 		return pConf, err
 	}
+	h.logger.Info("ValidateV6Neighbor: getIPAndIfIndexForNeighbor returned ip", ip, "ifIndex", ifIndex, "ifName", ifName)
 
 	if !h.isValidIP(bgpNeighbor.UpdateSource) {
 		err = errors.New(fmt.Sprintf("Update source %s not a valid IP", bgpNeighbor.UpdateSource))

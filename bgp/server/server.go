@@ -1654,7 +1654,7 @@ func (s *BGPServer) handleIntfDelete(ifIndex int32, peerAddrType config.PeerAddr
 }
 
 func (s *BGPServer) CreatePeer(newPeer config.NeighborConfig) {
-	s.logger.Info("CreatePeer %+v", newPeer)
+	s.logger.Infof("CreatePeer %+v", newPeer)
 	var ok bool
 	var peer *Peer
 
@@ -2067,6 +2067,8 @@ func (s *BGPServer) listenChannelUpdates() {
 		case tcpConn := <-s.acceptCh:
 			s.logger.Info("Connected to", tcpConn.RemoteAddr().String())
 			host, _, _ := net.SplitHostPort(tcpConn.RemoteAddr().String())
+			hostSplit := strings.Split(host, "%")
+			host = hostSplit[0]
 			peer, ok := s.PeerMap[host]
 			if !ok {
 				s.logger.Info("Can't accept connection. Peer is not configured yet", host)
@@ -2403,8 +2405,8 @@ func (s *BGPServer) ConvertIntfStrToIfIndex(intfString string) (ifIndex int32, i
 				s.IntfIdNameMap)
 			return ifIndex, ifName, errors.New(fmt.Sprintf("Did not ifIndex %d in interface map", ifIndex))
 		}
-		s.logger.Info("ConvertIntfStrToIfIndex - ifIndex =", ifIndex, "ifEntry =", ifEntry)
 		ifName = ifEntry.Name
+		s.logger.Info("ConvertIntfStrToIfIndex - ifIndex =", ifIndex, "ifEntry =", ifEntry, "ifName =", ifName)
 	} else {
 		//Verify ifName is valid
 		s.logger.Info("ConvertIntfStrToIfIndex - intfString", intfString, "is ifName")
@@ -2414,8 +2416,8 @@ func (s *BGPServer) ConvertIntfStrToIfIndex(intfString string) (ifIndex int32, i
 				s.IfNameToIfIndex)
 			return ifIndex, ifName, errors.New(fmt.Sprintf("Invalid ifName %d", intfString))
 		}
-		s.logger.Err("ConvertIntfStrToIfIndex - ifName =", intfString, "ifIndex =", ifIndex)
 		ifName = intfString
+		s.logger.Err("ConvertIntfStrToIfIndex - ifName =", ifName, "ifIndex =", ifIndex)
 	}
 	return ifIndex, ifName, nil
 }

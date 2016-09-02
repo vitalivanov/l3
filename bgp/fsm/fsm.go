@@ -1357,7 +1357,7 @@ func (fsm *FSM) InitiateConnToPeer() {
 		ip += "%"
 		ip += fsm.pConf.IfName
 	}
-	remote := net.JoinHostPort(fsm.pConf.NeighborAddress.String(), config.BGPPort)
+	remote := net.JoinHostPort(ip, config.BGPPort)
 	local := ""
 
 	fsm.logger.Info("Neighbor:", fsm.pConf.NeighborAddress, "FSM", fsm.id, "InitiateConnToPeer - source =",
