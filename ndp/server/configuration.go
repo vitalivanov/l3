@@ -40,8 +40,8 @@ func (cfg *NdpConfig) Validate(vrf string, retransmit uint32, reachableTime uint
 		return false, errors.New(fmt.Sprintln("Invalid Router Advertisement Interval", raTime))
 	}
 
-	if cfg.Vrf != "default" {
-		return false, errors.New(fmt.Sprintln("Global Config is only supported for default VRF", cfg.Vrf))
+	if vrf != "default" {
+		return false, errors.New(fmt.Sprintln("Global Config is only supported for default VRF", vrf))
 	}
 
 	return true, nil
