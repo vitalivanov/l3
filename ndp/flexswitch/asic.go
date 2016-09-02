@@ -28,6 +28,7 @@ import (
 	"l3/ndp/config"
 	"l3/ndp/debug"
 	"sync"
+	"syscall"
 	"utils/commonDefs"
 )
 
@@ -84,6 +85,10 @@ func (notifyHdl *AsicNotificationHdl) ProcessNotification(msg commonDefs.AsicdNo
 		}
 	case commonDefs.L3IntfStateNotifyMsg:
 		l3Msg := msg.(commonDefs.L3IntfStateNotifyMsg)
+		// only get state notification if ip type is v6
+		if l3Msg.IpType == syscall.AF_INET {
+			continue
+		}
 		if l3Msg.IfState == asicdCommonDefs.INTF_STATE_UP {
 			debug.Logger.Debug("Received Asicd L3 Port Notfication UP")
 			api.SendL3PortNotification(l3Msg.IfIndex, config.STATE_UP, l3Msg.IpAddr)
