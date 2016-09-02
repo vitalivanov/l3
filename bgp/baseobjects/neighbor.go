@@ -84,6 +84,20 @@ func NewNeighborConf(logger *logging.Writer, globalConf *config.GlobalConfig, pe
 	return &conf
 }
 
+func (n *NeighborConf) SetNeighborAddress(ip net.IP) {
+	n.Neighbor.NeighborAddress = ip
+	n.Neighbor.Config.NeighborAddress = ip
+	n.Neighbor.State.NeighborAddress = ip
+	n.RunningConf.NeighborAddress = ip
+}
+
+func (n *NeighborConf) ResetNeighborAddress() {
+	n.RunningConf.NeighborAddress = nil
+	n.Neighbor.NeighborAddress = nil
+	n.Neighbor.Config.NeighborAddress = nil
+	n.Neighbor.State.NeighborAddress = nil
+}
+
 func (n *NeighborConf) SetNeighborState(peerConf *config.NeighborConfig) {
 	n.Neighbor.State = config.NeighborState{
 		PeerAS:                  peerConf.PeerAS,
@@ -114,9 +128,12 @@ func (n *NeighborConf) SetNeighborState(peerConf *config.NeighborConfig) {
 	n.MaxPrefixesThreshold = uint32(float64(peerConf.MaxPrefixes*uint32(peerConf.MaxPrefixesThresholdPct)) / 100)
 }
 
+func (n *NeighborConf) copyNonKeyNeighConfAttrs(nConf config.NeighborConfig) {
+	n.Neighbor.Config.BaseConfig = nConf.BaseConfig
+}
+
 func (n *NeighborConf) UpdateNeighborConf(nConf config.NeighborConfig, bgp *config.Bgp) {
-	n.Neighbor.NeighborAddress = nConf.NeighborAddress
-	n.Neighbor.Config = nConf
+	n.copyNonKeyNeighConfAttrs(nConf)
 	n.RunningConf = config.NeighborConfig{}
 	if (n.Group == nil && nConf.PeerGroup != "") || (n.Group != nil && nConf.PeerGroup != n.Group.Name) {
 		protoFamily, _ := packet.GetProtocolFamilyFromPeerAddrType(nConf.PeerAddressType)
@@ -251,6 +268,7 @@ func (n *NeighborConf) GetConfFromNeighbor(inConf *config.NeighborConfig, outCon
 	outConf.PeerAddressType = inConf.PeerAddressType
 	outConf.NeighborAddress = inConf.NeighborAddress
 	outConf.IfIndex = inConf.IfIndex
+	outConf.IfName = inConf.IfName
 	outConf.PeerGroup = inConf.PeerGroup
 }
 
