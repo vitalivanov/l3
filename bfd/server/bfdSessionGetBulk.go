@@ -23,6 +23,10 @@
 
 package server
 
+import (
+	"strings"
+)
+
 func (server *BFDServer) GetBulkBfdSessionStates(idx int, cnt int) (int, int, []SessionState) {
 	var nextIdx int
 	var count int
@@ -37,7 +41,7 @@ func (server *BFDServer) GetBulkBfdSessionStates(idx int, cnt int) (int, int, []
 	for i := idx; i < count; i++ {
 		sessionId := server.bfdGlobal.SessionsIdSlice[i]
 		result[i].SessionId = server.bfdGlobal.Sessions[sessionId].state.SessionId
-		result[i].IpAddr = server.bfdGlobal.Sessions[sessionId].state.IpAddr
+		result[i].IpAddr = strings.Split(server.bfdGlobal.Sessions[sessionId].state.IpAddr, "%")[0]
 		result[i].ParamName = server.bfdGlobal.Sessions[sessionId].state.ParamName
 		result[i].Interface = server.bfdGlobal.Sessions[sessionId].state.Interface
 		result[i].InterfaceSpecific = server.bfdGlobal.Sessions[sessionId].state.InterfaceSpecific
@@ -72,10 +76,10 @@ func (server *BFDServer) GetBulkBfdSessionStates(idx int, cnt int) (int, int, []
 
 func (server *BFDServer) GetBfdSessionState(ipAddr string) (*SessionState, bool) {
 	sessionState := new(SessionState)
-	sessionId, found := server.FindBfdSession(ipAddr)
+	sessionId, found := server.FindBfdSessionContainingAddr(ipAddr)
 	if found {
 		sessionState.SessionId = server.bfdGlobal.Sessions[sessionId].state.SessionId
-		sessionState.IpAddr = server.bfdGlobal.Sessions[sessionId].state.IpAddr
+		sessionState.IpAddr = strings.Split(server.bfdGlobal.Sessions[sessionId].state.IpAddr, "%")[0]
 		sessionState.ParamName = server.bfdGlobal.Sessions[sessionId].state.ParamName
 		sessionState.Interface = server.bfdGlobal.Sessions[sessionId].state.Interface
 		sessionState.Interface = server.bfdGlobal.Sessions[sessionId].state.Interface

@@ -39,9 +39,27 @@ func (svr *NDPServer) readNdpGblCfg(dbHdl *dbutils.DBUtil) {
 	for _, obj := range objList {
 		dbEntry := obj.(objects.NDPGlobal)
 		svr.NdpConfig.Vrf = dbEntry.Vrf
-		svr.NdpConfig.RaRestransmitTime = uint8(dbEntry.RouterAdvertisementInterval)
-		svr.NdpConfig.ReachableTime = uint32(dbEntry.ReachableTime)
-		svr.NdpConfig.RetransTime = uint32(dbEntry.RetransmitInterval)
+		if dbEntry.RouterAdvertisementInterval == 0 {
+			debug.Logger.Warning("Invalid Router Advertisment and hence setting default value",
+				NDP_DEFAULT_RTR_ADVERTISEMENT_INTERVAL)
+			svr.NdpConfig.RaRestransmitTime = NDP_DEFAULT_RTR_ADVERTISEMENT_INTERVAL
+		} else {
+			svr.NdpConfig.RaRestransmitTime = uint8(dbEntry.RouterAdvertisementInterval)
+		}
+		if dbEntry.ReachableTime == 0 {
+			debug.Logger.Warning("Invalid Reachable Interval and hence setting default value",
+				NDP_DEFAULT_REACHABLE_INTERVAL)
+			svr.NdpConfig.ReachableTime = NDP_DEFAULT_REACHABLE_INTERVAL
+		} else {
+			svr.NdpConfig.ReachableTime = uint32(dbEntry.ReachableTime)
+		}
+		if dbEntry.RetransmitInterval == 0 {
+			debug.Logger.Warning("Invalid ReTransmit Interval and hence setting default value",
+				NDP_DEFAULT_RETRANSMIT_INTERVAL)
+			svr.NdpConfig.RetransTime = NDP_DEFAULT_RETRANSMIT_INTERVAL
+		} else {
+			svr.NdpConfig.RetransTime = uint32(dbEntry.RetransmitInterval)
+		}
 		debug.Logger.Info("Done with reading NDPGlobal config from DB")
 	}
 }
