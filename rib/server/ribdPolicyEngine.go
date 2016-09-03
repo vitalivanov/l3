@@ -393,7 +393,9 @@ func policyEngineActionUndoSetAdminDistance(actionItem interface{}, conditionsLi
 	logger.Info("Setting configured distance of prototype ", conditionProtocol, " to value ", 0, " default distance of this protocol is ", routeDistanceConfig.defaultDistance)
 	policyEngineTraverseAndUpdate()
 }
-func policyEngineActionSetAdminDistance(actionItem interface{}, conditionList []interface{}, params interface{}) {
+
+func policyEngineActionSetAdminDistance(actionItem interface{}, conditionList []interface{}, params interface{},
+	policyStmt policy.PolicyStmt) {
 	logger.Info("policyEngipolicyEngineActionSetAdminDistance")
 	actionInfo := actionItem.(int)
 	logger.Info("PoilcyActionTypeSetAdminDistance action to be applied")
@@ -420,7 +422,9 @@ func policyEngineActionSetAdminDistance(actionItem interface{}, conditionList []
 	policyEngineTraverseAndUpdate()
 	return
 }
-func policyEngineRouteDispositionAction(action interface{}, conditionInfo []interface{}, params interface{}) {
+
+func policyEngineRouteDispositionAction(action interface{}, conditionInfo []interface{}, params interface{},
+	policyStmt policy.PolicyStmt) {
 	logger.Info("policyEngineRouteDispositionAction")
 	if action.(string) == "Reject" {
 		logger.Info("Reject action")
@@ -429,15 +433,20 @@ func policyEngineRouteDispositionAction(action interface{}, conditionInfo []inte
 		policyEngineActionAcceptRoute(params)
 	}
 }
-func defaultImportPolicyEngineActionFunc(actionInfo interface{}, conditionInfo []interface{}, params interface{}) {
+
+func defaultImportPolicyEngineActionFunc(actionInfo interface{}, conditionInfo []interface{}, params interface{},
+	policyStmt policy.PolicyStmt) {
 	logger.Info("defaultImportPolicyEngineAction")
 	policyEngineActionAcceptRoute(params)
 }
 
-func defaultExportPolicyEngineActionFunc(actionInfo interface{}, conditionInfo []interface{}, params interface{}) {
+func defaultExportPolicyEngineActionFunc(actionInfo interface{}, conditionInfo []interface{}, params interface{},
+	policyStmt policy.PolicyStmt) {
 	logger.Info("defaultExportPolicyEngineActionFunc")
 }
-func policyEngineActionNetworkStatementAdvertise(actionInfo interface{}, conditionInfo []interface{}, params interface{}) {
+
+func policyEngineActionNetworkStatementAdvertise(actionInfo interface{}, conditionInfo []interface{}, params interface{},
+	policyStmt policy.PolicyStmt) {
 	logger.Info("policyEngineActionNetworkStatementAdvertise")
 	var route ribdInt.Routes
 	networkStatementAdvertiseTargetProtocol := actionInfo.(string)
@@ -469,7 +478,9 @@ func policyEngineActionNetworkStatementAdvertise(actionInfo interface{}, conditi
 	}
 	UpdateRedistributeTargetMap(evt, networkStatementAdvertiseTargetProtocol, route)
 }
-func policyEngineActionRedistribute(actionInfo interface{}, conditionInfo []interface{}, params interface{}) {
+
+func policyEngineActionRedistribute(actionInfo interface{}, conditionInfo []interface{}, params interface{},
+	policyStmt policy.PolicyStmt) {
 	logger.Info("policyEngineActionRedistribute")
 	var route ribdInt.Routes
 	redistributeActionInfo := actionInfo.(policy.RedistributeActionInfo)
