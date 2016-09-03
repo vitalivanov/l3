@@ -752,6 +752,7 @@ func (h *BGPHandler) validateBGPGlobalForPatchUpdate(oldConfig *bgpd.BGPGlobal, 
 	}
 	return gConf, err
 }
+
 func (h *BGPHandler) validateBGPGlobalForUpdate(oldConfig *bgpd.BGPGlobal, newConfig *bgpd.BGPGlobal, attrSet []bool) (gConf config.GlobalConfig, err error) {
 	h.logger.Info("validateBGPGlobalForUpdate")
 	if oldConfig == nil || newConfig == nil {
@@ -955,17 +956,6 @@ func (h *BGPHandler) isValidIP(ip string) bool {
 	return true
 }
 
-// Set BGP Default values.. This needs to move to API Layer once Northbound interfaces are implemented
-// for all the listeners
-func (h *BGPHandler) setDefault(pconf *config.NeighborConfig) {
-	if pconf.BaseConfig.HoldTime == 0 { // default hold time is 180 seconds
-		pconf.BaseConfig.HoldTime = 180
-	}
-	if pconf.BaseConfig.KeepaliveTime == 0 { // default keep alive time is 60 seconds
-		pconf.BaseConfig.KeepaliveTime = 60
-	}
-}
-
 func (h *BGPHandler) ConvertV4NeighborFromThrift(bgpNeighbor *bgpd.BGPv4Neighbor, ip net.IP, ifIndex int32) (
 	pConf config.NeighborConfig, err error) {
 
@@ -1032,7 +1022,6 @@ func (h *BGPHandler) ValidateV4Neighbor(bgpNeighbor *bgpd.BGPv4Neighbor) (pConf 
 		return pConf, err
 	}
 	pConf, _ = h.ConvertV4NeighborFromThrift(bgpNeighbor, ip, ifIndex)
-	h.setDefault(&pConf)
 	return pConf, err
 }
 
@@ -1070,18 +1059,6 @@ func (h *BGPHandler) SendBGPv4Neighbor(oldNeigh *bgpd.BGPv4Neighbor, newNeigh *b
 	if err := h.checkBGPGlobal(); err != nil {
 		h.logger.Err("checkBGPGlobal failed with err:", err)
 		return false, err
-	}
-
-	created := h.server.VerifyBgpGlobalConfig()
-	if !created {
-		h.logger.Err("global object not created")
-		return created, errors.New("BGP Global object not created yet")
-	}
-
-	global := h.server.GetBGPGlobalState()
-	if global.AS == 0 {
-		h.logger.Err("default BGP AS Num not updated yet")
-		return false, errors.New(fmt.Sprintf("The default BGP AS number 0 is not updated yet."))
 	}
 
 	oldNeighConf, err := h.ValidateV4Neighbor(oldNeigh)
@@ -1336,7 +1313,6 @@ func (h *BGPHandler) ValidateV6Neighbor(bgpNeighbor *bgpd.BGPv6Neighbor) (pConf 
 	}
 
 	pConf, _ = h.ConvertV6NeighborFromThrift(bgpNeighbor, ip, ifIndex, ifName)
-	h.setDefault(&pConf)
 	return pConf, err
 }
 
@@ -1597,18 +1573,18 @@ func (h *BGPHandler) SendBGPv4PeerGroup(oldGroup *bgpd.BGPv4PeerGroup, newGroup 
 }
 
 func (h *BGPHandler) CreateBGPv4PeerGroup(peerGroup *bgpd.BGPv4PeerGroup) (bool, error) {
-	h.logger.Info("Create BGP v4 peer group:", peerGroup)
+	h.logger.Infof("Create BGP v4 peer group:%+v", peerGroup)
 	return h.SendBGPv4PeerGroup(nil, peerGroup, make([]bool, 0))
 }
 
 func (h *BGPHandler) UpdateBGPv4PeerGroup(origG *bgpd.BGPv4PeerGroup, updatedG *bgpd.BGPv4PeerGroup, attrSet []bool,
 	op []*bgpd.PatchOpInfo) (bool, error) {
-	h.logger.Info("Update BGP v4 peer group:", updatedG)
+	h.logger.Infof("Update BGP v4 peer group:%+v", updatedG)
 	return h.SendBGPv4PeerGroup(origG, updatedG, attrSet)
 }
 
 func (h *BGPHandler) DeleteBGPv4PeerGroup(peerGroup *bgpd.BGPv4PeerGroup) (bool, error) {
-	h.logger.Info("Delete BGP v4 peer group:", peerGroup.Name)
+	h.logger.Info("Delete BGP v4 peer group:%+v", peerGroup.Name)
 	if err := h.checkBGPGlobal(); err != nil {
 		return false, err
 	}
