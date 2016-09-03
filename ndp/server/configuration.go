@@ -28,11 +28,22 @@ import (
 	"l3/ndp/debug"
 )
 
-func (cfg *NdpConfig) Validate(vrf string, rt uint32, reachableTime uint32, raTime uint8) (bool, error) {
-
-	if cfg.Vrf != "" {
-		return false, errors.New(fmt.Sprintln("Global Config is already created for", cfg.Vrf))
+func (cfg *NdpConfig) Validate(vrf string, retransmit uint32, reachableTime uint32, raTime uint8) (bool, error) {
+	if retransmit == 0 {
+		return false, errors.New(fmt.Sprintln("Invalid Re-Transmit Time", retransmit))
 	}
+	if reachableTime == 0 {
+		return false, errors.New(fmt.Sprintln("Invalid ReachableTime", reachableTime))
+	}
+
+	if raTime == 0 {
+		return false, errors.New(fmt.Sprintln("Invalid Router Advertisement Interval", raTime))
+	}
+
+	if vrf != "default" {
+		return false, errors.New(fmt.Sprintln("Global Config is only supported for default VRF", vrf))
+	}
+
 	return true, nil
 }
 
