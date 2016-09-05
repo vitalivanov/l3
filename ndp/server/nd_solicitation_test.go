@@ -20,35 +20,41 @@
 // |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
 // |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
 //
+package server
 
-// fsmState.go
-package config
-
-const BGPConnectRetryTime uint32 = 120 // seconds
-const BGPHoldTimeDefault uint32 = 180  // 180 seconds
-
-type BGPFSMState int
-
-const (
-	BGPFSMNone BGPFSMState = iota
-	BGPFSMIdle
-	BGPFSMConnect
-	BGPFSMActive
-	BGPFSMOpensent
-	BGPFSMOpenconfirm
-	BGPFSMEstablished
+import (
+	"l3/ndp/packet"
+	"testing"
 )
 
-var BGPStateToStr = map[BGPFSMState]string{
-	BGPFSMNone:        "INIT",
-	BGPFSMIdle:        "IDLE",
-	BGPFSMConnect:     "CONNECT",
-	BGPFSMActive:      "ACTIVE",
-	BGPFSMOpensent:    "OPENSENT",
-	BGPFSMOpenconfirm: "OPENCONFIRM",
-	BGPFSMEstablished: "ESTABLISHED",
-}
+const (
+	testMulticastSolicitationAddr = "ff02::1:ff7c:ca9f"
+	testUnspecifiecSrcIp          = "::"
+)
 
-func GetBGPStateToStr(stateId BGPFSMState) string {
-	return BGPStateToStr[stateId]
+func TestProcessNS(t *testing.T) {
+	intf := &Interface{}
+	ndInfo := &packet.NDInfo{
+		DstIp: testMulticastSolicitationAddr,
+	}
+	nbrInfo, operType := intf.processNS(ndInfo)
+	if nbrInfo != nil {
+		t.Error("for testMulticastSolicitationAddr nbrInfo should be nil")
+		return
+	}
+	if operType != IGNORE {
+		t.Error("for testMulticastSolicitationAddr operation should be IGNORE, but got:", operType)
+		return
+	}
+	ndInfo.SrcIp = testUnspecifiecSrcIp
+	ndInfo.DstIp = ""
+	nbrInfo, operType = intf.processNS(ndInfo)
+	if nbrInfo != nil {
+		t.Error("for testUnspecifiecSrcIp nbrInfo should be nil")
+		return
+	}
+	if operType != IGNORE {
+		t.Error("for testUnspecifiecSrcIp  operation should be IGNORE, but got:", operType)
+		return
+	}
 }

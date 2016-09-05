@@ -30,7 +30,7 @@ import (
 	"l3/ndp/debug"
 	"l3/ndp/packet"
 	_ "net"
-	_ "strings"
+	"strings"
 )
 
 /*
@@ -110,8 +110,10 @@ func (intf *Interface) SendNS(myMac, nbrMac, nbrIp string) NDP_OPERATION {
  *		    Then update the state to STALE
  */
 func (intf *Interface) processNS(ndInfo *packet.NDInfo) (nbrInfo *config.NeighborConfig, oper NDP_OPERATION) {
-	if ndInfo.SrcIp == "" || ndInfo.SrcIp == "::" {
-		// NS was generated locally
+	if ndInfo.SrcIp == "" || ndInfo.SrcIp == "::" || strings.Contains(ndInfo.DstIp, "ff02::1") {
+		// NS was generated locally or it is multicast-solicitation message
+		// @TODO: for multicast solicitation add a neigbor entry based of target address and
+		// mark it as inclomple
 		return nil, IGNORE
 	}
 	nbrKey := intf.createNbrKey(ndInfo)

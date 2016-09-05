@@ -92,14 +92,14 @@ func GetNeighborEntry(ipAddr string) *config.NeighborConfig {
 	return ndpApi.server.GetNeighborEntry(ipAddr)
 }
 
-func CreateGlobalConfig(vrf string, rt uint32, reachableTime uint32, raTime uint8) (bool, error) {
+func CreateGlobalConfig(vrf string, retransmit uint32, reachableTime uint32, raTime uint8) (bool, error) {
 	if ndpApi.server == nil {
 		return false, errors.New("Server is not initialized")
 	}
-	rv, err := ndpApi.server.NdpConfig.Validate(vrf, rt, reachableTime, raTime)
+	rv, err := ndpApi.server.NdpConfig.Validate(vrf, retransmit, reachableTime, raTime)
 	if err != nil {
 		return rv, err
 	}
-	ndpApi.server.GlobalCfg <- server.NdpConfig{vrf, rt, reachableTime, raTime}
+	ndpApi.server.GlobalCfg <- server.NdpConfig{vrf, reachableTime, retransmit, raTime}
 	return true, nil
 }
