@@ -195,7 +195,6 @@ func (svr *NDPServer) HandleIPIntfCreateDelete(obj *config.IPIntfNotification) {
 		}
 
 		ipInfo = Interface{}
-		//ipInfo.CreateIntf(obj, svr.GetIntfRefName(obj.IfIndex), svr.PktDataCh)
 		ipInfo.CreateIntf(obj, svr.PktDataCh, svr.NdpConfig)
 		svr.ndpL3IntfStateSlice = append(svr.ndpL3IntfStateSlice, ipInfo.IfIndex)
 	case config.CONFIG_DELETE:
@@ -205,8 +204,6 @@ func (svr *NDPServer) HandleIPIntfCreateDelete(obj *config.IPIntfNotification) {
 		}
 		// stop rx/tx on the deleted interface
 		debug.Logger.Info("Delete IP interface received for", ipInfo.IntfRef, "ifIndex:", ipInfo.IfIndex)
-		//ipInfo.DeleteIntf(obj.IpAddr)
-		//svr.StopRxTx(obj.IfIndex, obj.IpAddr)
 		deleteEntries := ipInfo.DeInitIntf()
 		if len(deleteEntries) > 0 {
 			svr.DeleteNeighborInfo(deleteEntries, obj.IfIndex)
@@ -238,7 +235,7 @@ func (svr *NDPServer) HandlePhyPortStateNotification(msg *config.PortState) {
 	case config.STATE_UP:
 		// if the port state is up, then we need to start RX/TX only for global scope ip address,
 		// if it is not started
-		debug.Logger.Info("Create pkt handler for", msg.IfIndex, "IpAddr:", l3Port.IpAddr)
+		debug.Logger.Info("Create pkt handler for", msg.IfIndex, "GS:", l3Port.IpAddr, "LS:", l3Port.LinkLocalIp)
 		svr.StartRxTx(msg.IfIndex)
 
 	case config.STATE_DOWN:
@@ -256,9 +253,9 @@ func (svr *NDPServer) HandlePhyPortStateNotification(msg *config.PortState) {
  *	    2) Delete:
  *		     Stop Rx/Tx in this case
  */
-func (svr *NDPServer) HandleStateNotification(msg *config.StateNotification) {
-	debug.Logger.Info("Received State:", msg.State, "for ifIndex:", msg.IfIndex, "ipAddr:", msg.IpAddr)
-	switch msg.State {
+func (svr *NDPServer) HandleStateNotification(msg *config.IPIntfNotification) {
+	debug.Logger.Info("Received State:", msg.Operation, "for ifIndex:", msg.IfIndex, "ipAddr:", msg.IpAddr)
+	switch msg.Operation {
 	case config.STATE_UP:
 		debug.Logger.Info("Create pkt handler for", msg.IfIndex, "IpAddr:", msg.IpAddr)
 		svr.StartRxTx(msg.IfIndex)

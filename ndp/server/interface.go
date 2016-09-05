@@ -167,8 +167,8 @@ func (intf *Interface) CreateIntf(obj *config.IPIntfNotification, pktCh chan con
 	intf.IntfRef = obj.IntfRef
 	intf.IfIndex = obj.IfIndex
 	intf.commonInit(obj.IpAddr, pktCh, gCfg)
-	debug.Logger.Info("Created IP inteface", intf.IntfRef, "ifIndex:", intf.IfIndex,
-		"GS:", intf.globalScope, "LS:", intf.linkScope)
+	debug.Logger.Info("Created IP interface", intf.IntfRef, "ifIndex:", intf.IfIndex,
+		"GS:", intf.globalScope, "LS:", intf.linkScope, "Pcap Users are:", intf.PcapUsers)
 }
 
 /*
@@ -187,6 +187,7 @@ func (intf *Interface) deleteNbrList() ([]string, error) {
 		deleteEntries, err := intf.FlushNeighbors()
 		return deleteEntries, err
 	}
+	debug.Logger.Debug("No neighbors to be deleted for interface:", intf.IntfRef, intf.IpAddr, intf.LinkLocalIp)
 	return make([]string, 0), nil
 }
 
@@ -194,7 +195,7 @@ func (intf *Interface) deleteNbrList() ([]string, error) {
  * DeleteIntf will kill pcap, flush neighbors and then stop all timers
  */
 func (intf *Interface) DeleteIntf(ipAddr string) ([]string, error) {
-	debug.Logger.Debug("Deleting Interface:", intf.IntfRef, intf.IpAddr, intf.LinkLocalIp)
+	debug.Logger.Debug("Deleting Interface Called for:", intf.IntfRef, intf.IpAddr, intf.LinkLocalIp)
 	//intf.removeIP(ipAddr)
 	intf.DeletePcap()
 	return intf.deleteNbrList()
@@ -222,8 +223,9 @@ func (intf *Interface) CreatePcap() (err error) {
 		// update pcap user and move on
 		intf.addPcapUser()
 		debug.Logger.Info("Updating total pcap user for", intf.IntfRef, "to", intf.PcapBase.PcapUsers)
-		debug.Logger.Info("Start receiving packets for ip:", intf.IpAddr, "on Port", intf.IntfRef)
-		return
+		debug.Logger.Info("Start receiving packets for GS:", intf.IpAddr, "LS:", intf.LinkLocalIp,
+			"on Port", intf.IntfRef)
+		return nil
 	}
 	if intf.PcapBase.PcapHandle == nil {
 		name := intf.IntfRef
@@ -275,6 +277,7 @@ func (intf *Interface) deletePcapUser() {
 func (intf *Interface) DeletePcap() {
 	if intf.PcapBase.PcapHandle == nil {
 		// create ip interface but state down will not have pcap handler created
+		debug.Logger.Debug("No pcap created and hence returning")
 		return
 	}
 	if intf.PcapBase.PcapUsers > 0 {

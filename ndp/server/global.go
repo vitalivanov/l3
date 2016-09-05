@@ -68,10 +68,8 @@ type NDPServer struct {
 
 	// Physical Port/ L2 Port State Notification
 	PhyPortStateCh chan *config.PortState
-	//IPV6 Create/Delete Notification Channel
+	//IPV6 Create/Delete State Up/Down Notification Channel
 	IpIntfCh chan *config.IPIntfNotification
-	// IPv6 Up/Down Notification Channel
-	IpStateCh chan *config.StateNotification
 	// Vlan Create/Delete/Update Notification Channel
 	VlanCh chan *config.VlanNotification
 	//Received Pkt Channel
@@ -100,6 +98,7 @@ type NDPServer struct {
 }
 
 const (
-	NDP_SERVER_MAP_INITIAL_CAP = 50
-	INTF_REF_NOT_FOUND         = "Not Found"
+	NDP_SERVER_MAP_INITIAL_CAP            = 50
+	NDP_SERVER_ASICD_NOTIFICATION_CH_SIZE = 1
+	INTF_REF_NOT_FOUND                    = "Not Found"
 )
