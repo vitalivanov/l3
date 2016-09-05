@@ -85,10 +85,10 @@ func (svr *NDPServer) InitGlobalDS() {
 	svr.PhyPortStateCh = make(chan *config.PortState, NDP_SERVER_ASICD_NOTIFICATION_CH_SIZE)
 	svr.IpIntfCh = make(chan *config.IPIntfNotification, NDP_SERVER_ASICD_NOTIFICATION_CH_SIZE)
 	svr.VlanCh = make(chan *config.VlanNotification)
-	svr.RxPktCh = make(chan *RxPktInfo, 10)
-	svr.PktDataCh = make(chan config.PacketData, 10)
+	svr.RxPktCh = make(chan *RxPktInfo, 30)
+	svr.PktDataCh = make(chan config.PacketData, 30)
 	svr.SnapShotLen = 1024
-	svr.Promiscuous = false
+	svr.Promiscuous = true
 	svr.Timeout = 1 * time.Second
 	svr.NeigborEntryLock = &sync.RWMutex{}
 	svr.Packet = packet.Init()

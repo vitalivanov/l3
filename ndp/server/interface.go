@@ -281,14 +281,15 @@ func (intf *Interface) DeletePcap() {
 		return
 	}
 	if intf.PcapBase.PcapUsers > 0 {
-		debug.Logger.Info("Updating total pcap user for", intf.IntfRef, "to", intf.PcapBase.PcapUsers)
-		debug.Logger.Info("Stop receiving packets for ip:", intf.IpAddr, "on Port", intf.IntfRef)
 		intf.deletePcapUser()
+		debug.Logger.Info("Updated total pcap user for", intf.IntfRef, "to", intf.PcapBase.PcapUsers)
+		debug.Logger.Info("Stop receiving packets for ip:", intf.IpAddr, "on Port", intf.IntfRef)
 	}
 	if intf.PcapBase.PcapUsers != 0 {
 		// there are still some pcap users and hence we should not delete
 		return
 	}
+	debug.Logger.Debug("No More Pcap users and hence close pcap Handler")
 
 	// Inform go routine spawned for intf to exit..
 	intf.PcapBase.PcapCtrl <- true

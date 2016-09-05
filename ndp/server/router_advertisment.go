@@ -25,6 +25,7 @@ package server
 import (
 	"github.com/google/gopacket/layers"
 	"l3/ndp/config"
+	"l3/ndp/debug"
 	"l3/ndp/packet"
 )
 
@@ -37,6 +38,7 @@ import (
  * fill the NDInfo and then return it back to caller
  */
 func (intf *Interface) processRA(ndInfo *packet.NDInfo) (nbrInfo *config.NeighborConfig, oper NDP_OPERATION) {
+	debug.Logger.Debug("Processing RA packet:", *ndInfo)
 	nbrKey := intf.createNbrKey(ndInfo)
 	nbr, exists := intf.Neighbor[nbrKey]
 	if exists {
