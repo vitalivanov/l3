@@ -25,7 +25,7 @@ package relayServer
 
 import (
 	"dhcprelayd"
-	_ "strconv"
+	"errors"
 	"sync"
 )
 
@@ -34,31 +34,24 @@ import (
  * Add a relay agent
  */
 
-func (h *DhcpRelayServiceHandler) CreateDhcpRelayGlobal(
-	config *dhcprelayd.DhcpRelayGlobal) (bool, error) {
-
+func (h *DhcpRelayServiceHandler) CreateDhcpRelayGlobal(config *dhcprelayd.DhcpRelayGlobal) (bool, error) {
+	logger.Info("Auto-Created DHCP Relay Global Object", *config)
 	DhcpRelayGlobalInit(config.Enable)
 	return true, nil
 }
 
-func (h *DhcpRelayServiceHandler) UpdateDhcpRelayGlobal(
-	origconfig *dhcprelayd.DhcpRelayGlobal,
-	newconfig *dhcprelayd.DhcpRelayGlobal,
+func (h *DhcpRelayServiceHandler) UpdateDhcpRelayGlobal(origconfig *dhcprelayd.DhcpRelayGlobal, newconfig *dhcprelayd.DhcpRelayGlobal,
 	attrset []bool, op []*dhcprelayd.PatchOpInfo) (bool, error) {
 	logger.Debug("DRA: updating relay config to", newconfig.Enable)
 	dhcprelayEnable = newconfig.Enable
 	return true, nil
 }
 
-func (h *DhcpRelayServiceHandler) DeleteDhcpRelayGlobal(
-	config *dhcprelayd.DhcpRelayGlobal) (bool, error) {
-	logger.Debug("DRA: deleting relay config to", config.Enable)
-	dhcprelayEnable = config.Enable
-	return true, nil
+func (h *DhcpRelayServiceHandler) DeleteDhcpRelayGlobal(config *dhcprelayd.DhcpRelayGlobal) (bool, error) {
+	return false, errors.New("Deleting Dhcp Relay Globall Is not Supported. Please Set DHCP Relay Global to false")
 }
 
-func (h *DhcpRelayServiceHandler) CreateDhcpRelayIntf(
-	config *dhcprelayd.DhcpRelayIntf) (bool, error) {
+func (h *DhcpRelayServiceHandler) CreateDhcpRelayIntf(config *dhcprelayd.DhcpRelayIntf) (bool, error) {
 	logger.Debug("DRA: Intf Config Create for", config.IfIndex)
 	// Copy over configuration into globalInfo
 	ifNum := config.IfIndex
@@ -93,9 +86,7 @@ func (h *DhcpRelayServiceHandler) CreateDhcpRelayIntf(
 	return true, nil
 }
 
-func (h *DhcpRelayServiceHandler) UpdateDhcpRelayIntf(
-	origconfig *dhcprelayd.DhcpRelayIntf,
-	newconfig *dhcprelayd.DhcpRelayIntf,
+func (h *DhcpRelayServiceHandler) UpdateDhcpRelayIntf(origconfig *dhcprelayd.DhcpRelayIntf, newconfig *dhcprelayd.DhcpRelayIntf,
 	attrset []bool, op []*dhcprelayd.PatchOpInfo) (bool, error) {
 	logger.Debug("DRA: Intf Config Update")
 	logger.Debug("DRA: Updating Dhcp Relay Config for interface")
@@ -133,8 +124,7 @@ func (h *DhcpRelayServiceHandler) UpdateDhcpRelayIntf(
 	return true, nil
 }
 
-func (h *DhcpRelayServiceHandler) DeleteDhcpRelayIntf(
-	config *dhcprelayd.DhcpRelayIntf) (bool, error) {
+func (h *DhcpRelayServiceHandler) DeleteDhcpRelayIntf(config *dhcprelayd.DhcpRelayIntf) (bool, error) {
 	logger.Debug("DRA: deleting config for interface", config.IfIndex)
 	ifNum := config.IfIndex
 	gblEntry, ok := dhcprelayGblInfo[ifNum]

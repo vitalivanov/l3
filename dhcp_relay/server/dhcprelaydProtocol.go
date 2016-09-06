@@ -757,6 +757,7 @@ func DhcpRelayProcessReceivedBuf(rcvdCh <-chan DhcpRelayPktChannel) {
 
 func DhcpRelayAgentReceiveDhcpPkt(clientHandler *net.UDPConn) {
 	var buf []byte = make([]byte, 1500)
+	count := 0
 	for {
 		if dhcprelayEnable == false {
 			logger.Warning("DRA: Enable DHCP RELAY AGENT GLOBALLY")
@@ -764,7 +765,9 @@ func DhcpRelayAgentReceiveDhcpPkt(clientHandler *net.UDPConn) {
 		}
 		dhcprelayRefCountMutex.Lock()
 		if dhcprelayEnabledIntfRefCount == 0 {
-			logger.Warning("No Relay Agent Enabled")
+			if count%10000 == 0 {
+				logger.Debug("No Relay Agent Enabled")
+			}
 			dhcprelayRefCountMutex.Unlock()
 			continue
 		}
