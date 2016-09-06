@@ -511,12 +511,14 @@ func policyEngineActionRedistribute(actionInfo interface{}, conditionInfo []inte
 		logger.Info("Redistribute target protocol same as route source, do nothing more here")
 		return
 	}
-	testIp := RouteInfo.destNetIp + "/128"
-	logger.Info("Redistribute: route dest ip info:", RouteInfo.destNetIp)
-	inRange := netUtils.CheckIfInRange(testIp, "fe80::/10", 10, 128)
-	if inRange {
-		//link local ip , dont redistribute
-		return
+	if RouteInfo.ipType == ribdCommonDefs.IPv6 {
+		testIp := RouteInfo.destNetIp + "/128"
+		logger.Info("Redistribute: route dest ip info:", RouteInfo.destNetIp)
+		inRange := netUtils.CheckIfInRange(testIp, "fe80::/10", 10, 128)
+		if inRange {
+			//link local ip , dont redistribute
+			return
+		}
 	}
 	route = ribdInt.Routes{Ipaddr: RouteInfo.destNetIp, Mask: RouteInfo.networkMask, NextHopIp: RouteInfo.nextHopIp, IPAddrType: ribdInt.Int(RouteInfo.ipType), IfIndex: ribdInt.Int(RouteInfo.nextHopIfIndex), Metric: ribdInt.Int(RouteInfo.metric), Prototype: ribdInt.Int(RouteInfo.routeType)}
 	route.RouteOrigin = ReverseRouteProtoTypeMapDB[int(RouteInfo.routeType)]
@@ -602,12 +604,15 @@ func PolicyEngineFilter(route ribdInt.Routes, policyPath int, params interface{}
 		return
 	}
 	routeInfo := params.(RouteParams)
-	testIp := routeInfo.destNetIp + "/128"
-	logger.Info("Redistribute: route dest ip info:", routeInfo.destNetIp)
-	inRange := netUtils.CheckIfInRange(testIp, "fe80::/10", 10, 128)
-	if inRange {
-		//link local ip , dont redistribute
-		return
+	//if the policy type if ipv6, check if it is link local
+	if routeInfo.ipType == ribdCommonDefs.IPv6 {
+		testIp := routeInfo.destNetIp + "/128"
+		logger.Info("Redistribute: route dest ip info:", routeInfo.destNetIp)
+		inRange := netUtils.CheckIfInRange(testIp, "fe80::/10", 10, 128)
+		if inRange {
+			//link local ip , dont redistribute
+			return
+		}
 	}
 	if destNetSlice[routeInfo.sliceIdx].isValid == false && routeInfo.createType != Invalid && policyPath == policyCommonDefs.PolicyPath_Export {
 		logger.Info("route down, return from policyenginefilter for deletetype and export path")

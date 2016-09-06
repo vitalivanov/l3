@@ -58,19 +58,10 @@ func SendL2PortNotification(ifIndex int32, state string) {
 }
 
 func SendL3PortNotification(ifIndex int32, state, ipAddr string) {
-	ndpApi.server.IpStateCh <- &config.StateNotification{
-		IfIndex: ifIndex,
-		State:   state,
-		IpAddr:  ipAddr,
-	}
-}
-
-func SendVlanNotification(oper string, vlanId int32, vlanName string, untagPorts []int32) {
-	ndpApi.server.VlanCh <- &config.VlanNotification{
-		Operation:  oper,
-		VlanId:     vlanId,
-		VlanName:   vlanName,
-		UntagPorts: untagPorts,
+	ndpApi.server.IpIntfCh <- &config.IPIntfNotification{
+		IfIndex:   ifIndex,
+		Operation: state,
+		IpAddr:    ipAddr,
 	}
 }
 
@@ -80,6 +71,15 @@ func SendIPIntfNotfication(ifIndex int32, ipaddr, intfRef, msgType string) {
 		IpAddr:    ipaddr,
 		IntfRef:   intfRef,
 		Operation: msgType,
+	}
+}
+
+func SendVlanNotification(oper string, vlanId int32, vlanName string, untagPorts []int32) {
+	ndpApi.server.VlanCh <- &config.VlanNotification{
+		Operation:  oper,
+		VlanId:     vlanId,
+		VlanName:   vlanName,
+		UntagPorts: untagPorts,
 	}
 }
 
