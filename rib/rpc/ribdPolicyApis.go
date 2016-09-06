@@ -137,6 +137,13 @@ func (m RIBDServicesHandler) DeletePolicyDefinition(cfg *ribd.PolicyDefinition) 
 }
 
 func (m RIBDServicesHandler) UpdatePolicyDefinition(origconfig *ribd.PolicyDefinition, newconfig *ribd.PolicyDefinition, attrset []bool, op []*ribd.PatchOpInfo) (val bool, err error) {
+	logger.Debug(fmt.Sprintln("UpdatePolicyDefinition for name ", origconfig.Name))
+	newPolicy := policy.PolicyDefinitionConfig{Name: origconfig.Name}
+	err = m.server.GlobalPolicyEngineDB.ValidatePolicyDefinitionUpdate(newPolicy)
+	if err != nil {
+		logger.Err(fmt.Sprintln("validation failed with err ", err))
+		return false, err
+	}
 	if op == nil || len(op) == 0 {
 		//update op
 		logger.Info("Update op for policy definition")

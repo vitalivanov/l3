@@ -666,8 +666,9 @@ func policyEngineTraverseAndApply(data interface{}, updatefunc policy.PolicyAppl
 	V6RouteInfoMap.VisitAndUpdate(policyEngineApplyForRoute, traverseAndApplyPolicyData)
 }
 func policyEngineTraverseAndReverse(applyPolicyItem interface{}) {
-	applyPolicyInfo := applyPolicyItem.(policy.ApplyPolicyInfo)
-	policy := applyPolicyInfo.ApplyPolicy //policyItem.(policy.Policy)
+	updateInfo := applyPolicyItem.(policy.PolicyStmtUpdateInfo)
+	applyPolicyInfo := updateInfo.ApplyPolicy //.(policy.ApplyPolicyInfo)
+	policy := applyPolicyInfo.ApplyPolicy     //policyItem.(policy.Policy)
 	logger.Info("PolicyEngineTraverseAndReverse - traverse routing table and inverse policy actions", policy.Name)
 	ext := policy.Extensions.(PolicyExtensions)
 	if ext.routeList == nil {
@@ -690,7 +691,7 @@ func policyEngineTraverseAndReverse(applyPolicyItem interface{}) {
 			return
 		}
 		//PolicyEngineDB.PolicyEngineUndoPolicyForEntity(entity, policy, params)
-		success := PolicyEngineDB.PolicyEngineUndoApplyPolicyForEntity(entity, applyPolicyInfo, params)
+		success := PolicyEngineDB.PolicyEngineUndoApplyPolicyForEntity(entity, updateInfo, params)
 		if success {
 			deleteRoutePolicyState(params.ipType, ipPrefix, policy.Name)
 			PolicyEngineDB.DeletePolicyEntityMapEntry(entity, policy.Name)

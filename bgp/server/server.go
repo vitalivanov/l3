@@ -786,7 +786,7 @@ func (s *BGPServer) TraverseAndReverseBGPRib(policyData interface{}, pe *bgppoli
 			s.logger.Info("Invalid route ", ipPrefix)
 			continue
 		}
-		pe.PolicyEngine.PolicyEngineUndoPolicyForEntity(peEntity, policy, callbackInfo)
+		pe.PolicyEngine.PolicyEngineUndoPolicyForEntity(peEntity, policy, nil, callbackInfo)
 		pe.DeleteRoutePolicyState(route, policy.Name)
 		pe.PolicyEngine.DeletePolicyEntityMapEntry(peEntity, policy.Name)
 	}
@@ -932,8 +932,9 @@ func (s *BGPServer) TraverseAndApplyAdjRibOut(data interface{}, updateFunc utils
 }
 
 func (s *BGPServer) TraverseAndReverseAdjRIB(policyData interface{}, pe *bgppolicy.AdjRibPPolicyEngine) {
-	applyPolicyInfo := policyData.(utilspolicy.ApplyPolicyInfo)
-	policy := applyPolicyInfo.ApplyPolicy //policyItem.(policy.Policy)
+	updateInfo := policyData.(utilspolicy.PolicyStmtUpdateInfo)
+	applyPolicyInfo := updateInfo.ApplyPolicy //policyData.(utilspolicy.ApplyPolicyInfo)
+	policy := applyPolicyInfo.ApplyPolicy     //policyItem.(policy.Policy)
 	s.logger.Info("BGPServer:TraverseAndReverseAdjRIB - policy", policy.Name)
 	policyExtensions := policy.Extensions.(bgppolicy.AdjRibPolicyExtensions)
 	if len(policyExtensions.RouteList) == 0 {
@@ -965,7 +966,7 @@ func (s *BGPServer) TraverseAndReverseAdjRIB(policyData interface{}, pe *bgppoli
 			Neighbor:  route.Neighbor.String(),
 		}
 
-		success := pe.PolicyEngine.PolicyEngineUndoApplyPolicyForEntity(peEntity, applyPolicyInfo, callbackInfo)
+		success := pe.PolicyEngine.PolicyEngineUndoApplyPolicyForEntity(peEntity, updateInfo, callbackInfo)
 		s.logger.Info("success value agyer undoapplypolicy:", success, " for policy:", policy.Name)
 		if success {
 			pe.AdjRIBDeleteRoutePolicyState(route, policy.Name)

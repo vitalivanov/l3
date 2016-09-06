@@ -328,7 +328,7 @@ func (m RIBDServer) ProcessPolicyDefinitionConfigPatchUpdate(origCfg *ribd.Polic
 			valueObjArr := []ribd.PolicyDefinitionStmtPriority{}
 			err = json.Unmarshal([]byte(op[idx].Value), &valueObjArr)
 			if err != nil {
-				//logger.Debug("error unmarshaling value:", err))
+				logger.Debug("error unmarshaling value:", err)
 				return errors.New(fmt.Sprintln("error unmarshaling value:", err))
 			}
 			logger.Debug("Number of statements:", len(valueObjArr))
@@ -341,9 +341,9 @@ func (m RIBDServer) ProcessPolicyDefinitionConfigPatchUpdate(origCfg *ribd.Polic
 			}
 			switch op[idx].Op {
 			case "add":
-				//db.UpdateAddPolicyDefinition(newPolicy)
+				db.UpdateAddPolicyDefinition(newPolicy)
 			case "remove":
-				//db.UpdateRemovePolicyDefinition(newconfig)
+				db.UpdateRemovePolicyDefinition(newPolicy)
 			default:
 				logger.Err("Operation ", op[idx].Op, " not supported")
 			}
