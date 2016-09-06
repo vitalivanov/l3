@@ -116,6 +116,7 @@ func (intf *Interface) processNS(ndInfo *packet.NDInfo) (nbrInfo *config.Neighbo
 		// mark it as inclomple
 		return nil, IGNORE
 	}
+	debug.Logger.Debug("Processing NS packet:", *ndInfo)
 	nbrKey := intf.createNbrKey(ndInfo)
 	nbr, exists := intf.Neighbor[nbrKey]
 	if exists {

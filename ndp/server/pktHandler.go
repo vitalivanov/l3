@@ -95,8 +95,10 @@ func (svr *NDPServer) StopRxTx(ifIndex int32, ipAddr string) {
 	var deleteEntries []string
 	var err error
 	if ipAddr == "ALL" {
+		debug.Logger.Debug("Deleting all entries")
 		deleteEntries, err = ipPort.DeleteAll()
 	} else {
+		debug.Logger.Debug("Deleing interface:", ipAddr)
 		deleteEntries, err = ipPort.DeleteIntf(ipAddr)
 	}
 	if len(deleteEntries) > 0 && err == nil {
