@@ -34,6 +34,12 @@ import (
 	"testing"
 )
 
+func initHelloTestParams() {
+	ospf = getServerObject()
+	initAttr()
+	go startDummyChannels(ospf)
+}
+
 func initAreaTestParams() {
 	ospf = getServerObject()
 	initAttr()
@@ -120,9 +126,8 @@ func areaTestLogic(tNum int) int {
 }
 
 func checkAsicdAPIs() {
-//ospf.listenForASICdUpdates("ribd")
-ospf.processAsicdNotification(hello)
-err := ospf.initAsicdForRxMulticastPkt()
-fmt.Println("Asicd initialised with err ", err)
+	//ospf.listenForASICdUpdates("ribd")
+	ospf.processAsicdNotification(hello)
+	err := ospf.initAsicdForRxMulticastPkt()
+	fmt.Println("Asicd initialised with err ", err)
 }
-
