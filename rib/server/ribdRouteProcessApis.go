@@ -758,7 +758,7 @@ func ResolveNextHop(ipAddr string) (nextHopIntf ribdInt.NextHopInfo, resolvedNex
 	nextHopIntf.NextHopIp = ipAddr
 	prev_intf.NextHopIp = ipAddr
 	first := true
-	if ipAddr == "0.0.0.0" {
+	if ipAddr == "0.0.0.0" || ipAddr == "::" {
 		nextHopIntf.IsReachable = true
 		return nextHopIntf, nextHopIntf, err
 	}
