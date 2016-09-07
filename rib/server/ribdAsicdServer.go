@@ -36,6 +36,10 @@ var asicdv4Routes []*asicdInt.IPv4Route
 var asicdv4Route []asicdInt.IPv4Route
 var asicdv6Route []asicdInt.IPv6Route
 
+type Linklocaldata struct{}
+
+var V6linklocalIPMap = make(map[string]Linklocaldata)
+
 func addAsicdRouteBulk(routeInfoRecord RouteInfoRecord, bulkEnd bool) {
 	logger.Info("addAsicdRouteBulk, bulkEnd:", bulkEnd)
 	if asicdclnt.IsConnected == false {
@@ -119,18 +123,32 @@ func addAsicdRoute(routeInfoRecord RouteInfoRecord) {
 			},
 		})
 	} else if routeInfoRecord.ipType == ribdCommonDefs.IPv6 {
-		asicdclnt.ClientHdl.OnewayCreateIPv6Route([]*asicdInt.IPv6Route{
-			&asicdInt.IPv6Route{
-				routeInfoRecord.destNetIp.String(),
-				routeInfoRecord.networkMask.String(),
-				[]*asicdInt.IPv6NextHop{
-					&asicdInt.IPv6NextHop{
-						NextHopIp: routeInfoRecord.resolvedNextHopIpIntf.NextHopIp,
-						Weight:    int32(routeInfoRecord.weight + 1),
+		add := true
+		//fmt.Println("RIBD addAsicdRoute: ipv6 address add for ", routeInfoRecord.destNetIp.String())
+		if routeInfoRecord.destNetIp.IsLinkLocalUnicast() {
+			//fmt.Println("RIBD addAsicdRoute: link local unicast ipv6 during add in asicdaddroute for ", routeInfoRecord.destNetIp.String())
+			if len(V6linklocalIPMap) > 0 {
+				//fmt.Println("RIBD addAsicdRoute ", routeInfoRecord.destNetIp.String(), " is not the first link local ip, there are already ", len(V6linklocalIPMap), " addresses ")
+				add = false
+			}
+			empty := Linklocaldata{}
+			V6linklocalIPMap[routeInfoRecord.destNetIp.String()] = empty
+		}
+		if add {
+			//fmt.Println("RIBD addAsicdRoute: add set to true, send add address to asicd for ", routeInfoRecord.destNetIp.String())
+			asicdclnt.ClientHdl.OnewayCreateIPv6Route([]*asicdInt.IPv6Route{
+				&asicdInt.IPv6Route{
+					routeInfoRecord.destNetIp.String(),
+					routeInfoRecord.networkMask.String(),
+					[]*asicdInt.IPv6NextHop{
+						&asicdInt.IPv6NextHop{
+							NextHopIp: routeInfoRecord.resolvedNextHopIpIntf.NextHopIp,
+							Weight:    int32(routeInfoRecord.weight + 1),
+						},
 					},
 				},
-			},
-		})
+			})
+		}
 	}
 }
 func delAsicdRoute(routeInfoRecord RouteInfoRecord) {
@@ -153,21 +171,33 @@ func delAsicdRoute(routeInfoRecord RouteInfoRecord) {
 			},
 		})
 	} else if routeInfoRecord.ipType == ribdCommonDefs.IPv6 {
-
-		asicdclnt.ClientHdl.OnewayDeleteIPv6Route([]*asicdInt.IPv6Route{
-			&asicdInt.IPv6Route{
-				routeInfoRecord.destNetIp.String(),
-				routeInfoRecord.networkMask.String(),
-				[]*asicdInt.IPv6NextHop{
-					&asicdInt.IPv6NextHop{
-						NextHopIp: routeInfoRecord.resolvedNextHopIpIntf.NextHopIp,
-						Weight:    int32(routeInfoRecord.weight + 1),
-						//NextHopIfType: int32(routeInfoRecord.resolvedNextHopIpIntf.NextHopIfType),
+		del := true
+		//fmt.Println("RIBD delAsicdRoute: delete asicd address:", routeInfoRecord.destNetIp.String())
+		if routeInfoRecord.destNetIp.IsLinkLocalUnicast() {
+			//fmt.Println("RIBD delAsicdRoute:link local unicast ipv6:", routeInfoRecord.destNetIp.String())
+			delete(V6linklocalIPMap, routeInfoRecord.destNetIp.String())
+			//fmt.Println("RIBD delAsicdRoute: deleted map entry for ", routeInfoRecord.destNetIp.String(), " len of v6linklocalmap:", len(V6linklocalIPMap))
+			if len(V6linklocalIPMap) > 0 {
+				//fmt.Println("RIBD delAsicdRoute:link local routes still configured, so do not delete this route: ", routeInfoRecord.destNetIp.String(), "from ASICd")
+				del = false
+			}
+		}
+		if del {
+			//fmt.Sprintln("RIBD delAsicdRoute:del is true, calling delasicdroute for ", routeInfoRecord.destNetIp.String())
+			asicdclnt.ClientHdl.OnewayDeleteIPv6Route([]*asicdInt.IPv6Route{
+				&asicdInt.IPv6Route{
+					routeInfoRecord.destNetIp.String(),
+					routeInfoRecord.networkMask.String(),
+					[]*asicdInt.IPv6NextHop{
+						&asicdInt.IPv6NextHop{
+							NextHopIp: routeInfoRecord.resolvedNextHopIpIntf.NextHopIp,
+							Weight:    int32(routeInfoRecord.weight + 1),
+							//NextHopIfType: int32(routeInfoRecord.resolvedNextHopIpIntf.NextHopIfType),
+						},
 					},
 				},
-			},
-		})
-
+			})
+		}
 	}
 }
 func (ribdServiceHandler *RIBDServer) StartAsicdServer() {
