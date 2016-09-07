@@ -375,25 +375,31 @@ func (p *Path) addPathToAggregate(destIP string, path *Path, generateASSet bool)
 		return false
 	}
 
-	idx, i := 0, 0
-	pathIdx := 0
+	origin := packet.BGPPathAttrOriginType(packet.GetOrigin(path.PathAttrs))
+	atomicAggregate := packet.GetAtomicAggregatePathAttr(path.PathAttrs)
+
+	idx := 0
+	foundAtomicAgg := false
+	p.logger.Debugf("addPathToAggregatePath - len=%d, p.PathAttrs=%+v", len(p.PathAttrs), p.PathAttrs)
+	p.logger.Debugf("addPathToAggregatePath - len=%d, path.PathAttrs=%+v", len(path.PathAttrs), path.PathAttrs)
 	for idx = 0; idx < len(p.PathAttrs); idx++ {
-		for i = pathIdx; i < len(path.PathAttrs) && path.PathAttrs[i].GetCode() < p.PathAttrs[idx].GetCode(); i++ {
-			if path.PathAttrs[i].GetCode() == packet.BGPPathAttrTypeAtomicAggregate {
-				atomicAggregate := packet.NewBGPPathAttrAtomicAggregate()
-				p.PathAttrs = packet.AddPathAttrToPathAttrs(p.PathAttrs, packet.BGPPathAttrTypeAtomicAggregate,
-					atomicAggregate)
-			}
+		if p.PathAttrs[idx].GetCode() == packet.BGPPathAttrTypeAtomicAggregate {
+			foundAtomicAgg = true
+			continue
 		}
 
-		if path.PathAttrs[i].GetCode() == p.PathAttrs[idx].GetCode() {
-			if p.PathAttrs[idx].GetCode() == packet.BGPPathAttrTypeOrigin {
-				if path.PathAttrs[i].(*packet.BGPPathAttrOrigin).Value > p.PathAttrs[idx].(*packet.BGPPathAttrOrigin).Value {
-					p.PathAttrs[idx].(*packet.BGPPathAttrOrigin).Value = path.PathAttrs[i].(*packet.BGPPathAttrOrigin).Value
-				}
+		if p.PathAttrs[idx].GetCode() == packet.BGPPathAttrTypeOrigin && origin != packet.BGPPathAttrOriginMax {
+			if origin > p.PathAttrs[idx].(*packet.BGPPathAttrOrigin).Value {
+				p.PathAttrs[idx].(*packet.BGPPathAttrOrigin).Value = origin
 			}
 		}
 	}
+
+	if !foundAtomicAgg && atomicAggregate != nil {
+		atomicAggregate := packet.NewBGPPathAttrAtomicAggregate()
+		p.PathAttrs = packet.AddPathAttrToPathAttrs(p.PathAttrs, packet.BGPPathAttrTypeAtomicAggregate, atomicAggregate)
+	}
+
 	p.AggregatedPaths[destIP] = path
 	return true
 }
