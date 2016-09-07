@@ -60,15 +60,9 @@ type IPv6IntfInfo struct {
 
 type IPIntfNotification struct {
 	IfIndex   int32
-	IpAddr    string
 	IntfRef   string
+	IpAddr    string
 	Operation string
-}
-
-type StateNotification struct {
-	IfIndex int32
-	State   string
-	IpAddr  string
 }
 
 type NeighborConfig struct {

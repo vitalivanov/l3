@@ -284,10 +284,10 @@ func TestIPv6IntfDelete(t *testing.T) {
 
 func TestIPv6IntfStateUpDown(t *testing.T) {
 	TestIPv6IntfCreate(t)
-	stateObj := config.StateNotification{
-		IfIndex: testIfIndex,
-		State:   config.STATE_UP,
-		IpAddr:  testMyLinkScopeIP,
+	stateObj := config.IPIntfNotification{
+		IfIndex:   testIfIndex,
+		Operation: config.STATE_UP,
+		IpAddr:    testMyLinkScopeIP,
 	}
 	t.Log(stateObj)
 	testNdpServer.HandleStateNotification(&stateObj)
@@ -308,7 +308,7 @@ func TestIPv6IntfStateUpDown(t *testing.T) {
 		return
 	}
 
-	stateObj.State = config.STATE_UP
+	stateObj.Operation = config.STATE_UP
 	stateObj.IpAddr = testMyGSIp
 
 	t.Log(stateObj)
@@ -330,7 +330,7 @@ func TestIPv6IntfStateUpDown(t *testing.T) {
 		return
 	}
 
-	stateObj.State = config.STATE_DOWN
+	stateObj.Operation = config.STATE_DOWN
 	stateObj.IpAddr = testMyLinkScopeIP
 
 	testNdpServer.HandleStateNotification(&stateObj)
@@ -350,7 +350,7 @@ func TestIPv6IntfStateUpDown(t *testing.T) {
 		return
 	}
 
-	stateObj.State = config.STATE_DOWN
+	stateObj.Operation = config.STATE_DOWN
 	stateObj.IpAddr = testMyGSIp
 
 	testNdpServer.HandleStateNotification(&stateObj)
