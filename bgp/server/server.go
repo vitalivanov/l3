@@ -2244,8 +2244,6 @@ func (s *BGPServer) ProcessIntfMapUpdates(cfg []config.IntfMapInfo) {
 		intfEntry := IntfEntry{Name: ifMap.IfName}
 		s.IntfIdNameMap[int32(ifMap.Idx)] = intfEntry
 		s.IfNameToIfIndex[ifMap.IfName] = ifMap.Idx
-		s.logger.Info("ProcessIntfMapUpdates, ifId = ", ifMap.Idx, "IntfIdNameMap[", ifMap.Idx, "] = ", s.IntfIdNameMap[int32(ifMap.Idx)],
-			"IfNameToIfIndex[", ifMap.IfName, "] = ", s.IfNameToIfIndex[ifMap.IfName])
 	}
 }
 
