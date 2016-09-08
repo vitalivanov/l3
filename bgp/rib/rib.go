@@ -116,7 +116,7 @@ func (l *LocRib) GetReachabilityInfo(ipStr string) *ReachabilityInfo {
 		return nil
 	}
 	nextHop := ribdReachabilityInfo.NextHopIp
-	if nextHop == "" || nextHop[0] == '0' {
+	if nextHop == "" || nextHop[0] == '0' || nextHop == "::" {
 		l.logger.Infof("Next hop for %s is %s. Using %s as the next hop", ipStr, nextHop, ipStr)
 		nextHop = ipStr
 	}

@@ -348,9 +348,11 @@ func (mgr *FSMManager) getFSMIdByDir(connDir config.ConnDir) uint8 {
 
 func (mgr *FSMManager) receivedBGPOpenMessage(id uint8, connDir config.ConnDir, openMsg *packet.BGPOpen) bool {
 	var closeConnDir config.ConnDir = config.ConnDirInvalid
-
+	var closeFSMId uint8 = uint8(config.ConnDirInvalid)
 	defer mgr.fsmMutex.Unlock()
 	mgr.fsmMutex.Lock()
+
+	mgr.logger.Infof("FSMManager - Neighbor %s: FSM %d rx OPEN message", mgr.pConf.NeighborAddress, id)
 
 	localBGPId := packet.ConvertIPBytesToUint(mgr.gConf.RouterId.To4())
 	bgpIdInt := packet.ConvertIPBytesToUint(openMsg.BGPId.To4())
@@ -364,18 +366,24 @@ func (mgr *FSMManager) receivedBGPOpenMessage(id uint8, connDir config.ConnDir, 
 				closeConnDir = config.ConnDirOut
 			}
 			closeFSMId := mgr.getFSMIdByDir(closeConnDir)
+			mgr.logger.Infof("FSMManager - Neighbor %s: Close FSM id %d", mgr.pConf.NeighborAddress, closeFSMId)
 			mgr.fsmClose(closeFSMId)
 		}
 	}
-	if closeConnDir == config.ConnDirInvalid || closeConnDir != connDir {
+
+	if closeFSMId == uint8(config.ConnDirInvalid) || closeFSMId != id {
 		asSize := packet.GetASSize(openMsg)
 		addPathFamily := packet.GetAddPathFamily(openMsg)
-		mgr.neighborConf.SetPeerAttrs(openMsg.BGPId, asSize, mgr.fsms[id].holdTime, mgr.fsms[id].keepAliveTime, addPathFamily)
+		if mgr.fsms[id] != nil {
+			mgr.logger.Infof("FSMManager - Neighbor %s: FSM %d set peer attr", mgr.pConf.NeighborAddress, id)
+			mgr.neighborConf.SetPeerAttrs(openMsg.BGPId, asSize, mgr.fsms[id].holdTime, mgr.fsms[id].keepAliveTime,
+				addPathFamily)
+		}
 	}
 
 	if closeConnDir == connDir {
-		mgr.logger.Infof("FSMManager: Peer %s, FSM %d Closing FSM... return false", mgr.pConf.NeighborAddress.String(),
-			id)
+		mgr.logger.Infof("FSMManager - Neighbor %s: FSM %d Closing FSM... return false",
+			mgr.pConf.NeighborAddress.String(), id)
 		return false
 	} else {
 		return true
