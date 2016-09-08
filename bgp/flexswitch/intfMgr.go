@@ -375,7 +375,6 @@ func (m *FSIntfMgr) GetLogicalIntfInfo() []config.IntfMapInfo {
 		m.logger.Info("len(bulkInfo.GetBulkLogicalIntfState)  = ", len(bulkInfo.LogicalIntfStateList), " num objects returned = ", bulkInfo.Count)
 		for i := 0; i < int(bulkInfo.Count); i++ {
 			ifId := (bulkInfo.LogicalIntfStateList[i].IfIndex)
-			m.logger.Info("logical interface = ", bulkInfo.LogicalIntfStateList[i].Name, "ifId = ", ifId)
 			intfMap := config.IntfMapInfo{Idx: ifId, IfName: bulkInfo.LogicalIntfStateList[i].Name}
 			intfMaps = append(intfMaps, intfMap)
 		}
@@ -406,7 +405,6 @@ func (m *FSIntfMgr) GetVlanInfo() []config.IntfMapInfo {
 		m.logger.Info("len(bulkInfo.GetBulkVlan)  = ", len(bulkInfo.VlanStateList), " num objects returned = ", bulkInfo.Count)
 		for i := 0; i < int(bulkInfo.Count); i++ {
 			ifId := (bulkInfo.VlanStateList[i].IfIndex)
-			m.logger.Info("vlan = ", bulkInfo.VlanStateList[i].VlanId, "ifId = ", ifId)
 			intfMap := config.IntfMapInfo{Idx: ifId, IfName: bulkInfo.VlanStateList[i].VlanName}
 			intfMaps = append(intfMaps, intfMap)
 		}
@@ -437,7 +435,6 @@ func (m *FSIntfMgr) GetPortInfo() []config.IntfMapInfo {
 		m.logger.Info("len(bulkInfo.PortStateList)  = ", len(bulkInfo.PortStateList), " num objects returned = ", bulkInfo.Count)
 		for i := 0; i < int(bulkInfo.Count); i++ {
 			ifId := bulkInfo.PortStateList[i].IfIndex
-			m.logger.Info("ifId = ", ifId)
 			intfMap := config.IntfMapInfo{Idx: ifId, IfName: bulkInfo.PortStateList[i].Name}
 			intfMaps = append(intfMaps, intfMap)
 		}

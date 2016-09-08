@@ -107,7 +107,7 @@ func (o *OutTCPConn) Connect(seconds uint32, remote, local string, connCh chan n
 			"local IP len", len(local))
 		localIP, _, err := net.SplitHostPort(local)
 		if err != nil {
-			o.logger.Info("Neighbor:", o.fsm.pConf.NeighborAddress, "FSM", o.fsm.id, "SplitHostPort for local IP",
+			o.logger.Err("Neighbor:", o.fsm.pConf.NeighborAddress, "FSM", o.fsm.id, "SplitHostPort for local IP",
 				local, "failed with error", err)
 			errCh <- err
 			return
@@ -129,8 +129,7 @@ func (o *OutTCPConn) Connect(seconds uint32, remote, local string, connCh chan n
 		"Connect called... calling DialTimeout with", seconds, "second timeout", "OutTCPCOnn id", o.id)
 	socket, err := netUtils.ConnectSocket("tcp", remote, local)
 	if err != nil {
-		o.logger.Info("Neighbor:", o.fsm.pConf.NeighborAddress, "FSM", o.fsm.id, "ConnectSocket failed with error",
-			err)
+		o.logger.Err("Neighbor:", o.fsm.pConf.NeighborAddress, "FSM", o.fsm.id, "ConnectSocket failed with error", err)
 		errCh <- err
 		return
 	}
@@ -140,7 +139,7 @@ func (o *OutTCPConn) Connect(seconds uint32, remote, local string, connCh chan n
 			socket, "password:", o.fsm.pConf.AuthPassword)
 		err = netUtils.SetSockoptTCPMD5(socket, remoteIP, o.fsm.pConf.AuthPassword)
 		if err != nil {
-			o.logger.Info("Neighbor:", o.fsm.pConf.NeighborAddress, "FSM", o.fsm.id,
+			o.logger.Err("Neighbor:", o.fsm.pConf.NeighborAddress, "FSM", o.fsm.id,
 				"Set MD5 option on the socket failed with error", err)
 			errCh <- err
 			return
@@ -149,7 +148,7 @@ func (o *OutTCPConn) Connect(seconds uint32, remote, local string, connCh chan n
 
 	err = netUtils.Connect(socket, "tcp", remote, local, time.Duration(seconds)*time.Second)
 	if err != nil {
-		o.logger.Info("Neighbor:", o.fsm.pConf.NeighborAddress, "FSM", o.fsm.id, "Connect failed with error", err)
+		o.logger.Err("Neighbor:", o.fsm.pConf.NeighborAddress, "FSM", o.fsm.id, "Connect failed with error", err)
 		errCh <- err
 		return
 	}
