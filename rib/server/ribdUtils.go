@@ -402,7 +402,7 @@ func getPolicyRouteMapIndex(entity policy.PolicyEngineFilterEntityParams, policy
    Update routelist for policy
 */
 func addPolicyRouteMap(route ribdInt.Routes, policyName string) {
-	logger.Info("addPolicyRouteMap")
+	logger.Info("addPolicyRouteMap for route ", route, " policy:", policyName)
 	ipPrefix, err := getNetowrkPrefixFromStrings(route.Ipaddr, route.Mask)
 	if err != nil {
 		logger.Err("Invalid ip prefix")
@@ -416,12 +416,11 @@ func addPolicyRouteMap(route ribdInt.Routes, policyName string) {
 	if err != nil {
 		return
 	}
-	logger.Info("prefixLen= ", prefixLen)
 	var newRoute string
 	found := false
 	newRoute = route.Ipaddr + "/" + strconv.Itoa(prefixLen)
 	//	newRoute := string(ipPrefix[:])
-	logger.Info("Adding ip prefix ", newRoute, ipPrefix)
+	logger.Info("addPolicyRouteMap for route ", route, " policy:", policyName, " Adding ip prefix ", newRoute, ipPrefix)
 	policyInfo := PolicyEngineDB.PolicyDB.Get(patriciaDB.Prefix(policyName))
 	if policyInfo == nil {
 		logger.Info("Unexpected:policyInfo nil for policy ", policyName)
@@ -434,9 +433,9 @@ func addPolicyRouteMap(route ribdInt.Routes, policyName string) {
 		logger.Info("routeList nil")
 		tempPolicy.routeList = make([]string, 0)
 	}
-	logger.Info("routelist len= ", len(tempPolicy.routeList), " prefix list so far")
+	logger.Info("routelist len= ", len(tempPolicy.routeList))
 	for i := 0; i < len(tempPolicy.routeList); i++ {
-		logger.Info(tempPolicy.routeList[i])
+		logger.Info(" policy ", policyName, " routeList contains ", tempPolicy.routeList[i])
 		if tempPolicy.routeList[i] == newRoute {
 			logger.Info(newRoute, " already is a part of ", policyName, "'s routelist")
 			found = true
@@ -448,7 +447,7 @@ func addPolicyRouteMap(route ribdInt.Routes, policyName string) {
 	found = false
 	logger.Info("routeInfoList details")
 	for i := 0; i < len(tempPolicy.routeInfoList); i++ {
-		logger.Info("IP: ", tempPolicy.routeInfoList[i].Ipaddr, ":", tempPolicy.routeInfoList[i].Mask, " routeType: ", tempPolicy.routeInfoList[i].Prototype)
+		logger.Info("IP: ", tempPolicy.routeInfoList[i].Ipaddr, ":", tempPolicy.routeInfoList[i].Mask, " protocolType: ", ReverseRouteProtoTypeMapDB[int(tempPolicy.routeInfoList[i].Prototype)])
 		if tempPolicy.routeInfoList[i].Ipaddr == route.Ipaddr && tempPolicy.routeInfoList[i].Mask == route.Mask && tempPolicy.routeInfoList[i].Prototype == route.Prototype {
 			logger.Info("route already is a part of ", policyName, "'s routeInfolist")
 			found = true
@@ -814,10 +813,10 @@ func validateNetworkPrefix(ipAddr string, mask string) (destNet patriciaDB.Prefi
 	return destNet, err
 }
 func getNetworkPrefix(destNetIp net.IP, networkMask net.IP) (destNet patriciaDB.Prefix, nwAddr string, err error) {
-	logger.Debug("getNetworkPrefix for ip: ", destNetIp, "  networkMask: ", networkMask)
+	//logger.Debug("getNetworkPrefix for ip: ", destNetIp, "  networkMask: ", networkMask)
 	prefixLen, err := getPrefixLen(networkMask)
 	if err != nil {
-		logger.Err("err when getting prefixLen, err= ", err)
+		logger.Err("getNetworkPrefix for ip: ", destNetIp, "  networkMask: ", networkMask, " err when getting prefixLen, err= ", err)
 		return destNet, nwAddr, errors.New(fmt.Sprintln("Invalid networkmask ", networkMask))
 	}
 	numbytes := prefixLen / 8
@@ -826,43 +825,43 @@ func getNetworkPrefix(destNetIp net.IP, networkMask net.IP) (destNet patriciaDB.
 	}
 	var netIp net.IP
 	vdestMask := net.IPMask(networkMask)
-	logger.Debug("vdestMask:", vdestMask)
+	//logger.Debug("vdestMask:", vdestMask)
 	if isIPv4Mask(net.IP(vdestMask)) {
 		netIp = destNetIp.Mask(vdestMask[12:16])
-		logger.Debug("ipv4 case, netIp = ", netIp, " vdestMask:", vdestMask[12:16], " nwAddr:", nwAddr)
+		logger.Debug("getNetworkPrefix for ip: ", destNetIp, "  networkMask: ", networkMask, " ipv4 case, netIp = ", netIp, " vdestMask:", vdestMask[12:16], " nwAddr:", nwAddr)
 	} else {
 		netIp = destNetIp.Mask(vdestMask)
-		logger.Debug("ipv6 case, netIp = ", netIp, " vdestMask:", vdestMask, " nwAddr:", nwAddr)
+		logger.Debug("getNetworkPrefix for ip: ", destNetIp, "  networkMask: ", networkMask, " ipv6 case, netIp = ", netIp, " vdestMask:", vdestMask, " nwAddr:", nwAddr)
 	}
 	logger.Debug("getNetworkPrefix: prefixLen  = ", prefixLen, " netIp:", netIp, " numbytes:", numbytes, " len(netIp):", len(netIp))
 	if netIp == nil {
-		logger.Err("netIp nil ")
+		logger.Err("getNetworkPrefix for ip: ", destNetIp, "  networkMask: ", networkMask, " netIp nil ")
 		return destNet, nwAddr, errors.New("netIp nil")
 	}
 	destNet = make([]byte, numbytes)
 	for i := 0; i < numbytes && i < len(netIp); i++ {
 		destNet[i] = netIp[i]
-		logger.Debug("destnet[", i, "]:", destNet[i], " netIp[", i, "]:", netIp[i])
+		//	logger.Debug("destnet[", i, "]:", destNet[i], " netIp[", i, "]:", netIp[i])
 	}
 	nwAddr = (destNetIp.Mask(net.IPMask(networkMask))).String() + "/" + strconv.Itoa(prefixLen)
 	return destNet, nwAddr, err
 }
 func getNetowrkPrefixFromStrings(ipAddr string, mask string) (prefix patriciaDB.Prefix, err error) {
-	logger.Debug("getNetowrkPrefixFromStrings for ip ", ipAddr, " mask: ", mask)
+	//logger.Debug("getNetowrkPrefixFromStrings for ip ", ipAddr, " mask: ", mask)
 	destNetIpAddr, err := getIP(ipAddr)
 	if err != nil {
-		logger.Info("destNetIpAddr ", ipAddr, " invalid")
+		logger.Info("getNetowrkPrefixFromStrings for ip ", ipAddr, " mask: ", mask, " destNetIpAddr ", ipAddr, " invalid")
 		return prefix, err
 	}
 	//logger.Debug("getNetworkPrefixFrmStrings:destNetIpAddr:", destNetIpAddr)
 	networkMaskAddr, err := getIP(mask)
 	if err != nil {
-		logger.Err("networkMaskAddr invalid")
+		logger.Err("getNetowrkPrefixFromStrings for ip ", ipAddr, " mask: ", mask, " networkMaskAddr invalid")
 		return prefix, err
 	}
 	prefix, _, err = getNetworkPrefix(destNetIpAddr, networkMaskAddr)
 	if err != nil {
-		logger.Info("err=", err)
+		logger.Info("getNetowrkPrefixFromStrings for ip ", ipAddr, " mask: ", mask, " err=", err)
 		return prefix, err
 	}
 	return prefix, err
@@ -877,7 +876,7 @@ func getNetworkPrefixFromCIDR(ipAddr string) (ipPrefix patriciaDB.Prefix, err er
 	copy(ipMask, ipNet.Mask)
 	ipAddrStr := ip.String()
 	//ipMaskStr := net.IP(ipMask).String()
-	logger.Debug("getNetowrkPrefixFromStrings for ip ", ipAddr, " calling getNetowrkPrefixFromStrings(", ipAddrStr, ",", (net.IP(ipNet.Mask)).String(), ")")
+	logger.Debug("getNetowrkPrefixFromCIDR for ip ", ipAddr, " calling getNetowrkPrefixFromStrings(", ipAddrStr, ",", (net.IP(ipNet.Mask)).String(), ")")
 	ipPrefix, err = getNetowrkPrefixFromStrings(ipAddrStr, (net.IP(ipNet.Mask)).String()) //ipMaskStr)
 	return ipPrefix, err
 }

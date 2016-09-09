@@ -74,7 +74,11 @@ func (m RIBDServicesHandler) UpdatePolicyStmt(origconfig *ribd.PolicyStmt, newco
 		PatchOp:          op,
 		Op:               "updatePolicyStmt",
 	}
-	return true, err
+	err = <-m.server.PolicyConfDone
+	if err == nil {
+		val = true
+	}
+	return val, err
 }
 func (m RIBDServicesHandler) GetPolicyStmtState(name string) (*ribd.PolicyStmtState, error) {
 	logger.Debug("Get state for Policy Stmt")
@@ -115,12 +119,6 @@ func (m RIBDServicesHandler) DeletePolicyDefinition(cfg *ribd.PolicyDefinition) 
 
 func (m RIBDServicesHandler) UpdatePolicyDefinition(origconfig *ribd.PolicyDefinition, newconfig *ribd.PolicyDefinition, attrset []bool, op []*ribd.PatchOpInfo) (val bool, err error) {
 	logger.Debug(fmt.Sprintln("UpdatePolicyDefinition for name ", origconfig.Name))
-	newPolicy := policy.PolicyDefinitionConfig{Name: origconfig.Name}
-	err = m.server.GlobalPolicyEngineDB.ValidatePolicyDefinitionUpdate(newPolicy)
-	if err != nil {
-		logger.Err(fmt.Sprintln("validation failed with err ", err))
-		return false, err
-	}
 	if op == nil || len(op) == 0 {
 		//update op
 		logger.Info("Update op for policy definition")
@@ -136,7 +134,11 @@ func (m RIBDServicesHandler) UpdatePolicyDefinition(origconfig *ribd.PolicyDefin
 		PatchOp:          op,
 		Op:               "updatePolicyDefinition",
 	}
-	return true, err
+	err = <-m.server.PolicyConfDone
+	if err == nil {
+		val = true
+	}
+	return val, err
 }
 func (m RIBDServicesHandler) GetPolicyDefinitionState(name string) (*ribd.PolicyDefinitionState, error) {
 	logger.Debug("Get state for Policy Definition")
@@ -156,6 +158,7 @@ func (m RIBDServicesHandler) ApplyPolicy(applyList []*ribdInt.ApplyPolicyInfo, u
 		PolicyList: server.ApplyPolicyList{applyList, undoList},
 		Op:         "applyPolicy",
 	}
+	err = <-m.server.PolicyConfDone
 	//m.server.PolicyApplyCh <- server.ApplyPolicyList{applyList, undoList} //source, policy, action, conditions}
 	return nil
 }
