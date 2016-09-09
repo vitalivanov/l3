@@ -1051,12 +1051,12 @@ func (fsm *FSM) ChangeState(newState BaseStateIface) {
 	fsm.State.leave()
 	fsm.State = newState
 	fsm.State.enter()
-	fsm.Manager.fsmStateChange(fsm.id, fsm.State.state())
 	if oldState == config.BGPFSMEstablished && fsm.State.state() != config.BGPFSMEstablished {
 		fsm.ConnBroken()
 	} else if oldState != config.BGPFSMEstablished && fsm.State.state() == config.BGPFSMEstablished {
 		fsm.ConnEstablished()
 	}
+	fsm.Manager.fsmStateChange(fsm.id, fsm.State.state())
 }
 
 func (fsm *FSM) sendAutoStartEvent() {
