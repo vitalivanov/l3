@@ -310,7 +310,7 @@ func (p *Peer) AcceptConn(conn *net.TCPConn) {
 	if p.fsmManager == nil {
 		p.logger.Errf("FSM Manager is not instantiated yet for neighbor %s",
 			p.NeighborConf.Neighbor.NeighborAddress)
-		(*conn).Close()
+		conn.Close()
 		return
 	}
 	p.fsmManager.AcceptCh <- conn
