@@ -35,13 +35,13 @@ type PortProperty struct {
 	Name     string
 	VlanName string
 	VlanId   uint16
-	IpAddr   net.IP
+	IpAddr   string
 }
 
 type VlanProperty struct {
 	Name       string
 	UntagPorts []int32
-	IpAddr     net.IP
+	IpAddr     string
 }
 
 type LagProperty struct {
