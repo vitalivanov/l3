@@ -354,10 +354,11 @@ func (intf *Interface) FlushNeighbors() ([]string, error) {
 	// during link local down we will have CIDR format ip
 	debug.Logger.Debug("Deleting all neighbor entries for interface:", intf.IntfRef)
 	deleteEntries := make([]string, 0)
-	for _, nbr := range intf.Neighbor {
+	for nbrKey, nbr := range intf.Neighbor {
 		nbr.DeInit()
 		deleteEntries = append(deleteEntries, nbr.IpAddr)
-		delete(intf.Neighbor, nbr.IpAddr)
+		debug.Logger.Debug("Deleting neighbor:", nbrKey)
+		delete(intf.Neighbor, nbrKey)
 	}
 	// do not delete link information here... only if IP interface is deleted then we need to delete
 	// link information
