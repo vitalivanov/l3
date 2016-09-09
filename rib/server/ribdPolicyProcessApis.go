@@ -27,6 +27,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 	"ribd"
 	"ribdInt"
 	"utils/patriciaDB"
@@ -219,15 +220,16 @@ func (m RIBDServer) ProcessPolicyStmtConfigDelete(cfg *ribd.PolicyStmt, db *poli
    Function to patch update policy stmt in the policyEngineDB
 */
 func (m RIBDServer) ProcessPolicyStmtConfigPatchUpdate(origCfg *ribd.PolicyStmt, newCfg *ribd.PolicyStmt, op []*ribd.PatchOpInfo, db *policy.PolicyEngineDB) (err error) {
-	logger.Debug("ProcessPolicyStmtConfigUpdate:", origCfg.Name)
+	func_msg := "ProcessPolicyStmtConfigPatchUpdate for stmt " + origCfg.Name + ":"
+	logger.Debug(func_msg)
 	if origCfg.Name != newCfg.Name {
-		logger.Err("Update for a different policy stmt")
+		logger.Err(func_msg, " Update for a different policy stmt")
 		return errors.New("Policy stmt to be updated is different than the original one")
 	}
 	for idx := 0; idx < len(op); idx++ {
 		switch op[idx].Path {
 		case "Conditions":
-			logger.Debug("Patch update for Conditions")
+			logger.Debug(func_msg, " Patch update for Conditions")
 			newPolicyStmt := policy.PolicyStmtConfig{
 				Name:            origCfg.Name,
 				MatchConditions: origCfg.MatchConditions,
@@ -238,24 +240,24 @@ func (m RIBDServer) ProcessPolicyStmtConfigPatchUpdate(origCfg *ribd.PolicyStmt,
 			var valueObjArr []string
 			err = json.Unmarshal([]byte(op[idx].Value), &valueObjArr)
 			if err != nil {
-				//logger.Debug("error unmarshaling value:", err))
+				logger.Debug(func_msg, "error unmarshaling value:", err)
 				return errors.New(fmt.Sprintln("error unmarshaling value:", err))
 			}
-			logger.Debug("Number of conditions:", len(valueObjArr))
+			logger.Debug(func_msg, " Number of conditions:", len(valueObjArr))
 			for _, val := range valueObjArr {
-				logger.Debug("condition - ", val)
+				logger.Debug(func_msg, " condition to be removed - ", val)
 				newPolicyStmt.Conditions = append(newPolicyStmt.Conditions, val)
 			}
 			switch op[idx].Op {
 			case "add":
-				//db.UpdateAddPolicyDefinition(newPolicy)
+				db.UpdateAddPolicyStmtConditions(newPolicyStmt)
 			case "remove":
-				//db.UpdateRemovePolicyDefinition(newconfig)
+				db.UpdateRemovePolicyStmtConditions(newPolicyStmt)
 			default:
 				logger.Err("Operation ", op[idx].Op, " not supported")
 			}
 		default:
-			logger.Err("Patch update for attribute:", op[idx].Path, " not supported")
+			logger.Err(func_msg, " Patch update for attribute:", op[idx].Path, " not supported")
 			err = errors.New(fmt.Sprintln("Operation ", op[idx].Op, " not supported"))
 		}
 	}
@@ -266,10 +268,34 @@ func (m RIBDServer) ProcessPolicyStmtConfigPatchUpdate(origCfg *ribd.PolicyStmt,
    Function to update policy stmt in the policyEngineDB
 */
 func (m RIBDServer) ProcessPolicyStmtConfigUpdate(origCfg *ribd.PolicyStmt, newCfg *ribd.PolicyStmt, attrset []bool, db *policy.PolicyEngineDB) (err error) {
-	logger.Debug("ProcessPolicyStmtConfigUpdate:", origCfg.Name)
+	func_msg := "ProcessPolicyStmtConfigUpdate for statement " + origCfg.Name
+	logger.Debug(func_msg)
 	if origCfg.Name != newCfg.Name {
-		logger.Err("Update for a different policy statement")
+		logger.Err(func_msg, "Update for a different policy statement")
 		return errors.New("Policy statement to be updated is different than the original one")
+	}
+	if attrset != nil {
+		objTyp := reflect.TypeOf(*origCfg)
+		for i := 0; i < objTyp.NumField(); i++ {
+			objName := objTyp.Field(i).Name
+			if attrset[i] {
+				if objName == "MatchConditions" {
+					logger.Debug(func_msg, " Attr to be updated is MatchType")
+					newPolicyStmt := policy.PolicyStmtConfig{
+						Name:            origCfg.Name,
+						MatchConditions: newCfg.MatchConditions,
+					}
+					err = db.UpdatePolicyStmtMatchTypeAttr(newPolicyStmt)
+					if err != nil {
+						db.Logger.Err(func_msg, " policylib returned err:", err, " for matchtype attribute")
+						return err
+					}
+				} else {
+					logger.Err(fmt.Sprintln("Update of ", objName, " not supported"))
+					return errors.New(fmt.Sprintln("PolicyStmt update for attribute ", objName, " not supported"))
+				}
+			}
+		}
 	}
 	return err
 }
@@ -341,9 +367,9 @@ func (m RIBDServer) ProcessPolicyDefinitionConfigPatchUpdate(origCfg *ribd.Polic
 			}
 			switch op[idx].Op {
 			case "add":
-				db.UpdateAddPolicyDefinition(newPolicy)
+				db.UpdateAddPolicyDefinitionStmts(newPolicy)
 			case "remove":
-				db.UpdateRemovePolicyDefinition(newPolicy)
+				db.UpdateRemovePolicyDefinitionStmts(newPolicy)
 			default:
 				logger.Err("Operation ", op[idx].Op, " not supported")
 			}

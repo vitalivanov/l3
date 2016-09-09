@@ -667,7 +667,7 @@ func policyEngineTraverseAndApply(data interface{}, updatefunc policy.PolicyAppl
 	V6RouteInfoMap.VisitAndUpdate(policyEngineApplyForRoute, traverseAndApplyPolicyData)
 }
 func policyEngineTraverseAndReverse(applyPolicyItem interface{}) {
-	updateInfo := applyPolicyItem.(policy.PolicyStmtUpdateInfo)
+	updateInfo := applyPolicyItem.(policy.PolicyEngineApplyInfo)
 	applyPolicyInfo := updateInfo.ApplyPolicy //.(policy.ApplyPolicyInfo)
 	policy := applyPolicyInfo.ApplyPolicy     //policyItem.(policy.Policy)
 	logger.Info("PolicyEngineTraverseAndReverse - traverse routing table and inverse policy actions", policy.Name)

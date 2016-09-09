@@ -78,6 +78,7 @@ func (m RIBDServicesHandler) UpdatePolicyStmt(origconfig *ribd.PolicyStmt, newco
 	if err == nil {
 		val = true
 	}
+	logger.Debug("updatepolicystmt ,err:", err, " val:", val)
 	return val, err
 }
 func (m RIBDServicesHandler) GetPolicyStmtState(name string) (*ribd.PolicyStmtState, error) {
