@@ -143,6 +143,7 @@ func (mgr *FSMManager) Init() {
 							mgr.logger.Infof("Neighbor %s: Send inConn message to FSM %d", mgr.pConf.NeighborAddress,
 								fsmId)
 							fsm.inConnCh <- inConn
+							break
 						}
 					}
 				}
