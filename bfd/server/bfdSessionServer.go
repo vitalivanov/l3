@@ -71,15 +71,13 @@ func (server *BFDServer) DispatchReceivedBfdPacket(ipAddr string, bfdPacket *Bfd
 	sessionId := int32(bfdPacket.YourDiscriminator)
 	session, exist := server.bfdGlobal.Sessions[sessionId]
 	if !exist {
-		for _, session = range server.bfdGlobal.Sessions {
-			if session.state.IpAddr == ipAddr {
-				exist = true
-				break
-			}
-		}
+		session, exist = server.bfdGlobal.SessionsByIp[ipAddr]
 	}
 	if exist && session != nil {
-		session.ReceivedPacketCh <- bfdPacket
+		if session.IsSessionActive() && session.rxInterval != 0 {
+			session.sessionTimer.Reset(time.Duration(session.rxInterval) * time.Millisecond)
+			session.ReceivedPacketCh <- bfdPacket
+		}
 	} else {
 		/*
 			// Create a session as discovered. This can be enabled for active mode of bfd.
@@ -97,6 +95,8 @@ func (server *BFDServer) DispatchReceivedBfdPacket(ipAddr string, bfdPacket *Bfd
 
 func (server *BFDServer) StartBfdSesionServer() error {
 	var ipAddr string
+	var bfdPacket *BfdControlPacket
+	var err error
 	destAddr := net.JoinHostPort("", strconv.Itoa(DEST_PORT))
 	ServerAddr, err := net.ResolveUDPAddr("udp", destAddr)
 	if err != nil {
@@ -116,22 +116,17 @@ func (server *BFDServer) StartBfdSesionServer() error {
 		if err != nil {
 			server.logger.Info("Failed to read from ", ServerAddr)
 		} else {
-			ipAddr, _, err = net.SplitHostPort(udpAddr.String())
-			if err == nil {
-				session, exist := server.bfdGlobal.SessionsByIp[ipAddr]
-				if exist {
-					if session.IsSessionActive() && session.rxInterval != 0 {
-						session.sessionTimer.Reset(time.Duration(session.rxInterval) * time.Millisecond)
-					}
-					if length >= DEFAULT_CONTROL_PACKET_LEN {
-						bfdPacket, err := DecodeBfdControlPacket(buf[0:length])
+			if length >= DEFAULT_CONTROL_PACKET_LEN {
+				bfdPacket, err = DecodeBfdControlPacket(buf[0:length])
+				if err != nil {
+					server.logger.Info("Failed to decode packet - ", err)
+					continue
+				} else {
+					ipAddr, _, err = net.SplitHostPort(udpAddr.String())
+					if err == nil {
+						err = server.DispatchReceivedBfdPacket(ipAddr, bfdPacket)
 						if err != nil {
-							server.logger.Info("Failed to decode packet - ", err)
-						} else {
-							err = server.DispatchReceivedBfdPacket(ipAddr, bfdPacket)
-							if err != nil {
-								server.logger.Info("Failed to dispatch received packet")
-							}
+							server.logger.Info("Failed to dispatch received packet")
 						}
 					}
 				}
@@ -366,13 +361,15 @@ func (server *BFDServer) NewBfdSession(DestIp string, ParamName string, Interfac
 	}
 	IfIndex, err := server.GetIfIndexFromDestIp(DestIp)
 	if err != nil {
-		server.logger.Err(err.Error())
+		server.logger.Err("Session creation failed " + err.Error())
+		return nil
 	} else {
 		IfType = asicdCommonDefs.GetIntfTypeFromIfIndex(IfIndex)
 		IfName, err := server.getLinuxIntfName(IfIndex)
 		if err == nil {
 			if interfaceSpecific && IfName != Interface {
 				server.logger.Info("Bfd session to ", DestIp, " cannot be created on interface ", Interface)
+				return nil
 			}
 		}
 	}
@@ -626,6 +623,7 @@ func (server *BFDServer) AdminDownBfdSession(sessionMgmt BfdSessionMgmt) error {
 // This function handles NextHop change from RIB.
 // A Poll control packet will be sent to BFD neighbor and expect a Final control packet.
 func (server *BFDServer) HandleNextHopChange(DestIp string, IfIndex int32, Reachable bool) error {
+	server.logger.Info("HandleNextHopChange - ", DestIp, IfIndex, Reachable)
 	if Reachable {
 		// Go through the list of tobeCreatedSessions and try to recreate.
 		for _, sessionMgmt := range server.tobeCreatedSessions {
