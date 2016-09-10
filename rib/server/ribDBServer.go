@@ -65,6 +65,11 @@ func (m RIBDServer) WriteIPv4RouteStateEntryToDB(dbInfo RouteDBInfo) error {
 		}
 		//logger.Debug("IntfRef = ", nextHopInfo[i].NextHopIntRef)
 		nextHopInfo[i].Weight = int32(routeInfoList[sel].weight)
+		if nextHopInfo[i].NextHopIp == "255.255.255.255" {
+			nextHopInfo[i].NextHopIp = "Null0"
+			nextHopInfo[i].NextHopIntRef = ""
+			nextHopInfo[i].Weight = 0
+		}
 		obj.NextHopList = append(obj.NextHopList, &nextHopInfo[i])
 		if routeInfoList[sel].protocol == int8(RouteProtocolTypeMapDB[routeList.selectedRouteProtocol]) {
 			obj.IsNetworkReachable = routeInfoList[sel].resolvedNextHopIpIntf.IsReachable
@@ -154,6 +159,11 @@ func (m RIBDServer) WriteIPv6RouteStateEntryToDB(dbInfo RouteDBInfo) error {
 		if ok {
 			logger.Debug("Map foud for ifndex : ", routeInfoList[sel].nextHopIfIndex, "Name = ", intfEntry.name)
 			nextHopInfo[i].NextHopIntRef = intfEntry.name
+		}
+		if nextHopInfo[i].NextHopIp == "255.255.255.255" {
+			nextHopInfo[i].NextHopIp = "Null0"
+			nextHopInfo[i].NextHopIntRef = ""
+			nextHopInfo[i].Weight = 0
 		}
 		//logger.Debug("IntfRef = ", nextHopInfo[i].NextHopIntRef)
 		nextHopInfo[i].Weight = int32(routeInfoList[sel].weight)
