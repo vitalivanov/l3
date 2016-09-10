@@ -295,7 +295,7 @@ func BuildRouteParamsFromribdIPv6Route(cfg *ribd.IPv6Route, createType int, dele
 	nextHopIp := cfg.NextHop[0].NextHopIp
 	if cfg.NullRoute == true { //commonDefs.IfTypeNull {
 		logger.Info("null route create request")
-		//nextHopIp = "255.255.255.255"  //TBD: mask IP for null route next hop
+		nextHopIp = "255.255.255.255" //TBD: mask IP for null route next hop
 	}
 	nextHopIntRef, _ := strconv.Atoi(cfg.NextHop[0].NextHopIntRef)
 	params := RouteParams{destNetIp: cfg.DestinationNw,
