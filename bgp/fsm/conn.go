@@ -191,6 +191,7 @@ func (o *OutTCPConn) ConnectToPeer(seconds uint32, remote, local string) {
 		connTime = seconds
 	}
 
+	done := false
 	go o.Connect(seconds, remote, local, connCh, errCh)
 
 	for {
@@ -203,8 +204,8 @@ func (o *OutTCPConn) ConnectToPeer(seconds uint32, remote, local string) {
 				return
 			}
 
+			done = true
 			o.fsmConnCh <- conn
-			return
 
 		case err := <-errCh:
 			o.logger.Info("Neighbor:", o.fsm.pConf.NeighborAddress, "FSM", o.fsm.id,
@@ -213,12 +214,15 @@ func (o *OutTCPConn) ConnectToPeer(seconds uint32, remote, local string) {
 				return
 			}
 
+			done = true
 			o.fsmConnErrCh <- PeerConnErr{0, err}
-			return
 
 		case <-o.StopConnCh:
 			o.logger.Info("Neighbor:", o.fsm.pConf.NeighborAddress, "FSM", o.fsm.id,
 				"ConnectToPeer: Recieved stop connecting to peer", remote, "OutTCPCOnn id", o.id)
+			if done {
+				return
+			}
 			stopConn = true
 		}
 	}
