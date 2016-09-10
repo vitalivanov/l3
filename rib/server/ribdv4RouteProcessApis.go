@@ -782,7 +782,7 @@ func (m RIBDServer) Getv4RouteCreatedTime(number int) (time string, err error) {
 }
 
 func (m RIBDServer) ProcessV4RouteCreateConfig(cfg *ribd.IPv4Route, addType int) (val bool, err error) {
-	logger.Debug("ProcessV4RouteCreateConfig: Received create route request for ip ", cfg.DestinationNw, " mask ", cfg.NetworkMask, " number of next hops: ", len(cfg.NextHop))
+	logger.Debug("ProcessV4RouteCreateConfig: Received create route request for ip ", cfg.DestinationNw, " mask ", cfg.NetworkMask, " number of next hops: ", len(cfg.NextHop), " null Route:", cfg.NullRoute)
 	newCfg := ribd.IPv4Route{
 		DestinationNw: cfg.DestinationNw,
 		NetworkMask:   cfg.NetworkMask,

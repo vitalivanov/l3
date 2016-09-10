@@ -120,10 +120,16 @@ func (svr *NDPServer) GetIPIntf() {
 		return
 	}
 	for _, obj := range ipsInfo {
-		ipInfo := Interface{}
-		ipInfo.InitIntf(obj, svr.PktDataCh, svr.NdpConfig)
+		ipInfo, exists := svr.L3Port[obj.IfIndex]
+		if !exists {
+			ipInfo.InitIntf(obj, svr.PktDataCh, svr.NdpConfig)
+		} else {
+			ipInfo.UpdateIntf(obj.IpAddr)
+		}
 		svr.L3Port[ipInfo.IfIndex] = ipInfo
-		svr.ndpL3IntfStateSlice = append(svr.ndpL3IntfStateSlice, ipInfo.IfIndex)
+		if !exists {
+			svr.ndpL3IntfStateSlice = append(svr.ndpL3IntfStateSlice, ipInfo.IfIndex)
+		}
 	}
 	debug.Logger.Info("Done with IPv6 State list")
 	return
@@ -254,13 +260,13 @@ func (svr *NDPServer) HandlePhyPortStateNotification(msg *config.PortState) {
  *		     Stop Rx/Tx in this case
  */
 func (svr *NDPServer) HandleStateNotification(msg *config.IPIntfNotification) {
-	debug.Logger.Info("Received State:", msg.Operation, "for ifIndex:", msg.IfIndex, "ipAddr:", msg.IpAddr)
+	debug.Logger.Info("Received State:", msg.Operation, "for port:", msg.IntfRef, "ifIndex:", msg.IfIndex, "ipAddr:", msg.IpAddr)
 	switch msg.Operation {
 	case config.STATE_UP:
-		debug.Logger.Info("Create pkt handler for", msg.IfIndex, "IpAddr:", msg.IpAddr)
+		debug.Logger.Info("Create pkt handler for port:", msg.IntfRef, "ifIndex:", msg.IfIndex, "IpAddr:", msg.IpAddr)
 		svr.StartRxTx(msg.IfIndex)
 	case config.STATE_DOWN:
-		debug.Logger.Info("Delete pkt handler for", msg.IfIndex, "IpAddr:", msg.IpAddr)
+		debug.Logger.Info("Delete pkt handler for port:", msg.IntfRef, "ifIndex:", msg.IfIndex, "IpAddr:", msg.IpAddr)
 		// stop pcap handler
 		svr.StopRxTx(msg.IfIndex, msg.IpAddr)
 	}
