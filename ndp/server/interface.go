@@ -141,6 +141,7 @@ func (intf *Interface) InitIntf(obj *commonDefs.IPv6IntfState, pktCh chan config
 	intf.IfIndex = obj.IfIndex
 	intf.OperState = obj.OperState
 	intf.commonInit(obj.IpAddr, pktCh, gCfg)
+	debug.Logger.Debug("InitIntf port:", obj.IntfRef, "ifIndex:", obj.IfIndex, "GS:", intf.IpAddr, "LS:", intf.LinkLocalIp)
 }
 
 /*
@@ -176,9 +177,7 @@ func (intf *Interface) CreateIntf(obj *config.IPIntfNotification, pktCh chan con
  */
 func (intf *Interface) UpdateIntf(ipAddr string) {
 	intf.addIP(ipAddr)
-	debug.Logger.Debug("Received update notification for ifIndex", intf.IfIndex,
-		"when entry already exist in the database. Received Ip:", ipAddr, "global scope:",
-		intf.IpAddr, "link scope ip:", intf.LinkLocalIp)
+	debug.Logger.Debug("UpdateIntf port:", intf.IntfRef, "ifIndex:", intf.IfIndex, "GS:", intf.IpAddr, "LS:", intf.LinkLocalIp)
 }
 
 func (intf *Interface) deleteNbrList() ([]string, error) {
