@@ -915,12 +915,14 @@ func (fsm *FSM) StartFSM() {
 				outConnCh.Close()
 				continue
 			}
+			fsm.StopConnToPeer()
 			fsm.outTCPConn = nil
 			out := PeerConnDir{config.ConnDirOut, &outConnCh}
 			fsm.ProcessEvent(BGPEventTcpCrAcked, out)
 
 		case outConnErrCh := <-fsm.outConnErrCh:
 			fsm.logger.Info("Neighbor:", fsm.pConf.NeighborAddress, "FSM", fsm.id, "connection FAIL")
+			fsm.StopConnToPeer()
 			if outConnErrCh.id != 0 && outConnErrCh.id != fsm.connId {
 				fsm.logger.Info("Neighbor:", fsm.pConf.NeighborAddress, "FSM", fsm.id, "connection FAIL, fsm conn id:",
 					fsm.connId, "err conn id:", outConnErrCh.id)

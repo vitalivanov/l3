@@ -179,10 +179,11 @@ func main() {
 		// Start keepalive routine
 		go keepalive.InitKeepAlive("bgpd", fileName)
 
-		logger.Info(fmt.Sprintln("Starting config listener..."))
+		logger.Info(fmt.Sprintln("Starting config listener"))
 		confIface := rpc.NewBGPHandler(bgpServer, bgpPolicyMgr, logger, dbUtil, fileName)
 		//dbUtil.Disconnect()
 
+		logger.Info(fmt.Sprintln("Starting thrift server"))
 		rpc.StartServer(logger, confIface, fileName)
 	}
 }
