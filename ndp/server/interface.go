@@ -172,7 +172,7 @@ func (intf *Interface) CreateIntf(obj *config.IPIntfNotification, pktCh chan con
 	intf.IntfRef = obj.IntfRef
 	intf.IfIndex = obj.IfIndex
 	intf.commonInit(obj.IpAddr, pktCh, gCfg)
-	debug.Logger.Info("Created IP interface", intf.IntfRef, "ifIndex:", intf.IfIndex,
+	debug.Logger.Debug("Created IP interface", intf.IntfRef, "ifIndex:", intf.IfIndex,
 		"GS:", intf.globalScope, "LS:", intf.linkScope, "Pcap Users are:", intf.PcapUsers)
 }
 
@@ -274,17 +274,15 @@ func (intf *Interface) DeletePcap() {
 		return
 	}
 	intf.deletePcapUser()
-	debug.Logger.Info("Total pcap user for", intf.IntfRef, "reduced to", intf.PcapBase.PcapUsers)
+	debug.Logger.Debug("Total pcap user for", intf.IntfRef, "reduced to", intf.PcapBase.PcapUsers)
 	if intf.PcapBase.PcapUsers == 0 {
 		debug.Logger.Debug("No More Pcap users and hence close pcap Handler for port:", intf.IntfRef)
 		// once go routine is exited, delete pcap handler
 		if intf.PcapBase.PcapHandle != nil {
 			// Inform go routine spawned for intf to exit..
-			debug.Logger.Debug("Sending signal to exit out of go routine which is receiving packets for port:", intf.IntfRef)
 			// @TODO: jgheewala: fix this after walmart
 			//intf.PcapBase.PcapCtrl <- true
 			//<-intf.PcapBase.PcapCtrl
-			debug.Logger.Debug("Go Routine exit is done, now closing pcap for port:", intf.IntfRef)
 			intf.PcapBase.PcapHandle.Close()
 			intf.PcapBase.PcapHandle = nil
 		}
