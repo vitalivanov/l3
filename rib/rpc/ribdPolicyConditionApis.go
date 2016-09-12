@@ -25,6 +25,7 @@
 package rpc
 
 import (
+	"errors"
 	"l3/rib/server"
 	"ribd"
 	//"utils/policy"
@@ -43,6 +44,21 @@ func (m RIBDServicesHandler) CreatePolicyPrefixSet(cfg *ribd.PolicyPrefixSet) (v
 	return val, err
 }
 func (m RIBDServicesHandler) UpdatePolicyPrefixSet(origconfig *ribd.PolicyPrefixSet, newconfig *ribd.PolicyPrefixSet, attrset []bool, op []*ribd.PatchOpInfo) (val bool, err error) {
+	if op == nil || len(op) == 0 {
+		//update op
+		logger.Info("Update op for policy prefix set definition")
+
+	} else {
+		//patch op
+		logger.Info("patch op:", op, " for policy prefix set definition")
+	}
+	m.server.PolicyConfCh <- server.RIBdServerConfig{
+		OrigConfigObject: origconfig,
+		NewConfigObject:  newconfig,
+		AttrSet:          attrset,
+		PatchOp:          op,
+		Op:               "updatePolicyPrefixSet",
+	}
 	return val, err
 }
 func (m RIBDServicesHandler) DeletePolicyPrefixSet(cfg *ribd.PolicyPrefixSet) (val bool, err error) {
@@ -93,6 +109,22 @@ func (m RIBDServicesHandler) DeletePolicyCondition(cfg *ribd.PolicyCondition) (v
 }
 func (m RIBDServicesHandler) UpdatePolicyCondition(origconfig *ribd.PolicyCondition, newconfig *ribd.PolicyCondition, attrset []bool, op []*ribd.PatchOpInfo) (val bool, err error) {
 	logger.Debug("UpdatePolicyConditionConfig:UpdatePolicyCondition: ", newconfig.Name)
+	if op == nil || len(op) == 0 {
+		//update op
+		logger.Info("Update op for policy condition definition")
+
+	} else {
+		//patch op
+		logger.Err("patch op:", op, " for policy condition definition not supported")
+		return false, errors.New("Patch update for policy condition not supported")
+	}
+	m.server.PolicyConfCh <- server.RIBdServerConfig{
+		OrigConfigObject: origconfig,
+		NewConfigObject:  newconfig,
+		AttrSet:          attrset,
+		PatchOp:          op,
+		Op:               "updatePolicyCondition",
+	}
 	return true, err
 }
 func (m RIBDServicesHandler) GetPolicyConditionState(name string) (*ribd.PolicyConditionState, error) {

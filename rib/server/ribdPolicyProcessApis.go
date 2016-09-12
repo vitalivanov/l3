@@ -24,6 +24,10 @@
 package server
 
 import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"reflect"
 	"ribd"
 	"ribdInt"
 	"utils/patriciaDB"
@@ -72,6 +76,65 @@ func (m RIBDServer) ProcessPolicyPrefixSetConfigDelete(cfg *ribd.PolicyPrefixSet
 }
 
 /*
+   Function to patch update policy prefix set in the policyEngineDB
+*/
+func (m RIBDServer) ProcessPolicyPrefixSetConfigPatchUpdate(origCfg *ribd.PolicyPrefixSet, newCfg *ribd.PolicyPrefixSet, op []*ribd.PatchOpInfo, db *policy.PolicyEngineDB) (err error) {
+	logger.Debug("ProcessPolicyPrefixSetConfigUpdate:", origCfg.Name)
+	if origCfg.Name != newCfg.Name {
+		logger.Err("Update for a different policy prefix set")
+		return errors.New("Policy prefix set to be updated is different than the original one")
+	}
+	for idx := 0; idx < len(op); idx++ {
+		switch op[idx].Path {
+		case "PrefixList":
+			logger.Debug("Patch update for PrefixList")
+			newPolicyObj := policy.PolicyPrefixSetConfig{
+				Name: origCfg.Name,
+			}
+			newPolicyObj.PrefixList = make([]policy.PolicyPrefix, 0)
+			valueObjArr := []ribd.PolicyPrefix{}
+			err = json.Unmarshal([]byte(op[idx].Value), &valueObjArr)
+			if err != nil {
+				//logger.Debug("error unmarshaling value:", err))
+				return errors.New(fmt.Sprintln("error unmarshaling value:", err))
+			}
+			logger.Debug("Number of prefixes:", len(valueObjArr))
+			for _, val := range valueObjArr {
+				logger.Debug("ipPrefix - ", val.Prefix, " masklengthrange:", val.MaskLengthRange)
+				newPolicyObj.PrefixList = append(newPolicyObj.PrefixList, policy.PolicyPrefix{
+					IpPrefix:        val.Prefix,
+					MasklengthRange: val.MaskLengthRange,
+				})
+			}
+			switch op[idx].Op {
+			case "add":
+				//db.UpdateAddPolicyDefinition(newPolicy)
+			case "remove":
+				//db.UpdateRemovePolicyDefinition(newconfig)
+			default:
+				logger.Err("Operation ", op[idx].Op, " not supported")
+			}
+		default:
+			logger.Err("Patch update for attribute:", op[idx].Path, " not supported")
+			err = errors.New(fmt.Sprintln("Operation ", op[idx].Op, " not supported"))
+		}
+	}
+	return err
+}
+
+/*
+   Function to update policy prefix set in the policyEngineDB
+*/
+func (m RIBDServer) ProcessPolicyPrefixSetConfigUpdate(origCfg *ribd.PolicyPrefixSet, newCfg *ribd.PolicyPrefixSet, attrset []bool, db *policy.PolicyEngineDB) (err error) {
+	logger.Debug("ProcessPolicyPrefixSetConfigUpdate:", origCfg.Name)
+	if origCfg.Name != newCfg.Name {
+		logger.Err("Update for a different policy prefix set statement")
+		return errors.New("Policy prefix set statement to be updated is different than the original one")
+	}
+	return err
+}
+
+/*
    Function to create policy condition in the policyEngineDB
 */
 func (m RIBDServer) ProcessPolicyConditionConfigCreate(cfg *ribd.PolicyCondition, db *policy.PolicyEngineDB) (val bool, err error) {
@@ -91,6 +154,88 @@ func (m RIBDServer) ProcessPolicyConditionConfigDelete(cfg *ribd.PolicyCondition
 	newPolicy := policy.PolicyConditionConfig{Name: cfg.Name}
 	val, err = db.DeletePolicyCondition(newPolicy)
 	return val, err
+}
+
+/*
+   Function to update policy condition in the policyEngineDB
+*/
+func (m RIBDServer) ProcessPolicyConditionConfigUpdate(origCfg *ribd.PolicyCondition, newCfg *ribd.PolicyCondition, attrset []bool, db *policy.PolicyEngineDB) (err error) {
+	func_msg := "ProcessPolicyConditionConfigUpdate for condition " + origCfg.Name
+	logger.Debug(func_msg)
+	if origCfg.Name != newCfg.Name {
+		logger.Err("Update for a different policy condition statement")
+		return errors.New("Policy prefix condition to be updated is different than the original one")
+	}
+	if attrset != nil {
+		objTyp := reflect.TypeOf(*origCfg)
+		for i := 0; i < objTyp.NumField(); i++ {
+			objName := objTyp.Field(i).Name
+			if attrset[i] {
+				if objName == "Protocol" {
+					logger.Debug(func_msg, " Attr to be updated is Protocol")
+					newPolicyCfg := policy.PolicyConditionConfig{
+						Name: origCfg.Name,
+						MatchProtocolConditionInfo: newCfg.Protocol,
+					}
+					err = db.UpdatePolicyCondition(newPolicyCfg, "Protocol")
+					if err != nil {
+						db.Logger.Err(func_msg, " policylib returned err:", err, " for Protocol attribute")
+						return err
+					}
+				} else if objName == "IpPrefix" {
+					logger.Debug(func_msg, " Attr to be updated is IpPrefix")
+					matchPrefix := policy.PolicyPrefix{IpPrefix: newCfg.IpPrefix}
+					newPolicyCfg := policy.PolicyConditionConfig{
+						Name: origCfg.Name,
+					}
+					newPolicyCfg.MatchDstIpPrefixConditionInfo = policy.PolicyDstIpMatchPrefixSetCondition{Prefix: matchPrefix}
+					err = db.UpdatePolicyCondition(newPolicyCfg, "IpPrefix")
+					if err != nil {
+						db.Logger.Err(func_msg, " policylib returned err:", err, " for Protocol ipprefix")
+						return err
+					}
+				} else if objName == "MaskLengthRange" {
+					logger.Debug(func_msg, " Attr to be updated is MaskLengthRange")
+					matchPrefix := policy.PolicyPrefix{MasklengthRange: newCfg.MaskLengthRange}
+					newPolicyCfg := policy.PolicyConditionConfig{
+						Name: origCfg.Name,
+					}
+					newPolicyCfg.MatchDstIpPrefixConditionInfo = policy.PolicyDstIpMatchPrefixSetCondition{Prefix: matchPrefix}
+					err = db.UpdatePolicyCondition(newPolicyCfg, "MaskLengthRange")
+					if err != nil {
+						db.Logger.Err(func_msg, " policylib returned err:", err, " for MaskLengthRange  attribute")
+						return err
+					}
+				} else if objName == "PrefixSet" {
+					logger.Debug(func_msg, " Attr to be updated is PrefixSet")
+					newPolicyCfg := policy.PolicyConditionConfig{
+						Name: origCfg.Name,
+					}
+					newPolicyCfg.MatchDstIpPrefixConditionInfo = policy.PolicyDstIpMatchPrefixSetCondition{PrefixSet: newCfg.PrefixSet}
+					err = db.UpdatePolicyCondition(newPolicyCfg, "PrefixSet")
+					if err != nil {
+						db.Logger.Err(func_msg, " policylib returned err:", err, " for PrefixSet attribute")
+						return err
+					}
+				} else if objName == "ConditionType" {
+					logger.Debug(func_msg, " Attr to be updated is ConditionType")
+					newPolicyCfg := policy.PolicyConditionConfig{
+						Name:          origCfg.Name,
+						ConditionType: newCfg.ConditionType,
+					}
+					err = db.UpdatePolicyCondition(newPolicyCfg, "ConditionType")
+					if err != nil {
+						db.Logger.Err(func_msg, " policylib returned err:", err, " for ConditionType attribute")
+						return err
+					}
+				} else {
+					logger.Err(fmt.Sprintln("Update of ", objName, " not supported"))
+					return errors.New(fmt.Sprintln("PolicyCondition update for attribute ", objName, " not supported"))
+				}
+			}
+		}
+	}
+	return err
 }
 
 /*
@@ -142,6 +287,90 @@ func (m RIBDServer) ProcessPolicyStmtConfigDelete(cfg *ribd.PolicyStmt, db *poli
 }
 
 /*
+   Function to patch update policy stmt in the policyEngineDB
+*/
+func (m RIBDServer) ProcessPolicyStmtConfigPatchUpdate(origCfg *ribd.PolicyStmt, newCfg *ribd.PolicyStmt, op []*ribd.PatchOpInfo, db *policy.PolicyEngineDB) (err error) {
+	func_msg := "ProcessPolicyStmtConfigPatchUpdate for stmt " + origCfg.Name + ":"
+	logger.Debug(func_msg)
+	if origCfg.Name != newCfg.Name {
+		logger.Err(func_msg, " Update for a different policy stmt")
+		return errors.New("Policy stmt to be updated is different than the original one")
+	}
+	for idx := 0; idx < len(op); idx++ {
+		switch op[idx].Path {
+		case "Conditions":
+			logger.Debug(func_msg, " Patch update for Conditions")
+			newPolicyStmt := policy.PolicyStmtConfig{
+				Name:            origCfg.Name,
+				MatchConditions: origCfg.MatchConditions,
+			}
+			newPolicyStmt.Actions = make([]string, 0)
+			newPolicyStmt.Actions = append(newPolicyStmt.Actions, origCfg.Action)
+			newPolicyStmt.Conditions = make([]string, 0)
+			var valueObjArr []string
+			err = json.Unmarshal([]byte(op[idx].Value), &valueObjArr)
+			if err != nil {
+				logger.Debug(func_msg, "error unmarshaling value:", err)
+				return errors.New(fmt.Sprintln("error unmarshaling value:", err))
+			}
+			logger.Debug(func_msg, " Number of conditions:", len(valueObjArr))
+			for _, val := range valueObjArr {
+				logger.Debug(func_msg, " condition to be removed - ", val)
+				newPolicyStmt.Conditions = append(newPolicyStmt.Conditions, val)
+			}
+			switch op[idx].Op {
+			case "add":
+				db.UpdateAddPolicyStmtConditions(newPolicyStmt)
+			case "remove":
+				db.UpdateRemovePolicyStmtConditions(newPolicyStmt)
+			default:
+				logger.Err("Operation ", op[idx].Op, " not supported")
+			}
+		default:
+			logger.Err(func_msg, " Patch update for attribute:", op[idx].Path, " not supported")
+			err = errors.New(fmt.Sprintln("Operation ", op[idx].Op, " not supported"))
+		}
+	}
+	return err
+}
+
+/*
+   Function to update policy stmt in the policyEngineDB
+*/
+func (m RIBDServer) ProcessPolicyStmtConfigUpdate(origCfg *ribd.PolicyStmt, newCfg *ribd.PolicyStmt, attrset []bool, db *policy.PolicyEngineDB) (err error) {
+	func_msg := "ProcessPolicyStmtConfigUpdate for statement " + origCfg.Name
+	logger.Debug(func_msg)
+	if origCfg.Name != newCfg.Name {
+		logger.Err(func_msg, "Update for a different policy statement")
+		return errors.New("Policy statement to be updated is different than the original one")
+	}
+	if attrset != nil {
+		objTyp := reflect.TypeOf(*origCfg)
+		for i := 0; i < objTyp.NumField(); i++ {
+			objName := objTyp.Field(i).Name
+			if attrset[i] {
+				if objName == "MatchConditions" {
+					logger.Debug(func_msg, " Attr to be updated is MatchType")
+					newPolicyStmt := policy.PolicyStmtConfig{
+						Name:            origCfg.Name,
+						MatchConditions: newCfg.MatchConditions,
+					}
+					err = db.UpdatePolicyStmtMatchTypeAttr(newPolicyStmt)
+					if err != nil {
+						db.Logger.Err(func_msg, " policylib returned err:", err, " for matchtype attribute")
+						return err
+					}
+				} else {
+					logger.Err(fmt.Sprintln("Update of ", objName, " not supported"))
+					return errors.New(fmt.Sprintln("PolicyStmt update for attribute ", objName, " not supported"))
+				}
+			}
+		}
+	}
+	return err
+}
+
+/*
    Function to create policy definition in the policyEngineDB
 */
 func (m RIBDServer) ProcessPolicyDefinitionConfigCreate(cfg *ribd.PolicyDefinition, db *policy.PolicyEngineDB) (err error) {
@@ -166,6 +395,71 @@ func (m RIBDServer) ProcessPolicyDefinitionConfigDelete(cfg *ribd.PolicyDefiniti
 	logger.Debug("ProcessPolicyDefinitionDelete:DeletePolicyDefinition for name ", cfg.Name)
 	policy := policy.PolicyDefinitionConfig{Name: cfg.Name}
 	err = db.DeletePolicyDefinition(policy)
+	return err
+}
+
+/*
+   Function to patch update policy definition in the policyEngineDB
+*/
+func (m RIBDServer) ProcessPolicyDefinitionConfigPatchUpdate(origCfg *ribd.PolicyDefinition, newCfg *ribd.PolicyDefinition, op []*ribd.PatchOpInfo, db *policy.PolicyEngineDB) (err error) {
+	logger.Debug("ProcessPolicyDefinitionConfigUpdate:", origCfg.Name)
+	if origCfg.Name != newCfg.Name {
+		logger.Err("Update for a different policy")
+		return errors.New("Policy to be updated is different than the original one")
+	}
+	for idx := 0; idx < len(op); idx++ {
+		switch op[idx].Path {
+		case "StatementList":
+			logger.Debug("Patch update for StatementList")
+			/*newconfig should only have the next hops that have to be added or deleted*/
+			newPolicy := policy.PolicyDefinitionConfig{
+				Name:       origCfg.Name,
+				Precedence: int(origCfg.Priority),
+				MatchType:  origCfg.MatchType,
+				PolicyType: origCfg.PolicyType,
+			}
+			newPolicy.PolicyDefinitionStatements = make([]policy.PolicyDefinitionStmtPrecedence, 0)
+			newPolicy.Extensions = PolicyExtensions{}
+			//logger.Debug("value = ", op[idx].Value)
+			valueObjArr := []ribd.PolicyDefinitionStmtPriority{}
+			err = json.Unmarshal([]byte(op[idx].Value), &valueObjArr)
+			if err != nil {
+				logger.Debug("error unmarshaling value:", err)
+				return errors.New(fmt.Sprintln("error unmarshaling value:", err))
+			}
+			logger.Debug("Number of statements:", len(valueObjArr))
+			for _, val := range valueObjArr {
+				logger.Debug("stmtInfo: pri - ", val.Priority, " stmt: ", val.Statement)
+				newPolicy.PolicyDefinitionStatements = append(newPolicy.PolicyDefinitionStatements, policy.PolicyDefinitionStmtPrecedence{
+					Precedence: int(val.Priority),
+					Statement:  val.Statement,
+				})
+			}
+			switch op[idx].Op {
+			case "add":
+				db.UpdateAddPolicyDefinitionStmts(newPolicy)
+			case "remove":
+				db.UpdateRemovePolicyDefinitionStmts(newPolicy)
+			default:
+				logger.Err("Operation ", op[idx].Op, " not supported")
+			}
+		default:
+			logger.Err("Patch update for attribute:", op[idx].Path, " not supported")
+			err = errors.New(fmt.Sprintln("Operation ", op[idx].Op, " not supported"))
+		}
+	}
+	return err
+}
+
+/*
+   Function to update policy definition in the policyEngineDB
+*/
+func (m RIBDServer) ProcessPolicyDefinitionConfigUpdate(origCfg *ribd.PolicyDefinition, newCfg *ribd.PolicyDefinition, attrset []bool, db *policy.PolicyEngineDB) (err error) {
+	logger.Debug("ProcessPolicyDefinitionConfigUpdate:", origCfg.Name)
+	if origCfg.Name != newCfg.Name {
+		logger.Err("Update for a different policy")
+		return errors.New("Policy to be updated is different than the original one")
+	}
 	return err
 }
 
@@ -289,68 +583,6 @@ func (m RIBDServer) GetBulkPolicyConditionState(fromIndex ribd.Int, rcount ribd.
 	return policyConditions, err
 }
 
-/*
-func (m RIBDServer) GetBulkPolicyActionState(fromIndex ribd.Int, rcount ribd.Int) (policyActions *ribdInt.PolicyActionStateGetInfo, err error) { //(routes []*ribd.Routes, err error) {
-	logger.Debug("GetBulkPolicyActionState"))
-	PolicyActionsDB := PolicyEngineDB.PolicyActionsDB
-	localPolicyActionsDB := *PolicyEngineDB.LocalPolicyActionsDB
-	var i, validCount, toIndex ribd.Int
-	var tempNode []ribdInt.PolicyActionState = make([]ribdInt.PolicyActionState, rcount)
-	var nextNode *ribdInt.PolicyActionState
-	var returnNodes []*ribdInt.PolicyActionState
-	var returnGetInfo ribdInt.PolicyActionStateGetInfo
-	i = 0
-	policyActions = &returnGetInfo
-	more := true
-	if localPolicyActionsDB == nil {
-		logger.Debug("PolicyDefinitionStmtMatchProtocolActionGetInfo not initialized"))
-		return policyActions, err
-	}
-	for ; ; i++ {
-		logger.Debug(fmt.Sprintf("Fetching trie record for index %d\n", i+fromIndex))
-		if i+fromIndex >= ribd.Int(len(localPolicyActionsDB)) {
-			logger.Debug("All the policy Actions fetched"))
-			more = false
-			break
-		}
-		if localPolicyActionsDB[i+fromIndex].IsValid == false {
-			logger.Debug("Invalid policy Action statement"))
-			continue
-		}
-		if validCount == rcount {
-			logger.Debug("Enough policy Actions fetched"))
-			break
-		}
-		logger.Debug(fmt.Sprintf("Fetching trie record for index %d and prefix %v\n", i+fromIndex, (localPolicyActionsDB[i+fromIndex].Prefix)))
-		prefixNodeGet := PolicyActionsDB.Get(localPolicyActionsDB[i+fromIndex].Prefix)
-		if prefixNodeGet != nil {
-			prefixNode := prefixNodeGet.(policy.PolicyAction)
-			nextNode = &tempNode[validCount]
-			nextNode.Name = prefixNode.Name
-			nextNode.ActionInfo = prefixNode.ActionGetBulkInfo
-			if prefixNode.PolicyStmtList != nil {
-				nextNode.PolicyStmtList = make([]string, 0)
-			}
-			for idx := 0; idx < len(prefixNode.PolicyStmtList); idx++ {
-				nextNode.PolicyStmtList = append(nextNode.PolicyStmtList, prefixNode.PolicyStmtList[idx])
-			}
-			toIndex = ribd.Int(prefixNode.LocalDBSliceIdx)
-			if len(returnNodes) == 0 {
-				returnNodes = make([]*ribdInt.PolicyActionState, 0)
-			}
-			returnNodes = append(returnNodes, nextNode)
-			validCount++
-		}
-	}
-	logger.Debug(fmt.Sprintf("Returning %d list of policyActions", validCount))
-	policyActions.PolicyActionStateList = returnNodes
-	policyActions.StartIdx = fromIndex
-	policyActions.EndIdx = toIndex + 1
-	policyActions.More = more
-	policyActions.Count = validCount
-	return policyActions, err
-}
-*/
 func (m RIBDServer) GetBulkPolicyStmtState(fromIndex ribd.Int, rcount ribd.Int, db *policy.PolicyEngineDB) (policyStmts *ribd.PolicyStmtStateGetInfo, err error) { //(routes []*ribd.Routes, err error) {
 	logger.Debug("GetBulkPolicyStmtState")
 	PolicyStmtDB := db.PolicyStmtDB
