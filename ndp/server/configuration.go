@@ -47,10 +47,17 @@ func (cfg *NdpConfig) Validate(vrf string, retransmit uint32, reachableTime uint
 	return true, nil
 }
 
-func (cfg *NdpConfig) Create(gCfg NdpConfig) {
-	debug.Logger.Info("Received Global Config Create for NDP:", gCfg)
+func (cfg *NdpConfig) Create(gCfg NdpConfig) bool {
+	update := false
+	if cfg.Vrf == "" {
+		debug.Logger.Debug("Received Global Config Create for NDP:", gCfg)
+	} else {
+		debug.Logger.Debug("Received Global Config Update for NDP:", gCfg)
+		update = true
+	}
 	cfg.Vrf = gCfg.Vrf
 	cfg.RetransTime = gCfg.RetransTime
 	cfg.RaRestransmitTime = gCfg.RaRestransmitTime
 	cfg.ReachableTime = gCfg.ReachableTime
+	return update
 }

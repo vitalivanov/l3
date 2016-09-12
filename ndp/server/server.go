@@ -134,6 +134,13 @@ func (svr *NDPServer) InitSystem() {
 	}
 }
 
+func (svr *NDPServer) UpdateInterfaceTimers() {
+	for key, intf := range svr.L3Port {
+		intf.UpdateTimer(svr.NdpConfig)
+		svr.L3Port[key] = intf
+	}
+}
+
 func (svr *NDPServer) EventsListener() {
 	for {
 		select {
@@ -150,6 +157,7 @@ func (svr *NDPServer) EventsListener() {
 			if !ok {
 				continue
 			}
+			svr.counter.Rcvd++
 			svr.ProcessRxPkt(rxChInfo.ifIndex, rxChInfo.pkt)
 		case pktData, ok := <-svr.PktDataCh:
 			if !ok {
@@ -167,7 +175,10 @@ func (svr *NDPServer) EventsListener() {
 			if !ok {
 				continue
 			}
-			svr.NdpConfig.Create(globalCfg)
+			update := svr.NdpConfig.Create(globalCfg)
+			if update {
+				svr.UpdateInterfaceTimers()
+			}
 		}
 	}
 }
