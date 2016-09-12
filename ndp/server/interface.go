@@ -270,7 +270,7 @@ func (intf *Interface) deletePcapUser() {
 func (intf *Interface) DeletePcap() {
 	if intf.PcapBase.PcapHandle == nil {
 		// create ip interface but state down will not have pcap handler created
-		debug.Logger.Debug("No pcap created and hence returning")
+		debug.Logger.Debug("No pcap created or it might have been deleted during l2 port down returning early")
 		return
 	}
 	intf.deletePcapUser()

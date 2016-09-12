@@ -171,6 +171,9 @@ func (svr *NDPServer) CreateNeighborInfo(nbrInfo *config.NeighborConfig) {
 }
 
 func (svr *NDPServer) deleteNeighbor(nbrIp string, ifIndex int32) {
+	// Inform clients that neighbor is gonna be deleted
+	svr.SendIPv6DeleteNotification(nbrIp, ifIndex)
+	// Request asicd to delete the neighbor
 	_, err := svr.SwitchPlugin.DeleteIPv6Neighbor(nbrIp)
 	if err != nil {
 		debug.Logger.Err("delete ipv6 neigbor failed for", nbrIp, "error is", err)
@@ -178,7 +181,6 @@ func (svr *NDPServer) deleteNeighbor(nbrIp string, ifIndex int32) {
 	// delete the entry from neighbor map
 	delete(svr.NeighborInfo, nbrIp)
 	svr.deleteNeighborInfo(nbrIp)
-	svr.SendIPv6DeleteNotification(nbrIp, ifIndex)
 }
 
 /*
