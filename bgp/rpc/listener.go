@@ -1122,6 +1122,7 @@ func (h *BGPHandler) convertToThriftV4Neighbor(neighborState *config.NeighborSta
 	bgpNeighborResponse.PeerType = int8(neighborState.PeerType)
 	bgpNeighborResponse.Description = neighborState.Description
 	bgpNeighborResponse.SessionState = int32(neighborState.SessionState)
+	bgpNeighborResponse.SessionStateUpdatedTime = neighborState.SessionStateUpdatedTime
 	bgpNeighborResponse.RouteReflectorClusterId = int32(neighborState.RouteReflectorClusterId)
 	bgpNeighborResponse.RouteReflectorClient = neighborState.RouteReflectorClient
 	bgpNeighborResponse.MultiHopEnable = neighborState.MultiHopEnable
@@ -1401,6 +1402,7 @@ func (h *BGPHandler) convertToThriftV6Neighbor(neighborState *config.NeighborSta
 	bgpNeighborResponse.PeerType = int8(neighborState.PeerType)
 	bgpNeighborResponse.Description = neighborState.Description
 	bgpNeighborResponse.SessionState = int32(neighborState.SessionState)
+	bgpNeighborResponse.SessionStateUpdatedTime = neighborState.SessionStateUpdatedTime
 	bgpNeighborResponse.RouteReflectorClusterId = int32(neighborState.RouteReflectorClusterId)
 	bgpNeighborResponse.RouteReflectorClient = neighborState.RouteReflectorClient
 	bgpNeighborResponse.MultiHopEnable = neighborState.MultiHopEnable
