@@ -154,6 +154,7 @@ type NeighborState struct {
 	TotalPrefixes           uint32
 	AdjRIBInFilter          string
 	AdjRIBOutFilter         string
+	SessionStateUpdatedTime string
 }
 
 type TransportConfig struct {
