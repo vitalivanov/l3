@@ -160,10 +160,80 @@ func (m RIBDServer) ProcessPolicyConditionConfigDelete(cfg *ribd.PolicyCondition
    Function to update policy condition in the policyEngineDB
 */
 func (m RIBDServer) ProcessPolicyConditionConfigUpdate(origCfg *ribd.PolicyCondition, newCfg *ribd.PolicyCondition, attrset []bool, db *policy.PolicyEngineDB) (err error) {
-	logger.Debug("ProcessPolicyConditionConfigUpdate:", origCfg.Name)
+	func_msg := "ProcessPolicyConditionConfigUpdate for condition " + origCfg.Name
+	logger.Debug(func_msg)
 	if origCfg.Name != newCfg.Name {
 		logger.Err("Update for a different policy condition statement")
 		return errors.New("Policy prefix condition to be updated is different than the original one")
+	}
+	if attrset != nil {
+		objTyp := reflect.TypeOf(*origCfg)
+		for i := 0; i < objTyp.NumField(); i++ {
+			objName := objTyp.Field(i).Name
+			if attrset[i] {
+				if objName == "Protocol" {
+					logger.Debug(func_msg, " Attr to be updated is Protocol")
+					newPolicyCfg := policy.PolicyConditionConfig{
+						Name: origCfg.Name,
+						MatchProtocolConditionInfo: newCfg.Protocol,
+					}
+					err = db.UpdatePolicyCondition(newPolicyCfg, "Protocol")
+					if err != nil {
+						db.Logger.Err(func_msg, " policylib returned err:", err, " for Protocol attribute")
+						return err
+					}
+				} else if objName == "IpPrefix" {
+					logger.Debug(func_msg, " Attr to be updated is IpPrefix")
+					matchPrefix := policy.PolicyPrefix{IpPrefix: newCfg.IpPrefix}
+					newPolicyCfg := policy.PolicyConditionConfig{
+						Name: origCfg.Name,
+					}
+					newPolicyCfg.MatchDstIpPrefixConditionInfo = policy.PolicyDstIpMatchPrefixSetCondition{Prefix: matchPrefix}
+					err = db.UpdatePolicyCondition(newPolicyCfg, "IpPrefix")
+					if err != nil {
+						db.Logger.Err(func_msg, " policylib returned err:", err, " for Protocol ipprefix")
+						return err
+					}
+				} else if objName == "MaskLengthRange" {
+					logger.Debug(func_msg, " Attr to be updated is MaskLengthRange")
+					matchPrefix := policy.PolicyPrefix{MasklengthRange: newCfg.MaskLengthRange}
+					newPolicyCfg := policy.PolicyConditionConfig{
+						Name: origCfg.Name,
+					}
+					newPolicyCfg.MatchDstIpPrefixConditionInfo = policy.PolicyDstIpMatchPrefixSetCondition{Prefix: matchPrefix}
+					err = db.UpdatePolicyCondition(newPolicyCfg, "MaskLengthRange")
+					if err != nil {
+						db.Logger.Err(func_msg, " policylib returned err:", err, " for MaskLengthRange  attribute")
+						return err
+					}
+				} else if objName == "PrefixSet" {
+					logger.Debug(func_msg, " Attr to be updated is PrefixSet")
+					newPolicyCfg := policy.PolicyConditionConfig{
+						Name: origCfg.Name,
+					}
+					newPolicyCfg.MatchDstIpPrefixConditionInfo = policy.PolicyDstIpMatchPrefixSetCondition{PrefixSet: newCfg.PrefixSet}
+					err = db.UpdatePolicyCondition(newPolicyCfg, "PrefixSet")
+					if err != nil {
+						db.Logger.Err(func_msg, " policylib returned err:", err, " for PrefixSet attribute")
+						return err
+					}
+				} else if objName == "ConditionType" {
+					logger.Debug(func_msg, " Attr to be updated is ConditionType")
+					newPolicyCfg := policy.PolicyConditionConfig{
+						Name:          origCfg.Name,
+						ConditionType: newCfg.ConditionType,
+					}
+					err = db.UpdatePolicyCondition(newPolicyCfg, "ConditionType")
+					if err != nil {
+						db.Logger.Err(func_msg, " policylib returned err:", err, " for ConditionType attribute")
+						return err
+					}
+				} else {
+					logger.Err(fmt.Sprintln("Update of ", objName, " not supported"))
+					return errors.New(fmt.Sprintln("PolicyCondition update for attribute ", objName, " not supported"))
+				}
+			}
+		}
 	}
 	return err
 }
