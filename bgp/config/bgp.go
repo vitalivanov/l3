@@ -121,11 +121,13 @@ type NeighborConfig struct {
 	IfIndex         int32
 	IfName          string
 	PeerGroup       string
+	Disabled        bool
 }
 
 type NeighborState struct {
 	NeighborAddress         net.IP
 	IfIndex                 int32
+	Disabled                bool
 	PeerAS                  uint32
 	LocalAS                 uint32
 	UpdateSource            string

@@ -68,6 +68,8 @@ type Peer struct {
 
 func NewPeer(server *BGPServer, locRib *bgprib.LocRib, globalConf *config.GlobalConfig,
 	peerGroup *config.PeerGroupConfig, peerConf config.NeighborConfig) *Peer {
+	server.logger.Info("NewPeer - ip:", peerConf.NeighborAddress, "ifIndex:", peerConf.IfIndex)
+
 	peer := Peer{
 		server: server,
 		logger: server.logger,
@@ -78,6 +80,19 @@ func NewPeer(server *BGPServer, locRib *bgprib.LocRib, globalConf *config.Global
 	}
 
 	peer.NeighborConf = base.NewNeighborConf(peer.logger, globalConf, peerGroup, peerConf)
+
+	if !peer.IsConfigured() {
+		peer.logger.Infof("NewPeer - Neighbor is not ready to be started, ip:",
+			peer.NeighborConf.Neighbor.NeighborAddress, "ifIndex:", peer.NeighborConf.Neighbor.Config.IfIndex)
+		return &peer
+	}
+
+	if peer.IsDisabled() {
+		peer.logger.Info("NewPeer - Neighbor is disabled, ip:", peer.NeighborConf.Neighbor.NeighborAddress,
+			"ifIndex:", peer.NeighborConf.Neighbor.Config.IfIndex)
+		return &peer
+	}
+
 	peer.fsmManager = fsm.NewFSMManager(peer.logger, peer.NeighborConf, server.BGPPktSrcCh,
 		server.PeerFSMConnCh, server.ReachabilityCh)
 	return &peer
@@ -131,6 +146,12 @@ func (p *Peer) RemoveAdjRIBFilter(pe *bgppolicy.AdjRibPPolicyEngine, policyName 
 		return
 	}
 
+	if p.IsDisabled() {
+		p.logger.Info("RemoveAdjRIBFilter - Neighbor is disabled, ip:", p.NeighborConf.Neighbor.NeighborAddress,
+			"ifIndex:", p.NeighborConf.Neighbor.Config.IfIndex)
+		return
+	}
+
 	policyEngine := pe.GetPolicyEngine()
 	policyDB := policyEngine.PolicyDB
 	//neighborIP := p.NeighborConf.RunningConf.NeighborAddress.String()
@@ -165,6 +186,12 @@ func (p *Peer) AddAdjRIBFilter(pe *bgppolicy.AdjRibPPolicyEngine, policyName str
 	if !p.IsConfigured() {
 		p.logger.Infof("AddAdjRIBFilter - Neighbor is not ready to be started, ip:",
 			p.NeighborConf.Neighbor.NeighborAddress, "ifIndex:", p.NeighborConf.Neighbor.Config.IfIndex)
+		return
+	}
+
+	if p.IsDisabled() {
+		p.logger.Info("AddAdjRIBFilter - Neighbor is disabled, ip:", p.NeighborConf.Neighbor.NeighborAddress,
+			"ifIndex:", p.NeighborConf.Neighbor.Config.IfIndex)
 		return
 	}
 
@@ -212,6 +239,10 @@ func (p *Peer) IsConfigured() bool {
 	return p.NeighborConf.RunningConf.NeighborAddress != nil
 }
 
+func (p *Peer) IsDisabled() bool {
+	return p.NeighborConf.RunningConf.Disabled
+}
+
 func (p *Peer) SetNeighborAddress(ip net.IP) {
 	p.NeighborConf.SetNeighborAddress(ip)
 }
@@ -228,6 +259,12 @@ func (p *Peer) Init() {
 		return
 	}
 
+	if p.IsDisabled() {
+		p.logger.Info("Init - Neighbor is disabled, ip:", p.NeighborConf.Neighbor.NeighborAddress, "ifIndex:",
+			p.NeighborConf.Neighbor.Config.IfIndex)
+		return
+	}
+
 	p.logger.Debug("Init - adjribinfilter:", p.NeighborConf.RunningConf.AdjRIBInFilter, "adjriboutfilter:",
 		p.NeighborConf.RunningConf.AdjRIBOutFilter)
 	if p.NeighborConf.RunningConf.AdjRIBInFilter != "" {
@@ -239,7 +276,7 @@ func (p *Peer) Init() {
 	}
 
 	if p.fsmManager == nil {
-		p.logger.Infof("Instantiating new FSM Manager for neighbor %s", p.NeighborConf.Neighbor.NeighborAddress)
+		p.logger.Infof("Init - Instantiating new FSM Manager for neighbor %s", p.NeighborConf.Neighbor.NeighborAddress)
 		fsmMgr = fsm.NewFSMManager(p.logger, p.NeighborConf, p.server.BGPPktSrcCh,
 			p.server.PeerFSMConnCh, p.server.ReachabilityCh)
 	} else {
@@ -258,6 +295,12 @@ func (p *Peer) Cleanup() {
 	if !p.IsConfigured() {
 		p.logger.Infof("Cleanup - Neighbor is not started yet, ip:",
 			p.NeighborConf.Neighbor.NeighborAddress, "ifIndex:", p.NeighborConf.Neighbor.Config.IfIndex)
+		return
+	}
+
+	if p.IsDisabled() {
+		p.logger.Info("Cleanup - Neighbor is disabled, ip:", p.NeighborConf.Neighbor.NeighborAddress, "ifIndex:",
+			p.NeighborConf.Neighbor.Config.IfIndex)
 		return
 	}
 
