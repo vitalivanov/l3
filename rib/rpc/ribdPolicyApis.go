@@ -59,7 +59,27 @@ func (m RIBDServicesHandler) DeletePolicyStmt(cfg *ribd.PolicyStmt) (val bool, e
 }
 
 func (m RIBDServicesHandler) UpdatePolicyStmt(origconfig *ribd.PolicyStmt, newconfig *ribd.PolicyStmt, attrset []bool, op []*ribd.PatchOpInfo) (val bool, err error) {
-	return true, err
+	if op == nil || len(op) == 0 {
+		//update op
+		logger.Info("Update op for policy stmt definition")
+
+	} else {
+		//patch op
+		logger.Info("patch op:", op, " for policy stmt definition")
+	}
+	m.server.PolicyConfCh <- server.RIBdServerConfig{
+		OrigConfigObject: origconfig,
+		NewConfigObject:  newconfig,
+		AttrSet:          attrset,
+		PatchOp:          op,
+		Op:               "updatePolicyStmt",
+	}
+	err = <-m.server.PolicyConfDone
+	if err == nil {
+		val = true
+	}
+	logger.Debug("updatepolicystmt ,err:", err, " val:", val)
+	return val, err
 }
 func (m RIBDServicesHandler) GetPolicyStmtState(name string) (*ribd.PolicyStmtState, error) {
 	logger.Debug("Get state for Policy Stmt")
@@ -99,7 +119,27 @@ func (m RIBDServicesHandler) DeletePolicyDefinition(cfg *ribd.PolicyDefinition) 
 }
 
 func (m RIBDServicesHandler) UpdatePolicyDefinition(origconfig *ribd.PolicyDefinition, newconfig *ribd.PolicyDefinition, attrset []bool, op []*ribd.PatchOpInfo) (val bool, err error) {
-	return true, err
+	logger.Debug(fmt.Sprintln("UpdatePolicyDefinition for name ", origconfig.Name))
+	if op == nil || len(op) == 0 {
+		//update op
+		logger.Info("Update op for policy definition")
+
+	} else {
+		//patch op
+		logger.Info("patch op:", op, " for policy definition")
+	}
+	m.server.PolicyConfCh <- server.RIBdServerConfig{
+		OrigConfigObject: origconfig,
+		NewConfigObject:  newconfig,
+		AttrSet:          attrset,
+		PatchOp:          op,
+		Op:               "updatePolicyDefinition",
+	}
+	err = <-m.server.PolicyConfDone
+	if err == nil {
+		val = true
+	}
+	return val, err
 }
 func (m RIBDServicesHandler) GetPolicyDefinitionState(name string) (*ribd.PolicyDefinitionState, error) {
 	logger.Debug("Get state for Policy Definition")
@@ -119,6 +159,7 @@ func (m RIBDServicesHandler) ApplyPolicy(applyList []*ribdInt.ApplyPolicyInfo, u
 		PolicyList: server.ApplyPolicyList{applyList, undoList},
 		Op:         "applyPolicy",
 	}
+	err = <-m.server.PolicyConfDone
 	//m.server.PolicyApplyCh <- server.ApplyPolicyList{applyList, undoList} //source, policy, action, conditions}
 	return nil
 }
