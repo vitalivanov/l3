@@ -32,14 +32,7 @@ const (
 	testInvalidTimer = 0
 )
 
-func TestNdpGlobal(t *testing.T) {
-	InitNDPTestServer()
-	gblCfg := NdpConfig{
-		Vrf:               "default",
-		ReachableTime:     30000,
-		RetransTime:       1,
-		RaRestransmitTime: 5,
-	}
+func testGlobalConfigNdpOperations(gblCfg NdpConfig, t *testing.T) {
 	update := testNdpServer.NdpConfig.Create(gblCfg)
 	if update {
 		t.Error("Global Create should not be treated as update")
@@ -70,4 +63,15 @@ func TestNdpGlobal(t *testing.T) {
 		t.Error("Assigning 0 as ra timer is not supported and hence should have failed")
 		return
 	}
+}
+
+func TestNdpGlobal(t *testing.T) {
+	InitNDPTestServer()
+	gblCfg := NdpConfig{
+		Vrf:               "default",
+		ReachableTime:     30000,
+		RetransTime:       1,
+		RaRestransmitTime: 5,
+	}
+	testGlobalConfigNdpOperations(gblCfg, t)
 }
