@@ -63,3 +63,15 @@ func (svr *NDPServer) GetNeighborEntry(ipAddr string) *config.NeighborConfig {
 	}
 	return nil
 }
+
+func (svr *NDPServer) GetGlobalState(vrf string) *config.GlobalState {
+	gblState := config.GlobalState{}
+	gblState.Vrf = vrf
+	gblState.TotalRxPackets = svr.counter.Rcvd
+	gblState.TotalTxPackets = svr.counter.Send
+	gblState.Neighbors = int32(len(svr.ndpUpIntfStateSlice))
+	gblState.RetransmitInterval = int32(svr.NdpConfig.RetransTime)
+	gblState.ReachableTime = int32(svr.NdpConfig.ReachableTime)
+	gblState.RouterAdvertisementInterval = int32(svr.NdpConfig.RaRestransmitTime)
+	return &gblState
+}

@@ -62,6 +62,11 @@ type PcapBase struct {
 	PcapUsers uint8
 }
 
+type PktCounter struct {
+	Send int64
+	Rcvd int64
+}
+
 type Interface struct {
 	PcapBase
 	IntfRef           string
@@ -80,6 +85,7 @@ type Interface struct {
 	linkScope         string                  // absolute
 	Neighbor          map[string]NeighborInfo // key is NbrIp_NbrMac to handle move scenario's
 	PktDataCh         chan config.PacketData
+	counter           PktCounter
 }
 
 func (intf *Interface) addIP(ipAddr string) {
@@ -135,6 +141,10 @@ func (intf *Interface) commonInit(ipAddr string, pktCh chan config.PacketData, g
 	// Neighbor Init
 	intf.PktDataCh = pktCh
 	intf.Neighbor = make(map[string]NeighborInfo, 10)
+
+	// set counters to zero
+	intf.counter.Send = 0
+	intf.counter.Rcvd = 0
 }
 
 /*
@@ -270,7 +280,7 @@ func (intf *Interface) deletePcapUser() {
 func (intf *Interface) DeletePcap() {
 	if intf.PcapBase.PcapHandle == nil {
 		// create ip interface but state down will not have pcap handler created
-		debug.Logger.Debug("No pcap created and hence returning")
+		debug.Logger.Debug("No pcap created or it might have been deleted during l2 port down returning early")
 		return
 	}
 	intf.deletePcapUser()
@@ -290,6 +300,9 @@ func (intf *Interface) DeletePcap() {
 		intf.PcapBase.PcapCtrl = nil
 		intf.PcapBase.PcapUsers = 0 // set to zero
 	}
+	// flushing the counter values after the pcap is deleted
+	intf.counter.Send = 0
+	intf.counter.Rcvd = 0
 }
 
 func (intf *Interface) writePkt(pkt []byte) error {
@@ -383,6 +396,7 @@ func (intf *Interface) createNbrKey(ndInfo *packet.NDInfo) (nbrkey string) {
  * process nd will be called during received message
  */
 func (intf *Interface) ProcessND(ndInfo *packet.NDInfo) (*config.NeighborConfig, NDP_OPERATION) {
+	intf.counter.Rcvd++
 	if intf.Neighbor == nil {
 		debug.Logger.Alert("!!!!Neighbor Initialization for intf:", intf.IntfRef, "didn't happen properly!!!!!")
 		intf.Neighbor = make(map[string]NeighborInfo, 10)
@@ -403,6 +417,7 @@ func (intf *Interface) ProcessND(ndInfo *packet.NDInfo) (*config.NeighborConfig,
  * send neighbor discover messages on timer expiry
  */
 func (intf *Interface) SendND(pktData config.PacketData, mac string) NDP_OPERATION {
+	intf.counter.Send++
 	switch pktData.SendPktType {
 	case layers.ICMPv6TypeNeighborSolicitation:
 		return intf.SendNS(mac, pktData.NeighborMac, pktData.NeighborIp)
@@ -412,4 +427,13 @@ func (intf *Interface) SendND(pktData config.PacketData, mac string) NDP_OPERATI
 		intf.SendRA(mac)
 	}
 	return IGNORE
+}
+
+/*
+ *  Update timer values
+ */
+func (intf *Interface) UpdateTimer(gCfg NdpConfig) {
+	intf.reachableTime = gCfg.ReachableTime
+	intf.raRestransmitTime = gCfg.RaRestransmitTime
+	intf.retransTime = gCfg.RetransTime
 }
