@@ -115,4 +115,13 @@ func TestProcessRA(t *testing.T) {
 		t.Error("Want Neigbor Info:", *wantNbrInfo, "but received nbrInfo:", *nbrInfo)
 		return
 	}
+	nbrInfo, oper = l3Port.processRA(ndInfo)
+	if oper != UPDATE {
+		t.Error("Failed to create a new neighbor entry on RA packet")
+		return
+	}
+	if nbrInfo != nil {
+		t.Error("During Update there should be no Neighbor Info received")
+		return
+	}
 }
