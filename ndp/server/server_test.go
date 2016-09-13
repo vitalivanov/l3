@@ -31,6 +31,7 @@ import (
 	"l3/ndp/config"
 	"l3/ndp/debug"
 	"log/syslog"
+	"reflect"
 	"testing"
 	asicdmock "utils/asicdClient/mock"
 	"utils/logging"
@@ -190,6 +191,57 @@ func TestNDPStartServer(t *testing.T) {
 	InitNDPTestServer()
 }
 
+func TestNdpDeInit(t *testing.T) {
+	TestNDPStartServer(t)
+	testNdpServer.DeInitGlobalDS()
+	if testNdpServer.PhyPort != nil {
+		t.Error("Deinit failed for PhyPort")
+		return
+	}
+	if testNdpServer.L3Port != nil {
+		t.Error("Deinit failed for l3 port")
+		return
+	}
+	if testNdpServer.PhyPortStateCh != nil {
+		t.Error("Deinit failed for phyPortStateCh")
+		return
+	}
+	if testNdpServer.IpIntfCh != nil {
+		t.Error("Deinit failed for ip intf ch")
+		return
+	}
+	if testNdpServer.VlanCh != nil {
+		t.Error("Deinit failed for vlan ch")
+		return
+	}
+	if testNdpServer.RxPktCh != nil {
+		t.Error("Deinit failed for rx pkt ch")
+		return
+	}
+}
+
+func TestGlobalUpdateTimer(t *testing.T) {
+	TestIPv6IntfCreate(t)
+	gCfg := NdpConfig{"default", 200, 100, 245}
+	testGlobalConfigNdpOperations(gCfg, t)
+	gCfg.RaRestransmitTime = 5
+	update := testNdpServer.NdpConfig.Create(gCfg)
+	if update != true {
+		t.Error("Second time calling ndpconfig create should return update infromation")
+		return
+	}
+	if !reflect.DeepEqual(gCfg, testNdpServer.NdpConfig) {
+		t.Error("Updating global config failed for ndp config old value is", testNdpServer.NdpConfig,
+			"new value should be", gCfg)
+		return
+	}
+	testNdpServer.UpdateInterfaceTimers()
+
+	for _, intf := range testNdpServer.L3Port {
+		validateTimerUpdate(t, gCfg, intf)
+	}
+}
+
 func TestIPv6IntfCreate(t *testing.T) {
 	InitNDPTestServer() // event listener channel is already running
 
@@ -199,12 +251,12 @@ func TestIPv6IntfCreate(t *testing.T) {
 		Operation: config.CONFIG_CREATE,
 		IntfRef:   testIntfRef,
 	}
-	t.Log("Ports Created are:", testNdpServer.PhyPort)
+	//t.Log("Ports Created are:", testNdpServer.PhyPort)
 	testNdpServer.HandleIPIntfCreateDelete(ipv6Obj)
 	ipv6Obj.IpAddr = testMyLinkScopeIP
 	testNdpServer.HandleIPIntfCreateDelete(ipv6Obj)
 
-	t.Log(testNdpServer.L3Port)
+	//t.Log(testNdpServer.L3Port)
 	l3Port, exists := testNdpServer.L3Port[testIfIndex]
 	if !exists {
 		t.Error("failed to init interface")
@@ -278,6 +330,74 @@ func TestIPv6IntfDelete(t *testing.T) {
 
 	if l3Port.linkScope != "" {
 		t.Error("Failed to delete link scope iP address:", l3Port.linkScope)
+		return
+	}
+}
+
+func TestL2IntfStateDown(t *testing.T) {
+	TestIPv6IntfCreate(t)
+	stateObj := config.IPIntfNotification{
+		IfIndex:   testIfIndex,
+		Operation: config.STATE_UP,
+		IpAddr:    testMyLinkScopeIP,
+	}
+	t.Log(stateObj)
+	testNdpServer.HandleStateNotification(&stateObj)
+	l3Port, _ := testNdpServer.L3Port[testIfIndex]
+	if l3Port.PcapBase.PcapHandle == nil {
+		t.Error("Failed to initialize pcap handler")
+		return
+	}
+
+	if l3Port.PcapBase.PcapCtrl == nil {
+		t.Error("failed to initialize pcap ctrl")
+		return
+	}
+
+	if l3Port.PcapBase.PcapUsers != 1 {
+		t.Error("Failed to add first pcap user")
+		return
+	}
+
+	stateObj.Operation = config.STATE_UP
+	stateObj.IpAddr = testMyGSIp
+
+	t.Log(stateObj)
+
+	testNdpServer.HandleStateNotification(&stateObj)
+	l3Port, _ = testNdpServer.L3Port[testIfIndex]
+	if l3Port.PcapBase.PcapHandle == nil {
+		t.Error("Failed to initialize pcap handler for second time")
+		return
+	}
+
+	if l3Port.PcapBase.PcapCtrl == nil {
+		t.Error("failed to initialize pcap ctrl")
+		return
+	}
+
+	if l3Port.PcapBase.PcapUsers != 2 {
+		t.Error("Failed to add second pcap user")
+		return
+	}
+	portState := &config.PortState{
+		IfIndex: testIfIndex,
+		IfState: config.STATE_DOWN,
+	}
+	testNdpServer.HandlePhyPortStateNotification(portState)
+	l3Port, _ = testNdpServer.L3Port[testIfIndex]
+	if l3Port.PcapBase.PcapHandle != nil {
+		t.Error("Pcap is not deleted even when there are no users")
+		return
+	}
+
+	if l3Port.PcapBase.PcapCtrl != nil {
+		t.Error("Pcap ctrl channel should be deleted when there are no users")
+		return
+	}
+
+	if l3Port.PcapBase.PcapUsers != 0 {
+		t.Error("Pcap users count should be zero when all ipaddress from interfaces are removed")
 		return
 	}
 }

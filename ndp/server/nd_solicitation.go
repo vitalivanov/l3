@@ -23,13 +23,11 @@
 package server
 
 import (
-	_ "encoding/binary"
-	_ "github.com/google/gopacket"
+	_ "fmt"
 	"github.com/google/gopacket/layers"
 	"l3/ndp/config"
 	"l3/ndp/debug"
 	"l3/ndp/packet"
-	_ "net"
 	"strings"
 )
 
@@ -62,7 +60,6 @@ func (intf *Interface) sendUnicastNS(srcMac, nbrMac, nbrIp string) NDP_OPERATION
 
 	debug.Logger.Debug("Sending Unicast NS message with (DMAC, SMAC)", pkt.DstMac, pkt.SrcMac,
 		"and (DIP, SIP)", pkt.DstIp, pkt.SrcIp)
-
 	pktToSend := pkt.Encode()
 	err := intf.writePkt(pktToSend)
 	if err != nil {
