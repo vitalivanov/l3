@@ -206,10 +206,18 @@ func (mgr *RIBDServer) DmnDownHandler(name string) error {
 //Daemon UP handler functions
 func (clnt *ArpdClient) DmnUpHandler() {
 	logger.Info("DmnUpHandler for ArpdClient")
+	if arpdclnt.IsConnected {
+		logger.Info("RIBD already connected to arpd")
+		return
+	}
 	go clnt.ConnectToClient()
 }
 func (clnt *AsicdClient) DmnUpHandler() {
 	logger.Info("DmnUpHandler for AsicdClient")
+	if asicdclnt.IsConnected {
+		logger.Info("RIBD already connected to asicd")
+		return
+	}
 	go clnt.ConnectToClient()
 }
 func (clnt *BGPdClient) DmnUpHandler() {
@@ -238,8 +246,10 @@ func (mgr *RIBDServer) ListenToClientStateChanges() {
 				logger.Info("Received client status: ", clientStatus.Name, clientStatus.Status)
 				switch clientStatus.Status {
 				case sysdCommonDefs.STOPPED, sysdCommonDefs.RESTARTING:
+					logger.Info(clientStatus.Name, " stopped or restarting")
 					go mgr.DmnDownHandler(clientStatus.Name)
 				case sysdCommonDefs.UP:
+					logger.Info(clientStatus.Name, " up now")
 					go mgr.DmnUpHandler(clientStatus.Name)
 				}
 			}
