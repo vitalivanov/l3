@@ -31,9 +31,9 @@ import (
 func (h *BFDHandler) ExecuteActionResetBfdSession(action *bfdd.ResetBfdSession) (bool, error) {
 	var err error
 	h.logger.Info("ResetBfdSession action attrs: ", action)
-	_, found := h.server.FindBfdSession(action.IpAddr)
+	sessionId, found := h.server.FindBfdSession(action.IpAddr)
 	if found {
-		h.server.ResetSessionCh <- action.IpAddr
+		h.server.ResetSessionCh <- sessionId
 		return true, nil
 	} else {
 		err = errors.New("Failed to find session to " + action.IpAddr)
