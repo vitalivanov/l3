@@ -146,6 +146,7 @@ type BFDServer struct {
 	DeleteSessionCh       chan BfdSessionMgmt
 	AdminUpSessionCh      chan BfdSessionMgmt
 	AdminDownSessionCh    chan BfdSessionMgmt
+	ResetSessionCh        chan string
 	SessionConfigCh       chan SessionConfig
 	CreatedSessionCh      chan int32
 	bfddPubSocket         *nanomsg.PubSocket

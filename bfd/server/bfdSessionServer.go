@@ -45,6 +45,7 @@ func (server *BFDServer) StartSessionHandler() error {
 	server.DeleteSessionCh = make(chan BfdSessionMgmt)
 	server.AdminUpSessionCh = make(chan BfdSessionMgmt)
 	server.AdminDownSessionCh = make(chan BfdSessionMgmt)
+	server.ResetSessionCh = make(chan string)
 	server.CreatedSessionCh = make(chan int32, MAX_NUM_SESSIONS)
 	server.FailedSessionClientCh = make(chan int32, MAX_NUM_SESSIONS)
 	server.tobeCreatedSessions = make(map[string]BfdSessionMgmt)
@@ -61,6 +62,8 @@ func (server *BFDServer) StartSessionHandler() error {
 			server.AdminUpBfdSession(sessionMgmt)
 		case sessionMgmt := <-server.AdminDownSessionCh:
 			server.AdminDownBfdSession(sessionMgmt)
+		case ipAddr := <-server.ResetSessionCh:
+			server.ResetBfdSession(ipAddr)
 
 		}
 	}
@@ -561,6 +564,10 @@ func (server *BFDServer) DeleteBfdSession(sessionMgmt BfdSessionMgmt) error {
 	} else {
 		server.logger.Info("Bfd session not found ", sessionId)
 	}
+	return nil
+}
+
+func (server *BFDServer) ResetBfdSession(ipAddr string) error {
 	return nil
 }
 
