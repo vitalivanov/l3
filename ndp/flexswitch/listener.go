@@ -58,7 +58,11 @@ func convertNDPEntryStateToThriftEntry(state config.NeighborConfig) *ndpd.NDPEnt
 	entry := ndpd.NewNDPEntryState()
 	entry.IpAddr = state.IpAddr
 	entry.MacAddr = state.MacAddr
-	entry.Vlan = strconv.Itoa(int(state.VlanId))
+	if state.VlanId == -1 {
+		entry.Vlan = "Internal Vlan"
+	} else {
+		entry.Vlan = strconv.Itoa(int(state.VlanId))
+	}
 	entry.Intf = state.Intf
 	entry.IfIndex = state.IfIndex
 	entry.ExpiryTimeLeft = state.ExpiryTimeLeft
