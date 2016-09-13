@@ -115,6 +115,18 @@ func TestProcessRA(t *testing.T) {
 		t.Error("Want Neigbor Info:", *wantNbrInfo, "but received nbrInfo:", *nbrInfo)
 		return
 	}
+	//t.Log(testNdpServer.NeighborInfo)
+	testNdpServer.CreateNeighborInfo(nbrInfo)
+	if len(testNdpServer.NeighborInfo) == 0 {
+		t.Error("Failed to add new learned neighbor information after processing router advertisement")
+		return
+	}
+
+	if len(testNdpServer.neighborKey) == 0 {
+		t.Error("Neighbor insert into NeighborInfo map but key is not added into neighborKey slice")
+		return
+	}
+	//t.Log(testNdpServer.NeighborInfo)
 	nbrInfo, oper = l3Port.processRA(ndInfo)
 	if oper != UPDATE {
 		t.Error("Failed to create a new neighbor entry on RA packet")
@@ -122,6 +134,29 @@ func TestProcessRA(t *testing.T) {
 	}
 	if nbrInfo != nil {
 		t.Error("During Update there should be no Neighbor Info received")
+		return
+	}
+
+	// test router advertisement delete packet
+	ndInfo.RouterLifetime = 0
+	nbrInfo, oper = l3Port.processRA(ndInfo)
+	if oper != DELETE {
+		t.Error("Failed to delete neighbor entry when Router Advertisement packet is received with routerLifeTime = 0")
+		return
+	}
+	if nbrInfo == nil {
+		t.Error("During router advertisement delete nbr Info should not be nil")
+		return
+	}
+	// delete neighbor entry that just got created using router advertisement
+	testNdpServer.deleteNeighbor(nbrInfo.IpAddr, testIfIndex)
+	if len(testNdpServer.NeighborInfo) != 0 {
+		t.Error("Failed to delete learned neighbor information after processing router advertisement")
+		return
+	}
+
+	if len(testNdpServer.neighborKey) != 0 {
+		t.Error("Neighbor delete into NeighborInfo map but key is not delete from into neighborKey slice")
 		return
 	}
 }
