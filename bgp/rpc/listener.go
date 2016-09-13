@@ -300,6 +300,7 @@ func (h *BGPHandler) convertModelToBGPv4Neighbor(obj objects.BGPv4Neighbor) (nei
 		NeighborAddress: ip,
 		IfIndex:         ifIndex,
 		PeerGroup:       obj.PeerGroup,
+		Disabled:        obj.Disabled,
 	}
 	return neighbor, err
 }
@@ -378,6 +379,7 @@ func (h *BGPHandler) convertModelToBGPv6Neighbor(obj objects.BGPv6Neighbor) (nei
 		IfIndex:         ifIndex,
 		IfName:          ifName,
 		PeerGroup:       obj.PeerGroup,
+		Disabled:        obj.Disabled,
 	}
 	return neighbor, err
 }
@@ -998,6 +1000,7 @@ func (h *BGPHandler) ConvertV4NeighborFromThrift(bgpNeighbor *bgpd.BGPv4Neighbor
 		NeighborAddress: ip,
 		IfIndex:         ifIndex,
 		PeerGroup:       bgpNeighbor.PeerGroup,
+		Disabled:        bgpNeighbor.Disabled,
 	}
 	return pConf, err
 }
@@ -1011,7 +1014,7 @@ func (h *BGPHandler) ValidateV4Neighbor(bgpNeighbor *bgpd.BGPv4Neighbor) (pConf 
 	var ifIndex int32
 	ip, ifIndex, _, err = h.getIPAndIfIndexForV4Neighbor(bgpNeighbor.NeighborAddress, bgpNeighbor.IntfRef)
 	if err != nil {
-		h.logger.Info("ValidateBGPNeighbor: getIPAndIfIndexForNeighbor failed for neighbor address",
+		h.logger.Info("ValidateV4Neighbor: getIPAndIfIndexForNeighbor failed for neighbor address",
 			bgpNeighbor.NeighborAddress, "and ifIndex", bgpNeighbor.IntfRef)
 		return pConf, err
 	}
@@ -1027,7 +1030,7 @@ func (h *BGPHandler) ValidateV4Neighbor(bgpNeighbor *bgpd.BGPv4Neighbor) (pConf 
 
 func (h *BGPHandler) ValidateV4NeighborForUpdate(oldNeigh *bgpd.BGPv4Neighbor, oldNeighConfig config.NeighborConfig,
 	newNeigh *bgpd.BGPv4Neighbor, attrSet []bool) (pConf config.NeighborConfig, err error) {
-	pConf, _ = h.ConvertV4NeighborFromThrift(oldNeigh, oldNeighConfig.NeighborAddress, oldNeighConfig.IfIndex)
+	pConf, _ = h.ConvertV4NeighborFromThrift(newNeigh, oldNeighConfig.NeighborAddress, oldNeighConfig.IfIndex)
 	h.logger.Info("ValidateV4NeighborForUpdate: AttrSet", attrSet)
 	if attrSet != nil {
 		objTyp := reflect.TypeOf(*oldNeigh)
@@ -1040,11 +1043,6 @@ func (h *BGPHandler) ValidateV4NeighborForUpdate(oldNeigh *bgpd.BGPv4Neighbor, o
 						err = errors.New(fmt.Sprintf("Update source %s not a valid IP", newNeigh.UpdateSource))
 						return pConf, err
 					}
-					pConf.UpdateSource = newNeigh.UpdateSource
-				}
-				if objName == "AdjRIBInFilter" {
-					h.logger.Info("Update AdjRIBInFilter to ", newNeigh.AdjRIBInFilter)
-					pConf.AdjRIBInFilter = newNeigh.AdjRIBInFilter
 				}
 			}
 		}
@@ -1115,6 +1113,7 @@ func (h *BGPHandler) convertToThriftV4Neighbor(neighborState *config.NeighborSta
 		h.logger.Err("local AS invalid, err:", err)
 		return bgpNeighborResponse
 	}
+	bgpNeighborResponse.Disabled = neighborState.Disabled
 	bgpNeighborResponse.PeerAS = peerAS   //int32(neighborState.PeerAS)
 	bgpNeighborResponse.LocalAS = localAS //int32(neighborState.LocalAS)
 	bgpNeighborResponse.UpdateSource = neighborState.UpdateSource
@@ -1287,6 +1286,7 @@ func (h *BGPHandler) ConvertV6NeighborFromThrift(bgpNeighbor *bgpd.BGPv6Neighbor
 		IfIndex:         ifIndex,
 		IfName:          ifName,
 		PeerGroup:       bgpNeighbor.PeerGroup,
+		Disabled:        bgpNeighbor.Disabled,
 	}
 	return pConf, err
 }
@@ -1319,7 +1319,7 @@ func (h *BGPHandler) ValidateV6Neighbor(bgpNeighbor *bgpd.BGPv6Neighbor) (pConf 
 
 func (h *BGPHandler) ValidateV6NeighborForUpdate(oldNeigh *bgpd.BGPv6Neighbor, oldNeighConfig config.NeighborConfig,
 	newNeigh *bgpd.BGPv6Neighbor, attrSet []bool) (pConf config.NeighborConfig, err error) {
-	pConf, _ = h.ConvertV6NeighborFromThrift(oldNeigh, oldNeighConfig.NeighborAddress, oldNeighConfig.IfIndex,
+	pConf, _ = h.ConvertV6NeighborFromThrift(newNeigh, oldNeighConfig.NeighborAddress, oldNeighConfig.IfIndex,
 		oldNeighConfig.IfName)
 	if attrSet != nil {
 		objTyp := reflect.TypeOf(*oldNeigh)
@@ -1332,10 +1332,6 @@ func (h *BGPHandler) ValidateV6NeighborForUpdate(oldNeigh *bgpd.BGPv6Neighbor, o
 						err = errors.New(fmt.Sprintf("Update source %s not a valid IP", newNeigh.UpdateSource))
 						return pConf, err
 					}
-					pConf.UpdateSource = newNeigh.UpdateSource
-				}
-				if objName == "AdjRIBInFilter" {
-					pConf.AdjRIBInFilter = newNeigh.AdjRIBInFilter
 				}
 			}
 		}
@@ -1396,6 +1392,7 @@ func (h *BGPHandler) convertToThriftV6Neighbor(neighborState *config.NeighborSta
 		h.logger.Err("local AS invalid, err:", err)
 		return bgpNeighborResponse
 	}
+	bgpNeighborResponse.Disabled = neighborState.Disabled
 	bgpNeighborResponse.PeerAS = peerAS   // int32(neighborState.PeerAS)
 	bgpNeighborResponse.LocalAS = localAS //int32(neighborState.LocalAS)
 	bgpNeighborResponse.UpdateSource = neighborState.UpdateSource
