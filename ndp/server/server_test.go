@@ -282,6 +282,74 @@ func TestIPv6IntfDelete(t *testing.T) {
 	}
 }
 
+func TestL2IntfStateDown(t *testing.T) {
+	TestIPv6IntfCreate(t)
+	stateObj := config.IPIntfNotification{
+		IfIndex:   testIfIndex,
+		Operation: config.STATE_UP,
+		IpAddr:    testMyLinkScopeIP,
+	}
+	t.Log(stateObj)
+	testNdpServer.HandleStateNotification(&stateObj)
+	l3Port, _ := testNdpServer.L3Port[testIfIndex]
+	if l3Port.PcapBase.PcapHandle == nil {
+		t.Error("Failed to initialize pcap handler")
+		return
+	}
+
+	if l3Port.PcapBase.PcapCtrl == nil {
+		t.Error("failed to initialize pcap ctrl")
+		return
+	}
+
+	if l3Port.PcapBase.PcapUsers != 1 {
+		t.Error("Failed to add first pcap user")
+		return
+	}
+
+	stateObj.Operation = config.STATE_UP
+	stateObj.IpAddr = testMyGSIp
+
+	t.Log(stateObj)
+
+	testNdpServer.HandleStateNotification(&stateObj)
+	l3Port, _ = testNdpServer.L3Port[testIfIndex]
+	if l3Port.PcapBase.PcapHandle == nil {
+		t.Error("Failed to initialize pcap handler for second time")
+		return
+	}
+
+	if l3Port.PcapBase.PcapCtrl == nil {
+		t.Error("failed to initialize pcap ctrl")
+		return
+	}
+
+	if l3Port.PcapBase.PcapUsers != 2 {
+		t.Error("Failed to add second pcap user")
+		return
+	}
+	portState := &config.PortState{
+		IfIndex: testIfIndex,
+		IfState: config.STATE_DOWN,
+	}
+	testNdpServer.HandlePhyPortStateNotification(portState)
+	l3Port, _ = testNdpServer.L3Port[testIfIndex]
+	if l3Port.PcapBase.PcapHandle != nil {
+		t.Error("Pcap is not deleted even when there are no users")
+		return
+	}
+
+	if l3Port.PcapBase.PcapCtrl != nil {
+		t.Error("Pcap ctrl channel should be deleted when there are no users")
+		return
+	}
+
+	if l3Port.PcapBase.PcapUsers != 0 {
+		t.Error("Pcap users count should be zero when all ipaddress from interfaces are removed")
+		return
+	}
+}
+
 func TestIPv6IntfStateUpDown(t *testing.T) {
 	TestIPv6IntfCreate(t)
 	stateObj := config.IPIntfNotification{
