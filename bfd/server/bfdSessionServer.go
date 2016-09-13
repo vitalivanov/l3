@@ -505,8 +505,6 @@ func (server *BFDServer) SessionDeleteHandler(session *BfdSession, Protocol bfdd
 	session.state.RegisteredProtocols[Protocol] = false
 	if ForceDel || session.CheckIfAnyProtocolRegistered() == false {
 		if session.IsSessionActive() {
-			session.txTimer.Stop()
-			session.sessionTimer.Stop()
 			session.SessionStopClientCh <- true
 		}
 		session.SessionStopServerCh <- true
@@ -569,6 +567,17 @@ func (server *BFDServer) DeleteBfdSession(sessionMgmt BfdSessionMgmt) error {
 
 func (server *BFDServer) ResetBfdSession(sessionId int32) error {
 	server.logger.Info("ResetSession: SessionId", sessionId)
+	session := server.bfdGlobal.Sessions[sessionId]
+	if session.IsSessionActive() {
+		session.SessionStopClientCh <- true
+	}
+	session.SessionStopServerCh <- true
+	session.ResetLocalSessionParams()
+	session.isClientActive = false
+	server.logger.Info("Starting server for session ", sessionId)
+	go session.StartSessionServer()
+	server.logger.Info("Starting client for session ", sessionId)
+	go session.StartSessionClient(server)
 	return nil
 }
 
