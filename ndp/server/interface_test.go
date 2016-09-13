@@ -68,3 +68,31 @@ func TestAddIp(t *testing.T) {
 	}
 	testIntf = nil
 }
+
+func validateTimerUpdate(t *testing.T, gCfg NdpConfig, intf Interface) {
+	if intf.reachableTime != gCfg.ReachableTime {
+		t.Error("Failure in updating reachableTime")
+		return
+	}
+
+	if intf.retransTime != gCfg.RetransTime {
+		t.Error("Failure in updating retransmit timer")
+		return
+	}
+
+	if intf.raRestransmitTime != gCfg.RaRestransmitTime {
+		t.Error("Failure in updating router advertisement timer")
+		return
+	}
+}
+
+func TestTimerUpdate(t *testing.T) {
+	intf := Interface{}
+	if intf.retransTime != 0 || intf.raRestransmitTime != 0 || intf.reachableTime != 0 {
+		t.Error("Initializing interface object failed")
+		return
+	}
+	gCfg := NdpConfig{"default", 200, 100, 245}
+	intf.UpdateTimer(gCfg)
+	validateTimerUpdate(t, gCfg, intf)
+}
