@@ -23,10 +23,65 @@
 package server
 
 import (
+	"github.com/google/gopacket/layers"
+	"l3/ndp/config"
+	"l3/ndp/packet"
+	"reflect"
 	"testing"
 )
 
-var testLinkScopeIp = "fe80::8a1d:fcff:fecf:15fc"
+const (
+	//Router Advertisement Const
+	testRASrcMac      = "88:1d:fc:cf:15:fc"
+	testRADstMac      = "33:33:00:00:00:01"
+	testRALinkScopeIp = "fe80::8a1d:fcff:fecf:15fc"
+	testRADstIp       = "ff02::1"
+
+	testLinkScopeIp = "fe80::8a1d:fcff:fecf:15fc"
+)
+
+var raBaseTestPkt = []byte{
+	0x33, 0x33, 0x00, 0x00, 0x00, 0x01, 0x88, 0x1d, 0xfc, 0xcf, 0x15, 0xfc, 0x86, 0xdd, 0x60, 0x00,
+	0x00, 0x00, 0x00, 0x20, 0x3a, 0xff, 0xfe, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x8a, 0x1d,
+	0xfc, 0xff, 0xfe, 0xcf, 0x15, 0xfc, 0xff, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x86, 0x00, 0xf2, 0x66, 0x40, 0x00, 0x07, 0x08, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x01, 0x88, 0x1d, 0xfc, 0xcf, 0x15, 0xfc, 0x05, 0x01,
+	0x00, 0x00, 0x00, 0x00, 0x05, 0xdc,
+}
+
+func constructBaseWantNDInfoForRA() *packet.NDInfo {
+	wantBaseNDInfo := &packet.NDInfo{
+		CurHopLimit:    64,
+		ReservedFlags:  0,
+		RouterLifetime: 1800,
+		ReachableTime:  0,
+		RetransTime:    0,
+		PktType:        layers.ICMPv6TypeRouterAdvertisement,
+		SrcMac:         testRASrcMac,
+		DstMac:         testRADstMac,
+		SrcIp:          testRALinkScopeIp,
+		DstIp:          testRADstIp,
+	}
+
+	sourcendOpt := &packet.NDOption{
+		Type:   packet.NDOptionTypeSourceLinkLayerAddress,
+		Length: 1,
+	}
+	sourcendOpt.Value = make([]byte, 6)
+	copy(sourcendOpt.Value, raBaseTestPkt[72:78])
+	mtuOpt := &packet.NDOption{
+		Type:   packet.NDOptionTypeMTU,
+		Length: 1,
+	}
+	for i := 0; i < 4; i++ {
+		mtuOpt.Value = append(mtuOpt.Value, 0)
+	}
+	mtuOpt.Value = append(mtuOpt.Value, 0x05)
+	mtuOpt.Value = append(mtuOpt.Value, 0xdc)
+	wantBaseNDInfo.Options = append(wantBaseNDInfo.Options, sourcendOpt)
+	wantBaseNDInfo.Options = append(wantBaseNDInfo.Options, mtuOpt)
+	return wantBaseNDInfo
+}
 
 func TestSendRA(t *testing.T) {
 	initServerBasic()
@@ -34,4 +89,30 @@ func TestSendRA(t *testing.T) {
 		linkScope: testLinkScopeIp,
 	}
 	intf.SendRA(testSrcMac)
+}
+
+func TestProcessRA(t *testing.T) {
+	// create ipv6 interface
+	TestIPv6IntfCreate(t)
+	ndInfo := constructBaseWantNDInfoForRA()
+	wantNbrInfo := &config.NeighborConfig{
+		MacAddr: testRASrcMac,
+		IpAddr:  testRALinkScopeIp,
+		Intf:    testIntfRef,
+		IfIndex: testIfIndex,
+	}
+	l3Port, exists := testNdpServer.L3Port[testIfIndex]
+	if !exists {
+		t.Error("Failed to get L3 Port for ifIndex:", testIfIndex)
+		return
+	}
+	nbrInfo, oper := l3Port.processRA(ndInfo)
+	if oper != CREATE {
+		t.Error("Failed to create a new neighbor entry on RA packet")
+		return
+	}
+	if !reflect.DeepEqual(wantNbrInfo, nbrInfo) {
+		t.Error("Want Neigbor Info:", *wantNbrInfo, "but received nbrInfo:", *nbrInfo)
+		return
+	}
 }

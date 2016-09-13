@@ -199,12 +199,12 @@ func TestIPv6IntfCreate(t *testing.T) {
 		Operation: config.CONFIG_CREATE,
 		IntfRef:   testIntfRef,
 	}
-	t.Log("Ports Created are:", testNdpServer.PhyPort)
+	//t.Log("Ports Created are:", testNdpServer.PhyPort)
 	testNdpServer.HandleIPIntfCreateDelete(ipv6Obj)
 	ipv6Obj.IpAddr = testMyLinkScopeIP
 	testNdpServer.HandleIPIntfCreateDelete(ipv6Obj)
 
-	t.Log(testNdpServer.L3Port)
+	//t.Log(testNdpServer.L3Port)
 	l3Port, exists := testNdpServer.L3Port[testIfIndex]
 	if !exists {
 		t.Error("failed to init interface")
