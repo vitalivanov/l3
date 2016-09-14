@@ -246,6 +246,10 @@ func (intf *Interface) CreatePcap() (err error) {
 			intf.PcapBase.PcapHandle = nil
 			return err
 		}
+		// just validate that pcap ctrl channel is inititalize if not then do init over here
+		if intf.PcapBase.PcapCtrl == nil {
+			intf.PcapBase.PcapCtrl = make(chan bool, 1)
+		}
 	}
 	intf.addPcapUser()
 	debug.Logger.Info("Total pcap user for", intf.IntfRef, "to", intf.PcapBase.PcapUsers)
