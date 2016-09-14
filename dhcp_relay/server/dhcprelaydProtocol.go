@@ -493,7 +493,7 @@ func DhcpRelayAgentSendClientOptPacket(ch *net.UDPConn, gblEntry DhcpRelayAgentG
 		dhcprelayHostServerStateMap[hostServerStateKey] = hostServerStateEntry
 		return
 	}
-	intfkey := strconv.Itoa(int(intfStateEntry.IntfId)) + "_" + serverIp
+	intfkey := strconv.Itoa(int(intfStateEntry.IfIndex)) + "_" + serverIp
 	intfStateServerEntry, ok := dhcprelayIntfServerStateMap[intfkey]
 	if !ok {
 		logger.Debug("DRA: Why don't we have entry for " + intfkey)
