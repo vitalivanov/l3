@@ -52,6 +52,7 @@ type SessionConfig struct {
 
 type SessionState struct {
 	IpAddr                    string
+	LocalAddr                 string
 	SessionId                 int32
 	ParamName                 string
 	Interface                 string
