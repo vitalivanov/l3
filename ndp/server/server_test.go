@@ -558,3 +558,67 @@ func TestProcessTimerExpiry(t *testing.T) {
 		return
 	}
 }
+
+func initNbrEntries() {
+	port := &config.NeighborConfig{
+		Intf:    "lo",
+		IfIndex: testIfIndex,
+		MacAddr: "aa:bb:cc:dd:ee:ff",
+		IpAddr:  "fe80::1",
+	}
+	testNdpServer.insertNeigborInfo(port)
+	port = &config.NeighborConfig{
+		Intf:    "lo1",
+		IfIndex: 96,
+		MacAddr: "aa:bb:cc:dd:ee:ff",
+		IpAddr:  "fe80::2",
+	}
+	testNdpServer.insertNeigborInfo(port)
+	port = &config.NeighborConfig{
+		Intf:    "lo2",
+		IfIndex: 97,
+		MacAddr: "aa:bb:cc:dd:ee:ff",
+		IpAddr:  "fe80::3",
+	}
+	testNdpServer.insertNeigborInfo(port)
+	port = &config.NeighborConfig{
+		Intf:    "lo3",
+		IfIndex: 98,
+		MacAddr: "aa:bb:cc:dd:ee:ff",
+		IpAddr:  "fe80::4",
+	}
+	testNdpServer.insertNeigborInfo(port)
+	port = &config.NeighborConfig{
+		Intf:    "lo4",
+		IfIndex: 99,
+		MacAddr: "aa:bb:cc:dd:ee:ff",
+		IpAddr:  "fe80::5",
+	}
+	testNdpServer.insertNeigborInfo(port)
+	port = &config.NeighborConfig{
+		Intf:    "lo5",
+		IfIndex: 95,
+		MacAddr: "aa:bb:cc:dd:ee:ff",
+		IpAddr:  "fe80::6",
+	}
+	testNdpServer.insertNeigborInfo(port)
+
+}
+
+func TestDeleteNeighborInfo(t *testing.T) {
+	InitNDPTestServer()
+	initNbrEntries()
+	//t.Log(testNdpServer.NeighborInfo)
+	if len(testNdpServer.NeighborInfo) != 6 {
+		t.Error("Creating Neighbors Entry in runtime server information failed")
+		return
+	}
+
+	deleteEntries := []string{"fe80::1", "fe80::2"}
+	testNdpServer.DeleteNeighborInfo(deleteEntries, testIfIndex)
+
+	if len(testNdpServer.NeighborInfo) != 4 {
+		t.Error("Failure in deleting 2 entries from server runtime NeighborInfo")
+		return
+	}
+}
