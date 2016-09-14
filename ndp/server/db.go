@@ -29,6 +29,10 @@ import (
 )
 
 func (svr *NDPServer) readNdpGblCfg(dbHdl *dbutils.DBUtil) {
+	if dbHdl == nil {
+		debug.Logger.Err("DB cannot be read as dbHDL is nil")
+		return
+	}
 	var dbGblObj objects.NDPGlobal
 	objList, err := dbHdl.GetAllObjFromDb(dbGblObj)
 	if err != nil {

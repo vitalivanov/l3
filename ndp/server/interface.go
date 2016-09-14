@@ -246,6 +246,10 @@ func (intf *Interface) CreatePcap() (err error) {
 			intf.PcapBase.PcapHandle = nil
 			return err
 		}
+		// just validate that pcap ctrl channel is inititalize if not then do init over here
+		if intf.PcapBase.PcapCtrl == nil {
+			intf.PcapBase.PcapCtrl = make(chan bool, 1)
+		}
 	}
 	intf.addPcapUser()
 	debug.Logger.Info("Total pcap user for", intf.IntfRef, "to", intf.PcapBase.PcapUsers)
@@ -299,10 +303,10 @@ func (intf *Interface) DeletePcap() {
 		// deleted ctrl channel to avoid any memory usage
 		intf.PcapBase.PcapCtrl = nil
 		intf.PcapBase.PcapUsers = 0 // set to zero
+		// flushing the counter values after the pcap is deleted
+		intf.counter.Send = 0
+		intf.counter.Rcvd = 0
 	}
-	// flushing the counter values after the pcap is deleted
-	intf.counter.Send = 0
-	intf.counter.Rcvd = 0
 }
 
 func (intf *Interface) writePkt(pkt []byte) error {
@@ -322,10 +326,10 @@ func (intf *Interface) writePkt(pkt []byte) error {
 /*
  * Receive Ndp Packet and push it on the pktCh
  */
-func (intf *Interface) ReceiveNdpPkts(pktCh chan *RxPktInfo) {
+func (intf *Interface) ReceiveNdpPkts(pktCh chan *RxPktInfo) error {
 	if intf.PcapBase.PcapHandle == nil {
 		debug.Logger.Err("pcap handler for port:", intf.IntfRef, "is not valid. ABORT!!!!")
-		return
+		return errors.New(fmt.Sprintln("pcap handler for port:", intf.IntfRef, "is not valid. ABORT!!!!"))
 	}
 	src := gopacket.NewPacketSource(intf.PcapBase.PcapHandle, layers.LayerTypeEthernet)
 	in := src.Packets()
@@ -338,10 +342,10 @@ func (intf *Interface) ReceiveNdpPkts(pktCh chan *RxPktInfo) {
 		case <-intf.PcapBase.PcapCtrl:
 			debug.Logger.Debug("Pcap closed and hence exiting go routine for port:", intf.IntfRef)
 			intf.PcapBase.PcapCtrl <- true
-			return
+			return nil
 		}
 	}
-	return
+	return nil
 }
 
 /*
