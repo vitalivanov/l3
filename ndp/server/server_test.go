@@ -31,6 +31,7 @@ import (
 	"l3/ndp/config"
 	"l3/ndp/debug"
 	"log/syslog"
+	"reflect"
 	"testing"
 	asicdmock "utils/asicdClient/mock"
 	"utils/logging"
@@ -188,6 +189,57 @@ func InitNDPTestServer() {
 
 func TestNDPStartServer(t *testing.T) {
 	InitNDPTestServer()
+}
+
+func TestNdpDeInit(t *testing.T) {
+	TestNDPStartServer(t)
+	testNdpServer.DeInitGlobalDS()
+	if testNdpServer.PhyPort != nil {
+		t.Error("Deinit failed for PhyPort")
+		return
+	}
+	if testNdpServer.L3Port != nil {
+		t.Error("Deinit failed for l3 port")
+		return
+	}
+	if testNdpServer.PhyPortStateCh != nil {
+		t.Error("Deinit failed for phyPortStateCh")
+		return
+	}
+	if testNdpServer.IpIntfCh != nil {
+		t.Error("Deinit failed for ip intf ch")
+		return
+	}
+	if testNdpServer.VlanCh != nil {
+		t.Error("Deinit failed for vlan ch")
+		return
+	}
+	if testNdpServer.RxPktCh != nil {
+		t.Error("Deinit failed for rx pkt ch")
+		return
+	}
+}
+
+func TestGlobalUpdateTimer(t *testing.T) {
+	TestIPv6IntfCreate(t)
+	gCfg := NdpConfig{"default", 200, 100, 245}
+	testGlobalConfigNdpOperations(gCfg, t)
+	gCfg.RaRestransmitTime = 5
+	update := testNdpServer.NdpConfig.Create(gCfg)
+	if update != true {
+		t.Error("Second time calling ndpconfig create should return update infromation")
+		return
+	}
+	if !reflect.DeepEqual(gCfg, testNdpServer.NdpConfig) {
+		t.Error("Updating global config failed for ndp config old value is", testNdpServer.NdpConfig,
+			"new value should be", gCfg)
+		return
+	}
+	testNdpServer.UpdateInterfaceTimers()
+
+	for _, intf := range testNdpServer.L3Port {
+		validateTimerUpdate(t, gCfg, intf)
+	}
 }
 
 func TestIPv6IntfCreate(t *testing.T) {

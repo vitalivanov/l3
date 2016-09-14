@@ -686,7 +686,6 @@ func (s *BGPServer) UpdateRouteAndPolicyDB(policyDetails utilspolicy.PolicyDetai
 
 func (s *BGPServer) TraverseAndApplyBGPRib(data interface{}, updateFunc utilspolicy.PolicyApplyfunc) {
 	s.logger.Infof("BGPServer:TraverseAndApplyBGPRib - start")
-	policy := data.(utilspolicy.ApplyPolicyInfo)
 	updated := make(map[uint32]map[*bgprib.Path][]*bgprib.Destination, 10)
 	withdrawn := make([]*bgprib.Destination, 0, 10)
 	updatedAddPaths := make([]*bgprib.Destination, 0)
@@ -719,7 +718,7 @@ func (s *BGPServer) TraverseAndApplyBGPRib(data interface{}, updateFunc utilspol
 						updatedAddPaths: &updatedAddPaths,
 					}
 
-					updateFunc(peEntity, policy, callbackInfo)
+					updateFunc(peEntity, data, callbackInfo)
 				}
 			}
 		}
@@ -876,13 +875,13 @@ func (s *BGPServer) GetAdjRIB(peer *Peer, adjRIBDir bgprib.AdjRIBDir) map[uint32
 func (s *BGPServer) TraverseAndApplyAdjRib(data interface{}, updateFunc utilspolicy.PolicyApplyfunc,
 	pe *bgppolicy.AdjRibPPolicyEngine, adjRibDir bgprib.AdjRIBDir) {
 	s.logger.Infof("BGPServer:TraverseAndApplyAdjRib - start")
-	policyInfo := data.(utilspolicy.ApplyPolicyInfo)
+	policyInfo := data.(utilspolicy.PolicyEngineApplyInfo)
 	conditionsDB := pe.PolicyEngine.PolicyConditionsDB
 	var neighborIP string
 	var peer *Peer
 	var ok bool
 
-	for _, condition := range policyInfo.Conditions {
+	for _, condition := range policyInfo.ApplyPolicy.Conditions {
 		s.logger.Infof("BGPServer:TraverseAndApplyAdjRib - condition:%+v", condition)
 		nodeGet := conditionsDB.Get(patriciaDB.Prefix(condition))
 		if nodeGet == nil {
