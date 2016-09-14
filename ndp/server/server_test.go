@@ -334,14 +334,14 @@ func TestIPv6IntfDelete(t *testing.T) {
 	}
 }
 
-func TestL2IntfStateDown(t *testing.T) {
+func TestL2IntfStateDownUp(t *testing.T) {
 	TestIPv6IntfCreate(t)
 	stateObj := config.IPIntfNotification{
 		IfIndex:   testIfIndex,
 		Operation: config.STATE_UP,
 		IpAddr:    testMyLinkScopeIP,
 	}
-	t.Log(stateObj)
+	//t.Log(stateObj)
 	testNdpServer.HandleStateNotification(&stateObj)
 	l3Port, _ := testNdpServer.L3Port[testIfIndex]
 	if l3Port.PcapBase.PcapHandle == nil {
@@ -362,7 +362,7 @@ func TestL2IntfStateDown(t *testing.T) {
 	stateObj.Operation = config.STATE_UP
 	stateObj.IpAddr = testMyGSIp
 
-	t.Log(stateObj)
+	//t.Log(stateObj)
 
 	testNdpServer.HandleStateNotification(&stateObj)
 	l3Port, _ = testNdpServer.L3Port[testIfIndex]
@@ -380,6 +380,7 @@ func TestL2IntfStateDown(t *testing.T) {
 		t.Error("Failed to add second pcap user")
 		return
 	}
+	// Test L2 Port state Down Notification
 	portState := &config.PortState{
 		IfIndex: testIfIndex,
 		IfState: config.STATE_DOWN,
@@ -400,16 +401,36 @@ func TestL2IntfStateDown(t *testing.T) {
 		t.Error("Pcap users count should be zero when all ipaddress from interfaces are removed")
 		return
 	}
+	// Test L2 port up notification also
+	portState = &config.PortState{
+		IfIndex: testIfIndex,
+		IfState: config.STATE_UP,
+	}
+	testNdpServer.HandlePhyPortStateNotification(portState)
+	l3Port, _ = testNdpServer.L3Port[testIfIndex]
+	if l3Port.PcapBase.PcapHandle == nil {
+		t.Error("Failed to initialize pcap handler for second time")
+		return
+	}
+
+	if l3Port.PcapBase.PcapCtrl == nil {
+		t.Error("failed to initialize pcap ctrl")
+		return
+	}
+
+	if l3Port.PcapBase.PcapUsers != 1 {
+		t.Error("Failed to add pcap user")
+		return
+	}
 }
 
-func TestIPv6IntfStateUpDown(t *testing.T) {
-	TestIPv6IntfCreate(t)
+func teststateUpHelperFunc(t *testing.T) {
 	stateObj := config.IPIntfNotification{
 		IfIndex:   testIfIndex,
 		Operation: config.STATE_UP,
 		IpAddr:    testMyLinkScopeIP,
 	}
-	t.Log(stateObj)
+	//	t.Log(stateObj)
 	testNdpServer.HandleStateNotification(&stateObj)
 
 	l3Port, _ := testNdpServer.L3Port[testIfIndex]
@@ -431,7 +452,7 @@ func TestIPv6IntfStateUpDown(t *testing.T) {
 	stateObj.Operation = config.STATE_UP
 	stateObj.IpAddr = testMyGSIp
 
-	t.Log(stateObj)
+	//	t.Log(stateObj)
 
 	testNdpServer.HandleStateNotification(&stateObj)
 	l3Port, _ = testNdpServer.L3Port[testIfIndex]
@@ -450,11 +471,18 @@ func TestIPv6IntfStateUpDown(t *testing.T) {
 		return
 	}
 
+}
+
+func teststateDownHelperFunc(t *testing.T) {
+	stateObj := config.IPIntfNotification{
+		IfIndex: testIfIndex,
+	}
+
 	stateObj.Operation = config.STATE_DOWN
 	stateObj.IpAddr = testMyLinkScopeIP
 
 	testNdpServer.HandleStateNotification(&stateObj)
-	l3Port, _ = testNdpServer.L3Port[testIfIndex]
+	l3Port, _ := testNdpServer.L3Port[testIfIndex]
 	if l3Port.PcapBase.PcapHandle == nil {
 		t.Error("Pcap got deleted even when there was one user")
 		return
@@ -489,6 +517,13 @@ func TestIPv6IntfStateUpDown(t *testing.T) {
 		t.Error("Pcap users count should be zero when all ipaddress from interfaces are removed")
 		return
 	}
+
+}
+
+func TestIPv6IntfStateUpDown(t *testing.T) {
+	TestIPv6IntfCreate(t)
+	teststateUpHelperFunc(t)
+	teststateDownHelperFunc(t)
 }
 
 func TestFindL3Port(t *testing.T) {
@@ -555,6 +590,80 @@ func TestProcessTimerExpiry(t *testing.T) {
 	err := testNdpServer.ProcessTimerExpiry(pktData)
 	if err != nil {
 		t.Error("Processing Timer expiry failed:", err)
+		return
+	}
+}
+
+func initNbrEntries() {
+	port := &config.NeighborConfig{
+		Intf:    "lo",
+		IfIndex: testIfIndex,
+		MacAddr: "aa:bb:cc:dd:ee:ff",
+		IpAddr:  "fe80::1",
+	}
+	testNdpServer.insertNeigborInfo(port)
+	port = &config.NeighborConfig{
+		Intf:    "lo1",
+		IfIndex: 96,
+		MacAddr: "aa:bb:cc:dd:ee:ff",
+		IpAddr:  "fe80::2",
+	}
+	testNdpServer.insertNeigborInfo(port)
+	port = &config.NeighborConfig{
+		Intf:    "lo2",
+		IfIndex: 97,
+		MacAddr: "aa:bb:cc:dd:ee:ff",
+		IpAddr:  "fe80::3",
+	}
+	testNdpServer.insertNeigborInfo(port)
+	port = &config.NeighborConfig{
+		Intf:    "lo3",
+		IfIndex: 98,
+		MacAddr: "aa:bb:cc:dd:ee:ff",
+		IpAddr:  "fe80::4",
+	}
+	testNdpServer.insertNeigborInfo(port)
+	port = &config.NeighborConfig{
+		Intf:    "lo4",
+		IfIndex: 99,
+		MacAddr: "aa:bb:cc:dd:ee:ff",
+		IpAddr:  "fe80::5",
+	}
+	testNdpServer.insertNeigborInfo(port)
+	port = &config.NeighborConfig{
+		Intf:    "lo5",
+		IfIndex: 95,
+		MacAddr: "aa:bb:cc:dd:ee:ff",
+		IpAddr:  "fe80::6",
+	}
+	testNdpServer.insertNeigborInfo(port)
+
+}
+
+func TestDeleteNeighborInfo(t *testing.T) {
+	InitNDPTestServer()
+	initNbrEntries()
+	//t.Log(testNdpServer.NeighborInfo)
+	if len(testNdpServer.NeighborInfo) != 6 {
+		t.Error("Creating Neighbors Entry in runtime server information failed")
+		return
+	}
+
+	deleteEntries := []string{"fe80::1", "fe80::2"}
+	testNdpServer.DeleteNeighborInfo(deleteEntries, testIfIndex)
+
+	if len(testNdpServer.NeighborInfo) != 4 {
+		t.Error("Failure in deleting 2 entries from server runtime NeighborInfo")
+		return
+	}
+}
+
+func TestInvalidDB(t *testing.T) {
+	InitNDPTestServer()
+	testNdpServer.ReadDB()
+	testNdpServer.readNdpGblCfg(nil)
+	if testNdpServer.NdpConfig.Vrf != "" {
+		t.Error("Db should not be read as the handler is nil")
 		return
 	}
 }
