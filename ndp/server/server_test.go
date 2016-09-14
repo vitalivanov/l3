@@ -669,6 +669,20 @@ func TestInvalidDB(t *testing.T) {
 	}
 }
 
+func testNilTransmitPacket(t *testing.T) {
+	l3Port, _ := testNdpServer.L3Port[testIfIndex]
+	l3Port, exists := testNdpServer.L3Port[testIfIndex]
+	if !exists {
+		t.Error("l3 interface should exists for ifIndex:", testIfIndex)
+		return
+	}
+	err := l3Port.writePkt(raServerBaseTestPkt)
+	if err == nil {
+		t.Error("Failure writing packet", err)
+		return
+	}
+}
+
 func testTransmitPacket(t *testing.T) {
 	l3Port, _ := testNdpServer.L3Port[testIfIndex]
 	l3Port, exists := testNdpServer.L3Port[testIfIndex]
@@ -687,6 +701,7 @@ func testTransmitPacket(t *testing.T) {
 
 func TestPktRxTx(t *testing.T) {
 	TestIPv6IntfCreate(t)
+	go testNilTransmitPacket(t)
 	teststateUpHelperFunc(t)
 	l3Port, exists := testNdpServer.L3Port[testIfIndex]
 	if !exists {
