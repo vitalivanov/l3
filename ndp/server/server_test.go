@@ -667,3 +667,42 @@ func TestInvalidDB(t *testing.T) {
 		return
 	}
 }
+
+func testTransmitPacket(t *testing.T) {
+	l3Port, _ := testNdpServer.L3Port[testIfIndex]
+	l3Port, exists := testNdpServer.L3Port[testIfIndex]
+	if !exists {
+		t.Error("l3 interface should exists for ifIndex:", testIfIndex)
+		return
+	}
+	err := l3Port.writePkt(raServerBaseTestPkt)
+	if err != nil {
+		t.Error("Failure writing packet", err)
+	}
+}
+
+func TestPktRxTx(t *testing.T) {
+	TestIPv6IntfCreate(t)
+	teststateUpHelperFunc(t)
+	l3Port, exists := testNdpServer.L3Port[testIfIndex]
+	if !exists {
+		t.Error("l3 interface should exists for ifIndex:", testIfIndex)
+		return
+	}
+	go l3Port.ReceiveNdpPkts(testNdpServer.RxPktCh)
+	go testTransmitPacket(t)
+	for {
+		select {
+		case rxChInfo, ok := <-testNdpServer.RxPktCh:
+			if !ok {
+				continue
+			}
+			testNdpServer.counter.Rcvd++
+			testNdpServer.ProcessRxPkt(rxChInfo.ifIndex, rxChInfo.pkt)
+			if testNdpServer.counter.Rcvd == 1 {
+				break
+			}
+		}
+		break
+	}
+}
