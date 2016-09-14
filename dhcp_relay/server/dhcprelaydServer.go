@@ -191,7 +191,7 @@ func DhcpRelayAgentInitIntfServerState(serverIp string, id int32) {
 
 func DhcpRelayAgentInitIntfState(IntfId int32) {
 	intfEntry := dhcprelayIntfStateMap[IntfId]
-	intfEntry.IntfId = IntfId
+	intfEntry.IfIndex = IntfId
 	intfEntry.TotalDrops = 0
 	intfEntry.TotalDhcpClientRx = 0
 	intfEntry.TotalDhcpClientTx = 0
