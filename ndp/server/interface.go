@@ -303,10 +303,10 @@ func (intf *Interface) DeletePcap() {
 		// deleted ctrl channel to avoid any memory usage
 		intf.PcapBase.PcapCtrl = nil
 		intf.PcapBase.PcapUsers = 0 // set to zero
+		// flushing the counter values after the pcap is deleted
+		intf.counter.Send = 0
+		intf.counter.Rcvd = 0
 	}
-	// flushing the counter values after the pcap is deleted
-	intf.counter.Send = 0
-	intf.counter.Rcvd = 0
 }
 
 func (intf *Interface) writePkt(pkt []byte) error {

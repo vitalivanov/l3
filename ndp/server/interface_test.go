@@ -105,3 +105,18 @@ func TestInvalidReceiveNdpPkt(t *testing.T) {
 		return
 	}
 }
+
+func TestDeleteOneIntf(t *testing.T) {
+	TestIPv6IntfCreate(t)
+	teststateUpHelperFunc(t)
+	l3Port, exists := testNdpServer.L3Port[testIfIndex]
+	if !exists {
+		t.Error("Failed to get L3 Port for ifIndex:", testIfIndex)
+		return
+	}
+	l3Port.DeleteIntf(testMyGSIp)
+	if l3Port.PcapBase.PcapUsers != 1 {
+		t.Error("Failed Deleting Interface")
+		return
+	}
+}

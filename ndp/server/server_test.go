@@ -424,8 +424,7 @@ func TestL2IntfStateDownUp(t *testing.T) {
 	}
 }
 
-func TestIPv6IntfStateUpDown(t *testing.T) {
-	TestIPv6IntfCreate(t)
+func teststateUpHelperFunc(t *testing.T) {
 	stateObj := config.IPIntfNotification{
 		IfIndex:   testIfIndex,
 		Operation: config.STATE_UP,
@@ -472,11 +471,18 @@ func TestIPv6IntfStateUpDown(t *testing.T) {
 		return
 	}
 
+}
+
+func teststateDownHelperFunc(t *testing.T) {
+	stateObj := config.IPIntfNotification{
+		IfIndex: testIfIndex,
+	}
+
 	stateObj.Operation = config.STATE_DOWN
 	stateObj.IpAddr = testMyLinkScopeIP
 
 	testNdpServer.HandleStateNotification(&stateObj)
-	l3Port, _ = testNdpServer.L3Port[testIfIndex]
+	l3Port, _ := testNdpServer.L3Port[testIfIndex]
 	if l3Port.PcapBase.PcapHandle == nil {
 		t.Error("Pcap got deleted even when there was one user")
 		return
@@ -511,6 +517,13 @@ func TestIPv6IntfStateUpDown(t *testing.T) {
 		t.Error("Pcap users count should be zero when all ipaddress from interfaces are removed")
 		return
 	}
+
+}
+
+func TestIPv6IntfStateUpDown(t *testing.T) {
+	TestIPv6IntfCreate(t)
+	teststateUpHelperFunc(t)
+	teststateDownHelperFunc(t)
 }
 
 func TestFindL3Port(t *testing.T) {
