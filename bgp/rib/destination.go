@@ -60,7 +60,7 @@ type Destination struct {
 	maxPathId         uint32
 	pathIds           []uint32
 	recalculate       bool
-	BGPRouteState     *bgpd.BGPRouteState
+	BGPRouteState     config.ModelRouteIntf
 	PathInfoRouteMap  map[*bgpd.PathInfo]*Route
 	routeListIdx      int
 }
@@ -81,13 +81,19 @@ func NewDestination(rib *LocRib, nlri packet.NLRI, protoFamily uint32, gConf *co
 		pathIds:           make([]uint32, 0),
 		routeListIdx:      -1,
 		PathInfoRouteMap:  make(map[*bgpd.PathInfo]*Route),
-		BGPRouteState: &bgpd.BGPRouteState{
-			Network: nlri.GetPrefix().String(),
-			CIDRLen: int16(nlri.GetLength()),
-		},
 	}
 
+	dest.setBGPRouteState(protoFamily, nlri.GetPrefix().String(), int16(nlri.GetLength()))
 	return dest
+}
+
+func (d *Destination) setBGPRouteState(protoFamily uint32, network string, cidrLen int16) {
+	afi, _ := packet.GetAfiSafi(protoFamily)
+	if afi == packet.AfiIP6 {
+		d.BGPRouteState = NewIPv6Route(network, cidrLen)
+	} else {
+		d.BGPRouteState = NewIPv4Route(network, cidrLen)
+	}
 }
 
 func (d *Destination) GetLocRibPathRoute() *Route {
@@ -95,7 +101,7 @@ func (d *Destination) GetLocRibPathRoute() *Route {
 	return d.LocRibPathRoute
 }
 
-func (d *Destination) GetBGPRoute() (route *bgpd.BGPRouteState) {
+func (d *Destination) GetBGPRoute() config.ModelRouteIntf {
 	return d.BGPRouteState
 }
 
@@ -231,6 +237,11 @@ func (d *Destination) AddOrUpdatePath(peerIp string, pathId uint32, path *Path) 
 
 	if oldPath, ok := pathMap[pathId]; ok {
 		d.logger.Infof("Destination %s Update path from %s, id %d", d.NLRI.GetPrefix(), peerIp, pathId)
+		if oldPath == path {
+			d.logger.Infof("Destination %s new path from %s, id %d is the same as the old path", d.NLRI.GetPrefix(),
+				peerIp, pathId)
+			return added
+		}
 		if route, ok := d.pathRouteMap[oldPath]; ok {
 			idx = route.routeListIdx
 			delete(d.PathInfoRouteMap, route.PathInfo)
@@ -252,10 +263,10 @@ func (d *Destination) AddOrUpdatePath(peerIp string, pathId uint32, path *Path) 
 	route := NewRoute(d, path, RouteActionNone, pathId, outPathId)
 	d.pathRouteMap[path] = route
 	if idx != -1 {
-		d.BGPRouteState.Paths[idx] = route.PathInfo
+		d.BGPRouteState.SetPath(route.PathInfo, idx)
 	} else {
-		idx = len(d.BGPRouteState.Paths)
-		d.BGPRouteState.Paths = append(d.BGPRouteState.Paths, route.PathInfo)
+		idx = len(d.BGPRouteState.GetPaths())
+		d.BGPRouteState.AppendPath(route.PathInfo)
 	}
 	d.PathInfoRouteMap[route.PathInfo] = route
 	route.setIdx(idx)
@@ -288,16 +299,14 @@ func (d *Destination) RemovePath(peerIP string, pathId uint32, path *Path) *Path
 		d.releasePathId(route.OutPathId)
 		delete(d.pathRouteMap, oldPath)
 		if route.routeListIdx != -1 {
-			newPath := d.BGPRouteState.Paths[len(d.BGPRouteState.Paths)-1]
+			newPath := d.BGPRouteState.GetLastPath()
 			if newRoute, ok := d.PathInfoRouteMap[newPath]; ok {
 				delete(d.PathInfoRouteMap, route.PathInfo)
-				d.BGPRouteState.Paths[route.routeListIdx] = newPath
+				d.BGPRouteState.RemovePathAndSetLast(route.routeListIdx)
 				newRoute.setIdx(route.routeListIdx)
-				d.BGPRouteState.Paths[len(d.BGPRouteState.Paths)-1] = nil
-				d.BGPRouteState.Paths = d.BGPRouteState.Paths[:len(d.BGPRouteState.Paths)-1]
 			} else {
-				d.logger.Errf("Could not find path %v in PathInfoRouteMap %v",
-					d.BGPRouteState.Paths[len(d.BGPRouteState.Paths)-1], d.PathInfoRouteMap)
+				d.logger.Errf("Could not find path %v in PathInfoRouteMap %v", d.BGPRouteState.GetLastPath(),
+					d.PathInfoRouteMap)
 			}
 		}
 		delete(d.peerPathMap[peerIP], pathId)
@@ -537,6 +546,9 @@ func (d *Destination) SelectRouteForLocRib(addPathCount int) (RouteAction, bool,
 					}
 					updatedRoutes = append(updatedRoutes, route)
 					route.setAction(RouteActionReplace)
+					if idx != 0 {
+						route.ResetBestPath()
+					}
 					break
 				}
 			}

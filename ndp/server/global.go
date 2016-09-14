@@ -29,6 +29,7 @@ import (
 	"sync"
 	"time"
 	"utils/asicdClient" // this is switch plugin need to change the name
+	"utils/dmnBase"
 )
 
 type RxPktInfo struct {
@@ -36,8 +37,17 @@ type RxPktInfo struct {
 	ifIndex int32
 }
 
+type NdpConfig struct {
+	Vrf               string
+	ReachableTime     uint32
+	RetransTime       uint32
+	RaRestransmitTime uint8
+}
+
 type NDPServer struct {
-	SwitchPlugin asicdClient.AsicdClientIntf
+	NdpConfig                                // base config
+	dmnBase      *dmnBase.FSBaseDmn          // base Daemon
+	SwitchPlugin asicdClient.AsicdClientIntf // asicd plugin
 
 	// System Ports information, key is IntfRef
 	PhyPort             map[int32]config.PortInfo        // key is l2 ifIndex
@@ -48,6 +58,8 @@ type NDPServer struct {
 	NeighborInfo        map[string]config.NeighborConfig // neighbor created by NDP used for STATE
 	neighborKey         []string                         // keys for all neighbor entries is stored here for GET calls
 
+	//Configuration Channels
+	GlobalCfg chan NdpConfig
 	// Lock for reading/writing NeighorInfo
 	// We need this lock because getbulk/getentry is not requested on the main entry point channel, rather it's a
 	// direct call to server. So to avoid updating the Neighbor Runtime Info during read
@@ -56,10 +68,8 @@ type NDPServer struct {
 
 	// Physical Port/ L2 Port State Notification
 	PhyPortStateCh chan *config.PortState
-	//IPV6 Create/Delete Notification Channel
+	//IPV6 Create/Delete State Up/Down Notification Channel
 	IpIntfCh chan *config.IPIntfNotification
-	// IPv6 Up/Down Notification Channel
-	IpStateCh chan *config.StateNotification
 	// Vlan Create/Delete/Update Notification Channel
 	VlanCh chan *config.VlanNotification
 	//Received Pkt Channel
@@ -88,6 +98,7 @@ type NDPServer struct {
 }
 
 const (
-	NDP_SERVER_MAP_INITIAL_CAP = 50
-	INTF_REF_NOT_FOUND         = "Not Found"
+	NDP_SERVER_MAP_INITIAL_CAP            = 50
+	NDP_SERVER_ASICD_NOTIFICATION_CH_SIZE = 1
+	INTF_REF_NOT_FOUND                    = "Not Found"
 )

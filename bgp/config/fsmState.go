@@ -24,6 +24,9 @@
 // fsmState.go
 package config
 
+const BGPConnectRetryTime uint32 = 120 // seconds
+const BGPHoldTimeDefault uint32 = 180  // 180 seconds
+
 type BGPFSMState int
 
 const (

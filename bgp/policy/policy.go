@@ -45,6 +45,7 @@ type BGPPolicyEngine interface {
 	DeletePolicyDefinition(string) error
 	DeletePolicyAction(string) (bool, error)
 	UpdateApplyPolicy(utilspolicy.ApplyPolicyInfo, bool)
+	UpdateUndoApplyPolicy(utilspolicy.ApplyPolicyInfo, bool)
 	SetTraverseFuncs(utilspolicy.EntityTraverseAndApplyPolicyfunc, utilspolicy.EntityTraverseAndReversePolicyfunc)
 	SetActionFuncs(map[int]PolicyActionFunc)
 	SetEntityUpdateFunc(utilspolicy.EntityUpdatefunc)
@@ -145,6 +146,10 @@ func (eng *BasePolicyEngine) DeletePolicyAction(actionName string) (bool, error)
 
 func (eng *BasePolicyEngine) UpdateApplyPolicy(info utilspolicy.ApplyPolicyInfo, apply bool) {
 	eng.PolicyEngine.UpdateApplyPolicy(info, apply)
+}
+
+func (eng *BasePolicyEngine) UpdateUndoApplyPolicy(info utilspolicy.ApplyPolicyInfo, apply bool) {
+	eng.PolicyEngine.UpdateUndoApplyPolicy(info, apply)
 }
 
 func (eng *BasePolicyEngine) GetPolicyEngine() *utilspolicy.PolicyEngineDB {

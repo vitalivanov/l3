@@ -13,20 +13,19 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 package relayServer
 
 import (
 	"dhcprelayd"
-	"fmt"
-	_ "strconv"
+	"errors"
 	"sync"
 )
 
@@ -35,46 +34,36 @@ import (
  * Add a relay agent
  */
 
-func (h *DhcpRelayServiceHandler) CreateDhcpRelayGlobal(
-	config *dhcprelayd.DhcpRelayGlobal) (bool, error) {
-
+func (h *DhcpRelayServiceHandler) CreateDhcpRelayGlobal(config *dhcprelayd.DhcpRelayGlobal) (bool, error) {
+	logger.Info("Auto-Created DHCP Relay Global Object", *config)
 	DhcpRelayGlobalInit(config.Enable)
 	return true, nil
 }
 
-func (h *DhcpRelayServiceHandler) UpdateDhcpRelayGlobal(
-	origconfig *dhcprelayd.DhcpRelayGlobal,
-	newconfig *dhcprelayd.DhcpRelayGlobal,
+func (h *DhcpRelayServiceHandler) UpdateDhcpRelayGlobal(origconfig *dhcprelayd.DhcpRelayGlobal, newconfig *dhcprelayd.DhcpRelayGlobal,
 	attrset []bool, op []*dhcprelayd.PatchOpInfo) (bool, error) {
-	logger.Info(fmt.Sprintln("DRA: updating relay config to",
-		newconfig.Enable))
+	logger.Debug("DRA: updating relay config to", newconfig.Enable)
 	dhcprelayEnable = newconfig.Enable
 	return true, nil
 }
 
-func (h *DhcpRelayServiceHandler) DeleteDhcpRelayGlobal(
-	config *dhcprelayd.DhcpRelayGlobal) (bool, error) {
-	logger.Info(fmt.Sprintln("DRA: deleting relay config to", config.Enable))
-	dhcprelayEnable = config.Enable
-	return true, nil
+func (h *DhcpRelayServiceHandler) DeleteDhcpRelayGlobal(config *dhcprelayd.DhcpRelayGlobal) (bool, error) {
+	return false, errors.New("Deleting Dhcp Relay Globall Is not Supported. Please Set DHCP Relay Global to false")
 }
 
-func (h *DhcpRelayServiceHandler) CreateDhcpRelayIntf(
-	config *dhcprelayd.DhcpRelayIntf) (bool, error) {
-	logger.Info(fmt.Sprintln("DRA: Intf Config Create for", config.IfIndex))
+func (h *DhcpRelayServiceHandler) CreateDhcpRelayIntf(config *dhcprelayd.DhcpRelayIntf) (bool, error) {
+	logger.Debug("DRA: Intf Config Create for", config.IfIndex)
 	// Copy over configuration into globalInfo
 	ifNum := config.IfIndex
 	gblEntry, ok := dhcprelayGblInfo[ifNum]
 	if !ok {
-		logger.Err(fmt.Sprintln("DRA: entry for ifNum", ifNum,
-			" doesn't exist.."))
+		logger.Err("DRA: entry for ifNum", ifNum, " doesn't exist..")
 		return ok, nil
 	}
 	gblEntry.IntfConfig.Enable = config.Enable
-	logger.Info("DRA: ServerIp:")
+	logger.Debug("DRA: ServerIp:")
 	for idx := 0; idx < len(config.ServerIp); idx++ {
-		logger.Info(fmt.Sprintln("DRA: Server", idx, ": ",
-			config.ServerIp[idx]))
+		logger.Debug("DRA: Server", idx, ":", config.ServerIp[idx])
 		gblEntry.IntfConfig.ServerIp = append(gblEntry.IntfConfig.ServerIp,
 			config.ServerIp[idx])
 		DhcpRelayAgentInitIntfServerState(config.ServerIp[idx], ifNum)
@@ -97,35 +86,30 @@ func (h *DhcpRelayServiceHandler) CreateDhcpRelayIntf(
 	return true, nil
 }
 
-func (h *DhcpRelayServiceHandler) UpdateDhcpRelayIntf(
-	origconfig *dhcprelayd.DhcpRelayIntf,
-	newconfig *dhcprelayd.DhcpRelayIntf,
+func (h *DhcpRelayServiceHandler) UpdateDhcpRelayIntf(origconfig *dhcprelayd.DhcpRelayIntf, newconfig *dhcprelayd.DhcpRelayIntf,
 	attrset []bool, op []*dhcprelayd.PatchOpInfo) (bool, error) {
-	logger.Info("DRA: Intf Config Update")
-	logger.Info("DRA: Updating Dhcp Relay Config for interface")
+	logger.Debug("DRA: Intf Config Update")
+	logger.Debug("DRA: Updating Dhcp Relay Config for interface")
 	if origconfig.IfIndex != newconfig.IfIndex {
-		logger.Info(fmt.Sprintln("DRA: Interface Id cannot be different.",
+		logger.Debug("DRA: Interface Id cannot be different.",
 			" Relay Agent will not accept this update for changing if id from",
-			origconfig.IfIndex, "to", newconfig.IfIndex))
+			origconfig.IfIndex, "to", newconfig.IfIndex)
 		return false, nil
 	}
-	logger.Info(fmt.Sprintln("DRA: Enable: ", origconfig.Enable, "changed to",
-		newconfig.Enable))
+	logger.Debug("DRA: Enable: ", origconfig.Enable, "changed to", newconfig.Enable)
 	// Copy over configuration into globalInfo
 	ifNum := origconfig.IfIndex
 	gblEntry, ok := dhcprelayGblInfo[ifNum]
 	if !ok {
-		logger.Err(fmt.Sprintln("DRA: entry for ifNum", ifNum,
-			" doesn't exist.. and hence cannot update"))
+		logger.Err("DRA: entry for ifNum", ifNum, " doesn't exist.. and hence cannot update")
 		return ok, nil
 	}
 	gblEntry.IntfConfig.Enable = newconfig.Enable
 	gblEntry.IntfConfig.ServerIp = nil
 	logger.Warning("DRA: Deleted Older DHCP Server IP's List and creating new")
-	logger.Info("DRA: New ServerIp's:")
+	logger.Debug("DRA: New ServerIp's:")
 	for idx := 0; idx < len(newconfig.ServerIp); idx++ {
-		logger.Info(fmt.Sprintln("DRA: Server", idx, ": ",
-			newconfig.ServerIp[idx]))
+		logger.Debug("DRA: Server", idx, ": ", newconfig.ServerIp[idx])
 		gblEntry.IntfConfig.ServerIp = append(gblEntry.IntfConfig.ServerIp,
 			newconfig.ServerIp[idx])
 		DhcpRelayAgentInitIntfServerState(newconfig.ServerIp[idx], ifNum)
@@ -140,14 +124,12 @@ func (h *DhcpRelayServiceHandler) UpdateDhcpRelayIntf(
 	return true, nil
 }
 
-func (h *DhcpRelayServiceHandler) DeleteDhcpRelayIntf(
-	config *dhcprelayd.DhcpRelayIntf) (bool, error) {
-	logger.Info(fmt.Sprintln("DRA: deleting config for interface", config.IfIndex))
+func (h *DhcpRelayServiceHandler) DeleteDhcpRelayIntf(config *dhcprelayd.DhcpRelayIntf) (bool, error) {
+	logger.Debug("DRA: deleting config for interface", config.IfIndex)
 	ifNum := config.IfIndex
 	gblEntry, ok := dhcprelayGblInfo[ifNum]
 	if !ok {
-		logger.Err(fmt.Sprintln("DRA: entry for ifNum", ifNum,
-			" doesn't exist.."))
+		logger.Err("DRA: entry for ifNum", ifNum, " doesn't exist..")
 		return ok, nil
 	}
 	// Setting up default values for globalEntry
@@ -161,13 +143,13 @@ func (h *DhcpRelayServiceHandler) DeleteDhcpRelayIntf(
 	dhcprelayRefCountMutex.Lock()
 	dhcprelayEnabledIntfRefCount--
 	dhcprelayRefCountMutex.Unlock()
-	logger.Info(fmt.Sprintln("DRA: deleted config for interface", config.IfIndex))
+	logger.Debug("DRA: deleted config for interface", config.IfIndex)
 	return true, nil
 }
 
 func (h *DhcpRelayServiceHandler) GetBulkDhcpRelayHostDhcpState(fromIndex dhcprelayd.Int,
 	count dhcprelayd.Int) (hostEntry *dhcprelayd.DhcpRelayHostDhcpStateGetInfo, err error) {
-	logger.Info(fmt.Sprintln("DRA: Get Bulk for Host Server State for ", count, " hosts"))
+	logger.Debug("DRA: Get Bulk for Host Server State for ", count, " hosts")
 
 	var nextEntry *dhcprelayd.DhcpRelayHostDhcpState
 	var finalList []*dhcprelayd.DhcpRelayHostDhcpState
@@ -177,7 +159,7 @@ func (h *DhcpRelayServiceHandler) GetBulkDhcpRelayHostDhcpState(fromIndex dhcpre
 	hostEntry = &returnBulk
 
 	if dhcprelayHostServerStateSlice == nil {
-		logger.Info("DRA: Host Server Slice is not initialized")
+		logger.Debug("DRA: Host Server Slice is not initialized")
 		return hostEntry, err
 	}
 	currIdx := int(fromIndex)
@@ -212,7 +194,7 @@ func (h *DhcpRelayServiceHandler) GetBulkDhcpRelayHostDhcpState(fromIndex dhcpre
 
 func (h *DhcpRelayServiceHandler) GetBulkDhcpRelayIntfState(fromIndex dhcprelayd.Int,
 	count dhcprelayd.Int) (intfEntry *dhcprelayd.DhcpRelayIntfStateGetInfo, err error) {
-	logger.Info(fmt.Sprintln("DRA: Get Bulk for Intf State for ", count, " interfaces"))
+	logger.Debug("DRA: Get Bulk for Intf State for ", count, " interfaces")
 	var nextEntry *dhcprelayd.DhcpRelayIntfState
 	var finalList []*dhcprelayd.DhcpRelayIntfState
 	var returnIntfStatebulk dhcprelayd.DhcpRelayIntfStateGetInfo
@@ -221,7 +203,7 @@ func (h *DhcpRelayServiceHandler) GetBulkDhcpRelayIntfState(fromIndex dhcprelayd
 	intfEntry = &returnIntfStatebulk
 
 	if dhcprelayIntfStateSlice == nil {
-		logger.Info("DRA: Interface Slice is not initialized")
+		logger.Debug("DRA: Interface Slice is not initialized")
 		return intfEntry, err
 	}
 	currIdx := int(fromIndex)
@@ -257,7 +239,7 @@ func (h *DhcpRelayServiceHandler) GetBulkDhcpRelayIntfState(fromIndex dhcprelayd
 
 func (h *DhcpRelayServiceHandler) GetBulkDhcpRelayIntfServerState(fromIndex dhcprelayd.Int,
 	count dhcprelayd.Int) (intfServerEntry *dhcprelayd.DhcpRelayIntfServerStateGetInfo, err error) {
-	logger.Info(fmt.Sprintln("DRA: Get Bulk for Intf Server State for ", count, " combination"))
+	logger.Debug("DRA: Get Bulk for Intf Server State for ", count, " combination")
 	var nextEntry *dhcprelayd.DhcpRelayIntfServerState
 	var finalList []*dhcprelayd.DhcpRelayIntfServerState
 	var returnBulk dhcprelayd.DhcpRelayIntfServerStateGetInfo
@@ -266,7 +248,7 @@ func (h *DhcpRelayServiceHandler) GetBulkDhcpRelayIntfServerState(fromIndex dhcp
 	intfServerEntry = &returnBulk
 
 	if dhcprelayIntfServerStateSlice == nil {
-		logger.Info("DRA: Interface Server Slice is not initialized")
+		logger.Debug("DRA: Interface Server Slice is not initialized")
 		return intfServerEntry, err
 	}
 	currIdx := int(fromIndex)
@@ -300,19 +282,19 @@ func (h *DhcpRelayServiceHandler) GetBulkDhcpRelayIntfServerState(fromIndex dhcp
 }
 
 func (h *DhcpRelayServiceHandler) GetDhcpRelayHostDhcpState(macAddr string) (*dhcprelayd.DhcpRelayHostDhcpState, error) {
-	logger.Info("Get State Info for host")
+	logger.Debug("Get State Info for host")
 	response := dhcprelayd.NewDhcpRelayHostDhcpState()
 	return response, nil
 }
 
 func (h *DhcpRelayServiceHandler) GetDhcpRelayIntfServerState(ifIndex int32) (*dhcprelayd.DhcpRelayIntfServerState, error) {
-	logger.Info("Get State Info for interface server")
+	logger.Debug("Get State Info for interface server")
 	response := dhcprelayd.NewDhcpRelayIntfServerState()
 	return response, nil
 }
 
 func (h *DhcpRelayServiceHandler) GetDhcpRelayIntfState(ifIndex int32) (*dhcprelayd.DhcpRelayIntfState, error) {
-	logger.Info("Get State Info for interface")
+	logger.Debug("Get State Info for interface")
 	response := dhcprelayd.NewDhcpRelayIntfState()
 	return response, nil
 }

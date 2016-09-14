@@ -25,7 +25,6 @@ package server
 
 import (
 	"bytes"
-	"fmt"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcap"
@@ -34,31 +33,26 @@ import (
 )
 
 func (session *BfdSession) StartPerLinkSessionServer(bfdServer *BFDServer) error {
-	var ifName string
 	var err error
 	var myMacAddr net.HardwareAddr
-	bfdServer.logger.Info(fmt.Sprintln("Starting perlink session ", session.state.SessionId, " on ", ifName))
+	ifName := session.state.Interface
+	bfdServer.logger.Info("Starting perlink session ", session.state.SessionId, " on ", ifName)
 	sessionId := session.state.SessionId
-	ifName, err = bfdServer.getLinuxIntfName(session.state.InterfaceId)
-	if err != nil {
-		bfdServer.logger.Info(fmt.Sprintln("Failed to get ifname for ", session.state.InterfaceId))
-		return err
-	}
 	myMacAddr, err = bfdServer.getMacAddrFromIntfName(ifName)
 	if err != nil {
-		bfdServer.logger.Info(fmt.Sprintln("Unable to get the MAC addr of ", ifName, err))
+		bfdServer.logger.Info("Unable to get the MAC addr of ", ifName, err)
 		return err
 	}
-	bfdServer.logger.Info(fmt.Sprintln("MAC is  ", myMacAddr, " on ", ifName))
+	bfdServer.logger.Info("MAC is  ", myMacAddr, " on ", ifName)
 	bfdPcapTimeout := time.Duration(session.state.RequiredMinRxInterval / 1000000)
 	session.recvPcapHandle, err = pcap.OpenLive(ifName, bfdSnapshotLen, bfdPromiscuous, bfdPcapTimeout)
 	if session.recvPcapHandle == nil {
-		bfdServer.logger.Info(fmt.Sprintln("Failed to open recvPcapHandle for ", ifName, err))
+		bfdServer.logger.Info("Failed to open recvPcapHandle for ", ifName, err)
 		return err
 	} else {
 		err = session.recvPcapHandle.SetBPFFilter(bfdPcapFilterLag)
 		if err != nil {
-			bfdServer.logger.Info(fmt.Sprintln("Unable to set filter on", ifName, err))
+			bfdServer.logger.Info("Unable to set filter on", ifName, err)
 			return err
 		}
 	}
@@ -68,22 +62,22 @@ func (session *BfdSession) StartPerLinkSessionServer(bfdServer *BFDServer) error
 		if bfdServer.bfdGlobal.Sessions[sessionId] == nil {
 			return nil
 		}
-		bfdServer.logger.Info(fmt.Sprintln("Receive packet ", receivedPacket))
+		bfdServer.logger.Info("Receive packet ", receivedPacket)
 
 		ethLayer := receivedPacket.Layer(layers.LayerTypeEthernet)
 		ethPacket, _ := ethLayer.(*layers.Ethernet)
-		bfdServer.logger.Info(fmt.Sprintln("Ethernet ", ethPacket.SrcMAC, ethPacket.DstMAC))
+		bfdServer.logger.Info("Ethernet ", ethPacket.SrcMAC, ethPacket.DstMAC)
 		nwLayer := receivedPacket.Layer(layers.LayerTypeIPv4)
 		ipPacket, _ := nwLayer.(*layers.IPv4)
-		bfdServer.logger.Info(fmt.Sprintln("Network ", ipPacket.SrcIP, ipPacket.DstIP))
+		bfdServer.logger.Info("Network ", ipPacket.SrcIP, ipPacket.DstIP)
 		transLayer := receivedPacket.Layer(layers.LayerTypeUDP)
 		udpPacket, _ := transLayer.(*layers.UDP)
-		bfdServer.logger.Info(fmt.Sprintln("Transport ", udpPacket.SrcPort, udpPacket.DstPort))
+		bfdServer.logger.Info("Transport ", udpPacket.SrcPort, udpPacket.DstPort)
 		appLayer := receivedPacket.ApplicationLayer()
-		bfdServer.logger.Info(fmt.Sprintln("Application ", appLayer))
+		bfdServer.logger.Info("Application ", appLayer)
 
 		if bytes.Equal(ethPacket.SrcMAC, myMacAddr) {
-			bfdServer.logger.Info(fmt.Sprintln("My packet looped back"))
+			bfdServer.logger.Info("My packet looped back")
 			continue
 		}
 
@@ -93,7 +87,7 @@ func (session *BfdSession) StartPerLinkSessionServer(bfdServer *BFDServer) error
 			if err == nil {
 				sessionId := int32(bfdPacket.YourDiscriminator)
 				if sessionId == 0 {
-					bfdServer.logger.Info(fmt.Sprintln("Ignore bfd packet for session ", sessionId))
+					bfdServer.logger.Info("Ignore bfd packet for session ", sessionId)
 				} else {
 					bfdSession := bfdServer.bfdGlobal.Sessions[sessionId]
 					match := bytes.Equal(bfdSession.state.RemoteMacAddr, ethPacket.SrcMAC)
@@ -104,7 +98,7 @@ func (session *BfdSession) StartPerLinkSessionServer(bfdServer *BFDServer) error
 					bfdSession.ProcessBfdPacket(bfdPacket)
 				}
 			} else {
-				bfdServer.logger.Info(fmt.Sprintln("Failed to decode packet - ", err))
+				bfdServer.logger.Info("Failed to decode packet - ", err)
 			}
 		}
 	}
@@ -112,27 +106,21 @@ func (session *BfdSession) StartPerLinkSessionServer(bfdServer *BFDServer) error
 }
 
 func (session *BfdSession) StartPerLinkSessionClient(bfdServer *BFDServer) error {
-	var ifName string
 	var err error
 	var myMacAddr net.HardwareAddr
-	bfdServer.logger.Info(fmt.Sprintln("Starting perlink session ", session.state.SessionId, " on ", ifName))
-	ifName, err = bfdServer.getLinuxIntfName(session.state.InterfaceId)
-	if err != nil {
-		bfdServer.logger.Info(fmt.Sprintln("Failed to get ifname for ", session.state.InterfaceId))
-		bfdServer.FailedSessionClientCh <- session.state.SessionId
-		return err
-	}
+	ifName := session.state.Interface
+	bfdServer.logger.Info("Starting perlink session ", session.state.SessionId, " on ", ifName)
 	myMacAddr, err = bfdServer.getMacAddrFromIntfName(ifName)
 	if err != nil {
-		bfdServer.logger.Info(fmt.Sprintln("Unable to get the MAC addr of ", ifName, err))
+		bfdServer.logger.Info("Unable to get the MAC addr of ", ifName, err)
 		bfdServer.FailedSessionClientCh <- session.state.SessionId
 		return err
 	}
-	bfdServer.logger.Info(fmt.Sprintln("MAC is  ", myMacAddr, " on ", ifName))
+	bfdServer.logger.Info("MAC is  ", myMacAddr, " on ", ifName)
 	bfdPcapTimeout := time.Duration(session.state.DesiredMinTxInterval / 1000000)
 	session.sendPcapHandle, err = pcap.OpenLive(ifName, bfdSnapshotLen, bfdPromiscuous, bfdPcapTimeout)
 	if session.sendPcapHandle == nil {
-		bfdServer.logger.Info(fmt.Sprintln("Failed to open sendPcapHandle for ", ifName, err))
+		bfdServer.logger.Info("Failed to open sendPcapHandle for ", ifName, err)
 		bfdServer.FailedSessionClientCh <- session.state.SessionId
 		return err
 	}
@@ -173,14 +161,14 @@ func (session *BfdSession) StartPerLinkSessionClient(bfdServer *BFDServer) error
 			bfdSession.UpdateBfdSessionControlPacket()
 			bfdPacket, err := bfdSession.bfdPacket.CreateBfdControlPacket()
 			if err != nil {
-				bfdServer.logger.Info(fmt.Sprintln("Failed to create bfd control packet for session ", bfdSession.state.SessionId))
+				bfdServer.logger.Info("Failed to create bfd control packet for session ", bfdSession.state.SessionId)
 			}
 			buffer := gopacket.NewSerializeBuffer()
 			gopacket.SerializeLayers(buffer, options, ethLayer, ipLayer, udpLayer, gopacket.Payload(bfdPacket))
 			outgoingPacket := buffer.Bytes()
 			err = bfdSession.sendPcapHandle.WritePacketData(outgoingPacket)
 			if err != nil {
-				bfdServer.logger.Info(fmt.Sprintln("Failed to create complete packet for session ", bfdSession.state.SessionId))
+				bfdServer.logger.Info("Failed to create complete packet for session ", bfdSession.state.SessionId)
 			} else {
 				if bfdSession.state.SessionState == STATE_UP {
 					bfdSession.useDedicatedMac = false

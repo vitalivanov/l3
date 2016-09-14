@@ -104,7 +104,7 @@ func deleteV4RoutesOfType(protocol string, destNet string) {
 	for _, protoroute := range testroutes { //protocolRouteList {
 		//logger.Info(len(testroutes), " number of ", protocol, " routes in routemap:", testroutes, " remaining")
 		//logger.Info("protoroute:", protoroute, " nexthop:", protoroute.nextHopIp.String())
-		_, err := deleteIPRoute(protoroute.destNetIp.String(), ribdCommonDefs.IPv4, protoroute.networkMask.String(), protocol, protoroute.nextHopIp.String(), FIBAndRIB, ribdCommonDefs.RoutePolicyStateChangetoInValid)
+		_, err := deleteIPRoute(protoroute.destNetIp.String(), ribdCommonDefs.IPv4, protoroute.networkMask.String(), protocol, protoroute.nextHopIp.String(), protoroute.nextHopIfIndex, FIBAndRIB, ribdCommonDefs.RoutePolicyStateChangetoInValid)
 		logger.Info("err :", err, " while deleting ", protocol, " route with destNet:", protoroute.destNetIp.String(), " nexthopIP:", protoroute.nextHopIp.String())
 	}
 }
@@ -131,7 +131,7 @@ func deleteV6RoutesOfType(protocol string, destNet string) {
 	for _, protoroute := range testroutes { //protocolRouteList {
 		//logger.Info(len(testroutes), " number of ", protocol, " routes in routemap:", testroutes, " remaining")
 		//logger.Info("protoroute:", protoroute, " nexthop:", protoroute.nextHopIp.String())
-		_, err := deleteIPRoute(protoroute.destNetIp.String(), ribdCommonDefs.IPv6, protoroute.networkMask.String(), protocol, protoroute.nextHopIp.String(), FIBAndRIB, ribdCommonDefs.RoutePolicyStateChangetoInValid)
+		_, err := deleteIPRoute(protoroute.destNetIp.String(), ribdCommonDefs.IPv6, protoroute.networkMask.String(), protocol, protoroute.nextHopIp.String(), protoroute.nextHopIfIndex, FIBAndRIB, ribdCommonDefs.RoutePolicyStateChangetoInValid)
 		logger.Info("err :", err, " while deleting ", protocol, " route with destNet:", protoroute.destNetIp.String(), " nexthopIP:", protoroute.nextHopIp.String())
 	}
 }
@@ -252,7 +252,8 @@ func (clnt *ArpdClient) ConnectToClient() {
 	var timer *time.Timer
 	logger.Info("in go routine ConnectToClient for connecting to ARPd")
 	for {
-		timer = time.NewTimer(time.Second * 10)
+		logger.Info("in for loop of go routine ConnectToClient for connecting to ARPd")
+		timer = time.NewTimer(time.Second * 1)
 		<-timer.C
 		logger.Info("Connecting to arpd at address ", arpdclnt.Address)
 		//arpdclnt.Address = "localhost:" + strconv.Itoa(port)
@@ -364,7 +365,23 @@ func (ribdServiceHandler *RIBDServer) ConnectToClients(paramsFile string) {
 		if client.Name == "asicd" {
 			logger.Info("found asicd at port ", client.Port)
 			asicdclnt.Address = "localhost:" + strconv.Itoa(client.Port)
-			asicdclnt.Transport, asicdclnt.PtrProtocolFactory, _ = ipcutils.CreateIPCHandles(asicdclnt.Address)
+			asicdclnt.Transport, asicdclnt.PtrProtocolFactory, err = ipcutils.CreateIPCHandles(asicdclnt.Address)
+			if err != nil {
+				logger.Info("Failed to connect to Asicd, retrying until connection is successful")
+				count := 0
+				ticker := time.NewTicker(time.Duration(1000) * time.Millisecond)
+				for _ = range ticker.C {
+					asicdclnt.Transport, asicdclnt.PtrProtocolFactory, err = ipcutils.CreateIPCHandles(asicdclnt.Address)
+					if err == nil {
+						ticker.Stop()
+						break
+					}
+					count++
+					if (count % 10) == 0 {
+						logger.Info("Still can't connect to Asicd, retrying...")
+					}
+				}
+			}
 			if asicdclnt.Transport != nil && asicdclnt.PtrProtocolFactory != nil {
 				logger.Info("connecting to asicd,arpdclnt.IsConnected:", arpdclnt.IsConnected)
 				asicdclnt.ClientHdl = asicdServices.NewASICDServicesClientFactory(asicdclnt.Transport, asicdclnt.PtrProtocolFactory)
@@ -375,14 +392,33 @@ func (ribdServiceHandler *RIBDServer) ConnectToClients(paramsFile string) {
 					ribdServiceHandler.AcceptConfigActions()
 				}
 			} else {
+				logger.Info("asicd clnt nil even after err is nil with createipchandles")
 				//go ribdServiceHandler.connectToClient(client.Name)
-				go asicdclnt.ConnectToClient()
+				//go asicdclnt.ConnectToClient()
 			}
 		}
 		if client.Name == "arpd" {
-			logger.Info("found arpd at port ", client.Port)
+			logger.Info("RIBD: found arpd at port ", client.Port)
 			arpdclnt.Address = "localhost:" + strconv.Itoa(client.Port)
-			arpdclnt.Transport, arpdclnt.PtrProtocolFactory, _ = ipcutils.CreateIPCHandles(arpdclnt.Address)
+			logger.Info("arpdclnt.Address:", arpdclnt.Address)
+			arpdclnt.Transport, arpdclnt.PtrProtocolFactory, err = ipcutils.CreateIPCHandles(arpdclnt.Address)
+			logger.Info("arpdclnt.transport:", arpdclnt.Transport, " arpdclnt.ProtocolFactory:", arpdclnt.PtrProtocolFactory, " err:", err)
+			if err != nil {
+				logger.Info("Failed to connect to Arpd, retrying until connection is successful")
+				count := 0
+				ticker := time.NewTicker(time.Duration(1000) * time.Millisecond)
+				for _ = range ticker.C {
+					arpdclnt.Transport, arpdclnt.PtrProtocolFactory, err = ipcutils.CreateIPCHandles(arpdclnt.Address)
+					if err == nil {
+						ticker.Stop()
+						break
+					}
+					count++
+					if (count % 10) == 0 {
+						logger.Info("Still can't connect to Arpd, retrying...")
+					}
+				}
+			}
 			if arpdclnt.Transport != nil && arpdclnt.PtrProtocolFactory != nil {
 				logger.Info("connecting to arpd,asicdclnt.IsConnected:", asicdclnt.IsConnected)
 				arpdclnt.ClientHdl = arpd.NewARPDServicesClientFactory(arpdclnt.Transport, arpdclnt.PtrProtocolFactory)
@@ -393,8 +429,9 @@ func (ribdServiceHandler *RIBDServer) ConnectToClients(paramsFile string) {
 					ribdServiceHandler.AcceptConfigActions()
 				}
 			} else {
+				logger.Info("arpd clnt nil even after err is nil with createipchandles")
 				//go ribdServiceHandler.connectToClient(client.Name)
-				go arpdclnt.ConnectToClient()
+				//go arpdclnt.ConnectToClient()
 			}
 		}
 	}

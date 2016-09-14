@@ -30,6 +30,7 @@ import (
 
 type ReachabilityInfo struct {
 	IP          string
+	IfIndex     int32
 	ReachableCh chan bool
 }
 
@@ -42,6 +43,8 @@ const (
 	BFD_STATE_INVALID
 	INTF_CREATED
 	INTF_DELETED
+	INTFV6_CREATED
+	INTFV6_DELETED
 	IPV6_NEIGHBOR_CREATED
 	IPV6_NEIGHBOR_DELETED
 	INTF_STATE_DOWN
@@ -109,4 +112,11 @@ type NextHopInfo struct {
 	IsReachable    bool
 	NextHopIfType  int32
 	NextHopIfIndex int32
+}
+
+type ApplyPolicyInfo struct {
+	Protocol   string
+	Policy     string
+	Action     string
+	Conditions []*ConditionInfo
 }

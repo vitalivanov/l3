@@ -35,11 +35,13 @@ import (
 	"syscall"
 	"time"
 	"utils/asicdClient"
+	"utils/dmnBase"
 )
 
-func NDPNewServer(sPlugin asicdClient.AsicdClientIntf) *NDPServer {
+func NDPNewServer(sPlugin asicdClient.AsicdClientIntf, dmnBase *dmnBase.FSBaseDmn) *NDPServer {
 	svr := &NDPServer{}
 	svr.SwitchPlugin = sPlugin
+	svr.dmnBase = dmnBase
 	return svr
 }
 
@@ -80,17 +82,19 @@ func (svr *NDPServer) InitGlobalDS() {
 	svr.VlanInfo = make(map[int32]config.VlanInfo, NDP_SERVER_MAP_INITIAL_CAP)
 	svr.VlanIfIdxVlanIdMap = make(map[int32]int32, NDP_SERVER_MAP_INITIAL_CAP)
 	svr.NeighborInfo = make(map[string]config.NeighborConfig, NDP_SERVER_MAP_INITIAL_CAP)
-	svr.PhyPortStateCh = make(chan *config.PortState, 2)
-	svr.IpIntfCh = make(chan *config.IPIntfNotification, 2)
-	svr.IpStateCh = make(chan *config.StateNotification, 2)
+	svr.PhyPortStateCh = make(chan *config.PortState, NDP_SERVER_ASICD_NOTIFICATION_CH_SIZE)
+	svr.IpIntfCh = make(chan *config.IPIntfNotification, NDP_SERVER_ASICD_NOTIFICATION_CH_SIZE)
 	svr.VlanCh = make(chan *config.VlanNotification)
-	svr.RxPktCh = make(chan *RxPktInfo, 10)
-	svr.PktDataCh = make(chan config.PacketData, 10)
+	svr.RxPktCh = make(chan *RxPktInfo, 30)
+	svr.PktDataCh = make(chan config.PacketData, 30)
 	svr.SnapShotLen = 1024
-	svr.Promiscuous = false
+	svr.Promiscuous = true
 	svr.Timeout = 1 * time.Second
 	svr.NeigborEntryLock = &sync.RWMutex{}
 	svr.Packet = packet.Init()
+
+	//configuration channels
+	svr.GlobalCfg = make(chan NdpConfig)
 
 	// init publisher
 	pub := publisher.NewPublisher()
@@ -103,7 +107,6 @@ func (svr *NDPServer) DeInitGlobalDS() {
 	svr.L3Port = nil
 	svr.PhyPortStateCh = nil
 	svr.IpIntfCh = nil
-	svr.IpStateCh = nil
 	svr.VlanCh = nil
 	svr.RxPktCh = nil
 }
@@ -137,9 +140,12 @@ func (svr *NDPServer) EventsListener() {
 		case phyPortStateCh := <-svr.PhyPortStateCh:
 			svr.HandlePhyPortStateNotification(phyPortStateCh)
 		case ipIntfNotify := <-svr.IpIntfCh:
-			svr.HandleCreateIPIntf(ipIntfNotify)
-		case ipStateCh := <-svr.IpStateCh:
-			svr.HandleStateNotification(ipStateCh)
+			switch ipIntfNotify.Operation {
+			case config.CONFIG_CREATE, config.CONFIG_DELETE:
+				svr.HandleIPIntfCreateDelete(ipIntfNotify)
+			case config.STATE_UP, config.STATE_DOWN:
+				svr.HandleStateNotification(ipIntfNotify)
+			}
 		case rxChInfo, ok := <-svr.RxPktCh:
 			if !ok {
 				continue
@@ -150,6 +156,18 @@ func (svr *NDPServer) EventsListener() {
 				continue
 			}
 			svr.ProcessTimerExpiry(pktData)
+
+		case vlanInfo, ok := <-svr.VlanCh:
+			if !ok {
+				continue
+			}
+			debug.Logger.Debug("Need to support vlan Notifications:", vlanInfo)
+
+		case globalCfg, ok := <-svr.GlobalCfg:
+			if !ok {
+				continue
+			}
+			svr.NdpConfig.Create(globalCfg)
 		}
 	}
 }

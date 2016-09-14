@@ -30,7 +30,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	//"net"
 	"time"
 )
 
@@ -143,7 +142,6 @@ const (
 	STARTUP_TX_INTERVAL                   = 2000000
 	STARTUP_RX_INTERVAL                   = 2000000
 	TX_JITTER                             = 10 //Timer will be running at 0 to 10% less than TX_INTERVAL
-	//DEDICATED_MAC                         = net.HardwareAddr{0x01, 0x00, 0x5E, 0x90, 0x00, 0x01}
 )
 
 // Flags in BFD Control packet

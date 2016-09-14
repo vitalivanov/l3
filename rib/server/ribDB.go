@@ -59,6 +59,28 @@ func (ribdServiceHandler *RIBDServer) UpdateRoutesFromDB() (err error) {
 		}*/
 	return err
 }
+func (ribdServiceHandler *RIBDServer) UpdateGlobalPolicyPrefixSetsFromDB(dbHdl *dbutils.DBUtil) (err error) {
+	logger.Debug("UpdateGlobalPolicyPrefixSetsFromDB")
+	if dbHdl != nil {
+		var dbObjCfg objects.PolicyPrefixSet
+		objList, err := dbHdl.GetAllObjFromDb(dbObjCfg)
+		if err == nil {
+			for idx := 0; idx < len(objList); idx++ {
+				obj := ribd.NewPolicyPrefixSet()
+				dbObj := objList[idx].(objects.PolicyPrefixSet)
+				objects.ConvertribdPolicyPrefixSetObjToThrift(&dbObj, obj)
+				ribdServiceHandler.PolicyConfCh <- RIBdServerConfig{
+					OrigConfigObject: obj,
+					Op:               "addPolicyPrefixSet",
+				}
+				err = <-ribdServiceHandler.PolicyConfDone
+			}
+		} else {
+			logger.Err("DB Query failed during PolicyPrefixSet query: RIBd init")
+		}
+	}
+	return err
+}
 
 func (ribdServiceHandler *RIBDServer) UpdateGlobalPolicyConditionsFromDB(dbHdl *dbutils.DBUtil) (err error) {
 	logger.Debug("UpdateGlobalPolicyConditionsFromDB")
@@ -70,10 +92,11 @@ func (ribdServiceHandler *RIBDServer) UpdateGlobalPolicyConditionsFromDB(dbHdl *
 				obj := ribd.NewPolicyCondition()
 				dbObj := objList[idx].(objects.PolicyCondition)
 				objects.ConvertribdPolicyConditionObjToThrift(&dbObj, obj)
-				ribdServiceHandler.PolicyConditionConfCh <- RIBdServerConfig{
+				ribdServiceHandler.PolicyConfCh <- RIBdServerConfig{
 					OrigConfigObject: obj,
-					Op:               "add",
+					Op:               "addPolicyCondition",
 				}
+				err = <-ribdServiceHandler.PolicyConfDone
 			}
 		} else {
 			logger.Err("DB Query failed during PolicyCondition query: RIBd init")
@@ -91,10 +114,11 @@ func (ribdServiceHandler *RIBDServer) UpdateGlobalPolicyStmtsFromDB(dbHdl *dbuti
 				obj := ribd.NewPolicyStmt()
 				dbObj := objList[idx].(objects.PolicyStmt)
 				objects.ConvertribdPolicyStmtObjToThrift(&dbObj, obj)
-				ribdServiceHandler.PolicyStmtConfCh <- RIBdServerConfig{
+				ribdServiceHandler.PolicyConfCh <- RIBdServerConfig{
 					OrigConfigObject: obj,
-					Op:               "add",
+					Op:               "addPolicyStmt",
 				}
+				err = <-ribdServiceHandler.PolicyConfDone
 			}
 		} else {
 			logger.Err("DB Query failed during PolicyStmt query: RIBd init")
@@ -112,10 +136,11 @@ func (ribdServiceHandler *RIBDServer) UpdateGlobalPolicyFromDB(dbHdl *dbutils.DB
 				obj := ribd.NewPolicyDefinition()
 				dbObj := objList[idx].(objects.PolicyDefinition)
 				objects.ConvertribdPolicyDefinitionObjToThrift(&dbObj, obj)
-				ribdServiceHandler.PolicyDefinitionConfCh <- RIBdServerConfig{
+				ribdServiceHandler.PolicyConfCh <- RIBdServerConfig{
 					OrigConfigObject: obj,
-					Op:               "add",
+					Op:               "addPolicyDefinition",
 				}
+				err = <-ribdServiceHandler.PolicyConfDone
 			}
 		} else {
 			logger.Err("DB Query failed during PolicyDefinition query: RIBd init")
@@ -126,6 +151,7 @@ func (ribdServiceHandler *RIBDServer) UpdateGlobalPolicyFromDB(dbHdl *dbutils.DB
 func (ribdServiceHandler *RIBDServer) UpdatePolicyObjectsFromDB() { //(paramsDir string) (err error) {
 	logger.Debug("UpdateFromDB")
 	dbHdl := ribdServiceHandler.DbHdl
+	ribdServiceHandler.UpdateGlobalPolicyPrefixSetsFromDB(dbHdl) //paramsDir, dbHdl)
 	ribdServiceHandler.UpdateGlobalPolicyConditionsFromDB(dbHdl) //paramsDir, dbHdl)
 	ribdServiceHandler.UpdateGlobalPolicyStmtsFromDB(dbHdl)
 	ribdServiceHandler.UpdateGlobalPolicyFromDB(dbHdl)

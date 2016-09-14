@@ -71,6 +71,7 @@ type PeerAddressType int
 const (
 	PeerAddressV4 PeerAddressType = iota
 	PeerAddressV6
+	PeerAddressMax
 )
 
 type BgpCounters struct {
@@ -118,6 +119,7 @@ type NeighborConfig struct {
 	BaseConfig
 	NeighborAddress net.IP
 	IfIndex         int32
+	IfName          string
 	PeerGroup       string
 }
 
@@ -255,7 +257,7 @@ type AddressFamily struct {
 
 type Bgp struct {
 	Global     Global
-	PeerGroups map[string]*PeerGroup
+	PeerGroups map[uint32]map[string]*PeerGroup
 	Neighbors  []Neighbor
 	Afs        map[uint32]*AddressFamily
 }

@@ -23,7 +23,7 @@ var V6RouteInfoMap *patriciaDB.Trie //Routes are stored in patricia trie
 /*
    Returns the longest prefix match route to reach the destination network destNet
 */
-func (m RIBDServer) GetV6RouteReachabilityInfo(destNet string) (nextHopIntf *ribdInt.NextHopInfo, err error) {
+func (m RIBDServer) GetV6RouteReachabilityInfo(destNet string, ifIndex ribdInt.Int) (nextHopIntf *ribdInt.NextHopInfo, err error) {
 	//logger.Debug("GetRouteReachabilityInfo of ", destNet)
 	//t1 := time.Now()
 	var retnextHopIntf ribdInt.NextHopInfo
@@ -50,7 +50,12 @@ func (m RIBDServer) GetV6RouteReachabilityInfo(destNet string) (nextHopIntf *rib
 				logger.Err("Selected route not found")
 				return nil, errors.New("dest ip address not reachable")
 			}
-			v := routeInfoList[0]
+			nhFound, v, _ := findRouteWithNextHop(routeInfoList, ribdCommonDefs.IPv6, "", ribd.Int(ifIndex))
+			if !nhFound {
+				logger.Err("Selected route not found")
+				return nil, errors.New(fmt.Sprintln("dest ip address not reachable via ifIndex", ifIndex))
+			}
+			//		v := routeInfoList[0]
 			nextHopIntf.NextHopIp = v.nextHopIp.String()
 			nextHopIntf.NextHopIfIndex = ribdInt.Int(v.nextHopIfIndex)
 			nextHopIntf.Metric = ribdInt.Int(v.metric)
@@ -343,7 +348,7 @@ func (m RIBDServer) IPv6RouteConfigValidationCheckForPatchUpdate(oldcfg *ribd.IP
 					logger.Debug(fmt.Sprintln("IntRef before : ", val.NextHopIntRef))
 					if val.NextHopIntRef == "" {
 						logger.Info(fmt.Sprintln("NextHopIntRef not set"))
-						nhIntf, err := RouteServiceHandler.GetRouteReachabilityInfo(val.NextHopIp)
+						nhIntf, err := RouteServiceHandler.GetV6RouteReachabilityInfo(val.NextHopIp, -1)
 						if err != nil {
 							logger.Err(fmt.Sprintln("next hop ip ", val.NextHopIp, " not reachable"))
 							return errors.New(fmt.Sprintln("next hop ip ", val.NextHopIp, " not reachable"))
@@ -463,7 +468,7 @@ func (m RIBDServer) IPv6RouteConfigValidationCheck(cfg *ribd.IPv6Route, op strin
 			*/
 			if cfg.NextHop[i].NextHopIntRef == "" {
 				logger.Info(fmt.Sprintln("NextHopIntRef not set"))
-				nhIntf, err := RouteServiceHandler.GetRouteReachabilityInfo(cfg.NextHop[i].NextHopIp)
+				nhIntf, err := RouteServiceHandler.GetRouteReachabilityInfo(cfg.NextHop[i].NextHopIp, -1)
 				if err != nil {
 					logger.Err(fmt.Sprintln("next hop ip ", cfg.NextHop[i].NextHopIp, " not reachable"))
 					return errors.New(fmt.Sprintln("next hop ip ", cfg.NextHop[i].NextHopIp, " not reachable"))
@@ -647,7 +652,7 @@ func (m RIBDServer) Getv6Route(destNetIp string) (route *ribdInt.IPv6RouteState,
 	return route, err
 }
 
-func (m RIBDServer) ProcessV6RouteCreateConfig(cfg *ribd.IPv6Route) (val bool, err error) {
+func (m RIBDServer) ProcessV6RouteCreateConfig(cfg *ribd.IPv6Route, addType int) (val bool, err error) {
 	logger.Debug("ProcessV6RouteCreate: Received create route request for ip: ", cfg.DestinationNw, " mask ", cfg.NetworkMask, " number of next hops: ", len(cfg.NextHop))
 	newCfg := ribd.IPv6Route{
 		DestinationNw: cfg.DestinationNw,
@@ -668,7 +673,7 @@ func (m RIBDServer) ProcessV6RouteCreateConfig(cfg *ribd.IPv6Route) (val bool, e
 	}
 
 	//	policyRoute := BuildPolicyRouteFromribdIPv6Route(&newCfg)
-	params := BuildRouteParamsFromribdIPv6Route(&newCfg, FIBAndRIB, Invalid, len(destNetSlice))
+	params := BuildRouteParamsFromribdIPv6Route(&newCfg, addType, Invalid, len(destNetSlice))
 
 	logger.Debug("createType = ", params.createType, "deleteType = ", params.deleteType)
 	//	PolicyEngineFilter(policyRoute, policyCommonDefs.PolicyPath_Import, params)
@@ -677,15 +682,26 @@ func (m RIBDServer) ProcessV6RouteCreateConfig(cfg *ribd.IPv6Route) (val bool, e
 	return true, err
 }
 
-func (m RIBDServer) ProcessV6RouteDeleteConfig(cfg *ribd.IPv6Route) (val bool, err error) {
+func (m RIBDServer) ProcessV6RouteDeleteConfig(cfg *ribd.IPv6Route, delType int) (val bool, err error) {
 	logger.Debug("ProcessRoutev6DeleteConfig:Received Route Delete request for ", cfg.DestinationNw, ":", cfg.NetworkMask, "number of nextHops:", len(cfg.NextHop), "Protocol ", cfg.Protocol)
 	if !RouteServiceHandler.AcceptConfig {
 		logger.Debug("Not ready to accept config")
 		//return 0,err
 	}
+	var nextHopIfIndex ribd.Int
 	for i := 0; i < len(cfg.NextHop); i++ {
+		nextHopIfIndex = -1
 		logger.Debug("nexthop info: ip: ", cfg.NextHop[i].NextHopIp, " intref: ", cfg.NextHop[i].NextHopIntRef)
-		_, err = deleteIPRoute(cfg.DestinationNw, ribdCommonDefs.IPv6, cfg.NetworkMask, cfg.Protocol, cfg.NextHop[i].NextHopIp, FIBAndRIB, ribdCommonDefs.RoutePolicyStateChangetoInValid)
+		if cfg.NextHop[i].NextHopIntRef != "" {
+			cfg.NextHop[i].NextHopIntRef, err = m.ConvertIntfStrToIfIndexStr(cfg.NextHop[i].NextHopIntRef)
+			if err != nil {
+				logger.Err(fmt.Sprintln("Invalid NextHop IntRef ", cfg.NextHop[i].NextHopIntRef))
+				return false, err
+			}
+		}
+		nextHopIntRef, _ := strconv.Atoi(cfg.NextHop[i].NextHopIntRef)
+		nextHopIfIndex = ribd.Int(nextHopIntRef)
+		_, err = deleteIPRoute(cfg.DestinationNw, ribdCommonDefs.IPv6, cfg.NetworkMask, cfg.Protocol, cfg.NextHop[i].NextHopIp, nextHopIfIndex, ribd.Int(delType), ribdCommonDefs.RoutePolicyStateChangetoInValid)
 	}
 	return true, err
 }
@@ -726,7 +742,7 @@ func (m RIBDServer) Processv6RoutePatchUpdateConfig(origconfig *ribd.IPv6Route, 
 				logger.Debug("IntRef before : ", val.NextHopIntRef)
 				if val.NextHopIntRef == "" {
 					logger.Info("NextHopIntRef not set")
-					nhIntf, err := RouteServiceHandler.GetRouteReachabilityInfo(val.NextHopIp)
+					nhIntf, err := RouteServiceHandler.GetRouteReachabilityInfo(val.NextHopIp, -1)
 					if err != nil {
 						logger.Err("next hop ip ", val.NextHopIp, " not reachable")
 						return ret, errors.New(fmt.Sprintln("next hop ip ", val.NextHopIp, " not reachable"))
@@ -749,9 +765,9 @@ func (m RIBDServer) Processv6RoutePatchUpdateConfig(origconfig *ribd.IPv6Route, 
 			}
 			switch op[idx].Op {
 			case "add":
-				m.ProcessV6RouteCreateConfig(newconfig)
+				m.ProcessV6RouteCreateConfig(newconfig, FIBAndRIB)
 			case "remove":
-				m.ProcessV6RouteDeleteConfig(newconfig)
+				m.ProcessV6RouteDeleteConfig(newconfig, FIBAndRIB)
 			default:
 				logger.Err("Operation ", op[idx].Op, " not supported")
 			}
@@ -786,7 +802,7 @@ func (m RIBDServer) Processv6RouteUpdateConfig(origconfig *ribd.IPv6Route, newco
 	routeInfoRecordList := routeInfoRecordListItem.(RouteInfoRecordList)
 	callUpdate := true
 	if attrset != nil {
-		found, routeInfoRecord, index := findRouteWithNextHop(routeInfoRecordList.routeInfoProtocolMap[origconfig.Protocol], ribdCommonDefs.IPv6, origconfig.NextHop[0].NextHopIp)
+		found, routeInfoRecord, index := findRouteWithNextHop(routeInfoRecordList.routeInfoProtocolMap[origconfig.Protocol], ribdCommonDefs.IPv6, origconfig.NextHop[0].NextHopIp, -1)
 		if !found || index == -1 {
 			logger.Debug("Invalid nextHopIP")
 			return val, err

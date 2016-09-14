@@ -27,10 +27,10 @@ import (
 	_ "github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"l3/ndp/config"
-	_ "l3/ndp/debug"
+	"l3/ndp/debug"
 	"l3/ndp/packet"
 	_ "net"
-	_ "strings"
+	"strings"
 )
 
 /*
@@ -59,6 +59,9 @@ func (intf *Interface) sendUnicastNS(srcMac, nbrMac, nbrIp string) NDP_OPERATION
 	} else {
 		pkt.SrcIp = intf.globalScope
 	}
+
+	debug.Logger.Debug("Sending Unicast NS message with (DMAC, SMAC)", pkt.DstMac, pkt.SrcMac,
+		"and (DIP, SIP)", pkt.DstIp, pkt.SrcIp)
 
 	pktToSend := pkt.Encode()
 	err := intf.writePkt(pktToSend)
@@ -107,10 +110,13 @@ func (intf *Interface) SendNS(myMac, nbrMac, nbrIp string) NDP_OPERATION {
  *		    Then update the state to STALE
  */
 func (intf *Interface) processNS(ndInfo *packet.NDInfo) (nbrInfo *config.NeighborConfig, oper NDP_OPERATION) {
-	if ndInfo.SrcIp == "" || ndInfo.SrcIp == "::" {
-		// NS was generated locally
+	if ndInfo.SrcIp == "" || ndInfo.SrcIp == "::" || strings.Contains(ndInfo.DstIp, "ff02::1") {
+		// NS was generated locally or it is multicast-solicitation message
+		// @TODO: for multicast solicitation add a neigbor entry based of target address and
+		// mark it as inclomple
 		return nil, IGNORE
 	}
+	debug.Logger.Debug("Processing NS packet:", *ndInfo)
 	nbrKey := intf.createNbrKey(ndInfo)
 	nbr, exists := intf.Neighbor[nbrKey]
 	if exists {

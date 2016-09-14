@@ -324,11 +324,15 @@ func (ribdServiceHandler *RIBDServer) StartRouteProcessServer() {
 		case routeConf := <-ribdServiceHandler.RouteConfCh:
 			//logger.Debug(fmt.Sprintln("received message on RouteConfCh channel, op: ", routeConf.Op)
 			if routeConf.Op == "add" {
-				ribdServiceHandler.ProcessV4RouteCreateConfig(routeConf.OrigConfigObject.(*ribd.IPv4Route))
+				ribdServiceHandler.ProcessV4RouteCreateConfig(routeConf.OrigConfigObject.(*ribd.IPv4Route), FIBAndRIB)
+			} else if routeConf.Op == "addFIBOnly" {
+				ribdServiceHandler.ProcessV4RouteCreateConfig(routeConf.OrigConfigObject.(*ribd.IPv4Route), FIBOnly)
 			} else if routeConf.Op == "addBulk" {
 				ribdServiceHandler.ProcessBulkRouteCreateConfig(routeConf.OrigBulkRouteConfigObject) //.([]*ribd.IPv4Route))
 			} else if routeConf.Op == "del" {
-				ribdServiceHandler.ProcessV4RouteDeleteConfig(routeConf.OrigConfigObject.(*ribd.IPv4Route))
+				ribdServiceHandler.ProcessV4RouteDeleteConfig(routeConf.OrigConfigObject.(*ribd.IPv4Route), FIBAndRIB)
+			} else if routeConf.Op == "delFIBOnly" {
+				ribdServiceHandler.ProcessV4RouteDeleteConfig(routeConf.OrigConfigObject.(*ribd.IPv4Route), FIBOnly)
 			} else if routeConf.Op == "update" {
 				if routeConf.PatchOp == nil || len(routeConf.PatchOp) == 0 {
 					ribdServiceHandler.Processv4RouteUpdateConfig(routeConf.OrigConfigObject.(*ribd.IPv4Route), routeConf.NewConfigObject.(*ribd.IPv4Route), routeConf.AttrSet)
@@ -337,10 +341,16 @@ func (ribdServiceHandler *RIBDServer) StartRouteProcessServer() {
 				}
 			} else if routeConf.Op == "addv6" {
 				//create ipv6 route
-				ribdServiceHandler.ProcessV6RouteCreateConfig(routeConf.OrigConfigObject.(*ribd.IPv6Route))
+				ribdServiceHandler.ProcessV6RouteCreateConfig(routeConf.OrigConfigObject.(*ribd.IPv6Route), FIBAndRIB)
+			} else if routeConf.Op == "addv6FIBOnly" {
+				//create ipv6 route
+				ribdServiceHandler.ProcessV6RouteCreateConfig(routeConf.OrigConfigObject.(*ribd.IPv6Route), FIBOnly)
 			} else if routeConf.Op == "delv6" {
 				//delete ipv6 route
-				ribdServiceHandler.ProcessV6RouteDeleteConfig(routeConf.OrigConfigObject.(*ribd.IPv6Route))
+				ribdServiceHandler.ProcessV6RouteDeleteConfig(routeConf.OrigConfigObject.(*ribd.IPv6Route), FIBAndRIB)
+			} else if routeConf.Op == "delv6FIBOnly" {
+				//delete ipv6 route
+				ribdServiceHandler.ProcessV6RouteDeleteConfig(routeConf.OrigConfigObject.(*ribd.IPv6Route), FIBOnly)
 			} else if routeConf.Op == "updatev6" {
 				//update ipv6 route
 				if routeConf.PatchOp == nil || len(routeConf.PatchOp) == 0 {

@@ -23,6 +23,8 @@
 package server
 
 import (
+	"errors"
+	"fmt"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"l3/ndp/config"
@@ -48,10 +50,11 @@ func (svr *NDPServer) StartRxTx(ifIndex int32) {
 	// create pcap handler if there is none created right now
 	err := ipPort.CreatePcap()
 	if err != nil {
+		debug.Logger.Err("Failed Creating Pcap Handler, err:", err, "for interface:", ipPort.IntfRef)
 		return
 	}
-	debug.Logger.Info("Start rx/tx for port:", ipPort.IntfRef, "ifIndex:", ipPort.IfIndex, "ip GS:", ipPort.IpAddr,
-		"LS:", ipPort.LinkLocalIp, "is done")
+	debug.Logger.Info("Start rx/tx for port:", ipPort.IntfRef, "ifIndex:",
+		ipPort.IfIndex, "ip GS:", ipPort.IpAddr, "LS:", ipPort.LinkLocalIp, "is done")
 
 	// Spawn go routines for rx & tx
 	go ipPort.ReceiveNdpPkts(svr.RxPktCh)
@@ -71,7 +74,7 @@ func (svr *NDPServer) StartRxTx(ifIndex int32) {
  *		       c) block until cleanup is going on
  *		       c) delete the entry from up interface slice
  */
-func (svr *NDPServer) StopRxTx(ifIndex int32) {
+func (svr *NDPServer) StopRxTx(ifIndex int32, ipAddr string) {
 	ipPort, exists := svr.L3Port[ifIndex]
 	if !exists {
 		debug.Logger.Err("No entry found for ifIndex:", ifIndex)
@@ -89,16 +92,27 @@ func (svr *NDPServer) StopRxTx(ifIndex int32) {
 	 *		On first Notification NDP will update pcap users and move on. Only when second delete
 	 *		notification comes then NDP will delete pcap
 	 */
-	deleteEntries, err := ipPort.DeleteIntf()
+	var deleteEntries []string
+	var err error
+	if ipAddr == "ALL" {
+		debug.Logger.Debug("Deleting all entries")
+		deleteEntries, err = ipPort.DeleteAll()
+	} else {
+		debug.Logger.Debug("Deleing interface:", ipAddr)
+		deleteEntries, err = ipPort.DeleteIntf(ipAddr)
+	}
 	if len(deleteEntries) > 0 && err == nil {
 		debug.Logger.Info("Server Got Neigbor Delete for interface:", ipPort.IntfRef)
 		svr.DeleteNeighborInfo(deleteEntries, ifIndex)
 	}
 
 	svr.L3Port[ifIndex] = ipPort
-	debug.Logger.Info("Stop rx/tx for port:", ipPort.IntfRef, "ifIndex:", ipPort.IfIndex, "ip GS:", ipPort.IpAddr,
-		"LS:", ipPort.LinkLocalIp, "is done")
-	// Delete Entry from Slice
+	if len(deleteEntries) == 0 {
+		return // only one ip address got deleted
+	}
+	debug.Logger.Info("Stop rx/tx for port:", ipPort.IntfRef, "ifIndex:",
+		ipPort.IfIndex, "ip GS:", ipPort.IpAddr, "LS:", ipPort.LinkLocalIp, "is done")
+	// Delete Entry from Slice only after all the ip's are deleted
 	svr.DeleteL3IntfFromUpState(ipPort.IfIndex)
 }
 
@@ -191,18 +205,19 @@ func (svr *NDPServer) DeleteNeighborInfo(deleteEntries []string, ifIndex int32) 
  *			   vlan id will be selected
  *			c) CreateIPv6 Neighbor entry
  */
-func (svr *NDPServer) ProcessRxPkt(ifIndex int32, pkt gopacket.Packet) {
+func (svr *NDPServer) ProcessRxPkt(ifIndex int32, pkt gopacket.Packet) error {
 	ipPort, exists := svr.L3Port[ifIndex]
 	if !exists {
-		return
+		return errors.New(fmt.Sprintln("Entry for ifIndex:", ifIndex, "doesn't exists"))
 	}
 	ndInfo, err := svr.Packet.DecodeND(pkt)
 	if err != nil || ndInfo == nil {
-		return
+		return errors.New(fmt.Sprintln("Failed decoding ND packet, error:", err))
 	}
 	nbrInfo, operation := ipPort.ProcessND(ndInfo)
-	if nbrInfo == nil || operation == DELETE {
-		return
+	if nbrInfo == nil || operation == IGNORE {
+		//debug.Logger.Warning("nbrInfo:", nbrInfo, "operation:", operation)
+		return nil
 	}
 	switch operation {
 	case CREATE:
@@ -211,14 +226,14 @@ func (svr *NDPServer) ProcessRxPkt(ifIndex int32, pkt gopacket.Packet) {
 	case DELETE:
 		svr.deleteNeighbor(nbrInfo.IpAddr, ifIndex) // used mostly by RA
 	}
-	return
+	return nil
 }
 
-func (svr *NDPServer) ProcessTimerExpiry(pktData config.PacketData) {
-
+func (svr *NDPServer) ProcessTimerExpiry(pktData config.PacketData) error {
 	l3Port, exists := svr.L3Port[pktData.IfIndex]
 	if !exists {
-		return
+		return errors.New(fmt.Sprintln("Entry for ifIndex:", pktData.IfIndex,
+			"doesn't exists and hence cannot process timer expiry event for neighbor:", pktData))
 	}
 	// fix this when we have per port mac addresses
 	operation := l3Port.SendND(pktData, svr.SwitchMac)
@@ -226,4 +241,5 @@ func (svr *NDPServer) ProcessTimerExpiry(pktData config.PacketData) {
 		svr.deleteNeighbor(pktData.NeighborIp, pktData.IfIndex)
 	}
 	svr.L3Port[pktData.IfIndex] = l3Port
+	return nil
 }

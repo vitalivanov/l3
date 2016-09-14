@@ -29,13 +29,14 @@ import (
 	//	"database/sql"
 	"fmt"
 	"github.com/op/go-nanomsg"
-	"l3/rib/ribdCommonDefs"
+	//"l3/rib/ribdCommonDefs"
 	"net"
 	//	"os"
 	//	"os/signal"
 	"ribd"
 	"ribdInt"
 	//	"syscall"
+	"strconv"
 	"utils/dbutils"
 	"utils/logging"
 	"utils/patriciaDB"
@@ -52,6 +53,7 @@ type RIBdServerConfig struct {
 	AttrSet                   []bool
 	Op                        string //"add"/"del"/"update/get"
 	PatchOp                   []*ribd.PatchOpInfo
+	PolicyList                ApplyPolicyList
 }
 
 /*type PatchUpdateRouteInfo struct {
@@ -60,27 +62,28 @@ type RIBdServerConfig struct {
 	Op        []*ribd.PatchOpInfo
 }*/
 type RIBDServer struct {
-	Logger                 *logging.Writer
-	PolicyEngineDB         *policy.PolicyEngineDB
-	GlobalPolicyEngineDB   *policy.PolicyEngineDB
-	TrackReachabilityCh    chan TrackReachabilityInfo
-	RouteConfCh            chan RIBdServerConfig
-	AsicdRouteCh           chan RIBdServerConfig
-	ArpdRouteCh            chan RIBdServerConfig
-	NotificationChannel    chan NotificationMsg
-	NextHopInfoMap         map[NextHopInfoKey]NextHopInfo
-	PolicyConditionConfCh  chan RIBdServerConfig
+	Logger               *logging.Writer
+	PolicyEngineDB       *policy.PolicyEngineDB
+	GlobalPolicyEngineDB *policy.PolicyEngineDB
+	TrackReachabilityCh  chan TrackReachabilityInfo
+	RouteConfCh          chan RIBdServerConfig
+	AsicdRouteCh         chan RIBdServerConfig
+	ArpdRouteCh          chan RIBdServerConfig
+	NotificationChannel  chan NotificationMsg
+	NextHopInfoMap       map[NextHopInfoKey]NextHopInfo
+	/*PolicyConditionConfCh  chan RIBdServerConfig
 	PolicyActionConfCh     chan RIBdServerConfig
-	PolicyStmtConfCh       chan RIBdServerConfig
-	PolicyDefinitionConfCh chan RIBdServerConfig
-	PolicyApplyCh          chan ApplyPolicyInfo
-	PolicyUpdateApplyCh    chan ApplyPolicyInfo
-	DBRouteCh              chan RIBdServerConfig
-	AcceptConfig           bool
-	ServerUpCh             chan bool
-	DBReadDone             chan bool
-	DbHdl                  *dbutils.DBUtil
-	Clients                map[string]ClientIf
+	PolicyStmtConfCh       chan RIBdServerConfig*/
+	PolicyConfCh chan RIBdServerConfig
+	//PolicyApplyCh       chan ApplyPolicyList
+	PolicyUpdateApplyCh chan ApplyPolicyList
+	DBRouteCh           chan RIBdServerConfig
+	AcceptConfig        bool
+	ServerUpCh          chan bool
+	DBReadDone          chan bool
+	PolicyConfDone      chan error
+	DbHdl               *dbutils.DBUtil
+	Clients             map[string]ClientIf
 	//RouteInstallCh                 chan RouteParams
 }
 
@@ -142,7 +145,7 @@ var dbReqCheckCountLimit = 5
 /*
    Handle Interface down event
 */
-func (ribdServiceHandler *RIBDServer) ProcessIPv4IntfDownEvent(ipAddr string) {
+func (ribdServiceHandler *RIBDServer) ProcessIPv4IntfDownEvent(ipAddr string, ifIndex int32) {
 	logger.Debug("processIPv4IntfDownEvent")
 	var ipMask net.IP
 	ip, ipNet, err := net.ParseCIDR(ipAddr)
@@ -154,14 +157,50 @@ func (ribdServiceHandler *RIBDServer) ProcessIPv4IntfDownEvent(ipAddr string) {
 	ipAddrStr := ip.String()
 	ipMaskStr := net.IP(ipMask).String()
 	logger.Info(" processIPv4IntfDownEvent for  ipaddr ", ipAddrStr, " mask ", ipMaskStr)
-	for i := 0; i < len(ConnectedRoutes); i++ {
-		if ConnectedRoutes[i].Ipaddr == ipAddrStr && ConnectedRoutes[i].Mask == ipMaskStr {
-			logger.Info(fmt.Sprintln("Delete this route with destAddress = ", ConnectedRoutes[i].Ipaddr, " nwMask = ", ConnectedRoutes[i].Mask))
-			deleteIPRoute(ConnectedRoutes[i].Ipaddr, ribdCommonDefs.IPv4, ConnectedRoutes[i].Mask, "CONNECTED", ConnectedRoutes[i].NextHopIp, FIBOnly, ribdCommonDefs.RoutePolicyStateChangeNoChange)
-		}
+	//deleteIPRoute(ConnectedRoutes[i].Ipaddr, ribdCommonDefs.IPv4, ConnectedRoutes[i].Mask, "CONNECTED", ConnectedRoutes[i].NextHopIp, ribd.Int(ConnectedRoutes[i].IfIndex), FIBOnly, ribdCommonDefs.RoutePolicyStateChangeNoChange)
+	cfg := ribd.IPv4Route{
+		DestinationNw: ipAddrStr,
+		Protocol:      "CONNECTED",
+		Cost:          0,
+		NetworkMask:   ipMaskStr,
 	}
+	nextHop := ribd.NextHopInfo{
+		NextHopIp:     "0.0.0.0",
+		NextHopIntRef: strconv.Itoa(int(ifIndex)),
+	}
+	cfg.NextHop = make([]*ribd.NextHopInfo, 0)
+	cfg.NextHop = append(cfg.NextHop, &nextHop)
+	ribdServiceHandler.RouteConfCh <- RIBdServerConfig{
+		OrigConfigObject: &cfg,
+		Op:               "delFIBOnly",
+	}
+	/*	for i := 0; i < len(ConnectedRoutes); i++ {
+		if ConnectedRoutes[i].Ipaddr == ipAddrStr && ConnectedRoutes[i].Mask == ipMaskStr {
+			if ifIndex != -1 && ConnectedRoutes[i].IfIndex != ribdInt.Int(ifIndex) {
+				continue
+			}
+			logger.Info("Delete this route with destAddress = ", ConnectedRoutes[i].Ipaddr, " nwMask = ", ConnectedRoutes[i].Mask, " ifIndex:", ifIndex)
+			//deleteIPRoute(ConnectedRoutes[i].Ipaddr, ribdCommonDefs.IPv4, ConnectedRoutes[i].Mask, "CONNECTED", ConnectedRoutes[i].NextHopIp, ribd.Int(ConnectedRoutes[i].IfIndex), FIBOnly, ribdCommonDefs.RoutePolicyStateChangeNoChange)
+			cfg := ribd.IPv4Route{
+				DestinationNw: ipAddrStr,
+				Protocol:      "CONNECTED",
+				Cost:          0,
+				NetworkMask:   ipMaskStr,
+			}
+			nextHop := ribd.NextHopInfo{
+				NextHopIp:     "0.0.0.0",
+				NextHopIntRef: strconv.Itoa(int(ifIndex)),
+			}
+			cfg.NextHop = make([]*ribd.NextHopInfo, 0)
+			cfg.NextHop = append(cfg.NextHop, &nextHop)
+			ribdServiceHandler.RouteConfCh <- RIBdServerConfig{
+				OrigConfigObject: &cfg,
+				Op:               "delFIBOnly",
+			}
+		}
+	}*/
 }
-func (ribdServiceHandler *RIBDServer) ProcessIPv6IntfDownEvent(ipAddr string) {
+func (ribdServiceHandler *RIBDServer) ProcessIPv6IntfDownEvent(ipAddr string, ifIndex int32) {
 	logger.Debug("processIPv6IntfDownEvent")
 	var ipMask net.IP
 	ip, ipNet, err := net.ParseCIDR(ipAddr)
@@ -173,18 +212,53 @@ func (ribdServiceHandler *RIBDServer) ProcessIPv6IntfDownEvent(ipAddr string) {
 	ipAddrStr := ip.String()
 	ipMaskStr := net.IP(ipMask).String()
 	logger.Info(" processIPv6IntfDownEvent for  ipaddr ", ipAddrStr, " mask ", ipMaskStr)
-	for i := 0; i < len(ConnectedRoutes); i++ {
-		if ConnectedRoutes[i].Ipaddr == ipAddrStr && ConnectedRoutes[i].Mask == ipMaskStr {
-			logger.Info(fmt.Sprintln("Delete this route with destAddress = ", ConnectedRoutes[i].Ipaddr, " nwMask = ", ConnectedRoutes[i].Mask))
-			deleteIPRoute(ConnectedRoutes[i].Ipaddr, ribdCommonDefs.IPv6, ConnectedRoutes[i].Mask, "CONNECTED", ConnectedRoutes[i].NextHopIp, FIBOnly, ribdCommonDefs.RoutePolicyStateChangeNoChange)
-		}
+	cfg := ribd.IPv6Route{
+		DestinationNw: ipAddrStr,
+		Protocol:      "CONNECTED",
+		Cost:          0,
+		NetworkMask:   ipMaskStr,
 	}
+	nextHop := ribd.NextHopInfo{
+		NextHopIp:     "::",
+		NextHopIntRef: strconv.Itoa(int(ifIndex)),
+	}
+	cfg.NextHop = make([]*ribd.NextHopInfo, 0)
+	cfg.NextHop = append(cfg.NextHop, &nextHop)
+	ribdServiceHandler.RouteConfCh <- RIBdServerConfig{
+		OrigConfigObject: &cfg,
+		Op:               "delv6FIBOnly",
+	}
+	/*	for i := 0; i < len(ConnectedRoutes); i++ {
+		if ConnectedRoutes[i].Ipaddr == ipAddrStr && ConnectedRoutes[i].Mask == ipMaskStr {
+			if ifIndex != -1 && ConnectedRoutes[i].IfIndex != ribdInt.Int(ifIndex) {
+				continue
+			}
+			logger.Info("Delete this route with destAddress = ", ConnectedRoutes[i].Ipaddr, " nwMask = ", ConnectedRoutes[i].Mask, " ifIndex:", ifIndex)
+			//deleteIPRoute(ConnectedRoutes[i].Ipaddr, ribdCommonDefs.IPv6, ConnectedRoutes[i].Mask, "CONNECTED", ConnectedRoutes[i].NextHopIp, ribd.Int(ConnectedRoutes[i].IfIndex), FIBOnly, ribdCommonDefs.RoutePolicyStateChangeNoChange)
+			cfg := ribd.IPv6Route{
+				DestinationNw: ipAddrStr,
+				Protocol:      "CONNECTED",
+				Cost:          0,
+				NetworkMask:   ipMaskStr,
+			}
+			nextHop := ribd.NextHopInfo{
+				NextHopIp:     "0.0.0.0",
+				NextHopIntRef: strconv.Itoa(int(ifIndex)),
+			}
+			cfg.NextHop = make([]*ribd.NextHopInfo, 0)
+			cfg.NextHop = append(cfg.NextHop, &nextHop)
+			ribdServiceHandler.RouteConfCh <- RIBdServerConfig{
+				OrigConfigObject: &cfg,
+				Op:               "delv6FIBOnly",
+			}
+		}
+	}*/
 }
 
 /*
    Handle Interface up event
 */
-func (ribdServiceHandler *RIBDServer) ProcessIPv4IntfUpEvent(ipAddr string) {
+func (ribdServiceHandler *RIBDServer) ProcessIPv4IntfUpEvent(ipAddr string, ifIndex int32) {
 	logger.Debug("processIPv4IntfUpEvent")
 	var ipMask net.IP
 	ip, ipNet, err := net.ParseCIDR(ipAddr)
@@ -197,18 +271,38 @@ func (ribdServiceHandler *RIBDServer) ProcessIPv4IntfUpEvent(ipAddr string) {
 	ipMaskStr := net.IP(ipMask).String()
 	logger.Info(" processIPv4IntfUpEvent for  ipaddr ", ipAddrStr, " mask ", ipMaskStr)
 	for i := 0; i < len(ConnectedRoutes); i++ {
-		logger.Info("Current state of this connected route is ", ConnectedRoutes[i].IsValid)
+		//logger.Info("Current state of this connected route is ", ConnectedRoutes[i].IsValid)
 		if ConnectedRoutes[i].Ipaddr == ipAddrStr && ConnectedRoutes[i].Mask == ipMaskStr && ConnectedRoutes[i].IsValid == false {
+			if ifIndex != -1 && ConnectedRoutes[i].IfIndex != ribdInt.Int(ifIndex) {
+				continue
+			}
 			logger.Info("Add this route with destAddress = ", ConnectedRoutes[i].Ipaddr, " nwMask = ", ConnectedRoutes[i].Mask)
 
 			ConnectedRoutes[i].IsValid = true
-			policyRoute := ribdInt.Routes{Ipaddr: ConnectedRoutes[i].Ipaddr, IPAddrType: ribdInt.Int(ribdCommonDefs.IPv4), Mask: ConnectedRoutes[i].Mask, NextHopIp: ConnectedRoutes[i].NextHopIp, IfIndex: ConnectedRoutes[i].IfIndex, Metric: ConnectedRoutes[i].Metric, Prototype: ConnectedRoutes[i].Prototype}
-			params := RouteParams{destNetIp: ConnectedRoutes[i].Ipaddr, ipType: ribdCommonDefs.IPv4, networkMask: ConnectedRoutes[i].Mask, nextHopIp: ConnectedRoutes[i].NextHopIp, nextHopIfIndex: ribd.Int(ConnectedRoutes[i].IfIndex), metric: ribd.Int(ConnectedRoutes[i].Metric), routeType: ribd.Int(ConnectedRoutes[i].Prototype), sliceIdx: ribd.Int(ConnectedRoutes[i].SliceIdx), createType: FIBOnly, deleteType: Invalid}
-			PolicyEngineFilter(policyRoute, policyCommonDefs.PolicyPath_Import, params)
+			//			policyRoute := ribdInt.Routes{Ipaddr: ConnectedRoutes[i].Ipaddr, IPAddrType: ribdInt.Int(ribdCommonDefs.IPv4), Mask: ConnectedRoutes[i].Mask, NextHopIp: ConnectedRoutes[i].NextHopIp, IfIndex: ConnectedRoutes[i].IfIndex, Metric: ConnectedRoutes[i].Metric, Prototype: ConnectedRoutes[i].Prototype}
+			//			params := RouteParams{destNetIp: ConnectedRoutes[i].Ipaddr, ipType: ribdCommonDefs.IPv4, networkMask: ConnectedRoutes[i].Mask, nextHopIp: ConnectedRoutes[i].NextHopIp, nextHopIfIndex: ribd.Int(ConnectedRoutes[i].IfIndex), metric: ribd.Int(ConnectedRoutes[i].Metric), routeType: ribd.Int(ConnectedRoutes[i].Prototype), sliceIdx: ribd.Int(ConnectedRoutes[i].SliceIdx), createType: FIBOnly, deleteType: Invalid}
+			//			PolicyEngineFilter(policyRoute, policyCommonDefs.PolicyPath_Import, params)
+			cfg := ribd.IPv4Route{
+				DestinationNw: ipAddrStr,
+				Protocol:      "CONNECTED",
+				Cost:          0,
+				NetworkMask:   ipMaskStr,
+			}
+			nextHop := ribd.NextHopInfo{
+				NextHopIp:     "0.0.0.0",
+				NextHopIntRef: strconv.Itoa(int(ifIndex)),
+			}
+			cfg.NextHop = make([]*ribd.NextHopInfo, 0)
+			cfg.NextHop = append(cfg.NextHop, &nextHop)
+
+			ribdServiceHandler.RouteConfCh <- RIBdServerConfig{
+				OrigConfigObject: &cfg,
+				Op:               "addFIBOnly",
+			}
 		}
 	}
 }
-func (ribdServiceHandler *RIBDServer) ProcessIPv6IntfUpEvent(ipAddr string) {
+func (ribdServiceHandler *RIBDServer) ProcessIPv6IntfUpEvent(ipAddr string, ifIndex int32) {
 	logger.Debug("processIPv6IntfUpEvent")
 	var ipMask net.IP
 	ip, ipNet, err := net.ParseCIDR(ipAddr)
@@ -221,14 +315,34 @@ func (ribdServiceHandler *RIBDServer) ProcessIPv6IntfUpEvent(ipAddr string) {
 	ipMaskStr := net.IP(ipMask).String()
 	logger.Info(" processIPv6IntfUpEvent for  ipaddr ", ipAddrStr, " mask ", ipMaskStr)
 	for i := 0; i < len(ConnectedRoutes); i++ {
-		logger.Info("Current state of this connected route is ", ConnectedRoutes[i].IsValid)
+		//logger.Info("Current state of this connected route is ", ConnectedRoutes[i].IsValid)
 		if ConnectedRoutes[i].Ipaddr == ipAddrStr && ConnectedRoutes[i].Mask == ipMaskStr && ConnectedRoutes[i].IsValid == false {
+			if ifIndex != -1 && ConnectedRoutes[i].IfIndex != ribdInt.Int(ifIndex) {
+				continue
+			}
 			logger.Info("Add this route with destAddress = ", ConnectedRoutes[i].Ipaddr, " nwMask = ", ConnectedRoutes[i].Mask)
 
 			ConnectedRoutes[i].IsValid = true
-			policyRoute := ribdInt.Routes{Ipaddr: ConnectedRoutes[i].Ipaddr, IPAddrType: ribdInt.Int(ribdCommonDefs.IPv6), Mask: ConnectedRoutes[i].Mask, NextHopIp: ConnectedRoutes[i].NextHopIp, IfIndex: ConnectedRoutes[i].IfIndex, Metric: ConnectedRoutes[i].Metric, Prototype: ConnectedRoutes[i].Prototype}
-			params := RouteParams{destNetIp: ConnectedRoutes[i].Ipaddr, ipType: ribdCommonDefs.IPv6, networkMask: ConnectedRoutes[i].Mask, nextHopIp: ConnectedRoutes[i].NextHopIp, nextHopIfIndex: ribd.Int(ConnectedRoutes[i].IfIndex), metric: ribd.Int(ConnectedRoutes[i].Metric), routeType: ribd.Int(ConnectedRoutes[i].Prototype), sliceIdx: ribd.Int(ConnectedRoutes[i].SliceIdx), createType: FIBOnly, deleteType: Invalid}
-			PolicyEngineFilter(policyRoute, policyCommonDefs.PolicyPath_Import, params)
+			//			policyRoute := ribdInt.Routes{Ipaddr: ConnectedRoutes[i].Ipaddr, IPAddrType: ribdInt.Int(ribdCommonDefs.IPv6), Mask: ConnectedRoutes[i].Mask, NextHopIp: ConnectedRoutes[i].NextHopIp, IfIndex: ConnectedRoutes[i].IfIndex, Metric: ConnectedRoutes[i].Metric, Prototype: ConnectedRoutes[i].Prototype}
+			//			params := RouteParams{destNetIp: ConnectedRoutes[i].Ipaddr, ipType: ribdCommonDefs.IPv6, networkMask: ConnectedRoutes[i].Mask, nextHopIp: ConnectedRoutes[i].NextHopIp, nextHopIfIndex: ribd.Int(ConnectedRoutes[i].IfIndex), metric: ribd.Int(ConnectedRoutes[i].Metric), routeType: ribd.Int(ConnectedRoutes[i].Prototype), sliceIdx: ribd.Int(ConnectedRoutes[i].SliceIdx), createType: FIBOnly, deleteType: Invalid}
+			//			PolicyEngineFilter(policyRoute, policyCommonDefs.PolicyPath_Import, params)
+			cfg := ribd.IPv6Route{
+				DestinationNw: ipAddrStr,
+				Protocol:      "CONNECTED",
+				Cost:          0,
+				NetworkMask:   ipMaskStr,
+			}
+			nextHop := ribd.NextHopInfo{
+				NextHopIp:     "::",
+				NextHopIntRef: strconv.Itoa(int(ifIndex)),
+			}
+			cfg.NextHop = make([]*ribd.NextHopInfo, 0)
+			cfg.NextHop = append(cfg.NextHop, &nextHop)
+
+			ribdServiceHandler.RouteConfCh <- RIBdServerConfig{
+				OrigConfigObject: &cfg,
+				Op:               "addv6FIBOnly",
+			}
 		}
 	}
 }
@@ -326,7 +440,6 @@ func getPortInfo() {
 		logger.Info("len(bulkInfo.PortStateList)  = ", len(bulkInfo.PortStateList), " num objects returned = ", bulkInfo.Count)
 		for i := 0; i < int(bulkInfo.Count); i++ {
 			ifId := bulkInfo.PortStateList[i].IfIndex
-			logger.Info("ifId = ", ifId)
 			if IntfIdNameMap == nil {
 				IntfIdNameMap = make(map[int32]IntfEntry)
 			}
@@ -336,6 +449,7 @@ func getPortInfo() {
 				IfNameToIfIndex = make(map[string]int32)
 			}
 			IfNameToIfIndex[bulkInfo.PortStateList[i].Name] = ifId
+			logger.Info("ifId = ", ifId, "IntfIdNameMap[", ifId, "] = ", IntfIdNameMap[ifId], "IfNameToIfIndex[", bulkInfo.PortStateList[i].Name, "] = ", IfNameToIfIndex[bulkInfo.PortStateList[i].Name])
 		}
 		if bulkInfo.More == false {
 			logger.Info("more returned as false, so no more get bulks")
@@ -384,6 +498,7 @@ func (ribdServiceHandler *RIBDServer) InitializeGlobalPolicyDB() *policy.PolicyE
 	ribdServiceHandler.GlobalPolicyEngineDB.SetTraverseAndApplyPolicyFunc(policyEngineTraverseAndApply)
 	ribdServiceHandler.GlobalPolicyEngineDB.SetTraverseAndReversePolicyFunc(policyEngineTraverseAndReverse)
 	ribdServiceHandler.GlobalPolicyEngineDB.SetGetPolicyEntityMapIndexFunc(getPolicyRouteMapIndex)
+	ribdServiceHandler.GlobalPolicyEngineDB.Global = true //this policy engine does not apply the policies
 	return ribdServiceHandler.GlobalPolicyEngineDB
 }
 
@@ -428,15 +543,16 @@ func NewRIBDServicesHandler(dbHdl *dbutils.DBUtil, loggerC *logging.Writer) *RIB
 	ribdServicesHandler.AsicdRouteCh = make(chan RIBdServerConfig, 100000)
 	ribdServicesHandler.ArpdRouteCh = make(chan RIBdServerConfig, 5000)
 	ribdServicesHandler.NotificationChannel = make(chan NotificationMsg, 5000)
-	ribdServicesHandler.PolicyConditionConfCh = make(chan RIBdServerConfig, 5000)
-	ribdServicesHandler.PolicyActionConfCh = make(chan RIBdServerConfig, 5000)
-	ribdServicesHandler.PolicyStmtConfCh = make(chan RIBdServerConfig, 5000)
-	ribdServicesHandler.PolicyDefinitionConfCh = make(chan RIBdServerConfig, 5000)
-	ribdServicesHandler.PolicyApplyCh = make(chan ApplyPolicyInfo, 100)
-	ribdServicesHandler.PolicyUpdateApplyCh = make(chan ApplyPolicyInfo, 100)
+	/*	ribdServicesHandler.PolicyConditionConfCh = make(chan RIBdServerConfig, 5000)
+		ribdServicesHandler.PolicyActionConfCh = make(chan RIBdServerConfig, 5000)
+		ribdServicesHandler.PolicyStmtConfCh = make(chan RIBdServerConfig, 5000)*/
+	ribdServicesHandler.PolicyConfCh = make(chan RIBdServerConfig, 5000)
+	//ribdServicesHandler.PolicyApplyCh = make(chan ApplyPolicyList, 100)
+	ribdServicesHandler.PolicyUpdateApplyCh = make(chan ApplyPolicyList, 100)
 	ribdServicesHandler.DBRouteCh = make(chan RIBdServerConfig, 100000)
 	ribdServicesHandler.ServerUpCh = make(chan bool)
 	ribdServicesHandler.DBReadDone = make(chan bool)
+	ribdServicesHandler.PolicyConfDone = make(chan error)
 	ribdServicesHandler.DbHdl = dbHdl
 	RouteServiceHandler = ribdServicesHandler
 	//ribdServicesHandler.RouteInstallCh = make(chan RouteParams)
@@ -474,18 +590,18 @@ func (ribdServiceHandler *RIBDServer) StartServer(paramsDir string) {
 	count := 0
 	for {
 		if !RouteServiceHandler.AcceptConfig {
-			if count%1000 == 0 {
-				logger.Debug("RIBD not ready to accept config")
+			if count%10000 == 0 {
+				//				logger.Debug("RIBD not ready to accept config")
 			}
 			count++
 			continue
 		}
 		select {
-		case info := <-ribdServiceHandler.PolicyApplyCh:
-			//logger.Debug("received message on PolicyApplyCh channel")
-			//update the local policyEngineDB
-			ribdServiceHandler.UpdateApplyPolicy(info, true, PolicyEngineDB)
-			ribdServiceHandler.PolicyUpdateApplyCh <- info
+		/*case list := <-ribdServiceHandler.PolicyApplyCh:
+		logger.Debug("received message on PolicyApplyCh channel")
+		//update the local policyEngineDB
+		ribdServiceHandler.UpdateApplyPolicyList(list.ApplyList, list.UndoList, true, PolicyEngineDB)
+		ribdServiceHandler.PolicyUpdateApplyCh <- list)*/
 		case info := <-ribdServiceHandler.TrackReachabilityCh:
 			//logger.Debug("received message on TrackReachabilityCh channel")
 			ribdServiceHandler.TrackReachabilityStatus(info.IpAddr, info.Protocol, info.Op)

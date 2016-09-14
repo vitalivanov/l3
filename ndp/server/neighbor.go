@@ -82,9 +82,9 @@ func (c *NeighborInfo) DeInit() {
 	// stopping all three timers in accending order
 	c.StopReTransmitTimer()
 	c.StopReachableTimer()
-	c.StopReComputeBaseTimer()
 	c.StopDelayProbeTimer()
 	c.StopInvalidTimer()
+	c.StopReComputeBaseTimer()
 }
 
 /*
@@ -104,7 +104,7 @@ func (c *NeighborInfo) InitCache(reachableTime, retransTime uint32, nbrKey strin
 	c.State = INCOMPLETE
 	ipMacStr := strings.Split(nbrKey, "_")
 	c.IpAddr = ipMacStr[0]
-	c.LinkLayerAddress = ipMacStr[1]
+	c.LinkLayerAddress = ipMacStr[1] // this is mac address
 	c.ProbesSent = uint8(0)
 	c.ReturnCh = pktCh
 	c.IfIndex = ifIndex

@@ -13,23 +13,23 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 package rpc
 
 import (
 	"bfdd"
 	"errors"
-	"fmt"
 	"l3/bfd/bfddCommonDefs"
 	"l3/bfd/server"
 	"strconv"
+	"time"
 )
 
 func (h *BFDHandler) convertGlobalStateToThrift(ent server.GlobalState) *bfdd.BfdGlobalState {
@@ -42,7 +42,7 @@ func (h *BFDHandler) convertGlobalStateToThrift(ent server.GlobalState) *bfdd.Bf
 }
 
 func (h *BFDHandler) GetBulkBfdGlobalState(fromIdx bfdd.Int, count bfdd.Int) (*bfdd.BfdGlobalStateGetInfo, error) {
-	h.logger.Info(fmt.Sprintln("Get BFD global state"))
+	h.logger.Info("Get BFD global state")
 
 	if fromIdx != 0 {
 		err := errors.New("Invalid range")
@@ -82,9 +82,8 @@ func (h *BFDHandler) convertSessionStateToThrift(ent server.SessionState) *bfdd.
 	sessionState.SessionId = int32(ent.SessionId)
 	sessionState.IpAddr = string(ent.IpAddr)
 	sessionState.ParamName = string(ent.ParamName)
-	sessionState.IfIndex = int32(ent.InterfaceId)
+	sessionState.IntfRef = string(ent.Interface)
 	sessionState.InterfaceSpecific = ent.InterfaceSpecific
-	sessionState.IfName = ent.InterfaceName
 	sessionState.PerLinkSession = ent.PerLinkSession
 	sessionState.LocalMacAddr = string(ent.LocalMacAddr.String())
 	sessionState.RemoteMacAddr = string(ent.RemoteMacAddr.String())
@@ -107,6 +106,13 @@ func (h *BFDHandler) convertSessionStateToThrift(ent server.SessionState) *bfdd.
 	sessionState.SentAuthSeq = int32(ent.SentAuthSeq)
 	sessionState.NumTxPackets = int32(ent.NumTxPackets)
 	sessionState.NumRxPackets = int32(ent.NumRxPackets)
+	sessionState.ToDownCount = int32(ent.ToDownCount)
+	sessionState.ToUpCount = int32(ent.ToUpCount)
+	if ent.SessionState == server.STATE_UP {
+		sessionState.UpDuration = string(time.Since(ent.UpTime).String())
+	} else {
+		sessionState.UpDuration = string("NA")
+	}
 	return sessionState
 }
 
@@ -127,7 +133,7 @@ func (h *BFDHandler) convertSessionParamStateToThrift(ent server.SessionParamSta
 }
 
 func (h *BFDHandler) GetBulkBfdSessionState(fromIdx bfdd.Int, count bfdd.Int) (*bfdd.BfdSessionStateGetInfo, error) {
-	h.logger.Info(fmt.Sprintln("Get session states"))
+	h.logger.Info("Get session states")
 	nextIdx, currCount, bfdSessionStates := h.server.GetBulkBfdSessionStates(int(fromIdx), int(count))
 	if bfdSessionStates == nil {
 		err := errors.New("Bfd server is busy")
@@ -147,7 +153,7 @@ func (h *BFDHandler) GetBulkBfdSessionState(fromIdx bfdd.Int, count bfdd.Int) (*
 }
 
 func (h *BFDHandler) GetBulkBfdSessionParamState(fromIdx bfdd.Int, count bfdd.Int) (*bfdd.BfdSessionParamStateGetInfo, error) {
-	h.logger.Info(fmt.Sprintln("Get session param states"))
+	h.logger.Info("Get session param states")
 	nextIdx, currCount, bfdSessionParamStates := h.server.GetBulkBfdSessionParamStates(int(fromIdx), int(count))
 	if bfdSessionParamStates == nil {
 		err := errors.New("Bfd server is busy")

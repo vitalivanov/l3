@@ -84,6 +84,20 @@ func NewNeighborConf(logger *logging.Writer, globalConf *config.GlobalConfig, pe
 	return &conf
 }
 
+func (n *NeighborConf) SetNeighborAddress(ip net.IP) {
+	n.Neighbor.NeighborAddress = ip
+	n.Neighbor.Config.NeighborAddress = ip
+	n.Neighbor.State.NeighborAddress = ip
+	n.RunningConf.NeighborAddress = ip
+}
+
+func (n *NeighborConf) ResetNeighborAddress() {
+	n.RunningConf.NeighborAddress = nil
+	n.Neighbor.NeighborAddress = nil
+	n.Neighbor.Config.NeighborAddress = nil
+	n.Neighbor.State.NeighborAddress = nil
+}
+
 func (n *NeighborConf) SetNeighborState(peerConf *config.NeighborConfig) {
 	n.Neighbor.State = config.NeighborState{
 		PeerAS:                  peerConf.PeerAS,
@@ -114,15 +128,21 @@ func (n *NeighborConf) SetNeighborState(peerConf *config.NeighborConfig) {
 	n.MaxPrefixesThreshold = uint32(float64(peerConf.MaxPrefixes*uint32(peerConf.MaxPrefixesThresholdPct)) / 100)
 }
 
+func (n *NeighborConf) copyNonKeyNeighConfAttrs(nConf config.NeighborConfig) {
+	n.Neighbor.Config.BaseConfig = nConf.BaseConfig
+}
+
 func (n *NeighborConf) UpdateNeighborConf(nConf config.NeighborConfig, bgp *config.Bgp) {
-	n.Neighbor.NeighborAddress = nConf.NeighborAddress
-	n.Neighbor.Config = nConf
+	n.copyNonKeyNeighConfAttrs(nConf)
 	n.RunningConf = config.NeighborConfig{}
 	if (n.Group == nil && nConf.PeerGroup != "") || (n.Group != nil && nConf.PeerGroup != n.Group.Name) {
-		if peerGroup, ok := bgp.PeerGroups[nConf.PeerGroup]; ok {
-			n.GetNeighConfFromPeerGroup(&peerGroup.Config, &n.RunningConf)
-		} else {
-			n.logger.Err("Peer group", nConf.PeerGroup, "not found in BGP config")
+		protoFamily, _ := packet.GetProtocolFamilyFromPeerAddrType(nConf.PeerAddressType)
+		if _, ok := bgp.PeerGroups[protoFamily]; ok {
+			if peerGroup, ok := bgp.PeerGroups[protoFamily][nConf.PeerGroup]; ok {
+				n.GetNeighConfFromPeerGroup(&peerGroup.Config, &n.RunningConf)
+			} else {
+				n.logger.Err("Peer group", nConf.PeerGroup, "not found in BGP config")
+			}
 		}
 	}
 	n.GetConfFromNeighbor(&n.Neighbor.Config, &n.RunningConf)
@@ -245,9 +265,28 @@ func (n *NeighborConf) GetConfFromNeighbor(inConf *config.NeighborConfig, outCon
 		outConf.AdjRIBOutFilter = inConf.AdjRIBOutFilter
 	}
 
+	n.setDefaults(outConf)
+	outConf.PeerAddressType = inConf.PeerAddressType
 	outConf.NeighborAddress = inConf.NeighborAddress
 	outConf.IfIndex = inConf.IfIndex
+	outConf.IfName = inConf.IfName
 	outConf.PeerGroup = inConf.PeerGroup
+}
+
+func (n *NeighborConf) setDefaults(nConf *config.NeighborConfig) {
+	if nConf.ConnectRetryTime == 0 {
+		nConf.ConnectRetryTime = config.BGPConnectRetryTime
+	}
+
+	if nConf.HoldTime == 0 { // default hold time is 180 seconds
+		nConf.HoldTime = config.BGPHoldTimeDefault
+	} else if nConf.HoldTime < 3 {
+		nConf.HoldTime = 3
+	}
+
+	if nConf.KeepaliveTime == 0 { // default keep alive time is 60 seconds
+		nConf.KeepaliveTime = nConf.HoldTime / 3
+	}
 }
 
 func (n *NeighborConf) IsInternal() bool {

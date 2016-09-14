@@ -25,27 +25,26 @@ package relayServer
 
 import (
 	"dhcprelayd"
-	"fmt"
 	"models/objects"
 	"utils/dbutils"
 )
 
 func DhcpRelayAgentInitDB() error {
-	logger.Info("DRA: initializing DB")
+	logger.Debug("DRA: initializing DB")
 	var err error
 	dhcprelayDbHdl = dbutils.NewDBUtil(logger)
 	err = dhcprelayDbHdl.Connect()
 	if err != nil {
-		logger.Err(fmt.Sprintln("DRA: Failed to create db handle", err))
+		logger.Err("DRA: Failed to create db handle", err)
 		return err
 	}
 
-	logger.Info("DRA: SQL DB init success")
+	logger.Debug("DRA: SQL DB init success")
 	return err
 }
 
 func DhcpRelayAgentReadDB() {
-	logger.Info("Reading Dhcp Relay Global Config from DB")
+	logger.Debug("Reading Dhcp Relay Global Config from DB")
 	if dhcprelayDbHdl == nil {
 		return
 	}
@@ -84,8 +83,7 @@ func DhcpRelayAgentReadDB() {
 		DhcpRelayAgentInitIntfState(IfIndex)
 		readIfIndex = append(readIfIndex, IfIndex)
 		for _, serverIp := range obj.ServerIp {
-			logger.Info(fmt.Sprintln("DRA: ifindex:", IfIndex, "Server Ip:",
-				serverIp))
+			logger.Debug("DRA: ifindex:", IfIndex, "Server Ip:", serverIp)
 			DhcpRelayAgentUpdateIntfServerIp(IfIndex, serverIp)
 		}
 	}

@@ -209,6 +209,7 @@ func convertModelsToPolicyDefintionConfig(cfg *objects.PolicyDefinition) *utilsp
 		Precedence:                 int(cfg.Priority),
 		MatchType:                  cfg.MatchType,
 		PolicyDefinitionStatements: stmtPrecedenceList,
+		PolicyType:                 cfg.PolicyType,
 	}
 }
 
@@ -233,7 +234,7 @@ func (mgr *FSPolicyMgr) handlePolicyDefinitionUpdates(msg ribdCommonDefs.RibdNot
 		return
 	}
 
-	mgr.logger.Info(updateMsg, "Policy definition", policyDefinition.Name)
+	mgr.logger.Info(updateMsg, "Policy definition", policyDefinition.Name, " policy type:", policyDefinition.PolicyType)
 	condition := convertModelsToPolicyDefintionConfig(&policyDefinition)
 	if condition == nil {
 		mgr.logger.Err(updateMsg, "Policy definition", policyDefinition.Name, "conversion failed")

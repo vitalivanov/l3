@@ -27,6 +27,7 @@ package server
 import (
 	"asicd/asicdCommonDefs"
 	"encoding/json"
+	//"fmt"
 	"github.com/op/go-nanomsg"
 	"net"
 	"ribd"
@@ -73,6 +74,7 @@ func (ribdServiceHandler *RIBDServer) ProcessIPv4IntfCreateEvent(msg asicdCommon
 	ipAddrStr := ip.String()
 	ipMaskStr := net.IP(ipMask).String()
 	ribdServiceHandler.Logger.Info("Calling createv4Route with ipaddr ", ipAddrStr, " mask ", ipMaskStr, " nextHopIntRef: ", strconv.Itoa(int(msg.IfIndex)))
+	//fmt.Println("Calling createv4Route with ipaddr ", ipAddrStr, " mask ", ipMaskStr, " nextHopIntRef: ", strconv.Itoa(int(msg.IfIndex)))
 	cfg := ribd.IPv4Route{
 		DestinationNw: ipAddrStr,
 		Protocol:      "CONNECTED",
@@ -109,7 +111,7 @@ func (ribdServiceHandler *RIBDServer) ProcessIPv6IntfCreateEvent(msg asicdCommon
 		NetworkMask:   ipMaskStr,
 	}
 	nextHop := ribd.NextHopInfo{
-		NextHopIp:     "0.0.0.0",
+		NextHopIp:     "::",
 		NextHopIntRef: strconv.Itoa(int(msg.IfIndex)),
 	}
 	cfg.NextHop = make([]*ribd.NextHopInfo, 0)
@@ -167,7 +169,7 @@ func (ribdServiceHandler *RIBDServer) ProcessIPv6IntfDeleteEvent(msg asicdCommon
 		NetworkMask:   ipMaskStr,
 	}
 	nextHop := ribd.NextHopInfo{
-		NextHopIp:     "0.0.0.0",
+		NextHopIp:     "::",
 		NextHopIntRef: strconv.Itoa(int(msg.IfIndex)),
 	}
 	cfg.NextHop = make([]*ribd.NextHopInfo, 0)
@@ -177,18 +179,18 @@ func (ribdServiceHandler *RIBDServer) ProcessIPv6IntfDeleteEvent(msg asicdCommon
 		Op:               "delv6",
 	}
 }
-func (ribdServiceHandler *RIBDServer) ProcessL3IntfUpEvent(ipAddr string, ipType int) {
+func (ribdServiceHandler *RIBDServer) ProcessL3IntfUpEvent(ipAddr string, ipType int, ifIndex int32) {
 	if ipType == asicdCommonDefs.IP_TYPE_IPV4 {
-		ribdServiceHandler.ProcessIPv4IntfUpEvent(ipAddr)
+		ribdServiceHandler.ProcessIPv4IntfUpEvent(ipAddr, ifIndex)
 	} else {
-		ribdServiceHandler.ProcessIPv6IntfUpEvent(ipAddr)
+		ribdServiceHandler.ProcessIPv6IntfUpEvent(ipAddr, ifIndex)
 	}
 }
-func (ribdServiceHandler *RIBDServer) ProcessL3IntfDownEvent(ipAddr string, ipType int) {
+func (ribdServiceHandler *RIBDServer) ProcessL3IntfDownEvent(ipAddr string, ipType int, ifIndex int32) {
 	if ipType == asicdCommonDefs.IP_TYPE_IPV4 {
-		ribdServiceHandler.ProcessIPv4IntfDownEvent(ipAddr)
+		ribdServiceHandler.ProcessIPv4IntfDownEvent(ipAddr, ifIndex)
 	} else {
-		ribdServiceHandler.ProcessIPv6IntfDownEvent(ipAddr)
+		ribdServiceHandler.ProcessIPv6IntfDownEvent(ipAddr, ifIndex)
 	}
 }
 func (ribdServiceHandler *RIBDServer) ProcessAsicdEvents(sub *nanomsg.SubSocket) {
@@ -237,13 +239,13 @@ func (ribdServiceHandler *RIBDServer) ProcessAsicdEvents(sub *nanomsg.SubSocket)
 				ribdServiceHandler.Logger.Info("Error in reading msg ", err)
 				return
 			}
-			ribdServiceHandler.Logger.Info("Msg linkstatus = %d msg ifType = %d ifId = %d\n", msg.IfState, msg.IfIndex)
+			ribdServiceHandler.Logger.Info("Msg linkstatus = ", msg.IfState, " msg  ifId ", msg.IfIndex)
 			if msg.IfState == asicdCommonDefs.INTF_STATE_DOWN {
 				//processLinkDownEvent(ribd.Int(msg.IfType), ribd.Int(msg.IfId))
-				ribdServiceHandler.ProcessL3IntfDownEvent(msg.IpAddr, msg.IpType)
+				ribdServiceHandler.ProcessL3IntfDownEvent(msg.IpAddr, msg.IpType, msg.IfIndex)
 			} else {
 				//processLinkUpEvent(ribd.Int(msg.IfType), ribd.Int(msg.IfId))
-				ribdServiceHandler.ProcessL3IntfUpEvent(msg.IpAddr, msg.IpType)
+				ribdServiceHandler.ProcessL3IntfUpEvent(msg.IpAddr, msg.IpType, msg.IfIndex)
 			}
 			break
 		case asicdCommonDefs.NOTIFY_IPV4INTF_CREATE:

@@ -27,10 +27,10 @@ import (
 	"bgpd"
 	"errors"
 	_ "fmt"
+	ovsdb "github.com/socketplane/libovsdb"
+	bgputils "l3/bgp/utils"
 	"net"
 	"strings"
-
-	ovsdb "github.com/socketplane/libovsdb"
 )
 
 const (
@@ -183,7 +183,7 @@ func (ovsHdl *BGPOvsdbHandler) DumpBgpNeighborInfo(addrs []net.IP, uuids []UUID,
 				//ovsHdl.logger.Info("new value:", value.New)
 				//ovsHdl.logger.Info("old value:", value.Old)
 				//ovsHdl.logger.Info("uuid", uuid, "key uuid", key)
-				newPeerAS, ok := value.New.Fields["remote_as"].(float64)
+				newPeerAS, ok := value.New.Fields["remote_as"].(int)
 				if !ok {
 					ovsHdl.logger.Warning("no asn")
 					continue
@@ -191,9 +191,19 @@ func (ovsHdl *BGPOvsdbHandler) DumpBgpNeighborInfo(addrs []net.IP, uuids []UUID,
 				newNeighborAddr := addrs[idx].String()
 				// @TODO: remove this neighbor config thrift call once interface for
 				// listener side is already implemented
+				peerAS, err := bgputils.GetAsDot(int(newPeerAS))
+				if err != nil {
+					ovsHdl.logger.Err("Invalid peer asnum")
+					continue
+				}
+				localAS, err := bgputils.GetAsDot(int(ovsHdl.routerInfo.asn))
+				if err != nil {
+					ovsHdl.logger.Err("Invalid local asnum")
+					continue
+				}
 				neighborCfg := &bgpd.BGPv4Neighbor{
-					PeerAS:          int32(newPeerAS),
-					LocalAS:         int32(ovsHdl.routerInfo.asn),
+					PeerAS:          peerAS,
+					LocalAS:         localAS,
 					NeighborAddress: newNeighborAddr,
 				}
 				ovsHdl.logger.Info("PeerAS", newPeerAS)
@@ -258,8 +268,13 @@ func (ovsHdl *BGPOvsdbHandler) DumpBgpNeighborInfo(addrs []net.IP, uuids []UUID,
  *  parse/collected from ovsdb update
  */
 func (ovsHdl *BGPOvsdbHandler) CreateBgpGlobalConfig(rtrInfo *BGPOvsRouterInfo) *bgpd.BGPGlobal {
+	asnum, err := bgputils.GetAsDot(int(rtrInfo.asn))
+	if err != nil {
+		ovsHdl.logger.Err("Invalid peer asnum")
+		return nil
+	}
 	bgpGlobal := &bgpd.BGPGlobal{
-		ASNum:            int32(rtrInfo.asn),
+		ASNum:            (asnum),
 		RouterId:         rtrInfo.routerId,
 		UseMultiplePaths: true,
 		EBGPMaxPaths:     32,

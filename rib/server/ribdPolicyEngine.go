@@ -30,6 +30,7 @@ import (
 	"ribdInt"
 	"strconv"
 	"strings"
+	netUtils "utils/netUtils"
 	"utils/patriciaDB"
 	"utils/policy"
 	"utils/policy/policyCommonDefs"
@@ -82,7 +83,7 @@ func policyEngineActionRejectRoute(params interface{}) {
 	}
 	cfg.NextHop = make([]*ribd.NextHopInfo, 0)
 	cfg.NextHop = append(cfg.NextHop, &nextHop)
-	_, err := RouteServiceHandler.ProcessV4RouteDeleteConfig(&cfg) //routeInfo.destNetIp, routeInfo.networkMask, ReverseRouteProtoTypeMapDB[int(routeInfo.routeType)], routeInfo.nextHopIp) // FIBAndRIB)//,ribdCommonDefs.RoutePolicyStateChangetoInValid)
+	_, err := RouteServiceHandler.ProcessV4RouteDeleteConfig(&cfg, FIBAndRIB) //routeInfo.destNetIp, routeInfo.networkMask, ReverseRouteProtoTypeMapDB[int(routeInfo.routeType)], routeInfo.nextHopIp) // FIBAndRIB)//,ribdCommonDefs.RoutePolicyStateChangetoInValid)
 	if err != nil {
 		logger.Info("deleting v4 route failed with err ", err)
 		return
@@ -499,6 +500,15 @@ func policyEngineActionRedistribute(actionInfo interface{}, conditionInfo []inte
 		logger.Info("Redistribute target protocol same as route source, do nothing more here")
 		return
 	}
+	if RouteInfo.ipType == ribdCommonDefs.IPv6 {
+		testIp := RouteInfo.destNetIp + "/128"
+		logger.Info("Redistribute: route dest ip info:", RouteInfo.destNetIp)
+		inRange := netUtils.CheckIfInRange(testIp, "fe80::/10", 10, 128)
+		if inRange {
+			//link local ip , dont redistribute
+			return
+		}
+	}
 	route = ribdInt.Routes{Ipaddr: RouteInfo.destNetIp, Mask: RouteInfo.networkMask, NextHopIp: RouteInfo.nextHopIp, IPAddrType: ribdInt.Int(RouteInfo.ipType), IfIndex: ribdInt.Int(RouteInfo.nextHopIfIndex), Metric: ribdInt.Int(RouteInfo.metric), Prototype: ribdInt.Int(RouteInfo.routeType)}
 	route.RouteOrigin = ReverseRouteProtoTypeMapDB[int(RouteInfo.routeType)]
 	publisherInfo, ok := PublisherInfoMap[redistributeActionInfo.RedistributeTargetProtocol]
@@ -513,7 +523,7 @@ func policyEngineActionRedistribute(actionInfo interface{}, conditionInfo []inte
 
 func UpdateRouteAndPolicyDB(policyDetails policy.PolicyDetails, params interface{}) {
 	routeInfo := params.(RouteParams)
-	route := ribdInt.Routes{Ipaddr: routeInfo.destNetIp, Mask: routeInfo.networkMask, NextHopIp: routeInfo.nextHopIp, IfIndex: ribdInt.Int(routeInfo.nextHopIfIndex), Metric: ribdInt.Int(routeInfo.metric), Prototype: ribdInt.Int(routeInfo.routeType)}
+	route := ribdInt.Routes{Ipaddr: routeInfo.destNetIp, Mask: routeInfo.networkMask, IPAddrType: ribdInt.Int(routeInfo.ipType), NextHopIp: routeInfo.nextHopIp, IfIndex: ribdInt.Int(routeInfo.nextHopIfIndex), Metric: ribdInt.Int(routeInfo.metric), Prototype: ribdInt.Int(routeInfo.routeType)}
 	var op int
 	if routeInfo.deleteType != Invalid {
 		op = del
@@ -539,7 +549,7 @@ func DoesRouteExist(params interface{}) (exists bool) {
 	}
 	routeInfoRecordList := RouteInfoMapGet(routeInfo.ipType, ipPrefix)
 	if routeInfoRecordList == nil {
-		logger.Info("Route for this prefix no longer exists")
+		logger.Info("Route for type ", routeInfo.ipType, " and prefix", ipPrefix, " no longer exists")
 		routeDeleted = true
 	} else {
 		if routeInfoRecordList.(RouteInfoRecordList).selectedRouteProtocol != ReverseRouteProtoTypeMapDB[int(routeInfo.routeType)] {
@@ -583,7 +593,21 @@ func PolicyEngineFilter(route ribdInt.Routes, policyPath int, params interface{}
 		return
 	}
 	routeInfo := params.(RouteParams)
-	logger.Info("PolicyEngineFilter for policypath ", policyPath_Str, "createType = ", routeInfo.createType, " deleteType = ", routeInfo.deleteType, " route: ", route.Ipaddr, ":", route.Mask, " protocol type: ", route.Prototype)
+	//if the policy type if ipv6, check if it is link local
+	if routeInfo.ipType == ribdCommonDefs.IPv6 {
+		testIp := routeInfo.destNetIp + "/128"
+		logger.Info("Redistribute: route dest ip info:", routeInfo.destNetIp)
+		inRange := netUtils.CheckIfInRange(testIp, "fe80::/10", 10, 128)
+		if inRange {
+			//link local ip , dont redistribute
+			return
+		}
+	}
+	if destNetSlice[routeInfo.sliceIdx].isValid == false && routeInfo.createType != Invalid && policyPath == policyCommonDefs.PolicyPath_Export {
+		logger.Info("route down, return from policyenginefilter for deletetype and export path")
+		return
+	}
+	logger.Info("PolicyEngineFilter for policypath ", policyPath_Str, "createType = ", routeInfo.createType, " deleteType = ", routeInfo.deleteType, " route: ", route.Ipaddr, ":", route.Mask, " protocol type: ", route.Prototype, " addrtype:", route.IPAddrType)
 	entity, err := buildPolicyEntityFromRoute(route, params)
 	if err != nil {
 		logger.Info(("Error building policy params"))
@@ -602,14 +626,14 @@ func PolicyEngineFilter(route ribdInt.Routes, policyPath int, params interface{}
 }
 
 func policyEngineApplyForRoute(prefix patriciaDB.Prefix, item patriciaDB.Item, traverseAndApplyPolicyDataInfo patriciaDB.Item) (err error) {
-	logger.Info("policyEngineApplyForRoute")
+	logger.Info("policyEngineApplyForRoute for route:", item)
 	traverseAndApplyPolicyData := traverseAndApplyPolicyDataInfo.(TraverseAndApplyPolicyData)
 	rmapInfoRecordList := item.(RouteInfoRecordList)
 	if rmapInfoRecordList.routeInfoProtocolMap == nil {
 		logger.Info(("rmapInfoRecordList.routeInfoProtocolMap) = nil"))
 		return err
 	}
-	logger.Info("Selected route protocol = ", rmapInfoRecordList.selectedRouteProtocol)
+	logger.Debug("rmapInfoRecordList:", rmapInfoRecordList, " Selected route protocol = ", rmapInfoRecordList.selectedRouteProtocol)
 	selectedRouteList := rmapInfoRecordList.routeInfoProtocolMap[rmapInfoRecordList.selectedRouteProtocol]
 	if len(selectedRouteList) == 0 {
 		logger.Info("len(selectedRouteList) == 0")
@@ -618,6 +642,7 @@ func policyEngineApplyForRoute(prefix patriciaDB.Prefix, item patriciaDB.Item, t
 	for i := 0; i < len(selectedRouteList); i++ {
 		selectedRouteInfoRecord := selectedRouteList[i]
 		if destNetSlice[selectedRouteInfoRecord.sliceIdx].isValid == false {
+			logger.Debug("route ", selectedRouteInfoRecord, " not valid, continue")
 			continue
 		}
 		policyRoute := ribdInt.Routes{Ipaddr: selectedRouteInfoRecord.destNetIp.String(), Mask: selectedRouteInfoRecord.networkMask.String(), NextHopIp: selectedRouteInfoRecord.nextHopIp.String(), IfIndex: ribdInt.Int(selectedRouteInfoRecord.nextHopIfIndex), Metric: ribdInt.Int(selectedRouteInfoRecord.metric), Prototype: ribdInt.Int(selectedRouteInfoRecord.protocol), IsPolicyBasedStateValid: rmapInfoRecordList.isPolicyBasedStateValid}
@@ -641,8 +666,9 @@ func policyEngineTraverseAndApply(data interface{}, updatefunc policy.PolicyAppl
 	V4RouteInfoMap.VisitAndUpdate(policyEngineApplyForRoute, traverseAndApplyPolicyData)
 	V6RouteInfoMap.VisitAndUpdate(policyEngineApplyForRoute, traverseAndApplyPolicyData)
 }
-func policyEngineTraverseAndReverse(policyItem interface{}) {
-	policy := policyItem.(policy.Policy)
+func policyEngineTraverseAndReverse(applyPolicyItem interface{}) {
+	applyPolicyInfo := applyPolicyItem.(policy.ApplyPolicyInfo)
+	policy := applyPolicyInfo.ApplyPolicy //policyItem.(policy.Policy)
 	logger.Info("PolicyEngineTraverseAndReverse - traverse routing table and inverse policy actions", policy.Name)
 	ext := policy.Extensions.(PolicyExtensions)
 	if ext.routeList == nil {
@@ -664,8 +690,11 @@ func policyEngineTraverseAndReverse(policyItem interface{}) {
 			logger.Err("Error builiding policy entity params")
 			return
 		}
-		PolicyEngineDB.PolicyEngineUndoPolicyForEntity(entity, policy, params)
-		deleteRoutePolicyState(params.ipType, ipPrefix, policy.Name)
-		PolicyEngineDB.DeletePolicyEntityMapEntry(entity, policy.Name)
+		//PolicyEngineDB.PolicyEngineUndoPolicyForEntity(entity, policy, params)
+		success := PolicyEngineDB.PolicyEngineUndoApplyPolicyForEntity(entity, applyPolicyInfo, params)
+		if success {
+			deleteRoutePolicyState(params.ipType, ipPrefix, policy.Name)
+			PolicyEngineDB.DeletePolicyEntityMapEntry(entity, policy.Name)
+		}
 	}
 }

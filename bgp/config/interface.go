@@ -23,6 +23,11 @@
 
 package config
 
+import (
+	"bgpd"
+	"models/objects"
+)
+
 /*  Port/Interface state change manager.
  */
 type IntfStateMgrIntf interface {
@@ -43,11 +48,11 @@ type IntfStateMgrIntf interface {
  */
 type RouteMgrIntf interface {
 	Start()
-	GetNextHopInfo(ipAddr string) (*NextHopInfo, error)
+	GetNextHopInfo(ipAddr string, ifIndex int32) (*NextHopInfo, error)
 	CreateRoute(*RouteConfig)
 	DeleteRoute(*RouteConfig)
 	UpdateRoute(cfg *RouteConfig, op string)
-	ApplyPolicy(protocol string, policy string, action string, conditions []*ConditionInfo)
+	ApplyPolicy(applyList []*ApplyPolicyInfo, undoList []*ApplyPolicyInfo)
 	GetRoutes() ([]*RouteInfo, []*RouteInfo)
 }
 
@@ -61,6 +66,21 @@ type PolicyMgrIntf interface {
  */
 type BfdMgrIntf interface {
 	Start()
-	CreateBfdSession(ipAddr string, sessionParam string) (bool, error)
-	DeleteBfdSession(ipAddr string) (bool, error)
+	CreateBfdSession(ipAddr string, iface string, sessionParam string) (bool, error)
+	DeleteBfdSession(ipAddr string, iface string) (bool, error)
+}
+
+type ModelRouteIntf interface {
+	GetModelObject() objects.ConfigObj
+	GetThriftObject() interface{}
+	SetNetwork(string)
+	GetNetwork() string
+	SetCIDRLen(int16)
+	GetCIDRLen() int16
+	GetPaths() []*bgpd.PathInfo
+	AppendPath(*bgpd.PathInfo)
+	SetPath(*bgpd.PathInfo, int)
+	GetPath(int) *bgpd.PathInfo
+	GetLastPath() *bgpd.PathInfo
+	RemovePathAndSetLast(int)
 }

@@ -25,6 +25,7 @@ package server
 import (
 	"github.com/google/gopacket/layers"
 	"l3/ndp/config"
+	"l3/ndp/debug"
 	"l3/ndp/packet"
 )
 
@@ -37,6 +38,7 @@ import (
  * fill the NDInfo and then return it back to caller
  */
 func (intf *Interface) processRA(ndInfo *packet.NDInfo) (nbrInfo *config.NeighborConfig, oper NDP_OPERATION) {
+	debug.Logger.Debug("Processing RA packet:", *ndInfo)
 	nbrKey := intf.createNbrKey(ndInfo)
 	nbr, exists := intf.Neighbor[nbrKey]
 	if exists {
@@ -57,6 +59,7 @@ func (intf *Interface) processRA(ndInfo *packet.NDInfo) (nbrInfo *config.Neighbo
 			oper = UPDATE
 		}
 	} else {
+		debug.Logger.Debug("New Neighbor learned via RA:", nbrKey)
 		// create new neighbor
 		nbr.InitCache(intf.reachableTime, intf.retransTime, nbrKey, intf.PktDataCh, intf.IfIndex)
 		nbr.InValidTimer(ndInfo.RouterLifetime)
@@ -64,9 +67,9 @@ func (intf *Interface) processRA(ndInfo *packet.NDInfo) (nbrInfo *config.Neighbo
 		nbr.State = REACHABLE
 		nbrInfo = nbr.populateNbrInfo(intf.IfIndex, intf.IntfRef)
 		oper = CREATE
-
 	}
 	intf.Neighbor[nbrKey] = nbr
+	debug.Logger.Debug("Neighbor Info is:", nbr, "operation from interface to server is:", oper)
 	return nbrInfo, oper
 }
 

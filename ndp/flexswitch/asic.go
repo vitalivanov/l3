@@ -28,6 +28,7 @@ import (
 	"l3/ndp/config"
 	"l3/ndp/debug"
 	"sync"
+	"syscall"
 	"utils/commonDefs"
 )
 
@@ -73,34 +74,43 @@ func GetSwitchInst() *commonDefs.AsicdClientStruct {
 
 func (notifyHdl *AsicNotificationHdl) ProcessNotification(msg commonDefs.AsicdNotifyMsg) {
 	switch msg.(type) {
+	case commonDefs.IPv6IntfNotifyMsg:
+		// create/delete ipv6 interface notification case
+		ipv6Msg := msg.(commonDefs.IPv6IntfNotifyMsg)
+		if ipv6Msg.MsgType == commonDefs.NOTIFY_IPV6INTF_CREATE {
+			debug.Logger.Debug("Received Asicd IPV6 INTF Notfication CREATE:", ipv6Msg)
+			api.SendIPIntfNotfication(ipv6Msg.IfIndex, ipv6Msg.IpAddr, ipv6Msg.IntfRef, config.CONFIG_CREATE)
+		} else {
+			debug.Logger.Debug("Received Asicd IPV6 INTF Notfication DELETE:", ipv6Msg)
+			api.SendIPIntfNotfication(ipv6Msg.IfIndex, ipv6Msg.IpAddr, ipv6Msg.IntfRef, config.CONFIG_DELETE)
+		}
+	case commonDefs.L3IntfStateNotifyMsg:
+		// state up/down for ipv6 interface case
+		l3Msg := msg.(commonDefs.L3IntfStateNotifyMsg)
+		// only get state notification if ip type is v6
+		if l3Msg.IpType == syscall.AF_INET6 {
+			if l3Msg.IfState == asicdCommonDefs.INTF_STATE_UP {
+				debug.Logger.Debug("Received Asicd L3 State Notfication UP:", l3Msg)
+				api.SendL3PortNotification(l3Msg.IfIndex, config.STATE_UP, l3Msg.IpAddr)
+			} else {
+				debug.Logger.Debug("Received Asicd L3 State Notfication DOWN:", l3Msg)
+				api.SendL3PortNotification(l3Msg.IfIndex, config.STATE_DOWN, l3Msg.IpAddr)
+			}
+		} else {
+			debug.Logger.Debug("Ignoring asicd l3 state notification for:", l3Msg)
+		}
 	case commonDefs.L2IntfStateNotifyMsg:
 		l2Msg := msg.(commonDefs.L2IntfStateNotifyMsg)
 		if l2Msg.IfState == asicdCommonDefs.INTF_STATE_UP {
-			debug.Logger.Debug("Received Asicd L2 Port Notfication UP")
-			api.SendL2PortNotification(l2Msg.IfIndex, config.STATE_UP)
+			debug.Logger.Debug("Received Asicd L2 Port Notfication UP:", l2Msg,
+				"so NDP should get L3 Port UP Notification also")
+			//api.SendL2PortNotification(l2Msg.IfIndex, config.STATE_UP)
 		} else {
-			debug.Logger.Debug("Received Asicd L2 Port Notfication DOWN")
-			api.SendL2PortNotification(l2Msg.IfIndex, config.STATE_DOWN)
-		}
-	case commonDefs.L3IntfStateNotifyMsg:
-		l3Msg := msg.(commonDefs.L3IntfStateNotifyMsg)
-		if l3Msg.IfState == asicdCommonDefs.INTF_STATE_UP {
-			debug.Logger.Debug("Received Asicd L3 Port Notfication UP")
-			api.SendL3PortNotification(l3Msg.IfIndex, config.STATE_UP, l3Msg.IpAddr)
-		} else {
-			debug.Logger.Debug("Received Asicd L3 Port Notfication DOWN")
-			api.SendL3PortNotification(l3Msg.IfIndex, config.STATE_DOWN, l3Msg.IpAddr)
+			debug.Logger.Debug("Received Asicd L2 Port Notfication DOWN:", l2Msg,
+				"so NDP should get L3 Port Down Notification also")
+			//api.SendL2PortNotification(l2Msg.IfIndex, config.STATE_DOWN)
 		}
 	case commonDefs.VlanNotifyMsg:
-		/*
-			type VlanNotifyMsg struct {
-				MsgType    uint8
-				VlanId     uint16
-				VlanName   string
-				TagPorts   []int32
-				UntagPorts []int32
-			}
-		*/
 		vlanMsg := msg.(commonDefs.VlanNotifyMsg)
 		oper := ""
 		switch vlanMsg.MsgType {
@@ -115,14 +125,5 @@ func (notifyHdl *AsicNotificationHdl) ProcessNotification(msg commonDefs.AsicdNo
 			oper = config.CONFIG_UPDATE
 		}
 		api.SendVlanNotification(oper, int32(vlanMsg.VlanId), vlanMsg.VlanName, vlanMsg.UntagPorts)
-	case commonDefs.IPv6IntfNotifyMsg:
-		ipv6Msg := msg.(commonDefs.IPv6IntfNotifyMsg)
-		if ipv6Msg.MsgType == commonDefs.NOTIFY_IPV6INTF_CREATE {
-			debug.Logger.Debug("Received Asicd IPV6 INTF Notfication CREATE")
-			api.SendIPIntfNotfication(ipv6Msg.IfIndex, ipv6Msg.IpAddr, config.CONFIG_CREATE)
-		} else {
-			debug.Logger.Debug("Received Asicd IPV6 INTF Notfication DELETE")
-			api.SendIPIntfNotfication(ipv6Msg.IfIndex, ipv6Msg.IpAddr, config.CONFIG_DELETE)
-		}
 	}
 }

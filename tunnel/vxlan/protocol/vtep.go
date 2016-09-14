@@ -267,10 +267,10 @@ func saveVtepConfigData(c *VtepConfig) *VtepDbEntry {
 
 func SaveVtepSrcMacSrcIp(paramspath string) {
 	var cfgFile cfgFileJson
-	asicdconffilename := paramspath + "asicd.conf"
+	asicdconffilename := paramspath + "asicdConf.json"
 	cfgFileData, err := ioutil.ReadFile(asicdconffilename)
 	if err != nil {
-		logger.Info("Error reading config file - asicd.conf")
+		logger.Info("Error reading config file - asicdConf.json")
 		return
 	}
 	err = json.Unmarshal(cfgFileData, &cfgFile)

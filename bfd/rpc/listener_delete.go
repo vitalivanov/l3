@@ -13,20 +13,19 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 package rpc
 
 import (
 	"bfdd"
 	"errors"
-	"fmt"
 	"l3/bfd/bfddCommonDefs"
 	"l3/bfd/server"
 )
@@ -43,7 +42,7 @@ func (h *BFDHandler) SendBfdSessionDeleteConfig(bfdSessionConfig *bfdd.BfdSessio
 }
 
 func (h *BFDHandler) DeleteBfdGlobal(bfdGlobalConf *bfdd.BfdGlobal) (bool, error) {
-	h.logger.Info(fmt.Sprintln("Delete global config attrs:", bfdGlobalConf))
+	h.logger.Info("Delete global config attrs:", bfdGlobalConf)
 	err := errors.New("BFD Global config delete not supported")
 	return false, err
 }
@@ -53,7 +52,7 @@ func (h *BFDHandler) DeleteBfdSession(bfdSessionConf *bfdd.BfdSession) (bool, er
 		err := errors.New("Invalid Session Configuration")
 		return false, err
 	}
-	h.logger.Info(fmt.Sprintln("Delete session config attrs:", bfdSessionConf))
+	h.logger.Info("Delete session config attrs:", bfdSessionConf)
 	return h.SendBfdSessionDeleteConfig(bfdSessionConf), nil
 }
 
@@ -62,7 +61,7 @@ func (h *BFDHandler) DeleteBfdSessionParam(bfdSessionParamConf *bfdd.BfdSessionP
 		err := errors.New("Invalid Session Param Configuration")
 		return false, err
 	}
-	h.logger.Info(fmt.Sprintln("Delete session param config attrs:", bfdSessionParamConf))
+	h.logger.Info("Delete session param config attrs:", bfdSessionParamConf)
 	paramName := bfdSessionParamConf.Name
 	h.server.SessionParamDeleteCh <- paramName
 	return true, nil

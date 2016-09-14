@@ -25,6 +25,8 @@
 package server
 
 import (
+	"bgpd"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"l3/bgp/config"
@@ -34,6 +36,7 @@ import (
 	bgprib "l3/bgp/rib"
 	"l3/bgp/utils"
 	"net"
+	"reflect"
 	"runtime"
 	"strconv"
 	"strings"
@@ -49,15 +52,22 @@ import (
 )
 
 type GlobalUpdate struct {
+	BGPConfig *bgpd.BGPGlobal
 	OldConfig config.GlobalConfig
 	NewConfig config.GlobalConfig
 	AttrSet   []bool
+	PatchOp   []*bgpd.PatchOpInfo
+	Op        string
 }
 
 type PeerUpdate struct {
-	OldPeer config.NeighborConfig
-	NewPeer config.NeighborConfig
-	AttrSet []bool
+	BGPPeer  interface{}
+	PeerType string
+	OldPeer  config.NeighborConfig
+	NewPeer  config.NeighborConfig
+	AttrSet  []bool
+	PatchOp  []*bgpd.PatchOpInfo
+	Op       string
 }
 
 type PeerGroupUpdate struct {
@@ -98,9 +108,9 @@ type BGPServer struct {
 	BgpConfig        config.Bgp
 	GlobalConfigCh   chan GlobalUpdate
 	AddPeerCh        chan PeerUpdate
-	RemPeerCh        chan string
+	RemPeerCh        chan config.NeighborConfig
 	AddPeerGroupCh   chan PeerGroupUpdate
-	RemPeerGroupCh   chan string
+	RemPeerGroupCh   chan config.PeerGroupConfig
 	AddAggCh         chan AggUpdate
 	RemAggCh         chan config.BGPAggregate
 	PeerFSMConnCh    chan fsm.PeerFSMConn
@@ -117,16 +127,18 @@ type BGPServer struct {
 	ServerUpCh       chan bool
 	GlobalCfgDone    bool
 
-	NeighborMutex   sync.RWMutex
-	PeerMap         map[string]*Peer
-	Neighbors       []*Peer
-	LocRib          *bgprib.LocRib
-	ConnRoutesPath  *bgprib.Path
-	IfacePeerMap    map[int32][]string
-	IntfIdNameMap   map[int32]IntfEntry
-	IfNameToIfIndex map[string]int32
-	ifaceIP         net.IP
-	AddPathCount    int
+	NeighborMutex     sync.RWMutex
+	PeerMap           map[string]*Peer
+	ifaceNeighbors    map[config.PeerAddressType]map[int32]*Peer
+	Neighbors         []*Peer
+	LocRib            *bgprib.LocRib
+	ConnRoutesPath    *bgprib.Path
+	IfIndexPeerMap    map[int32][]string
+	IntfIdNameMap     map[int32]IntfEntry
+	IfNameToIfIndex   map[string]int32
+	RedistributionMap map[string]string
+	ifaceIP           net.IP
+	AddPathCount      int
 	// all managers
 	IntfMgr    config.IntfStateMgrIntf
 	routeMgr   config.RouteMgrIntf
@@ -144,9 +156,9 @@ func NewBGPServer(logger *logging.Writer, policyManager *bgppolicy.BGPPolicyMana
 	bgpServer.GlobalCfgDone = false
 	bgpServer.GlobalConfigCh = make(chan GlobalUpdate)
 	bgpServer.AddPeerCh = make(chan PeerUpdate)
-	bgpServer.RemPeerCh = make(chan string)
+	bgpServer.RemPeerCh = make(chan config.NeighborConfig)
 	bgpServer.AddPeerGroupCh = make(chan PeerGroupUpdate)
-	bgpServer.RemPeerGroupCh = make(chan string)
+	bgpServer.RemPeerGroupCh = make(chan config.PeerGroupConfig)
 	bgpServer.AddAggCh = make(chan AggUpdate)
 	bgpServer.RemAggCh = make(chan config.BGPAggregate)
 	bgpServer.PeerFSMConnCh = make(chan fsm.PeerFSMConn, 50)
@@ -163,6 +175,10 @@ func NewBGPServer(logger *logging.Writer, policyManager *bgppolicy.BGPPolicyMana
 
 	bgpServer.NeighborMutex = sync.RWMutex{}
 	bgpServer.PeerMap = make(map[string]*Peer)
+	bgpServer.ifaceNeighbors = make(map[config.PeerAddressType]map[int32]*Peer)
+	bgpServer.ifaceNeighbors[config.PeerAddressV4] = make(map[int32]*Peer)
+	bgpServer.ifaceNeighbors[config.PeerAddressV6] = make(map[int32]*Peer)
+
 	bgpServer.Neighbors = make([]*Peer, 0)
 	bgpServer.IntfMgr = iMgr
 	bgpServer.routeMgr = rMgr
@@ -171,7 +187,8 @@ func NewBGPServer(logger *logging.Writer, policyManager *bgppolicy.BGPPolicyMana
 	bgpServer.LocRib = bgprib.NewLocRib(logger, rMgr, sDBMgr, &bgpServer.BgpConfig.Global.Config)
 	bgpServer.IfNameToIfIndex = make(map[string]int32)
 	bgpServer.IntfIdNameMap = make(map[int32]IntfEntry)
-	bgpServer.IfacePeerMap = make(map[int32][]string)
+	bgpServer.IfIndexPeerMap = make(map[int32][]string)
+	bgpServer.RedistributionMap = make(map[string]string)
 	bgpServer.ifaceIP = nil
 	bgpServer.AddPathCount = 0
 	bgpServer.initGlobalConfig()
@@ -274,10 +291,6 @@ func (s *BGPServer) listenForPeers(listener *net.TCPListener, acceptCh chan *net
 	}
 }
 
-func (s *BGPServer) IsPeerLocal(peerIp string) bool {
-	return s.PeerMap[peerIp].NeighborConf.RunningConf.PeerAS == s.BgpConfig.Global.Config.AS
-}
-
 func (s *BGPServer) SendUpdate(updated map[uint32]map[*bgprib.Path][]*bgprib.Destination, withdrawn,
 	updatedAddPaths []*bgprib.Destination) {
 	for _, peer := range s.PeerMap {
@@ -290,8 +303,8 @@ func (s *BGPServer) DoesRouteExist(params interface{}) bool {
 	dest := policyParams.dest
 	if dest == nil {
 		s.logger.Info("BGPServer:DoesRouteExist - dest not found for ip",
-			policyParams.route.Dest.BGPRouteState.Network, "prefix length",
-			policyParams.route.Dest.BGPRouteState.CIDRLen)
+			policyParams.route.Dest.BGPRouteState.GetNetwork(), "prefix length",
+			policyParams.route.Dest.BGPRouteState.GetCIDRLen())
 		return false
 	}
 
@@ -484,8 +497,8 @@ func (s *BGPServer) setUpdatedWithAggPaths(policyParams *PolicyParams,
 func (s *BGPServer) UndoAggregateAction(actionInfo interface{},
 	conditionList []interface{}, params interface{}, policyStmt utilspolicy.PolicyStmt) {
 	policyParams := params.(PolicyParams)
-	ipPrefix := packet.NewIPPrefix(net.ParseIP(policyParams.route.Dest.BGPRouteState.Network),
-		uint8(policyParams.route.Dest.BGPRouteState.CIDRLen))
+	ipPrefix := packet.NewIPPrefix(net.ParseIP(policyParams.route.Dest.BGPRouteState.GetNetwork()),
+		uint8(policyParams.route.Dest.BGPRouteState.GetCIDRLen()))
 	protoFamily := policyParams.route.Dest.GetProtocolFamily()
 	aggPrefix := s.getAggPrefix(conditionList)
 	aggActions := actionInfo.(utilspolicy.PolicyAggregateActionInfo)
@@ -515,8 +528,8 @@ func (s *BGPServer) UndoAggregateAction(actionInfo interface{},
 
 func (s *BGPServer) ApplyAggregateAction(actionInfo interface{}, conditionInfo []interface{}, params interface{}) {
 	policyParams := params.(PolicyParams)
-	ipPrefix := packet.NewIPPrefix(net.ParseIP(policyParams.route.Dest.BGPRouteState.Network),
-		uint8(policyParams.route.Dest.BGPRouteState.CIDRLen))
+	ipPrefix := packet.NewIPPrefix(net.ParseIP(policyParams.route.Dest.BGPRouteState.GetNetwork()),
+		uint8(policyParams.route.Dest.BGPRouteState.GetCIDRLen()))
 	protoFamily := policyParams.route.Dest.GetProtocolFamily()
 	aggPrefix := s.getAggPrefix(conditionInfo)
 	aggActions := actionInfo.(utilspolicy.PolicyAggregateActionInfo)
@@ -579,7 +592,7 @@ func (s *BGPServer) CheckForAggregation(updated map[uint32]map[*bgprib.Path][]*b
 			continue
 		}
 		peEntity := utilspolicy.PolicyEngineFilterEntityParams{
-			DestNetIp:  route.Dest.BGPRouteState.Network + "/" + strconv.Itoa(int(route.Dest.BGPRouteState.CIDRLen)),
+			DestNetIp:  route.Dest.BGPRouteState.GetNetwork() + "/" + strconv.Itoa(int(route.Dest.BGPRouteState.GetCIDRLen())),
 			NextHopIp:  route.PathInfo.NextHop,
 			DeletePath: true,
 		}
@@ -621,7 +634,7 @@ func (s *BGPServer) CheckForAggregation(updated map[uint32]map[*bgprib.Path][]*b
 					"applying create policy", dest.NLRI.GetPrefix().String(), route.PolicyList, route.PolicyHitCounter)
 				if route != nil {
 					peEntity := utilspolicy.PolicyEngineFilterEntityParams{
-						DestNetIp:  route.Dest.BGPRouteState.Network + "/" + strconv.Itoa(int(route.Dest.BGPRouteState.CIDRLen)),
+						DestNetIp:  route.Dest.BGPRouteState.GetNetwork() + "/" + strconv.Itoa(int(route.Dest.BGPRouteState.GetCIDRLen())),
 						NextHopIp:  route.PathInfo.NextHop,
 						CreatePath: true,
 					}
@@ -691,8 +704,8 @@ func (s *BGPServer) TraverseAndApplyBGPRib(data interface{}, updateFunc utilspol
 						continue
 					}
 					peEntity := utilspolicy.PolicyEngineFilterEntityParams{
-						DestNetIp: route.Dest.BGPRouteState.Network + "/" +
-							strconv.Itoa(int(route.Dest.BGPRouteState.CIDRLen)),
+						DestNetIp: route.Dest.BGPRouteState.GetNetwork() + "/" +
+							strconv.Itoa(int(route.Dest.BGPRouteState.GetCIDRLen())),
 						NextHopIp:  route.PathInfo.NextHop,
 						PolicyList: route.PolicyList,
 					}
@@ -750,8 +763,8 @@ func (s *BGPServer) TraverseAndReverseBGPRib(policyData interface{}, pe *bgppoli
 	var route *bgprib.Route
 	for idx := 0; idx < len(policyExtensions.RouteInfoList); idx++ {
 		route = policyExtensions.RouteInfoList[idx]
-		dest := s.LocRib.GetDestFromIPAndLen(route.Dest.GetProtocolFamily(), route.Dest.BGPRouteState.Network,
-			uint32(route.Dest.BGPRouteState.CIDRLen))
+		dest := s.LocRib.GetDestFromIPAndLen(route.Dest.GetProtocolFamily(), route.Dest.BGPRouteState.GetNetwork(),
+			uint32(route.Dest.BGPRouteState.GetCIDRLen()))
 
 		callbackInfo := PolicyParams{
 			CreateType:      utilspolicy.Invalid,
@@ -763,12 +776,12 @@ func (s *BGPServer) TraverseAndReverseBGPRib(policyData interface{}, pe *bgppoli
 			updatedAddPaths: &updatedAddPaths,
 		}
 		peEntity := utilspolicy.PolicyEngineFilterEntityParams{
-			DestNetIp: route.Dest.BGPRouteState.Network + "/" + strconv.Itoa(int(route.Dest.BGPRouteState.CIDRLen)),
+			DestNetIp: route.Dest.BGPRouteState.GetNetwork() + "/" + strconv.Itoa(int(route.Dest.BGPRouteState.GetCIDRLen())),
 			NextHopIp: route.PathInfo.NextHop,
 		}
 
-		ipPrefix, err := bgppolicy.GetNetworkPrefixFromCIDR(route.Dest.BGPRouteState.Network + "/" +
-			strconv.Itoa(int(route.Dest.BGPRouteState.CIDRLen)))
+		ipPrefix, err := bgppolicy.GetNetworkPrefixFromCIDR(route.Dest.BGPRouteState.GetNetwork() + "/" +
+			strconv.Itoa(int(route.Dest.BGPRouteState.GetCIDRLen())))
 		if err != nil {
 			s.logger.Info("Invalid route ", ipPrefix)
 			continue
@@ -919,7 +932,8 @@ func (s *BGPServer) TraverseAndApplyAdjRibOut(data interface{}, updateFunc utils
 }
 
 func (s *BGPServer) TraverseAndReverseAdjRIB(policyData interface{}, pe *bgppolicy.AdjRibPPolicyEngine) {
-	policy := policyData.(utilspolicy.Policy)
+	applyPolicyInfo := policyData.(utilspolicy.ApplyPolicyInfo)
+	policy := applyPolicyInfo.ApplyPolicy //policyItem.(policy.Policy)
 	s.logger.Info("BGPServer:TraverseAndReverseAdjRIB - policy", policy.Name)
 	policyExtensions := policy.Extensions.(bgppolicy.AdjRibPolicyExtensions)
 	if len(policyExtensions.RouteList) == 0 {
@@ -934,7 +948,7 @@ func (s *BGPServer) TraverseAndReverseAdjRIB(policyData interface{}, pe *bgppoli
 		peerIP := route.Neighbor.String()
 		if peer == nil {
 			var ok bool
-			if peer, ok = s.PeerMap[peerIP]; ok {
+			if peer, ok = s.PeerMap[peerIP]; !ok {
 				s.logger.Err("Peer not found for ip", peerIP, "for NLRI", route.NLRI.GetIPPrefix().String())
 				continue
 			}
@@ -951,9 +965,12 @@ func (s *BGPServer) TraverseAndReverseAdjRIB(policyData interface{}, pe *bgppoli
 			Neighbor:  route.Neighbor.String(),
 		}
 
-		pe.PolicyEngine.PolicyEngineUndoPolicyForEntity(peEntity, policy, callbackInfo)
-		pe.AdjRIBDeleteRoutePolicyState(route, policy.Name)
-		pe.PolicyEngine.DeletePolicyEntityMapEntry(peEntity, policy.Name)
+		success := pe.PolicyEngine.PolicyEngineUndoApplyPolicyForEntity(peEntity, applyPolicyInfo, callbackInfo)
+		s.logger.Info("success value agyer undoapplypolicy:", success, " for policy:", policy.Name)
+		if success {
+			pe.AdjRIBDeleteRoutePolicyState(route, policy.Name)
+			pe.PolicyEngine.DeletePolicyEntityMapEntry(peEntity, policy.Name)
+		}
 	}
 }
 
@@ -988,12 +1005,14 @@ func (s *BGPServer) convertDestIPToIPPrefix(routes []*config.RouteInfo) map[uint
 		}
 
 		if ip.To4() != nil {
+			s.logger.Info("convertDestIPToIPPrefix:ipv4")
 			protoFamily = packet.GetProtocolFamily(packet.AfiIP, packet.SafiUnicast)
 		} else {
+			s.logger.Info("convertDestIPToIPPrefix:ipv6")
 			protoFamily = packet.GetProtocolFamily(packet.AfiIP6, packet.SafiUnicast)
 		}
 
-		s.logger.Infof("Connected route: addr %s netmask %s", r.IPAddr, r.Mask)
+		s.logger.Infof("Connected route: addr %s netmask %s, protoFamily:", r.IPAddr, r.Mask, protoFamily)
 		if _, ok := pfNLRI[protoFamily]; !ok {
 			pfNLRI[protoFamily] = make([]packet.NLRI, 0)
 		}
@@ -1022,6 +1041,10 @@ func (s *BGPServer) ProcessIntfStates(intfs []*config.IntfStateInfo) {
 			s.ifaceMgr.AddIface(ifState.Idx, ifState.IPAddr)
 		} else if ifState.State == config.INTF_DELETED {
 			s.ifaceMgr.RemoveIface(ifState.Idx, ifState.IPAddr)
+		} else if ifState.State == config.INTFV6_CREATED {
+			s.ifaceMgr.AddV6Iface(ifState.Idx, ifState.IPAddr)
+		} else if ifState.State == config.INTFV6_DELETED {
+			s.ifaceMgr.RemoveV6Iface(ifState.Idx, ifState.IPAddr)
 		} else if ifState.State == config.IPV6_NEIGHBOR_CREATED {
 			s.ifaceMgr.AddLinkLocalIface(ifState.Idx, ifState.LinkLocalIP)
 		} else if ifState.State == config.IPV6_NEIGHBOR_DELETED {
@@ -1029,10 +1052,12 @@ func (s *BGPServer) ProcessIntfStates(intfs []*config.IntfStateInfo) {
 		}
 	}
 }
+
 func (s *BGPServer) GetIfaceIP(ifIndex int32) (ipInfo utils.IPInfo, err error) {
 	ipInfo, err = s.ifaceMgr.GetIfaceIP(ifIndex)
 	return ipInfo, err
 }
+
 func (s *BGPServer) ProcessRemoveNeighbor(peerIp string, peer *Peer) {
 	updated, withdrawn, updatedAddPaths := s.LocRib.RemoveUpdatesFromNeighbor(peerIp, peer.NeighborConf,
 		s.AddPathCount)
@@ -1068,10 +1093,11 @@ func (s *BGPServer) removePeerFromList(peer *Peer) {
 	}
 }
 
-func (s *BGPServer) StopPeersByGroup(groupName string) []*Peer {
+func (s *BGPServer) StopPeersByGroup(groupName string, peerAddrType config.PeerAddressType) []*Peer {
 	peers := make([]*Peer, 0)
 	for peerIP, peer := range s.PeerMap {
-		if peer.NeighborConf.Group != nil && peer.NeighborConf.Group.Name == groupName {
+		if peer.NeighborConf.Group != nil && peer.NeighborConf.RunningConf.PeerAddressType == peerAddrType &&
+			peer.NeighborConf.Group.Name == groupName {
 			s.logger.Info("Clean up peer", peerIP)
 			peer.Cleanup()
 			s.ProcessRemoveNeighbor(peerIP, peer)
@@ -1084,35 +1110,12 @@ func (s *BGPServer) StopPeersByGroup(groupName string) []*Peer {
 	return peers
 }
 
-func (s *BGPServer) UpdatePeerGroupInPeers(groupName string, peerGroup *config.PeerGroupConfig) {
-	peers := s.StopPeersByGroup(groupName)
+func (s *BGPServer) UpdatePeerGroupInPeers(groupName string, peerAddrType config.PeerAddressType,
+	peerGroup *config.PeerGroupConfig) {
+	peers := s.StopPeersByGroup(groupName, peerAddrType)
 	for _, peer := range peers {
 		peer.UpdatePeerGroup(peerGroup)
 		peer.Init()
-	}
-}
-
-func (s *BGPServer) SetupRedistribution(gConf config.GlobalConfig) {
-	s.logger.Info("SetUpRedistribution")
-	if gConf.Redistribution == nil || len(gConf.Redistribution) == 0 {
-		s.logger.Info("No redistribution policies configured")
-		return
-	}
-	conditions := make([]*config.ConditionInfo, 0)
-	for i := 0; i < len(gConf.Redistribution); i++ {
-		s.logger.Info("Sources: ", gConf.Redistribution[i].Sources)
-		sources := make([]string, 0)
-		sources = strings.Split(gConf.Redistribution[i].Sources, ",")
-		s.logger.Infof("Setting up %s as redistribution policy for source(s): ", gConf.Redistribution[i].Policy)
-		for j := 0; j < len(sources); j++ {
-			s.logger.Infof("%s ", sources[j])
-			if sources[j] == "" {
-				continue
-			}
-			conditions = append(conditions, &config.ConditionInfo{ConditionType: "MatchProtocol", Protocol: sources[j]})
-		}
-		s.logger.Info("")
-		s.routeMgr.ApplyPolicy("BGP", gConf.Redistribution[i].Policy, "Redistribution", conditions)
 	}
 }
 
@@ -1205,7 +1208,7 @@ func (s *BGPServer) AddOrUpdateAgg(oldConf config.BGPAggregate, newConf config.B
 		}
 
 		precedence := pe.GetNextId()
-		def := utilspolicy.PolicyDefinitionConfig{Name: name, Precedence: int(precedence), MatchType: "any"}
+		def := utilspolicy.PolicyDefinitionConfig{Name: name, Precedence: int(precedence), MatchType: "any", PolicyType: "BGP"}
 		def.PolicyDefinitionStatements = make([]utilspolicy.PolicyDefinitionStmtPrecedence, 1)
 		policyDefinitionStatement := utilspolicy.PolicyDefinitionStmtPrecedence{
 			Precedence: 1,
@@ -1277,12 +1280,10 @@ func (s *BGPServer) handleBfdNotifications(oper config.Operation, DestIp string,
 	State bool) {
 	if peer, ok := s.PeerMap[DestIp]; ok {
 		if !State && peer.NeighborConf.Neighbor.State.BfdNeighborState == "up" {
-			peer.NeighborConf.BfdFaultSet()
-			peer.Command(int(fsm.BGPEventManualStop), fsm.BGPCmdReasonNone)
+			peer.BfdFaultSet()
 		}
 		if State && peer.NeighborConf.Neighbor.State.BfdNeighborState == "down" {
-			peer.NeighborConf.BfdFaultCleared()
-			peer.Command(int(fsm.BGPEventManualStart), fsm.BGPCmdReasonNone)
+			peer.BfdFaultCleared()
 		}
 		s.logger.Info("Bfd state of peer ", peer.NeighborConf.Neighbor.NeighborAddress, " is ",
 			peer.NeighborConf.Neighbor.State.BfdNeighborState)
@@ -1291,20 +1292,20 @@ func (s *BGPServer) handleBfdNotifications(oper config.Operation, DestIp string,
 
 func (s *BGPServer) setInterfaceMapForPeer(peerIP string, peer *Peer) {
 	s.logger.Info("Server: setInterfaceMapForPeer Peer", peer, "calling GetRouteReachabilityInfo")
-	reachInfo, err := s.routeMgr.GetNextHopInfo(peerIP)
+	reachInfo, err := s.routeMgr.GetNextHopInfo(peerIP, -1)
 	s.logger.Info("Server: setInterfaceMapForPeer Peer", peer, "GetRouteReachabilityInfo returned", reachInfo)
 	if err != nil {
 		s.logger.Infof("Server: Peer %s is not reachable", peerIP)
 	} else {
 		// @TODO: jgheewala think of something better for ovsdb....
-		ifIdx := s.IntfMgr.GetIfIndex(int(reachInfo.NextHopIfIndex),
-			int(reachInfo.NextHopIfType))
-		///		ifIdx := asicdCommonDefs.GetIfIndexFromIntfIdAndIntfType(int(reachInfo.NextHopIfIndex), int(reachInfo.NextHopIfType))
+		ifIdx := s.IntfMgr.GetIfIndex(int(reachInfo.NextHopIfIndex), int(reachInfo.NextHopIfType))
+		// ifIdx := asicdCommonDefs.GetIfIndexFromIntfIdAndIntfType(int(reachInfo.NextHopIfIndex),
+		//	int(reachInfo.NextHopIfType))
 		s.logger.Infof("Server: Peer %s IfIdx %d", peerIP, ifIdx)
-		if _, ok := s.IfacePeerMap[ifIdx]; !ok {
-			s.IfacePeerMap[ifIdx] = make([]string, 0)
+		if _, ok := s.IfIndexPeerMap[ifIdx]; !ok {
+			s.IfIndexPeerMap[ifIdx] = make([]string, 0)
 		}
-		s.IfacePeerMap[ifIdx] = append(s.IfacePeerMap[ifIdx], peerIP)
+		s.IfIndexPeerMap[ifIdx] = append(s.IfIndexPeerMap[ifIdx], peerIP)
 		peer.setIfIdx(ifIdx)
 	}
 }
@@ -1312,13 +1313,13 @@ func (s *BGPServer) setInterfaceMapForPeer(peerIP string, peer *Peer) {
 func (s *BGPServer) clearInterfaceMapForPeer(peerIP string, peer *Peer) {
 	ifIdx := peer.getIfIdx()
 	s.logger.Infof("Server: Peer %s FSM connection broken ifIdx %v", peerIP, ifIdx)
-	if peerList, ok := s.IfacePeerMap[ifIdx]; ok {
+	if peerList, ok := s.IfIndexPeerMap[ifIdx]; ok {
 		for idx, ip := range peerList {
 			if ip == peerIP {
-				s.IfacePeerMap[ifIdx] = append(s.IfacePeerMap[ifIdx][:idx],
-					s.IfacePeerMap[ifIdx][idx+1:]...)
-				if len(s.IfacePeerMap[ifIdx]) == 0 {
-					delete(s.IfacePeerMap, ifIdx)
+				s.IfIndexPeerMap[ifIdx] = append(s.IfIndexPeerMap[ifIdx][:idx],
+					s.IfIndexPeerMap[ifIdx][idx+1:]...)
+				if len(s.IfIndexPeerMap[ifIdx]) == 0 {
+					delete(s.IfIndexPeerMap, ifIdx)
 				}
 				break
 			}
@@ -1336,103 +1337,676 @@ func (s *BGPServer) constructBGPGlobalState(gConf *config.GlobalConfig) {
 	s.BgpConfig.Global.State.IBGPMaxPaths = gConf.IBGPMaxPaths
 }
 
+func (s *BGPServer) SetupRedistribution(gConf config.GlobalConfig) {
+	s.logger.Info("SetUpRedistribution")
+	if gConf.Redistribution == nil || len(gConf.Redistribution) == 0 {
+		s.logger.Info("No redistribution policies configured")
+		return
+	}
+	if s.RedistributionMap == nil {
+		s.RedistributionMap = make(map[string]string)
+	}
+	applyList := make([]*config.ApplyPolicyInfo, 0)
+	undoApplyList := make([]*config.ApplyPolicyInfo, 0)
+	applyIndex := 0
+	undoIndex := 0
+	source := ""
+	for i := 0; i < len(gConf.Redistribution); i++ {
+		s.logger.Info("Sources: ", gConf.Redistribution[i].Sources)
+		sources := make([]string, 0)
+		sources = strings.Split(gConf.Redistribution[i].Sources, ",")
+		s.logger.Infof("Setting up %s as redistribution policy for source(s): ", gConf.Redistribution[i].Policy)
+		for j := 0; j < len(sources); j++ {
+			source = sources[j]
+			s.logger.Info("source: ", source)
+			var condition *config.ConditionInfo
+			condition = nil
+			if sources[j] != "" {
+				condition = &config.ConditionInfo{ConditionType: "MatchProtocol", Protocol: source}
+			}
+			_, ok := s.RedistributionMap[source]
+			if !ok {
+				s.logger.Info("No policy applied for this source so far")
+				s.RedistributionMap[source] = gConf.Redistribution[i].Policy
+				applyList = append(applyList, &config.ApplyPolicyInfo{
+					Protocol: "BGP",
+					Policy:   gConf.Redistribution[i].Policy,
+					Action:   "Redistribution"})
+				if condition != nil {
+					if applyList[applyIndex].Conditions == nil {
+						applyList[applyIndex].Conditions = make([]*config.ConditionInfo, 0)
+					}
+					applyList[applyIndex].Conditions = append(applyList[applyIndex].Conditions, condition)
+				}
+				applyIndex++
+			} else if s.RedistributionMap[source] == gConf.Redistribution[i].Policy {
+				s.logger.Info("Policy unchanged for source ", source)
+				continue
+			} else {
+				s.logger.Info("Another policy:", s.RedistributionMap[source], " already applied for source :", source)
+				applyList = append(applyList, &config.ApplyPolicyInfo{
+					Protocol: "BGP",
+					Policy:   gConf.Redistribution[i].Policy,
+					Action:   "Redistribution"})
+				if condition != nil {
+					if applyList[applyIndex].Conditions == nil {
+						applyList[applyIndex].Conditions = make([]*config.ConditionInfo, 0)
+					}
+					applyList[applyIndex].Conditions = append(applyList[applyIndex].Conditions, condition)
+				}
+				applyIndex++
+				if s.RedistributionMap[source] != "" {
+					undoApplyList = append(undoApplyList, &config.ApplyPolicyInfo{
+						Protocol: "BGP",
+						Policy:   s.RedistributionMap[source],
+						Action:   "Redistribution"})
+					if condition != nil {
+						if undoApplyList[undoIndex].Conditions == nil {
+							undoApplyList[undoIndex].Conditions = make([]*config.ConditionInfo, 0)
+						}
+						undoApplyList[undoIndex].Conditions = append(undoApplyList[undoIndex].Conditions, condition)
+					}
+					undoIndex++
+				}
+
+				s.RedistributionMap[source] = gConf.Redistribution[i].Policy
+			}
+		}
+	}
+	if len(applyList) > 0 || len(undoApplyList) > 0 {
+		s.routeMgr.ApplyPolicy(applyList, undoApplyList)
+	}
+}
+
+func (s *BGPServer) UpdateGlobalForPatchUpdate(oldConfig, newConfig config.GlobalConfig, op []*bgpd.PatchOpInfo) {
+	s.logger.Info("UpdateGlobalForPatchUpdate")
+	for idx := 0; idx < len(op); idx++ {
+		s.logger.Debug("patch update")
+		switch op[idx].Path {
+		case "Redistribution":
+			s.logger.Debug("Patch update for redistribution")
+			applyList := make([]*config.ApplyPolicyInfo, 0)
+			undoApplyList := make([]*config.ApplyPolicyInfo, 0)
+			if len(op[idx].Value) == 0 {
+				/*
+					If redistribution update is trying to update redistribution, non zero value is expected
+				*/
+				s.logger.Err("Must specify sources")
+				return
+			}
+			s.logger.Debug("value = ", op[idx].Value)
+			valueObjArr := []bgpd.SourcePolicyList{}
+			err := json.Unmarshal([]byte(op[idx].Value), &valueObjArr)
+			if err != nil {
+				s.logger.Err("error unmarshaling value:", err)
+				return
+			}
+			s.logger.Debug("Number of redistribution soures:", len(valueObjArr))
+			for _, val := range valueObjArr {
+				policy := val.Policy
+				sources := make([]string, 0)
+				sources = strings.Split(val.Sources, ",")
+				s.logger.Infof("Setting up %s as redistribution policy for source(s): ", policy)
+				for j := 0; j < len(sources); j++ {
+					var condition *config.ConditionInfo
+					condition = nil
+					source := sources[j]
+					s.logger.Info("source: ", source)
+					if sources[j] != "" {
+						condition = &config.ConditionInfo{ConditionType: "MatchProtocol", Protocol: source}
+					}
+					switch op[idx].Op {
+					case "add":
+						s.logger.Debug("add op: source:", source, " policy:", policy)
+						_, ok := s.RedistributionMap[source]
+						if !ok {
+							s.logger.Info("No policy applied for this source so far")
+							s.RedistributionMap[source] = policy
+							if len(applyList) == 0 {
+								applyList = append(applyList, &config.ApplyPolicyInfo{
+									Protocol: "BGP",
+									Policy:   policy,
+									Action:   "Redistribution"})
+							}
+							if condition != nil {
+								if applyList[0].Conditions == nil {
+									applyList[0].Conditions = make([]*config.ConditionInfo, 0)
+								}
+								applyList[0].Conditions = append(applyList[0].Conditions, condition)
+							}
+							if len(applyList) > 0 || len(undoApplyList) > 0 {
+								s.routeMgr.ApplyPolicy(applyList, undoApplyList)
+							}
+						} else {
+							s.logger.Err("Cannot add policy for source:", source, " there is already a policy ,",
+								s.RedistributionMap[source], " applied")
+						}
+					case "remove":
+						s.logger.Debug("remove op: source:", source, " policy:", policy)
+						_, ok := s.RedistributionMap[source]
+						if !ok {
+							s.logger.Err("No policy applied for source:", source, " nothing to be removed")
+						} else if policy != "" && s.RedistributionMap[source] != policy {
+							s.logger.Err("Policy applied", s.RedistributionMap,
+								"is not the same as policy being removed:", policy)
+						} else {
+							if len(undoApplyList) == 0 {
+								undoApplyList = append(undoApplyList, &config.ApplyPolicyInfo{
+									Protocol: "BGP",
+									Policy:   s.RedistributionMap[source],
+									Action:   "Redistribution"})
+							}
+							if condition != nil {
+								if undoApplyList[0].Conditions == nil {
+									undoApplyList[0].Conditions = make([]*config.ConditionInfo, 0)
+								}
+								undoApplyList[0].Conditions = append(undoApplyList[0].Conditions, condition)
+							}
+							delete(s.RedistributionMap, source)
+							if len(applyList) > 0 || len(undoApplyList) > 0 {
+								s.routeMgr.ApplyPolicy(applyList, undoApplyList)
+							}
+						}
+					default:
+						s.logger.Err("operation ", op[idx].Op, " not supported")
+						return
+					}
+				}
+			}
+		default:
+			s.logger.Err("Patch update for attribute:", op[idx].Path, " not supported")
+			return
+		}
+	}
+}
+
+func (s *BGPServer) UpdateGlobal(bgpGlobal *bgpd.BGPGlobal, oldConfig, newConfig config.GlobalConfig, attrSet []bool) {
+	s.logger.Info("UpdateGlobal")
+	if bgpGlobal == nil {
+		s.logger.Err("bgpglobal nil in update")
+		return
+	}
+	if attrSet != nil {
+		objTyp := reflect.TypeOf(*bgpGlobal)
+		for i := 0; i < objTyp.NumField(); i++ {
+			objName := objTyp.Field(i).Name
+			if attrSet[i] {
+				s.logger.Debug("UpdateGlobal : changed ", objName)
+				if objName == "Redistribution" {
+					if len(newConfig.Redistribution) == 0 {
+						s.logger.Err("Must specify redistribution")
+						return
+					}
+					s.SetupRedistribution(newConfig)
+				} else {
+					//if objName == "RouterId" || objName == "ASNum" {
+					s.Restart(newConfig)
+				}
+			}
+		}
+	}
+}
+
+func (s *BGPServer) Restart(cfg config.GlobalConfig) {
+	s.logger.Info("Restart BGP")
+	for peerIP, peer := range s.PeerMap {
+		s.logger.Infof("Cleanup peer %s", peerIP)
+		peer.Cleanup()
+	}
+	s.logger.Infof("Giving up CPU so that all peer FSMs will get cleaned up")
+	runtime.Gosched()
+
+	gConf := cfg
+	packet.SetNextHopPathAttrs(s.ConnRoutesPath.PathAttrs, gConf.RouterId)
+	s.RemoveRoutesFromAllNeighbor()
+	s.copyGlobalConf(gConf)
+	s.constructBGPGlobalState(&gConf)
+	for _, peer := range s.PeerMap {
+		peer.Init()
+	}
+	//s.SetupRedistribution(gConf)
+	// Get routes from the route manager
+	add, remove := s.routeMgr.GetRoutes()
+	if add != nil && remove != nil {
+		s.ProcessConnectedRoutes(add, remove)
+	}
+
+}
+
+func (s *BGPServer) updateGlobalConfig(bgpGlobal *bgpd.BGPGlobal, oldConfig, newConfig config.GlobalConfig,
+	attrSet []bool, op []*bgpd.PatchOpInfo) {
+	s.logger.Info("updateGlobalConfig")
+	if op == nil || len(op) == 0 {
+		s.UpdateGlobal(bgpGlobal, oldConfig, newConfig, attrSet)
+	} else {
+		s.UpdateGlobalForPatchUpdate(oldConfig, newConfig, op)
+	}
+}
+
+func (s *BGPServer) getIfaceIP(ifIndex int32, peerAddrType config.PeerAddressType) net.IP {
+	ipInfo, err := s.GetIfaceIP(ifIndex)
+	s.logger.Info("ipInfo:", ipInfo, " err:", err)
+	if err != nil {
+		s.logger.Errf("IP not configured on interface %d yet", ifIndex)
+		return nil
+	}
+
+	if peerAddrType == config.PeerAddressV4 {
+		ip := ipInfo.IpAddr
+		ifIP := make(net.IP, len(ip))
+		copy(ifIP, ip)
+		ipMask := ipInfo.IpMask
+		if ipMask[len(ipMask)-1] < 252 {
+			s.logger.Err("IPv4Addr", ifIP, "of the interface", ifIndex, "is not /30 or /31 address")
+			return nil
+		}
+		s.logger.Info("IPv4Addr of the v4Neighbor local interface", ifIndex, "is", ifIP)
+		ifIP[len(ifIP)-1] = ifIP[len(ifIP)-1] ^ (^ipMask[len(ipMask)-1])
+		s.logger.Info("Peer IPv4Addr of the v4Neighbor interface", ifIndex, "is", ifIP)
+		return ifIP
+	} else if peerAddrType == config.PeerAddressV6 {
+		return net.ParseIP(ipInfo.LinklocalIpAddr)
+	} else {
+		s.logger.Err("getIfaceIP - Unknown peer address type", peerAddrType, "ifIndex", ifIndex)
+	}
+	return nil
+}
+
+func (s *BGPServer) handleIntfCreate(ifIndex int32, peerAddrType config.PeerAddressType) {
+	s.logger.Infof("handleIntfCreate - ifIndex:%d, peerAddrType:%d", ifIndex, peerAddrType)
+	ip := s.getIfaceIP(ifIndex, peerAddrType)
+	if ip != nil {
+		if _, ok := s.ifaceNeighbors[peerAddrType]; ok {
+			if peer, ok := s.ifaceNeighbors[peerAddrType][ifIndex]; ok {
+				peer.SetNeighborAddress(ip)
+				s.PeerMap[ip.String()] = peer
+				peer.Init()
+			} else {
+				s.logger.Infof("handleIntfCreate - ifIndex not found in neighbors mape:%+v, ifIndex:%d, peerAddrType:%d",
+					s.ifaceNeighbors[peerAddrType], ifIndex, peerAddrType)
+			}
+		} else {
+			s.logger.Infof("handleIntfCreate - addr type not found in neighbors mape:%+v, ifIndex:%d, peerAddrType:%d",
+				s.ifaceNeighbors, ifIndex, peerAddrType)
+		}
+	}
+}
+
+func (s *BGPServer) handleIntfDelete(ifIndex int32, peerAddrType config.PeerAddressType) {
+	s.logger.Infof("handleIntfDelete - ifIndex:%d, peerAddrType:%d", ifIndex, peerAddrType)
+	if _, ok := s.ifaceNeighbors[peerAddrType]; ok {
+		if peer, ok := s.ifaceNeighbors[peerAddrType][ifIndex]; ok {
+			ip := peer.NeighborConf.RunningConf.NeighborAddress
+			delete(s.PeerMap, ip.String())
+			peer.Cleanup()
+			if ip != nil {
+				s.ProcessRemoveNeighbor(ip.String(), peer)
+			}
+			peer.ResetNeighborAddress()
+		} else {
+			s.logger.Infof("handleIntfDelete - ifIndex not found in neighbors mape:%+v, ifIndex:%d, peerAddrType:%d",
+				s.ifaceNeighbors[peerAddrType], ifIndex, peerAddrType)
+		}
+	} else {
+		s.logger.Infof("handleIntfDelete - addr type not found in neighbors mape:%+v, ifIndex:%d, peerAddrType:%d",
+			s.ifaceNeighbors, ifIndex, peerAddrType)
+	}
+}
+
+func (s *BGPServer) CreatePeer(newPeer config.NeighborConfig) {
+	s.logger.Infof("CreatePeer %+v", newPeer)
+	var ok bool
+	var peer *Peer
+
+	if newPeer.NeighborAddress != nil {
+		if _, ok = s.PeerMap[newPeer.NeighborAddress.String()]; ok {
+			s.logger.Infof("Failed to add neighbor. Neighbor at address %s already exists", newPeer.NeighborAddress)
+			return
+		}
+	}
+
+	if newPeer.IfIndex != -1 {
+		if _, ok = s.ifaceNeighbors[newPeer.PeerAddressType]; !ok {
+			s.logger.Infof("Failed to add neighbor. Peer address type", newPeer.PeerAddressType, "not supported")
+			return
+		}
+		if _, ok = s.ifaceNeighbors[newPeer.PeerAddressType][newPeer.IfIndex]; ok {
+			s.logger.Infof("Failed to add neighbor. Neighbor at interface %d already exists", newPeer.IfIndex)
+			return
+		}
+
+		s.logger.Info("Add iface neighbor, ip:", newPeer.NeighborAddress.String(), "ifIndex:", newPeer.IfIndex,
+			"ifName:", newPeer.IfName)
+		newPeer.NeighborAddress = s.getIfaceIP(newPeer.IfIndex, newPeer.PeerAddressType)
+	}
+
+	var groupConfig *config.PeerGroupConfig
+	if newPeer.PeerGroup != "" {
+		protoFamily, _ := packet.GetProtocolFamilyFromPeerAddrType(newPeer.PeerAddressType)
+		if _, ok := s.BgpConfig.PeerGroups[protoFamily]; !ok {
+			s.logger.Info("No peer groups with Peer address type", newPeer.PeerAddressType, "exists")
+		} else {
+			if group, ok := s.BgpConfig.PeerGroups[protoFamily][newPeer.PeerGroup]; !ok {
+				s.logger.Info("Peer group", newPeer.PeerGroup, "not created yet, creating peer",
+					newPeer.NeighborAddress.String(), "without the group")
+			} else {
+				groupConfig = &group.Config
+			}
+		}
+	}
+
+	s.logger.Info("Add neighbor, ip:", newPeer.NeighborAddress.String(), "ifIndex:", newPeer.IfIndex)
+	peer = NewPeer(s, s.LocRib, &s.BgpConfig.Global.Config, groupConfig, newPeer)
+	if peer.NeighborConf.RunningConf.NeighborAddress.To4() != nil &&
+		peer.NeighborConf.RunningConf.AuthPassword != "" {
+		err := netUtils.SetTCPListenerMD5(s.listener, newPeer.NeighborAddress.String(),
+			peer.NeighborConf.RunningConf.AuthPassword)
+		if err != nil {
+			s.logger.Info("Failed to add MD5 authentication for neighbor",
+				newPeer.NeighborAddress.String(), "with error", err)
+		}
+	}
+
+	if newPeer.NeighborAddress != nil {
+		s.PeerMap[newPeer.NeighborAddress.String()] = peer
+	}
+
+	if newPeer.IfIndex != -1 {
+		s.ifaceNeighbors[newPeer.PeerAddressType][newPeer.IfIndex] = peer
+	}
+
+	s.NeighborMutex.Lock()
+	s.addPeerToList(peer)
+	s.NeighborMutex.Unlock()
+	peer.Init()
+}
+
+func (s *BGPServer) getPeer(neighbor config.NeighborConfig) *Peer {
+	var peer *Peer
+	var ok bool
+	if neighbor.NeighborAddress != nil {
+		if peer, ok = s.PeerMap[neighbor.NeighborAddress.String()]; !ok {
+			s.logger.Err("Peer not found for address", neighbor.NeighborAddress.String())
+		}
+	} else if neighbor.IfIndex != -1 {
+		if _, ok = s.ifaceNeighbors[neighbor.PeerAddressType]; ok {
+			if peer, ok = s.ifaceNeighbors[neighbor.PeerAddressType][neighbor.IfIndex]; !ok {
+				s.logger.Err("Peer not found for ifIndex", neighbor.IfIndex)
+			}
+		}
+	}
+
+	return peer
+}
+
+func (s *BGPServer) updatePeerConf(oldPeer, newPeer config.NeighborConfig, peer *Peer) {
+	s.logger.Info("Clean up peer, ip:", oldPeer.NeighborAddress.String(), "ifIndex:", oldPeer.IfIndex)
+	peer.Cleanup()
+	if peer.NeighborConf.RunningConf.NeighborAddress != nil {
+		s.ProcessRemoveNeighbor(peer.NeighborConf.RunningConf.NeighborAddress.String(), peer)
+		if peer.NeighborConf.RunningConf.NeighborAddress.To4() != nil &&
+			peer.NeighborConf.RunningConf.AuthPassword != "" {
+			err := netUtils.SetTCPListenerMD5(s.listener, peer.NeighborConf.RunningConf.NeighborAddress.String(), "")
+			if err != nil {
+				s.logger.Info("Failed to add MD5 authentication for old neighbor",
+					newPeer.NeighborAddress.String(), "with error", err)
+			}
+		}
+	}
+	peer.UpdateNeighborConf(newPeer, &s.BgpConfig)
+
+	runtime.Gosched()
+
+	if newPeer.PeerGroup != "" {
+		protoFamily, _ := packet.GetProtocolFamilyFromPeerAddrType(newPeer.PeerAddressType)
+		if _, ok := s.BgpConfig.PeerGroups[protoFamily]; !ok {
+			s.logger.Info("No peer groups with Peer address type", newPeer.PeerAddressType, "exists")
+		} else {
+			if group, ok := s.BgpConfig.PeerGroups[protoFamily][newPeer.PeerGroup]; !ok {
+				s.logger.Info("Peer group", newPeer.PeerGroup, "not created yet, creating peer",
+					newPeer.NeighborAddress.String(), "without the group")
+			} else {
+				peer.UpdatePeerGroup(&group.Config)
+			}
+		}
+	}
+
+	if peer.NeighborConf.RunningConf.NeighborAddress.To4() != nil &&
+		peer.NeighborConf.RunningConf.AuthPassword != "" {
+		err := netUtils.SetTCPListenerMD5(s.listener, newPeer.NeighborAddress.String(),
+			peer.NeighborConf.RunningConf.AuthPassword)
+		if err != nil {
+			s.logger.Info("Failed to add MD5 authentication for neighbor",
+				newPeer.NeighborAddress.String(), "with error", err)
+		}
+	}
+	peer.Init()
+}
+
+func (s *BGPServer) Updatev4Peer(bgpPeer *bgpd.BGPv4Neighbor, oldPeer, newPeer config.NeighborConfig, attrSet []bool) {
+	s.logger.Info("Updatev4Peer")
+	var peer *Peer
+
+	if peer = s.getPeer(oldPeer); peer == nil {
+		s.logger.Err("Updatev4Peer - Peer not found for ip:", oldPeer.NeighborAddress, "ifIndex:", oldPeer.IfIndex)
+		return
+	}
+
+	if attrSet != nil {
+		updateConfig := false
+		s.logger.Info("attrSet:", attrSet)
+		objTyp := reflect.TypeOf(*bgpPeer)
+		s.logger.Info("numfield:", objTyp.NumField())
+		for i := 0; i < objTyp.NumField(); i++ {
+			objName := objTyp.Field(i).Name
+			if attrSet[i] {
+				s.logger.Debug("UpdatePeer : changed ", objName)
+				if objName == "AdjRIBInFilter" {
+					s.logger.Info("Update AdjRIBInFilter to ", newPeer.AdjRIBInFilter)
+					if oldPeer.AdjRIBInFilter != "" {
+						s.logger.Info("old filter applied was :", oldPeer.AdjRIBInFilter,
+							"p.NeighborConf.RunningConf.AdjRIBInFilter:", peer.NeighborConf.RunningConf.AdjRIBInFilter)
+						peer.RemoveAdjRIBFilter(peer.server.ribInPE, peer.NeighborConf.RunningConf.AdjRIBInFilter,
+							bgprib.AdjRIBDirIn)
+					}
+					peer.UpdateNeighborConf(newPeer, &s.BgpConfig)
+					if newPeer.AdjRIBInFilter != "" {
+						s.logger.Info("new filter being applied is:", newPeer.AdjRIBInFilter,
+							"p.NeighborConf.RunningConf.AdjRIBInFilter:", peer.NeighborConf.RunningConf.AdjRIBInFilter)
+						peer.AddAdjRIBFilter(peer.server.ribInPE, peer.NeighborConf.RunningConf.AdjRIBInFilter,
+							bgprib.AdjRIBDirIn)
+					}
+				} else { // this needs to be changed to if cases of each and every settable attribute
+					updateConfig = true
+				}
+			}
+		}
+
+		if updateConfig {
+			s.updatePeerConf(oldPeer, newPeer, peer)
+		}
+	}
+}
+
+func (s *BGPServer) Updatev6Peer(bgpPeer *bgpd.BGPv6Neighbor, oldPeer, newPeer config.NeighborConfig, attrSet []bool) {
+	s.logger.Info("Updatev4Peer")
+	var peer *Peer
+
+	if peer = s.getPeer(oldPeer); peer == nil {
+		s.logger.Err("Updatev4Peer - Peer not found for ip:", oldPeer.NeighborAddress, "ifIndex:", oldPeer.IfIndex)
+		return
+	}
+
+	if attrSet != nil {
+		updateConfig := false
+		s.logger.Info("attrSet:", attrSet)
+		objTyp := reflect.TypeOf(*bgpPeer)
+		s.logger.Info("numfield:", objTyp.NumField())
+		for i := 0; i < objTyp.NumField(); i++ {
+			objName := objTyp.Field(i).Name
+			if attrSet[i] {
+				s.logger.Debug("UpdatePeer : changed ", objName)
+				if objName == "AdjRIBInFilter" {
+					s.logger.Info("Update AdjRIBInFilter to ", newPeer.AdjRIBInFilter)
+					if oldPeer.AdjRIBInFilter != "" {
+						s.logger.Info("old filter applied was :", oldPeer.AdjRIBInFilter,
+							"p.NeighborConf.RunningConf.AdjRIBInFilter:", peer.NeighborConf.RunningConf.AdjRIBInFilter)
+						peer.RemoveAdjRIBFilter(peer.server.ribInPE, peer.NeighborConf.RunningConf.AdjRIBInFilter,
+							bgprib.AdjRIBDirIn)
+					}
+					peer.UpdateNeighborConf(newPeer, &s.BgpConfig)
+					if newPeer.AdjRIBInFilter != "" {
+						s.logger.Info("new filter being applied is:", newPeer.AdjRIBInFilter,
+							"p.NeighborConf.RunningConf.AdjRIBInFilter:", peer.NeighborConf.RunningConf.AdjRIBInFilter)
+						peer.AddAdjRIBFilter(peer.server.ribInPE, peer.NeighborConf.RunningConf.AdjRIBInFilter,
+							bgprib.AdjRIBDirIn)
+					}
+				} else { // this needs to be changed to if cases of each and every settable attribute
+					updateConfig = true
+				}
+			}
+		}
+
+		if updateConfig {
+			s.updatePeerConf(oldPeer, newPeer, peer)
+		}
+	}
+}
+
+func (s *BGPServer) removePeer(neighbor config.NeighborConfig) {
+	s.logger.Info("Remove Peer, ip:", neighbor.NeighborAddress, "ifIndex:", neighbor.IfIndex)
+	var peerIP string
+	var ifacePeer *Peer
+	var ok bool
+
+	if neighbor.NeighborAddress != nil {
+		peerIP = neighbor.NeighborAddress.String()
+	} else if neighbor.IfIndex != -1 {
+		if _, ok = s.ifaceNeighbors[neighbor.PeerAddressType]; ok {
+			if ifacePeer, ok = s.ifaceNeighbors[neighbor.PeerAddressType][neighbor.IfIndex]; ok {
+				if ifacePeer.NeighborConf.RunningConf.NeighborAddress != nil {
+					peerIP = ifacePeer.NeighborConf.RunningConf.NeighborAddress.String()
+				}
+				delete(s.ifaceNeighbors[neighbor.PeerAddressType], neighbor.IfIndex)
+			}
+		}
+		if peerIP == "" {
+			s.logger.Err("Failed to remove peer. Peer IP not found for ifIndex", neighbor.IfIndex)
+			return
+		}
+	} else {
+		s.logger.Err("removePeer - IP and ifIndex not set in neighbor conf")
+		return
+	}
+
+	if peer, ok := s.PeerMap[peerIP]; ok {
+		s.NeighborMutex.Lock()
+		s.removePeerFromList(peer)
+		s.NeighborMutex.Unlock()
+		delete(s.PeerMap, peerIP)
+		peer.Cleanup()
+		s.ProcessRemoveNeighbor(peerIP, peer)
+	} else if ifacePeer != nil {
+		s.NeighborMutex.Lock()
+		s.removePeerFromList(ifacePeer)
+		s.NeighborMutex.Unlock()
+		ifacePeer.Cleanup()
+	}
+}
+
 func (s *BGPServer) listenChannelUpdates() {
 	for {
 		select {
 		case globalUpdate := <-s.GlobalConfigCh:
-			for peerIP, peer := range s.PeerMap {
-				s.logger.Infof("Cleanup peer %s", peerIP)
-				peer.Cleanup()
+			if globalUpdate.Op == "create" {
+				s.Restart(globalUpdate.NewConfig)
+			} else if globalUpdate.Op == "update" {
+				s.updateGlobalConfig(globalUpdate.BGPConfig, globalUpdate.OldConfig, globalUpdate.NewConfig,
+					globalUpdate.AttrSet, globalUpdate.PatchOp)
 			}
-			s.logger.Infof("Giving up CPU so that all peer FSMs will get cleaned up")
-			runtime.Gosched()
-
-			gConf := globalUpdate.NewConfig
-			packet.SetNextHopPathAttrs(s.ConnRoutesPath.PathAttrs, gConf.RouterId)
-			s.RemoveRoutesFromAllNeighbor()
-			s.copyGlobalConf(gConf)
-			s.constructBGPGlobalState(&gConf)
-			for _, peer := range s.PeerMap {
-				peer.Init()
-			}
-			s.SetupRedistribution(gConf)
 
 		case peerUpdate := <-s.AddPeerCh:
 			s.logger.Info("message received on AddPeerCh")
 			oldPeer := peerUpdate.OldPeer
 			newPeer := peerUpdate.NewPeer
-			var peer *Peer
-			var ok bool
-			if oldPeer.NeighborAddress != nil {
-				if peer, ok = s.PeerMap[oldPeer.NeighborAddress.String()]; ok {
-					s.logger.Info("Clean up peer", oldPeer.NeighborAddress.String())
-					peer.Cleanup()
-					s.ProcessRemoveNeighbor(oldPeer.NeighborAddress.String(), peer)
+			if peerUpdate.Op == "create" {
+				s.CreatePeer(newPeer)
+			} else if peerUpdate.Op == "update" {
+				if peerUpdate.PeerType == "v4" {
+					peer := peerUpdate.BGPPeer.(*bgpd.BGPv4Neighbor)
+					s.Updatev4Peer(peer, oldPeer, newPeer, peerUpdate.AttrSet)
+				} else {
+					peer := peerUpdate.BGPPeer.(*bgpd.BGPv6Neighbor)
+					s.Updatev6Peer(peer, oldPeer, newPeer, peerUpdate.AttrSet)
+				}
+			}
+			/*
+				var peer *Peer
+				var ok bool
+				if oldPeer.NeighborAddress != nil {
+					if peer, ok = s.PeerMap[oldPeer.NeighborAddress.String()]; ok {
+						s.logger.Info("Clean up peer", oldPeer.NeighborAddress.String())
+						peer.Cleanup()
+						s.ProcessRemoveNeighbor(oldPeer.NeighborAddress.String(), peer)
+						if peer.NeighborConf.RunningConf.NeighborAddress.To4() != nil &&
+							peer.NeighborConf.RunningConf.AuthPassword != "" {
+							err := netUtils.SetTCPListenerMD5(s.listener, oldPeer.NeighborAddress.String(), "")
+							if err != nil {
+								s.logger.Info("Failed to add MD5 authentication for old neighbor",
+									newPeer.NeighborAddress.String(), "with error", err)
+							}
+						}
+						peer.UpdateNeighborConf(newPeer, &s.BgpConfig)
+
+						runtime.Gosched()
+					} else {
+						s.logger.Info("Can't find neighbor with old address", oldPeer.NeighborAddress.String())
+					}
+				}
+
+				if !ok {
+					_, ok = s.PeerMap[newPeer.NeighborAddress.String()]
+					if ok {
+						s.logger.Info("Failed to add neighbor. Neighbor at that address already exists,",
+							newPeer.NeighborAddress.String())
+						break
+					}
+
+					var groupConfig *config.PeerGroupConfig
+					if newPeer.PeerGroup != "" {
+						protoFamily, _ := packet.GetProtocolFamilyFromPeerAddrType(newPeer.PeerAddressType)
+						if _, ok := s.BgpConfig.PeerGroups[protoFamily]; !ok {
+							s.logger.Info("No peer groups with Peer address type", newPeer.PeerAddressType, "exists")
+						} else {
+							if group, ok := s.BgpConfig.PeerGroups[protoFamily][newPeer.PeerGroup]; !ok {
+								s.logger.Info("Peer group", newPeer.PeerGroup, "not created yet, creating peer",
+									newPeer.NeighborAddress.String(), "without the group")
+							} else {
+								groupConfig = &group.Config
+							}
+						}
+					}
+					s.logger.Info("Add neighbor, ip:", newPeer.NeighborAddress.String())
+					peer = NewPeer(s, s.LocRib, &s.BgpConfig.Global.Config, groupConfig, newPeer)
 					if peer.NeighborConf.RunningConf.NeighborAddress.To4() != nil &&
 						peer.NeighborConf.RunningConf.AuthPassword != "" {
-						err := netUtils.SetTCPListenerMD5(s.listener, oldPeer.NeighborAddress.String(), "")
+						err := netUtils.SetTCPListenerMD5(s.listener, newPeer.NeighborAddress.String(),
+							peer.NeighborConf.RunningConf.AuthPassword)
 						if err != nil {
-							s.logger.Info("Failed to add MD5 authentication for old neighbor",
+							s.logger.Info("Failed to add MD5 authentication for neighbor",
 								newPeer.NeighborAddress.String(), "with error", err)
 						}
 					}
-					peer.UpdateNeighborConf(newPeer, &s.BgpConfig)
-
-					runtime.Gosched()
-				} else {
-					s.logger.Info("Can't find neighbor with old address", oldPeer.NeighborAddress.String())
+					s.PeerMap[newPeer.NeighborAddress.String()] = peer
+					s.NeighborMutex.Lock()
+					s.addPeerToList(peer)
+					s.NeighborMutex.Unlock()
 				}
-			}
-
-			if !ok {
-				_, ok = s.PeerMap[newPeer.NeighborAddress.String()]
-				if ok {
-					s.logger.Info("Failed to add neighbor. Neighbor at that address already exists,",
-						newPeer.NeighborAddress.String())
-					break
-				}
-
-				var groupConfig *config.PeerGroupConfig
-				if newPeer.PeerGroup != "" {
-					if group, ok :=
-						s.BgpConfig.PeerGroups[newPeer.PeerGroup]; !ok {
-						s.logger.Info("Peer group", newPeer.PeerGroup, "not created yet, creating peer",
-							newPeer.NeighborAddress.String(), "without the group")
-					} else {
-						groupConfig = &group.Config
-					}
-				}
-				s.logger.Info("Add neighbor, ip:", newPeer.NeighborAddress.String())
-				peer = NewPeer(s, s.LocRib, &s.BgpConfig.Global.Config, groupConfig, newPeer)
-				if peer.NeighborConf.RunningConf.NeighborAddress.To4() != nil &&
-					peer.NeighborConf.RunningConf.AuthPassword != "" {
-					err := netUtils.SetTCPListenerMD5(s.listener, newPeer.NeighborAddress.String(),
-						peer.NeighborConf.RunningConf.AuthPassword)
-					if err != nil {
-						s.logger.Info("Failed to add MD5 authentication for neighbor",
-							newPeer.NeighborAddress.String(), "with error", err)
-					}
-				}
-				s.PeerMap[newPeer.NeighborAddress.String()] = peer
-				s.NeighborMutex.Lock()
-				s.addPeerToList(peer)
-				s.NeighborMutex.Unlock()
-			}
-			peer.Init()
+				peer.Init()
+			*/
 
 		case remPeer := <-s.RemPeerCh:
-			s.logger.Info("Remove Peer:", remPeer)
-			peer, ok := s.PeerMap[remPeer]
-			if !ok {
-				s.logger.Info("Failed to remove peer. Peer at that address does not exist,", remPeer)
-				break
-			}
-			s.NeighborMutex.Lock()
-			s.removePeerFromList(peer)
-			s.NeighborMutex.Unlock()
-			delete(s.PeerMap, remPeer)
-			peer.Cleanup()
-			s.ProcessRemoveNeighbor(remPeer, peer)
+			s.removePeer(remPeer)
 
 		case groupUpdate := <-s.AddPeerGroupCh:
 			oldGroupConf := groupUpdate.OldGroup
@@ -1441,29 +2015,44 @@ func (s *BGPServer) listenChannelUpdates() {
 			var ok bool
 
 			if oldGroupConf.Name != "" {
-				if _, ok = s.BgpConfig.PeerGroups[oldGroupConf.Name]; !ok {
-					s.logger.Err("Could not find peer group", oldGroupConf.Name)
-					break
+				protoFamily, _ := packet.GetProtocolFamilyFromPeerAddrType(oldGroupConf.PeerAddressType)
+				if _, ok = s.BgpConfig.PeerGroups[protoFamily]; ok {
+					if _, ok = s.BgpConfig.PeerGroups[protoFamily][oldGroupConf.Name]; !ok {
+						s.logger.Err("Could not find peer group", oldGroupConf.Name)
+					}
 				}
 			}
 
-			if _, ok = s.BgpConfig.PeerGroups[newGroupConf.Name]; !ok {
+			protoFamily, _ := packet.GetProtocolFamilyFromPeerAddrType(newGroupConf.PeerAddressType)
+			if _, ok = s.BgpConfig.PeerGroups[protoFamily]; !ok {
+				s.BgpConfig.PeerGroups[protoFamily] = make(map[string]*config.PeerGroup)
+			}
+			if _, ok = s.BgpConfig.PeerGroups[protoFamily][newGroupConf.Name]; !ok {
 				s.logger.Info("Add new peer group with name", newGroupConf.Name)
 				peerGroup := config.PeerGroup{
 					Config: newGroupConf,
 				}
-				s.BgpConfig.PeerGroups[newGroupConf.Name] = &peerGroup
+				s.BgpConfig.PeerGroups[protoFamily][newGroupConf.Name] = &peerGroup
+			} else {
+				s.logger.Info("Update peer group", newGroupConf.Name)
+				s.BgpConfig.PeerGroups[protoFamily][newGroupConf.Name].Config = newGroupConf
 			}
-			s.UpdatePeerGroupInPeers(newGroupConf.Name, &newGroupConf)
+			s.UpdatePeerGroupInPeers(newGroupConf.Name, newGroupConf.PeerAddressType, &newGroupConf)
 
-		case groupName := <-s.RemPeerGroupCh:
-			s.logger.Info("Remove Peer group:", groupName)
-			if _, ok := s.BgpConfig.PeerGroups[groupName]; !ok {
-				s.logger.Info("Peer group", groupName, "not found")
+		case group := <-s.RemPeerGroupCh:
+			s.logger.Info("Remove Peer group:", group.Name)
+			protoFamily, _ := packet.GetProtocolFamilyFromPeerAddrType(group.PeerAddressType)
+			if _, ok := s.BgpConfig.PeerGroups[protoFamily]; !ok {
+				s.logger.Err("Peer group address type", group.PeerAddressType, "not found in map")
 				break
 			}
-			delete(s.BgpConfig.PeerGroups, groupName)
-			s.UpdatePeerGroupInPeers(groupName, nil)
+
+			if _, ok := s.BgpConfig.PeerGroups[protoFamily][group.Name]; !ok {
+				s.logger.Err("Peer group", group.Name, "not found in map")
+				break
+			}
+			delete(s.BgpConfig.PeerGroups[protoFamily], group.Name)
+			s.UpdatePeerGroupInPeers(group.Name, group.PeerAddressType, nil)
 
 		case aggUpdate := <-s.AddAggCh:
 			oldAgg := aggUpdate.OldAgg
@@ -1478,6 +2067,8 @@ func (s *BGPServer) listenChannelUpdates() {
 		case tcpConn := <-s.acceptCh:
 			s.logger.Info("Connected to", tcpConn.RemoteAddr().String())
 			host, _, _ := net.SplitHostPort(tcpConn.RemoteAddr().String())
+			hostSplit := strings.Split(host, "%")
+			host = hostSplit[0]
 			peer, ok := s.PeerMap[host]
 			if !ok {
 				s.logger.Info("Can't accept connection. Peer is not configured yet", host)
@@ -1536,7 +2127,7 @@ func (s *BGPServer) listenChannelUpdates() {
 				s.logger.Infof("Failed to process FSM connection success, Peer %s does not exist", peerIP)
 				break
 			}
-			reachInfo, err := s.routeMgr.GetNextHopInfo(peerIP)
+			reachInfo, err := s.routeMgr.GetNextHopInfo(peerIP, -1)
 			if err != nil {
 				s.logger.Infof("Server: Peer %s is not reachable", peerIP)
 			} else {
@@ -1544,11 +2135,12 @@ func (s *BGPServer) listenChannelUpdates() {
 				ifIdx := s.IntfMgr.GetIfIndex(int(reachInfo.NextHopIfIndex),
 					int(reachInfo.NextHopIfType))
 				s.logger.Infof("Server: Peer %s IfIdx %d", peerIP, ifIdx)
-				if _, ok := s.IfacePeerMap[ifIdx]; !ok {
-					s.IfacePeerMap[ifIdx] = make([]string, 0)
-					//ifIdx := asicdCommonDefs.GetIfIndexFromIntfIdAndIntfType(int(reachInfo.NextHopIfIndex), int(reachInfo.NextHopIfType))
+				if _, ok := s.IfIndexPeerMap[ifIdx]; !ok {
+					s.IfIndexPeerMap[ifIdx] = make([]string, 0)
+					//ifIdx := asicdCommonDefs.GetIfIndexFromIntfIdAndIntfType(int(reachInfo.NextHopIfIndex),
+					//	int(reachInfo.NextHopIfType))
 				}
-				s.IfacePeerMap[ifIdx] = append(s.IfacePeerMap[ifIdx],
+				s.IfIndexPeerMap[ifIdx] = append(s.IfIndexPeerMap[ifIdx],
 					peerIP)
 				peer.setIfIdx(ifIdx)
 			}
@@ -1564,14 +2156,14 @@ func (s *BGPServer) listenChannelUpdates() {
 			}
 			ifIdx := peer.getIfIdx()
 			s.logger.Infof("Server: Peer %s FSM connection broken ifIdx %v", peerIP, ifIdx)
-			if peerList, ok := s.IfacePeerMap[ifIdx]; ok {
+			if peerList, ok := s.IfIndexPeerMap[ifIdx]; ok {
 				for idx, ip := range peerList {
 					if ip == peerIP {
-						s.IfacePeerMap[ifIdx] =
-							append(s.IfacePeerMap[ifIdx][:idx],
-								s.IfacePeerMap[ifIdx][idx+1:]...)
-						if len(s.IfacePeerMap[ifIdx]) == 0 {
-							delete(s.IfacePeerMap, ifIdx)
+						s.IfIndexPeerMap[ifIdx] =
+							append(s.IfIndexPeerMap[ifIdx][:idx],
+								s.IfIndexPeerMap[ifIdx][idx+1:]...)
+						if len(s.IfIndexPeerMap[ifIdx]) == 0 {
+							delete(s.IfIndexPeerMap, ifIdx)
 						}
 						break
 					}
@@ -1587,19 +2179,20 @@ func (s *BGPServer) listenChannelUpdates() {
 		case reachabilityInfo := <-s.ReachabilityCh:
 			s.logger.Info("Server: Reachability info for ip", reachabilityInfo.IP)
 
-			_, err := s.routeMgr.GetNextHopInfo(reachabilityInfo.IP)
+			_, err := s.routeMgr.GetNextHopInfo(reachabilityInfo.IP, reachabilityInfo.IfIndex)
 			if err != nil {
 				reachabilityInfo.ReachableCh <- false
 			} else {
 				reachabilityInfo.ReachableCh <- true
 			}
+
 		case bfdNotify := <-s.BfdCh:
-			s.handleBfdNotifications(bfdNotify.Oper,
-				bfdNotify.DestIp, bfdNotify.State)
+			s.handleBfdNotifications(bfdNotify.Oper, bfdNotify.DestIp, bfdNotify.State)
+
 		case ifState := <-s.IntfCh:
 			s.logger.Info("Received message on ItfCh")
 			if ifState.State == config.INTF_STATE_DOWN {
-				if peerList, ok := s.IfacePeerMap[ifState.Idx]; ok {
+				if peerList, ok := s.IfIndexPeerMap[ifState.Idx]; ok {
 					for _, peerIP := range peerList {
 						if peer, ok := s.PeerMap[peerIP]; ok {
 							peer.StopFSM("Interface Down")
@@ -1608,14 +2201,25 @@ func (s *BGPServer) listenChannelUpdates() {
 				}
 			} else if ifState.State == config.INTF_CREATED {
 				s.ifaceMgr.AddIface(ifState.Idx, ifState.IPAddr)
+				s.handleIntfCreate(ifState.Idx, config.PeerAddressV4)
 			} else if ifState.State == config.INTF_DELETED {
 				s.ifaceMgr.RemoveIface(ifState.Idx, ifState.IPAddr)
+				s.handleIntfDelete(ifState.Idx, config.PeerAddressV4)
+			} else if ifState.State == config.INTFV6_CREATED {
+				s.ifaceMgr.AddV6Iface(ifState.Idx, ifState.IPAddr)
+				s.handleIntfCreate(ifState.Idx, config.PeerAddressV6)
+			} else if ifState.State == config.INTFV6_DELETED {
+				s.ifaceMgr.RemoveV6Iface(ifState.Idx, ifState.IPAddr)
+				s.handleIntfDelete(ifState.Idx, config.PeerAddressV6)
 			} else if ifState.State == config.IPV6_NEIGHBOR_CREATED {
 				s.logger.Info("IPV6_NEIGHBOR_CREATED message")
 				s.ifaceMgr.AddLinkLocalIface(ifState.Idx, ifState.LinkLocalIP)
+				s.handleIntfCreate(ifState.Idx, config.PeerAddressV6)
 			} else if ifState.State == config.IPV6_NEIGHBOR_DELETED {
 				s.ifaceMgr.RemoveLinkLocalIface(ifState.Idx, ifState.LinkLocalIP)
+				s.handleIntfDelete(ifState.Idx, config.PeerAddressV6)
 			}
+
 		case ifMap := <-s.IntfMapCh:
 			s.logger.Info("Received interface map")
 			s.ProcessIntfMapUpdates([]config.IntfMapInfo{config.IntfMapInfo{Idx: ifMap.Idx, IfName: ifMap.IfName}})
@@ -1626,7 +2230,9 @@ func (s *BGPServer) listenChannelUpdates() {
 	}
 
 }
+
 func (s *BGPServer) ProcessIntfMapUpdates(cfg []config.IntfMapInfo) {
+	s.logger.Infof("ProcessIntfMapUpdates, cfg = %+v", cfg)
 	if s.IntfIdNameMap == nil {
 		s.IntfIdNameMap = make(map[int32]IntfEntry)
 	}
@@ -1637,9 +2243,9 @@ func (s *BGPServer) ProcessIntfMapUpdates(cfg []config.IntfMapInfo) {
 		intfEntry := IntfEntry{Name: ifMap.IfName}
 		s.IntfIdNameMap[int32(ifMap.Idx)] = intfEntry
 		s.IfNameToIfIndex[ifMap.IfName] = ifMap.Idx
-
 	}
 }
+
 func (s *BGPServer) InitBGPEvent() {
 	// Start DB Util
 	s.eventDbHdl = dbutils.NewDBUtil(s.logger)
@@ -1653,6 +2259,7 @@ func (s *BGPServer) InitBGPEvent() {
 		s.logger.Err("Unable to initialize events", err)
 	}
 }
+
 func (s *BGPServer) GetIntfObjects() {
 
 	intfs := s.IntfMgr.GetIPv4Intfs()
@@ -1695,7 +2302,7 @@ func (s *BGPServer) StartServer() {
 	s.logger.Info("Recieved global conf:", gConf)
 	s.BgpConfig.Global.Config = gConf
 	s.constructBGPGlobalState(&gConf)
-	s.BgpConfig.PeerGroups = make(map[string]*config.PeerGroup)
+	s.BgpConfig.PeerGroups = make(map[uint32]map[string]*config.PeerGroup)
 
 	pathAttrs := packet.ConstructPathAttrForConnRoutes(gConf.AS)
 	protoFamily := packet.GetProtocolFamily(packet.AfiIP6, packet.SafiUnicast)
@@ -1784,22 +2391,31 @@ func (s *BGPServer) VerifyBgpGlobalConfig() bool {
 	return s.GlobalCfgDone
 }
 
-func (s *BGPServer) ConvertIntfStrToIfIndexStr(intfString string) (ifIndex string, err error) {
+func (s *BGPServer) ConvertIntfStrToIfIndex(intfString string) (ifIndex int32, ifName string, err error) {
 	if val, err := strconv.Atoi(intfString); err == nil {
+		s.logger.Info("ConvertIntfStrToIfIndex - intfString", intfString, "is ifIndex")
 		//Verify ifIndex is valid
+		ifIndex = int32(val)
 		s.logger.Info("IfIndex = ", val)
-		_, ok := s.IntfIdNameMap[int32(val)]
-		if !ok {
-			s.logger.Err("Cannot create ip route on a unknown L3 interface")
-			return ifIndex, errors.New("Cannot create ip route on a unknown L3 interface")
+		ifEntry, ok := s.IntfIdNameMap[ifIndex]
+		if !ok || ifEntry.Name == "" {
+			s.logger.Errf("ConvertIntfStrToIfIndex - Did not find ifIndex %d in IntfIdNameMap map %+v", ifIndex,
+				s.IntfIdNameMap)
+			return ifIndex, ifName, errors.New(fmt.Sprintf("Did not ifIndex %d in interface map", ifIndex))
 		}
-		ifIndex = intfString
+		ifName = ifEntry.Name
+		s.logger.Info("ConvertIntfStrToIfIndex - ifIndex =", ifIndex, "ifEntry =", ifEntry, "ifName =", ifName)
 	} else {
 		//Verify ifName is valid
-		if _, ok := s.IfNameToIfIndex[intfString]; !ok {
-			return ifIndex, errors.New("Invalid ifName value")
+		s.logger.Info("ConvertIntfStrToIfIndex - intfString", intfString, "is ifName")
+		var ok bool
+		if ifIndex, ok = s.IfNameToIfIndex[intfString]; !ok {
+			s.logger.Errf("ConvertIntfStrToIfIndex - Did not find ifName %s in ifnametoifindex map %+v", intfString,
+				s.IfNameToIfIndex)
+			return ifIndex, ifName, errors.New(fmt.Sprintf("Invalid ifName %d", intfString))
 		}
-		ifIndex = strconv.Itoa(int(s.IfNameToIfIndex[intfString]))
+		ifName = intfString
+		s.logger.Err("ConvertIntfStrToIfIndex - ifName =", ifName, "ifIndex =", ifIndex)
 	}
-	return ifIndex, nil
+	return ifIndex, ifName, nil
 }

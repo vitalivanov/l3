@@ -48,13 +48,37 @@ type Policy struct {
 }
 
 /*
+   Function to create policy prefix set in the policyEngineDB
+*/
+func (m RIBDServer) ProcessPolicyPrefixSetConfigCreate(cfg *ribd.PolicyPrefixSet, db *policy.PolicyEngineDB) (val bool, err error) {
+	logger.Debug("ProcessPolicyConditionConfigCreate:CreatePolicyConditioncfg: ", cfg.Name)
+	prefixList := make([]policy.PolicyPrefix, 0)
+	for _, prefix := range cfg.PrefixList {
+		prefixList = append(prefixList, policy.PolicyPrefix{IpPrefix: prefix.Prefix, MasklengthRange: prefix.MaskLengthRange})
+	}
+	newCfg := policy.PolicyPrefixSetConfig{Name: cfg.Name, PrefixList: prefixList}
+	val, err = db.CreatePolicyPrefixSet(newCfg)
+	return val, err
+}
+
+/*
+   Function to delete policy prefix set in the policyEngineDB
+*/
+func (m RIBDServer) ProcessPolicyPrefixSetConfigDelete(cfg *ribd.PolicyPrefixSet, db *policy.PolicyEngineDB) (val bool, err error) {
+	logger.Debug("ProcessPolicyPrefixSetConfigDelete: ", cfg.Name)
+	newCfg := policy.PolicyPrefixSetConfig{Name: cfg.Name}
+	val, err = db.DeletePolicyPrefixSet(newCfg)
+	return val, err
+}
+
+/*
    Function to create policy condition in the policyEngineDB
 */
 func (m RIBDServer) ProcessPolicyConditionConfigCreate(cfg *ribd.PolicyCondition, db *policy.PolicyEngineDB) (val bool, err error) {
 	logger.Debug("ProcessPolicyConditionConfigCreate:CreatePolicyConditioncfg: ", cfg.Name)
 	newPolicy := policy.PolicyConditionConfig{Name: cfg.Name, ConditionType: cfg.ConditionType, MatchProtocolConditionInfo: cfg.Protocol}
 	matchPrefix := policy.PolicyPrefix{IpPrefix: cfg.IpPrefix, MasklengthRange: cfg.MaskLengthRange}
-	newPolicy.MatchDstIpPrefixConditionInfo = policy.PolicyDstIpMatchPrefixSetCondition{Prefix: matchPrefix}
+	newPolicy.MatchDstIpPrefixConditionInfo = policy.PolicyDstIpMatchPrefixSetCondition{Prefix: matchPrefix, PrefixSet: cfg.PrefixSet}
 	val, err = db.CreatePolicyCondition(newPolicy)
 	return val, err
 }
@@ -122,7 +146,7 @@ func (m RIBDServer) ProcessPolicyStmtConfigDelete(cfg *ribd.PolicyStmt, db *poli
 */
 func (m RIBDServer) ProcessPolicyDefinitionConfigCreate(cfg *ribd.PolicyDefinition, db *policy.PolicyEngineDB) (err error) {
 	logger.Debug("ProcessPolicyDefinitionCreate:CreatePolicyDefinition")
-	newPolicy := policy.PolicyDefinitionConfig{Name: cfg.Name, Precedence: int(cfg.Priority), MatchType: cfg.MatchType}
+	newPolicy := policy.PolicyDefinitionConfig{Name: cfg.Name, Precedence: int(cfg.Priority), MatchType: cfg.MatchType, PolicyType: cfg.PolicyType}
 	newPolicy.PolicyDefinitionStatements = make([]policy.PolicyDefinitionStmtPrecedence, 0)
 	var policyDefinitionStatement policy.PolicyDefinitionStmtPrecedence
 	for i := 0; i < len(cfg.StatementList); i++ {
@@ -143,6 +167,68 @@ func (m RIBDServer) ProcessPolicyDefinitionConfigDelete(cfg *ribd.PolicyDefiniti
 	policy := policy.PolicyDefinitionConfig{Name: cfg.Name}
 	err = db.DeletePolicyDefinition(policy)
 	return err
+}
+
+func (m RIBDServer) GetBulkPolicyPrefixSetState(fromIndex ribd.Int, rcount ribd.Int, db *policy.PolicyEngineDB) (policyPrefixSets *ribd.PolicyPrefixSetStateGetInfo, err error) { //(routes []*ribd.Routes, err error) {
+	logger.Debug("GetBulkPolicyPrefixSetState")
+	PolicyPrefixSetDB := db.PolicyPrefixSetDB
+	localPolicyPrefixSetDB := *db.LocalPolicyPrefixSetDB
+	var i, validCount, toIndex ribd.Int
+	var tempNode []ribd.PolicyPrefixSetState = make([]ribd.PolicyPrefixSetState, rcount)
+	var nextNode *ribd.PolicyPrefixSetState
+	var returnNodes []*ribd.PolicyPrefixSetState
+	var returnGetInfo ribd.PolicyPrefixSetStateGetInfo
+	i = 0
+	policyPrefixSets = &returnGetInfo
+	more := true
+	if localPolicyPrefixSetDB == nil {
+		logger.Debug("localPolicyPrefixSetDB not initialized")
+		return policyPrefixSets, err
+	}
+	for ; ; i++ {
+		if i+fromIndex >= ribd.Int(len(localPolicyPrefixSetDB)) {
+			logger.Debug("All the policy prefix sets fetched")
+			more = false
+			break
+		}
+		if localPolicyPrefixSetDB[i+fromIndex].IsValid == false {
+			logger.Debug("Invalid policy prefix set")
+			continue
+		}
+		if validCount == rcount {
+			logger.Debug("Enough policy prefix sets fetched")
+			break
+		}
+		prefixNodeGet := PolicyPrefixSetDB.Get(localPolicyPrefixSetDB[i+fromIndex].Prefix)
+		if prefixNodeGet != nil {
+			prefixNode := prefixNodeGet.(policy.PolicyPrefixSet)
+			nextNode = &tempNode[validCount]
+			nextNode.Name = prefixNode.Name
+			nextNode.PrefixList = make([]*ribd.PolicyPrefix, 0)
+			for _, prefix := range prefixNode.PrefixList {
+				nextNode.PrefixList = append(nextNode.PrefixList, &ribd.PolicyPrefix{prefix.IpPrefix, prefix.MasklengthRange})
+			}
+			logger.Info("len(nextNode.PrefixList):", len(nextNode.PrefixList), " len(prefixNode.PrefixList:", len(prefixNode.PrefixList))
+			if prefixNode.PolicyConditionList != nil {
+				nextNode.PolicyConditionList = make([]string, 0)
+			}
+			for idx := 0; idx < len(prefixNode.PolicyConditionList); idx++ {
+				nextNode.PolicyConditionList = append(nextNode.PolicyConditionList, prefixNode.PolicyConditionList[idx])
+			}
+			toIndex = ribd.Int(prefixNode.LocalDBSliceIdx)
+			if len(returnNodes) == 0 {
+				returnNodes = make([]*ribd.PolicyPrefixSetState, 0)
+			}
+			returnNodes = append(returnNodes, nextNode)
+			validCount++
+		}
+	}
+	policyPrefixSets.PolicyPrefixSetStateList = returnNodes
+	policyPrefixSets.StartIdx = fromIndex
+	policyPrefixSets.EndIdx = toIndex + 1
+	policyPrefixSets.More = more
+	policyPrefixSets.Count = validCount
+	return policyPrefixSets, err
 }
 
 func (m RIBDServer) GetBulkPolicyConditionState(fromIndex ribd.Int, rcount ribd.Int, db *policy.PolicyEngineDB) (policyConditions *ribd.PolicyConditionStateGetInfo, err error) { //(routes []*ribd.Routes, err error) {
@@ -392,11 +478,20 @@ func (m RIBDServer) GetBulkPolicyDefinitionState(fromIndex ribd.Int, rcount ribd
                                           Action - what needs to be done on a hit
             apply - type bool - whether to apply the policy
 */
-func (m RIBDServer) UpdateApplyPolicy(info ApplyPolicyInfo, apply bool, db *policy.PolicyEngineDB) {
-	logger.Debug("UpdateApplyPolicy with apply set to ", apply)
+func (m *RIBDServer) UpdateApplyPolicyList(applyList []*ribdInt.ApplyPolicyInfo, undoList []*ribdInt.ApplyPolicyInfo, apply bool, db *policy.PolicyEngineDB) {
+	logger.Debug("UpdateApplyPolicyList")
+	for _, applyListInfo := range applyList {
+		m.UpdateApplyPolicy(applyListInfo, apply, db)
+	}
+	for _, undoListInfo := range undoList {
+		m.UndoApplyPolicy(undoListInfo, apply, db)
+	}
+}
+func (m *RIBDServer) UndoApplyPolicy(info *ribdInt.ApplyPolicyInfo, apply bool, db *policy.PolicyEngineDB) {
+	logger.Debug("UndoApplyPolicy with apply set to ", apply)
 	var err error
-	conditionName := ""
 	source := info.Source
+	conditionName := ""
 	policyName := info.Policy
 	action := info.Action
 	var policyAction policy.PolicyAction
@@ -411,37 +506,104 @@ func (m RIBDServer) UpdateApplyPolicy(info ApplyPolicyInfo, apply bool, db *poli
 		return
 	}
 	node := nodeGet.(policy.Policy)
-	if apply {
-		conditions := make([]ribdInt.ConditionInfo, 0)
-		for i := 0; i < len(info.Conditions); i++ {
-			conditions = append(conditions, *info.Conditions[i])
-		}
-		logger.Debug("RIB handler UpdateApplyPolicy source:", source, " policy:", policyName, " action:", action, " apply:", apply, "conditions: ")
-		for j := 0; j < len(conditions); j++ {
-			logger.Debug("ConditionType =  :", conditions[j].ConditionType)
-			switch conditions[j].ConditionType {
-			case "MatchProtocol":
-				logger.Debug(conditions[j].Protocol)
-				conditionName = "Match" + conditions[j].Protocol
-				ok := policyConditionsDB.Match(patriciaDB.Prefix(conditionName))
-				if !ok {
-					logger.Debug("Define condition ", conditionName)
-					policyCondition := ribd.PolicyCondition{Name: conditionName, ConditionType: conditions[j].ConditionType, Protocol: conditions[j].Protocol}
-					_, err = m.ProcessPolicyConditionConfigCreate(&policyCondition, db)
-				}
-			case "MatchDstIpPrefix":
-			case "MatchSrcIpPrefix":
-				logger.Debug("IpPrefix:", conditions[j].IpPrefix, "MasklengthRange:", conditions[j].MasklengthRange)
-			default:
-				logger.Err("Invalid condition type:", conditions[j].ConditionType)
+	conditions := make([]ribdInt.ConditionInfo, 0)
+	for i := 0; i < len(info.Conditions); i++ {
+		conditions = append(conditions, *info.Conditions[i])
+	}
+	logger.Debug("RIB handler UndoApplyPolicy source:", source, " policy:", policyName, " action:", action, " apply:", apply, "conditions: ")
+	for j := 0; j < len(conditions); j++ {
+		logger.Debug("ConditionType =  :", conditions[j].ConditionType)
+		switch conditions[j].ConditionType {
+		case "MatchProtocol":
+			logger.Debug(conditions[j].Protocol)
+			conditionName = "Match" + conditions[j].Protocol
+			ok := policyConditionsDB.Match(patriciaDB.Prefix(conditionName))
+			if !ok {
+				logger.Debug("condition ", conditionName, " not found")
 				return
 			}
-			if err == nil {
-				logger.Debug("Adding condition ", conditionName, " to conditionNameList")
-				conditionNameList = append(conditionNameList, conditionName)
-			}
+		case "MatchDstIpPrefix":
+		case "MatchSrcIpPrefix":
+			logger.Debug("IpPrefix:", conditions[j].IpPrefix, "MasklengthRange:", conditions[j].MasklengthRange)
+		default:
+			logger.Err("Invalid condition type:", conditions[j].ConditionType)
+			return
+		}
+		if err == nil {
+			logger.Debug("Adding condition ", conditionName, " to conditionNameList")
+			conditionNameList = append(conditionNameList, conditionName)
 		}
 	}
+	switch action {
+	case "Redistribution":
+		logger.Debug("Setting up Redistribution action map")
+		redistributeActionInfo := policy.RedistributeActionInfo{false, source}
+		policyAction = policy.PolicyAction{Name: action, ActionType: policyCommonDefs.PolicyActionTypeRouteRedistribute, ActionInfo: redistributeActionInfo}
+		break
+	default:
+		logger.Debug("Action ", action, "currently a no-op")
+		return
+	}
+	/*
+	   Call the policy library updateApplyPolicy function
+	*/
+	logger.Debug("Calling undo applypolicy with conditionNameList: ", conditionNameList)
+	db.UpdateUndoApplyPolicy(policy.ApplyPolicyInfo{node, policyAction, conditionNameList}, apply)
+	return
+}
+func (m RIBDServer) UpdateApplyPolicy(info *ribdInt.ApplyPolicyInfo, apply bool, db *policy.PolicyEngineDB) {
+	logger.Debug("UpdateApplyPolicy with apply set to ", apply)
+	var err error
+	conditionName := ""
+	source := info.Source
+	policyName := info.Policy
+	action := info.Action
+	var policyAction policy.PolicyAction
+	conditionNameList := make([]string, 0)
+
+	policyDB := db.PolicyDB
+	policyConditionsDB := db.PolicyConditionsDB
+
+	var node policy.Policy
+	node.Name = policyName
+	nodeGet := policyDB.Get(patriciaDB.Prefix(policyName))
+	if nodeGet == nil {
+		logger.Err("Policy ", policyName, " not defined")
+		//return
+	} else {
+		node = nodeGet.(policy.Policy)
+	}
+	//if apply {
+	conditions := make([]ribdInt.ConditionInfo, 0)
+	for i := 0; i < len(info.Conditions); i++ {
+		conditions = append(conditions, *info.Conditions[i])
+	}
+	logger.Debug("RIB handler UpdateApplyPolicy source:", source, " policy:", policyName, " action:", action, " apply:", apply, "conditions: ")
+	for j := 0; j < len(conditions); j++ {
+		logger.Debug("ConditionType =  :", conditions[j].ConditionType)
+		switch conditions[j].ConditionType {
+		case "MatchProtocol":
+			logger.Debug(conditions[j].Protocol)
+			conditionName = "Match" + conditions[j].Protocol
+			ok := policyConditionsDB.Match(patriciaDB.Prefix(conditionName))
+			if !ok {
+				logger.Debug("Define condition ", conditionName)
+				policyCondition := ribd.PolicyCondition{Name: conditionName, ConditionType: conditions[j].ConditionType, Protocol: conditions[j].Protocol}
+				_, err = m.ProcessPolicyConditionConfigCreate(&policyCondition, db)
+			}
+		case "MatchDstIpPrefix":
+		case "MatchSrcIpPrefix":
+			logger.Debug("IpPrefix:", conditions[j].IpPrefix, "MasklengthRange:", conditions[j].MasklengthRange)
+		default:
+			logger.Err("Invalid condition type:", conditions[j].ConditionType)
+			return
+		}
+		if err == nil {
+			logger.Debug("Adding condition ", conditionName, " to conditionNameList")
+			conditionNameList = append(conditionNameList, conditionName)
+		}
+	}
+	//}
 	//define Action
 	switch action {
 	case "Redistribution":

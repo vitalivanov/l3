@@ -82,16 +82,16 @@ func (mgr *FSRouteMgr) setupSubSocket(address string) (*nanomsg.SubSocket, error
 	}
 
 	if err = socket.Subscribe(""); err != nil {
-		mgr.logger.Err("Failed to subscribe to \"\" on subscribe socket %s, error:%s", address, err)
+		mgr.logger.Errf("Failed to subscribe to \"\" on subscribe socket %s, error:%s", address, err)
 		return nil, err
 	}
 
 	if _, err = socket.Connect(address); err != nil {
-		mgr.logger.Err("Failed to connect to publisher socket %s, error:%s", address, err)
+		mgr.logger.Errf("Failed to connect to publisher socket %s, error:%s", address, err)
 		return nil, err
 	}
 
-	mgr.logger.Info("Connected to publisher socket %s", address)
+	mgr.logger.Infof("Connected to publisher socket %s", address)
 	if err = socket.SetRecvBuffer(1024 * 1024); err != nil {
 		mgr.logger.Err("Failed to set the buffer size for subsriber socket %s, error:", address, err)
 		return nil, err
@@ -160,10 +160,10 @@ func (mgr *FSRouteMgr) handleRibUpdates(rxBuf []byte) {
 	}
 }
 
-func (mgr *FSRouteMgr) GetNextHopInfo(ipAddr string) (*config.NextHopInfo, error) {
-	info, err := mgr.ribdClient.GetRouteReachabilityInfo(ipAddr)
+func (mgr *FSRouteMgr) GetNextHopInfo(ipAddr string, ifIndex int32) (*config.NextHopInfo, error) {
+	info, err := mgr.ribdClient.GetRouteReachabilityInfo(ipAddr, ribdInt.Int(ifIndex))
 	if err != nil {
-		mgr.logger.Err("Getting route reachability for ", ipAddr, "failed, error:", err)
+		mgr.logger.Err("Getting route reachability for ", ipAddr, " ifIndex:", ifIndex, "failed, error:", err)
 		return nil, err
 	}
 	reachInfo := &config.NextHopInfo{
@@ -278,16 +278,42 @@ func (mgr *FSRouteMgr) UpdateRoute(cfg *config.RouteConfig, op string) {
 	}
 }
 
-func (mgr *FSRouteMgr) ApplyPolicy(protocol string, policy string, action string, conditions []*config.ConditionInfo) {
-	temp := make([]ribdInt.ConditionInfo, len(conditions))
-	ribdConditions := make([]*ribdInt.ConditionInfo, 0)
+func (mgr *FSRouteMgr) ApplyPolicy(applyList []*config.ApplyPolicyInfo, undoList []*config.ApplyPolicyInfo) {
+
+	mgr.logger.Info("RouteMgr:ApplyPolicy, applyList:", applyList)
+	tempApplyList := make([]ribdInt.ApplyPolicyInfo, len(applyList))
 	j := 0
-	for i := 0; i < len(conditions); i++ {
-		temp[j] = ribdInt.ConditionInfo{conditions[i].ConditionType, conditions[i].Protocol, conditions[i].IpPrefix, conditions[i].MasklengthRange}
-		ribdConditions = append(ribdConditions, &temp[j])
+	ribdApplyList := make([]*ribdInt.ApplyPolicyInfo, 0)
+	for i := 0; i < len(applyList); i++ {
+		temp := make([]ribdInt.ConditionInfo, len(applyList[i].Conditions))
+		ribdConditions := make([]*ribdInt.ConditionInfo, 0)
+		j1 := 0
+		for _, conditions := range applyList[i].Conditions {
+			temp[j1] = ribdInt.ConditionInfo{conditions.ConditionType, conditions.Protocol, conditions.IpPrefix, conditions.MasklengthRange}
+			ribdConditions = append(ribdConditions, &temp[j1])
+			j1++
+		}
+		tempApplyList[j] = ribdInt.ApplyPolicyInfo{applyList[i].Protocol, applyList[i].Policy, applyList[i].Action, ribdConditions}
+		ribdApplyList = append(ribdApplyList, &tempApplyList[j])
 		j++
 	}
-	mgr.ribdClient.ApplyPolicy(protocol, policy, action, ribdConditions)
+	tempUndoList := make([]ribdInt.ApplyPolicyInfo, len(undoList))
+	k := 0
+	ribdUndoApplyList := make([]*ribdInt.ApplyPolicyInfo, 0)
+	for i := 0; i < len(undoList); i++ {
+		temp := make([]ribdInt.ConditionInfo, len(undoList[i].Conditions))
+		ribdConditions := make([]*ribdInt.ConditionInfo, 0)
+		j1 := 0
+		for _, conditions := range undoList[i].Conditions {
+			temp[j1] = ribdInt.ConditionInfo{conditions.ConditionType, conditions.Protocol, conditions.IpPrefix, conditions.MasklengthRange}
+			ribdConditions = append(ribdConditions, &temp[j1])
+			j1++
+		}
+		tempUndoList[k] = ribdInt.ApplyPolicyInfo{undoList[i].Protocol, undoList[i].Policy, undoList[i].Action, ribdConditions}
+		ribdUndoApplyList = append(ribdUndoApplyList, &tempUndoList[k])
+		k++
+	}
+	mgr.ribdClient.ApplyPolicy(ribdApplyList, ribdUndoApplyList)
 }
 
 func (mgr *FSRouteMgr) GetRoutes() ([]*config.RouteInfo, []*config.RouteInfo) {

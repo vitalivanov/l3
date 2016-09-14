@@ -26,7 +26,6 @@ package rpc
 import (
 	"bfdd"
 	"errors"
-	"fmt"
 	"l3/bfd/bfddCommonDefs"
 	"l3/bfd/server"
 )
@@ -82,7 +81,7 @@ func (h *BFDHandler) CreateBfdSession(bfdSessionConf *bfdd.BfdSession) (bool, er
 		err := errors.New("Invalid Session Configuration")
 		return false, err
 	}
-	h.logger.Info(fmt.Sprintln("Create session config attrs:", bfdSessionConf))
+	h.logger.Info("Create session config attrs:", bfdSessionConf)
 	return h.SendBfdSessionConfig(bfdSessionConf), nil
 }
 
@@ -91,6 +90,6 @@ func (h *BFDHandler) CreateBfdSessionParam(bfdSessionParamConf *bfdd.BfdSessionP
 		err := errors.New("Invalid Session Param Configuration")
 		return false, err
 	}
-	h.logger.Info(fmt.Sprintln("Create session param config attrs:", bfdSessionParamConf))
+	h.logger.Info("Create session param config attrs:", bfdSessionParamConf)
 	return h.SendBfdSessionParamConfig(bfdSessionParamConf), nil
 }

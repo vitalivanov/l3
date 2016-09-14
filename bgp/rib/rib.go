@@ -67,11 +67,11 @@ type LocRib struct {
 	destPathMap      map[uint32]map[string]*Destination
 	reachabilityMap  map[string]*ReachabilityInfo
 	unreachablePaths map[string]map[*Path]map[*Destination][]uint32
-	routeList        []*Destination
+	routeList        map[uint32][]*Destination
 	routeMutex       sync.RWMutex
-	routeListDirty   bool
-	activeGet        bool
-	timer            *time.Timer
+	routeListDirty   map[uint32]bool
+	activeGet        map[uint32]bool
+	timer            map[uint32]*time.Timer
 }
 
 func NewLocRib(logger *logging.Writer, rMgr config.RouteMgrIntf, sDBMgr statedbclient.StateDBClient,
@@ -84,14 +84,12 @@ func NewLocRib(logger *logging.Writer, rMgr config.RouteMgrIntf, sDBMgr statedbc
 		destPathMap:      make(map[uint32]map[string]*Destination),
 		reachabilityMap:  make(map[string]*ReachabilityInfo),
 		unreachablePaths: make(map[string]map[*Path]map[*Destination][]uint32),
-		routeList:        make([]*Destination, 0),
-		routeListDirty:   false,
-		activeGet:        false,
+		routeList:        make(map[uint32][]*Destination),
+		routeListDirty:   make(map[uint32]bool),
+		activeGet:        make(map[uint32]bool),
 		routeMutex:       sync.RWMutex{},
+		timer:            make(map[uint32]*time.Timer),
 	}
-
-	rib.timer = time.AfterFunc(time.Duration(100)*time.Second, rib.ResetRouteList)
-	rib.timer.Stop()
 
 	return rib
 }
@@ -112,13 +110,13 @@ func (l *LocRib) GetReachabilityInfo(ipStr string) *ReachabilityInfo {
 	}
 
 	l.logger.Infof("GetReachabilityInfo: Reachability info not cached for Next hop %s", ipStr)
-	ribdReachabilityInfo, err := l.routeMgr.GetNextHopInfo(ipStr)
+	ribdReachabilityInfo, err := l.routeMgr.GetNextHopInfo(ipStr, -1)
 	if err != nil {
 		l.logger.Infof("NEXT_HOP[%s] is not reachable", ipStr)
 		return nil
 	}
 	nextHop := ribdReachabilityInfo.NextHopIp
-	if nextHop == "" || nextHop[0] == '0' {
+	if nextHop == "" || nextHop[0] == '0' || nextHop == "::" {
 		l.logger.Infof("Next hop for %s is %s. Using %s as the next hop", ipStr, nextHop, ipStr)
 		nextHop = ipStr
 	}
@@ -150,7 +148,7 @@ func (l *LocRib) GetDest(nlri packet.NLRI, protoFamily uint32, createIfNotExist 
 		if !ok && createIfNotExist {
 			dest = NewDestination(l, nlri, protoFamily, l.gConf)
 			l.destPathMap[protoFamily][nlri.GetPrefix().String()] = dest
-			l.addRoutesToRouteList(dest)
+			l.addRoutesToRouteList(dest, protoFamily)
 		}
 	}
 
@@ -177,10 +175,8 @@ func (l *LocRib) updateRibOutInfo(action RouteAction, addPathsMod bool, addRoute
 	return updated, withdrawn, updatedAddPaths
 }
 
-func (l *LocRib) GetRouteStateConfigObj(route *bgpd.BGPRouteState) objects.ConfigObj {
-	var dbObj objects.BGPRouteState
-	objects.ConvertThriftTobgpdBGPRouteStateObj(route, &dbObj)
-	return &dbObj
+func (l *LocRib) GetRouteStateConfigObj(route config.ModelRouteIntf) objects.ConfigObj {
+	return route.GetModelObject()
 }
 
 func (l *LocRib) ProcessRoutes(peerIP string, add, rem []packet.NLRI, addPath, remPath *Path, addPathCount int,
@@ -243,7 +239,7 @@ func (l *LocRib) ProcessRoutes(peerIP string, add, rem []packet.NLRI, addPath, r
 			if action == RouteActionDelete {
 				if dest.IsEmpty() {
 					op = l.stateDBMgr.DeleteObject
-					l.removeRoutesFromRouteList(dest)
+					l.removeRoutesFromRouteList(dest, protoFamily)
 					delete(l.destPathMap[protoFamily], nlri.GetPrefix().String())
 				}
 			}
@@ -330,31 +326,35 @@ func (l *LocRib) ProcessRoutesForReachableRoutes(nextHop string, reachabilityInf
 func (l *LocRib) TestNHAndProcessRoutes(peerIP string, add, remove []packet.NLRI, addPath, remPath *Path,
 	addPathCount int, protoFamily uint32, updated map[uint32]map[*Path][]*Destination, withdrawn,
 	updatedAddPaths []*Destination) (map[uint32]map[*Path][]*Destination, []*Destination, []*Destination, bool) {
-	nextHop := addPath.GetNextHop(protoFamily)
-	if nextHop == nil {
-		l.logger.Errf("RIB - Next hop not found for protocol family %d", protoFamily)
-		return updated, withdrawn, updatedAddPaths, true
-	}
-	nextHopStr := nextHop.String()
-	reachabilityInfo := l.GetReachabilityInfo(nextHopStr)
-	addPath.SetReachabilityForFamily(protoFamily, reachabilityInfo)
+	var reachabilityInfo *ReachabilityInfo
+	nextHopStr := ""
+	if len(add) > 0 {
+		nextHop := addPath.GetNextHop(protoFamily)
+		if nextHop == nil {
+			l.logger.Errf("RIB - Next hop not found for protocol family %d", protoFamily)
+			return updated, withdrawn, updatedAddPaths, true
+		}
+		nextHopStr = nextHop.String()
+		reachabilityInfo = l.GetReachabilityInfo(nextHopStr)
+		addPath.SetReachabilityForFamily(protoFamily, reachabilityInfo)
 
-	//addPath.GetReachabilityInfo()
-	if !addPath.IsValid() {
-		l.logger.Infof("Received a update with our cluster id %d, Discarding the update.",
-			addPath.NeighborConf.RunningConf.RouteReflectorClusterId)
-		return updated, withdrawn, updatedAddPaths, true
-	}
-
-	if reachabilityInfo == nil {
-		l.logger.Infof("ProcessUpdate - next hop %s is not reachable", nextHopStr)
-
-		if _, ok := l.unreachablePaths[nextHopStr]; !ok {
-			l.unreachablePaths[nextHopStr] = make(map[*Path]map[*Destination][]uint32)
+		//addPath.GetReachabilityInfo()
+		if !addPath.IsValid() {
+			l.logger.Infof("Received a update with our cluster id %d, Discarding the update.",
+				addPath.NeighborConf.RunningConf.RouteReflectorClusterId)
+			return updated, withdrawn, updatedAddPaths, true
 		}
 
-		if _, ok := l.unreachablePaths[nextHopStr][addPath]; !ok {
-			l.unreachablePaths[nextHopStr][addPath] = make(map[*Destination][]uint32)
+		if reachabilityInfo == nil {
+			l.logger.Infof("ProcessUpdate - next hop %s is not reachable", nextHopStr)
+
+			if _, ok := l.unreachablePaths[nextHopStr]; !ok {
+				l.unreachablePaths[nextHopStr] = make(map[*Path]map[*Destination][]uint32)
+			}
+
+			if _, ok := l.unreachablePaths[nextHopStr][addPath]; !ok {
+				l.unreachablePaths[nextHopStr][addPath] = make(map[*Destination][]uint32)
+			}
 		}
 	}
 
@@ -455,7 +455,7 @@ func (l *LocRib) RemoveUpdatesFromNeighbor(peerIP string, neighborConf *base.Nei
 				delRoutes, dest, updated, withdrawn, updatedAddPaths)
 			if action == RouteActionDelete && dest.IsEmpty() {
 				l.logger.Info("All routes removed for dest", dest.NLRI.GetPrefix().String())
-				l.removeRoutesFromRouteList(dest)
+				l.removeRoutesFromRouteList(dest, protoFamily)
 				delete(l.destPathMap[protoFamily], destIP)
 				op = l.stateDBMgr.DeleteObject
 			}
@@ -482,7 +482,7 @@ func (l *LocRib) RemoveUpdatesFromAllNeighbors(addPathCount int) {
 			l.updateRibOutInfo(action, addPathsMod, addRoutes, updRoutes, delRoutes, dest, updated, withdrawn,
 				updatedAddPaths)
 			if action == RouteActionDelete && dest.IsEmpty() {
-				l.removeRoutesFromRouteList(dest)
+				l.removeRoutesFromRouteList(dest, protoFamily)
 				delete(l.destPathMap[protoFamily], destIP)
 				op = l.stateDBMgr.DeleteObject
 			}
@@ -554,7 +554,7 @@ func (l *LocRib) RemoveRouteFromAggregate(ip *packet.IPPrefix, aggIP *packet.IPP
 		dest.aggPath = aggPath
 	}
 	if action == RouteActionDelete && aggDest.IsEmpty() {
-		l.removeRoutesFromRouteList(dest)
+		l.removeRoutesFromRouteList(dest, protoFamily)
 		delete(l.destPathMap[protoFamily], aggIP.Prefix.String())
 		op = l.stateDBMgr.DeleteObject
 	}
@@ -625,99 +625,153 @@ func (l *LocRib) AddRouteToAggregate(ip *packet.IPPrefix, aggIP *packet.IPPrefix
 	return updated, withdrawn, updatedAddPaths
 }
 
-func (l *LocRib) removeRoutesFromRouteList(dest *Destination) {
+func (l *LocRib) removeRoutesFromRouteList(dest *Destination, protoFamily uint32) {
 	defer l.routeMutex.Unlock()
 	l.routeMutex.Lock()
+	if _, ok := l.routeList[protoFamily]; !ok {
+		l.logger.Err("Protocol family", protoFamily, "not found in RIB route list")
+		return
+	}
+
 	idx := dest.routeListIdx
 	if idx != -1 {
 		l.logger.Info("removeRoutesFromRouteList: remove dest at idx", idx)
-		if !l.activeGet {
-			l.routeList[idx] = l.routeList[len(l.routeList)-1]
-			l.routeList[idx].routeListIdx = idx
-			l.routeList[len(l.routeList)-1] = nil
-			l.routeList = l.routeList[:len(l.routeList)-1]
+		if !l.activeGet[protoFamily] {
+			l.routeList[protoFamily][idx] = l.routeList[protoFamily][len(l.routeList[protoFamily])-1]
+			l.routeList[protoFamily][idx].routeListIdx = idx
+			l.routeList[protoFamily][len(l.routeList[protoFamily])-1] = nil
+			l.routeList[protoFamily] = l.routeList[protoFamily][:len(l.routeList[protoFamily])-1]
 		} else {
-			l.routeList[idx] = nil
-			l.routeListDirty = true
+			l.routeList[protoFamily][idx] = nil
+			l.routeListDirty[protoFamily] = true
 		}
 	}
 }
 
-func (l *LocRib) addRoutesToRouteList(dest *Destination) {
+func (l *LocRib) addRoutesToRouteList(dest *Destination, protoFamily uint32) {
 	defer l.routeMutex.Unlock()
 	l.routeMutex.Lock()
-	l.routeList = append(l.routeList, dest)
-	l.logger.Info("addRoutesToRouteList: added dest at idx", len(l.routeList)-1)
-	dest.routeListIdx = len(l.routeList) - 1
+
+	if _, ok := l.timer[protoFamily]; !ok {
+		l.timer[protoFamily] = time.AfterFunc(time.Duration(100)*time.Second, func() { l.ResetRouteList(protoFamily) })
+		l.timer[protoFamily].Stop()
+	}
+
+	l.routeList[protoFamily] = append(l.routeList[protoFamily], dest)
+	l.logger.Info("addRoutesToRouteList: added dest at idx", len(l.routeList[protoFamily])-1)
+	dest.routeListIdx = len(l.routeList[protoFamily]) - 1
 }
 
-func (l *LocRib) ResetRouteList() {
+func (l *LocRib) ResetAllRouteLists() {
+	for protoFamily, _ := range l.routeList {
+		l.ResetRouteList(protoFamily)
+	}
+}
+
+func (l *LocRib) ResetRouteList(protoFamily uint32) {
 	defer l.routeMutex.Unlock()
 	l.routeMutex.Lock()
-	l.activeGet = false
 
-	if !l.routeListDirty {
+	l.activeGet[protoFamily] = false
+
+	if !l.routeListDirty[protoFamily] {
 		return
 	}
 
-	lastIdx := len(l.routeList) - 1
+	lastIdx := len(l.routeList[protoFamily]) - 1
 	var modIdx, idx int
-	for idx = 0; idx < len(l.routeList); idx++ {
-		if l.routeList[idx] == nil {
-			for modIdx = lastIdx; modIdx > idx && l.routeList[modIdx] == nil; modIdx-- {
+	for idx = 0; idx < len(l.routeList[protoFamily]); idx++ {
+		if l.routeList[protoFamily][idx] == nil {
+			for modIdx = lastIdx; modIdx > idx && l.routeList[protoFamily][modIdx] == nil; modIdx-- {
 			}
 			if modIdx <= idx {
 				lastIdx = idx
 				break
 			}
-			l.routeList[idx] = l.routeList[modIdx]
-			l.routeList[idx].routeListIdx = idx
-			l.routeList[modIdx] = nil
+			l.routeList[protoFamily][idx] = l.routeList[protoFamily][modIdx]
+			l.routeList[protoFamily][idx].routeListIdx = idx
+			l.routeList[protoFamily][modIdx] = nil
 			lastIdx = modIdx
 		}
 	}
-	l.routeList = l.routeList[:idx]
-	l.routeListDirty = false
+	l.routeList[protoFamily] = l.routeList[protoFamily][:idx]
+	l.routeListDirty[protoFamily] = false
 }
 
-func (l *LocRib) GetBGPRoute(prefix string) *bgpd.BGPRouteState {
+func (l *LocRib) GetBGPRoute(prefix string, protocolFamily uint32) interface{} {
 	defer l.routeMutex.RUnlock()
 	l.routeMutex.RLock()
 
-	for _, ipDestMap := range l.destPathMap {
-		if dest, ok := ipDestMap[prefix]; ok {
-			return dest.GetBGPRoute()
+	for pf, ipDestMap := range l.destPathMap {
+		if protocolFamily == pf {
+			if dest, ok := ipDestMap[prefix]; ok {
+				return dest.GetBGPRoute().GetThriftObject()
+			}
 		}
 	}
 
 	return nil
 }
 
-func (l *LocRib) BulkGetBGPRoutes(index int, count int) (int, int, []*bgpd.BGPRouteState) {
-	l.timer.Stop()
-	if index == 0 && l.activeGet {
-		l.ResetRouteList()
+func (l *LocRib) GetBGPv4Route(prefix string) *bgpd.BGPv4RouteState {
+	route := l.GetBGPRoute(prefix, packet.GetProtocolFamily(packet.AfiIP, packet.SafiUnicast))
+	return route.(*bgpd.BGPv4RouteState)
+}
+
+func (l *LocRib) GetBGPv6Route(prefix string) *bgpd.BGPv6RouteState {
+	route := l.GetBGPRoute(prefix, packet.GetProtocolFamily(packet.AfiIP6, packet.SafiUnicast))
+	return route.(*bgpd.BGPv6RouteState)
+}
+
+func (l *LocRib) BulkGetBGPRoutes(index int, count int, protoFamily uint32) (int, int, []interface{}) {
+	var i int
+	n := 0
+	result := make([]interface{}, count)
+
+	if _, ok := l.timer[protoFamily]; !ok {
+		l.logger.Err("BulkGetBGPRoutes - protocol family", protoFamily, "not found in routes list")
+		return i, n, result
 	}
-	l.activeGet = true
+
+	l.timer[protoFamily].Stop()
+	if index == 0 && l.activeGet[protoFamily] {
+		l.ResetRouteList(protoFamily)
+	}
+	l.activeGet[protoFamily] = true
 
 	defer l.routeMutex.RUnlock()
 	l.routeMutex.RLock()
 
-	var i int
-	n := 0
-	result := make([]*bgpd.BGPRouteState, count)
-	for i = index; i < len(l.routeList) && n < count; i++ {
-		if l.routeList[i] != nil && len(l.routeList[i].BGPRouteState.Paths) > 0 {
-			result[n] = l.routeList[i].GetBGPRoute()
+	for i = index; i < len(l.routeList[protoFamily]) && n < count; i++ {
+		if l.routeList[protoFamily][i] != nil && len(l.routeList[protoFamily][i].BGPRouteState.GetPaths()) > 0 {
+			result[n] = l.routeList[protoFamily][i].GetBGPRoute().GetThriftObject()
 			n++
 		}
 	}
 	result = result[:n]
 
-	if i >= len(l.routeList) {
+	if i >= len(l.routeList[protoFamily]) {
 		i = 0
 	}
 
-	l.timer.Reset(time.Duration(ResetTime) * time.Second)
+	l.timer[protoFamily].Reset(time.Duration(ResetTime) * time.Second)
 	return i, n, result
+}
+
+func (l *LocRib) BulkGetBGPv4Routes(index int, count int) (int, int, []*bgpd.BGPv4RouteState) {
+	i, n, routes := l.BulkGetBGPRoutes(index, count, packet.GetProtocolFamily(packet.AfiIP, packet.SafiUnicast))
+	thriftRoutes := make([]*bgpd.BGPv4RouteState, len(routes))
+	for idx, route := range routes {
+		thriftRoutes[idx] = route.(*bgpd.BGPv4RouteState)
+	}
+	return i, n, thriftRoutes
+}
+
+func (l *LocRib) BulkGetBGPv6Routes(index int, count int) (int, int, []*bgpd.BGPv6RouteState) {
+	i, n, routes := l.BulkGetBGPRoutes(index, count, packet.GetProtocolFamily(packet.AfiIP6, packet.SafiUnicast))
+	thriftRoutes := make([]*bgpd.BGPv6RouteState, len(routes))
+	for idx, route := range routes {
+		thriftRoutes[idx] = route.(*bgpd.BGPv6RouteState)
+	}
+	return i, n, thriftRoutes
 }

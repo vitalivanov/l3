@@ -26,6 +26,7 @@ package rpc
 
 import (
 	"bgpd"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"l3/bgp/config"
@@ -33,9 +34,11 @@ import (
 	"l3/bgp/packet"
 	bgppolicy "l3/bgp/policy"
 	"l3/bgp/server"
+	bgputils "l3/bgp/utils"
+	"math"
 	"models/objects"
 	"net"
-	"strconv"
+	"reflect"
 	"strings"
 	"utils/dbutils"
 	"utils/logging"
@@ -69,10 +72,14 @@ func NewBGPHandler(server *server.BGPServer, policyMgr *bgppolicy.BGPPolicyManag
 	return h
 }
 
-func (h *BGPHandler) convertModelToBGPGlobalConfig(obj objects.BGPGlobal) (config.GlobalConfig, error) {
-	var err error
-	gConf := config.GlobalConfig{
-		AS:                  obj.ASNum,
+func (h *BGPHandler) convertModelToBGPGlobalConfig(obj objects.BGPGlobal) (gConf config.GlobalConfig, err error) {
+	asnum, err := bgputils.GetAsNum(obj.ASNum)
+	if err != nil {
+		h.logger.Err("Invalid asnum")
+		return gConf, err
+	}
+	gConf = config.GlobalConfig{
+		AS:                  uint32(asnum),
 		RouterId:            h.convertStrIPToNetIP(obj.RouterId),
 		UseMultiplePaths:    obj.UseMultiplePaths,
 		EBGPMaxPaths:        obj.EBGPMaxPaths,
@@ -111,17 +118,27 @@ func (h *BGPHandler) handleGlobalConfig() error {
 			h.logger.Err("handleGlobalConfig - Failed to convert Model object BGP Global, error:", err)
 			return err
 		}
-		h.server.GlobalConfigCh <- server.GlobalUpdate{config.GlobalConfig{}, gConf, make([]bool, 0)}
+		h.server.GlobalConfigCh <- server.GlobalUpdate{nil, config.GlobalConfig{}, gConf, make([]bool, 0), nil, "create"}
 	}
 	return nil
 }
 
 func (h *BGPHandler) convertModelToBGPv4PeerGroup(obj objects.BGPv4PeerGroup) (group config.PeerGroupConfig,
 	err error) {
+	peerAS, err := bgputils.GetAsNum(obj.PeerAS)
+	if err != nil {
+		h.logger.Err("Invalid peer asnum")
+		return group, err
+	}
+	localAS, err := bgputils.GetAsNum(obj.LocalAS)
+	if err != nil {
+		h.logger.Err("Invalid local asnum")
+		return group, err
+	}
 	group = config.PeerGroupConfig{
 		BaseConfig: config.BaseConfig{
-			PeerAS:                  uint32(obj.PeerAS),
-			LocalAS:                 uint32(obj.LocalAS),
+			PeerAS:                  uint32(peerAS),
+			LocalAS:                 uint32(localAS),
 			PeerAddressType:         config.PeerAddressV4,
 			UpdateSource:            obj.UpdateSource,
 			AuthPassword:            obj.AuthPassword,
@@ -139,6 +156,8 @@ func (h *BGPHandler) convertModelToBGPv4PeerGroup(obj objects.BGPv4PeerGroup) (g
 			MaxPrefixesThresholdPct: uint8(obj.MaxPrefixesThresholdPct),
 			MaxPrefixesDisconnect:   obj.MaxPrefixesDisconnect,
 			MaxPrefixesRestartTimer: uint8(obj.MaxPrefixesRestartTimer),
+			AdjRIBInFilter:          obj.AdjRIBInFilter,
+			AdjRIBOutFilter:         obj.AdjRIBOutFilter,
 		},
 		Name: obj.Name,
 	}
@@ -170,10 +189,20 @@ func (h *BGPHandler) handleV4PeerGroup() error {
 
 func (h *BGPHandler) convertModelToBGPv6PeerGroup(obj objects.BGPv6PeerGroup) (group config.PeerGroupConfig,
 	err error) {
+	peerAS, err := bgputils.GetAsNum(obj.PeerAS)
+	if err != nil {
+		h.logger.Err("Invalid peer asnum")
+		return group, err
+	}
+	localAS, err := bgputils.GetAsNum(obj.LocalAS)
+	if err != nil {
+		h.logger.Err("Invalid local asnum")
+		return group, err
+	}
 	group = config.PeerGroupConfig{
 		BaseConfig: config.BaseConfig{
-			PeerAS:                  uint32(obj.PeerAS),
-			LocalAS:                 uint32(obj.LocalAS),
+			PeerAS:                  uint32(peerAS),
+			LocalAS:                 uint32(localAS),
 			PeerAddressType:         config.PeerAddressV6,
 			UpdateSource:            obj.UpdateSource,
 			Description:             obj.Description,
@@ -190,6 +219,8 @@ func (h *BGPHandler) convertModelToBGPv6PeerGroup(obj objects.BGPv6PeerGroup) (g
 			MaxPrefixesThresholdPct: uint8(obj.MaxPrefixesThresholdPct),
 			MaxPrefixesDisconnect:   obj.MaxPrefixesDisconnect,
 			MaxPrefixesRestartTimer: uint8(obj.MaxPrefixesRestartTimer),
+			AdjRIBInFilter:          obj.AdjRIBInFilter,
+			AdjRIBOutFilter:         obj.AdjRIBOutFilter,
 		},
 		Name: obj.Name,
 	}
@@ -223,17 +254,27 @@ func (h *BGPHandler) convertModelToBGPv4Neighbor(obj objects.BGPv4Neighbor) (nei
 	err error) {
 	var ip net.IP
 	var ifIndex int32
-	ip, ifIndex, err = h.getIPAndIfIndexForV4Neighbor(obj.NeighborAddress, obj.IntfRef)
+	ip, ifIndex, _, err = h.getIPAndIfIndexForV4Neighbor(obj.NeighborAddress, obj.IntfRef)
 	if err != nil {
 		h.logger.Info("convertModelToBGPv4Neighbor: getIPAndIfIndexForV4Neighbor",
 			"failed for neighbor address", obj.NeighborAddress, "and ifIndex", obj.IntfRef)
 		return neighbor, err
 	}
 
+	peerAS, err := bgputils.GetAsNum(obj.PeerAS)
+	if err != nil {
+		h.logger.Err("Invalid peer asnum")
+		return neighbor, err
+	}
+	localAS, err := bgputils.GetAsNum(obj.LocalAS)
+	if err != nil {
+		h.logger.Err("Invalid local asnum")
+		return neighbor, err
+	}
 	neighbor = config.NeighborConfig{
 		BaseConfig: config.BaseConfig{
-			PeerAS:                  uint32(obj.PeerAS),
-			LocalAS:                 uint32(obj.LocalAS),
+			PeerAS:                  uint32(peerAS),
+			LocalAS:                 uint32(localAS),
 			PeerAddressType:         config.PeerAddressV4,
 			UpdateSource:            obj.UpdateSource,
 			AuthPassword:            obj.AuthPassword,
@@ -253,6 +294,8 @@ func (h *BGPHandler) convertModelToBGPv4Neighbor(obj objects.BGPv4Neighbor) (nei
 			MaxPrefixesThresholdPct: uint8(obj.MaxPrefixesThresholdPct),
 			MaxPrefixesDisconnect:   obj.MaxPrefixesDisconnect,
 			MaxPrefixesRestartTimer: uint8(obj.MaxPrefixesRestartTimer),
+			AdjRIBInFilter:          obj.AdjRIBInFilter,
+			AdjRIBOutFilter:         obj.AdjRIBOutFilter,
 		},
 		NeighborAddress: ip,
 		IfIndex:         ifIndex,
@@ -278,7 +321,7 @@ func (h *BGPHandler) handleV4NeighborConfig() error {
 			return err
 		}
 
-		h.server.AddPeerCh <- server.PeerUpdate{config.NeighborConfig{}, neighbor, make([]bool, 0)}
+		h.server.AddPeerCh <- server.PeerUpdate{nil, "v4", config.NeighborConfig{}, neighbor, make([]bool, 0), nil, "create"}
 	}
 
 	return nil
@@ -288,17 +331,28 @@ func (h *BGPHandler) convertModelToBGPv6Neighbor(obj objects.BGPv6Neighbor) (nei
 	err error) {
 	var ip net.IP
 	var ifIndex int32
-	ip, ifIndex, err = h.getIPAndIfIndexForV6Neighbor(obj.NeighborAddress, obj.IntfRef)
+	var ifName string
+	ip, ifIndex, ifName, err = h.getIPAndIfIndexForV6Neighbor(obj.NeighborAddress, obj.IntfRef)
 	if err != nil {
 		h.logger.Info("convertModelToBGPv6Neighbor: getIPAndIfIndexForV6Neighbor",
 			"failed for neighbor address", obj.NeighborAddress, "and ifIndex", obj.IntfRef)
 		return neighbor, err
 	}
+	peerAS, err := bgputils.GetAsNum(obj.PeerAS)
+	if err != nil {
+		h.logger.Err("Invalid peer asnum")
+		return neighbor, err
+	}
+	localAS, err := bgputils.GetAsNum(obj.LocalAS)
+	if err != nil {
+		h.logger.Err("Invalid local asnum")
+		return neighbor, err
+	}
 
 	neighbor = config.NeighborConfig{
 		BaseConfig: config.BaseConfig{
-			PeerAS:                  uint32(obj.PeerAS),
-			LocalAS:                 uint32(obj.LocalAS),
+			PeerAS:                  uint32(peerAS),
+			LocalAS:                 uint32(localAS),
 			PeerAddressType:         config.PeerAddressV6,
 			UpdateSource:            obj.UpdateSource,
 			Description:             obj.Description,
@@ -317,9 +371,12 @@ func (h *BGPHandler) convertModelToBGPv6Neighbor(obj objects.BGPv6Neighbor) (nei
 			MaxPrefixesThresholdPct: uint8(obj.MaxPrefixesThresholdPct),
 			MaxPrefixesDisconnect:   obj.MaxPrefixesDisconnect,
 			MaxPrefixesRestartTimer: uint8(obj.MaxPrefixesRestartTimer),
+			AdjRIBInFilter:          obj.AdjRIBInFilter,
+			AdjRIBOutFilter:         obj.AdjRIBOutFilter,
 		},
 		NeighborAddress: ip,
 		IfIndex:         ifIndex,
+		IfName:          ifName,
 		PeerGroup:       obj.PeerGroup,
 	}
 	return neighbor, err
@@ -342,7 +399,7 @@ func (h *BGPHandler) handleV6NeighborConfig() error {
 			return err
 		}
 
-		h.server.AddPeerCh <- server.PeerUpdate{config.NeighborConfig{}, neighbor, make([]bool, 0)}
+		h.server.AddPeerCh <- server.PeerUpdate{nil, "v6", config.NeighborConfig{}, neighbor, make([]bool, 0), nil, "create"}
 	}
 
 	return nil
@@ -472,6 +529,70 @@ func (h *BGPHandler) handlePolicyDefinitions() error {
 	return nil
 }
 
+func (h *BGPHandler) convertModelToBGPv4Aggregate(obj objects.BGPv4Aggregate) (config.BGPAggregate, error) {
+	aggConf := config.BGPAggregate{
+		IPPrefix:        obj.IpPrefix,
+		GenerateASSet:   obj.GenerateASSet,
+		SendSummaryOnly: obj.SendSummaryOnly,
+		AddressFamily:   packet.GetProtocolFamily(packet.AfiIP, packet.SafiUnicast),
+	}
+
+	return aggConf, nil
+}
+
+func (h *BGPHandler) handleBGPv4Aggregate() error {
+	var obj objects.BGPv4Aggregate
+	objList, err := h.dbUtil.GetAllObjFromDb(obj)
+	if err != nil {
+		h.logger.Errf("GetAllObjFromDb failed for BGPv4Aggregate with error %s", err)
+		return err
+	}
+
+	for _, confObj := range objList {
+		obj = confObj.(objects.BGPv4Aggregate)
+
+		aggConf, err := h.convertModelToBGPv4Aggregate(obj)
+		if err != nil {
+			h.logger.Err("handleBGPv4Aggregate - Failed to convert Model object BGPv4Aggregate, error:", err)
+			return err
+		}
+		h.server.AddAggCh <- server.AggUpdate{config.BGPAggregate{}, aggConf, make([]bool, 0)}
+	}
+	return nil
+}
+
+func (h *BGPHandler) convertModelToBGPv6Aggregate(obj objects.BGPv6Aggregate) (config.BGPAggregate, error) {
+	aggConf := config.BGPAggregate{
+		IPPrefix:        obj.IpPrefix,
+		GenerateASSet:   obj.GenerateASSet,
+		SendSummaryOnly: obj.SendSummaryOnly,
+		AddressFamily:   packet.GetProtocolFamily(packet.AfiIP6, packet.SafiUnicast),
+	}
+
+	return aggConf, nil
+}
+
+func (h *BGPHandler) handleBGPv6Aggregate() error {
+	var obj objects.BGPv6Aggregate
+	objList, err := h.dbUtil.GetAllObjFromDb(obj)
+	if err != nil {
+		h.logger.Errf("GetAllObjFromDb failed for BGPv6Aggregate with error %s", err)
+		return err
+	}
+
+	for _, confObj := range objList {
+		obj = confObj.(objects.BGPv6Aggregate)
+
+		aggConf, err := h.convertModelToBGPv6Aggregate(obj)
+		if err != nil {
+			h.logger.Err("handleBGPv6Aggregate - Failed to convert Model object BGPv6Aggregate, error:", err)
+			return err
+		}
+		h.server.AddAggCh <- server.AggUpdate{config.BGPAggregate{}, aggConf, make([]bool, 0)}
+	}
+	return nil
+}
+
 func (h *BGPHandler) readConfigFromDB(filePath string) error {
 	var err error
 
@@ -492,6 +613,14 @@ func (h *BGPHandler) readConfigFromDB(filePath string) error {
 	}
 
 	if err = h.handleGlobalConfig(); err != nil {
+		return err
+	}
+
+	if err = h.handleBGPv4Aggregate(); err != nil {
+		return err
+	}
+
+	if err = h.handleBGPv6Aggregate(); err != nil {
 		return err
 	}
 
@@ -527,10 +656,14 @@ func (h *BGPHandler) validateBGPGlobal(bgpGlobal *bgpd.BGPGlobal) (gConf config.
 		return gConf, err
 	}
 
-	asNum := uint32(bgpGlobal.ASNum)
-	if asNum == 0 || asNum == uint32(packet.BGPASTrans) {
+	asNum, err := bgputils.GetAsNum(bgpGlobal.ASNum) //uint32(bgpGlobal.ASNum)
+	if err != nil {
+		return gConf, err
+	}
+	h.logger.Info("Setting ASnum = ", asNum, " for ", bgpGlobal.ASNum)
+	if asNum == (math.MaxUint16) || asNum == (math.MaxUint32) || asNum == int(packet.BGPASTrans) {
 		err = errors.New(fmt.Sprintf("BGPGlobal: AS number %d is not valid", bgpGlobal.ASNum))
-		h.logger.Info("SendBGPGlobal: AS number", bgpGlobal.ASNum, "is not valid")
+		h.logger.Info("SendBGPGlobal: AS number", bgpGlobal.ASNum, "is a reserved AS number")
 		return gConf, err
 	}
 
@@ -542,7 +675,7 @@ func (h *BGPHandler) validateBGPGlobal(bgpGlobal *bgpd.BGPGlobal) (gConf config.
 	}
 
 	gConf = config.GlobalConfig{
-		AS:                  uint32(bgpGlobal.ASNum),
+		AS:                  uint32(asNum),
 		RouterId:            ip,
 		UseMultiplePaths:    bgpGlobal.UseMultiplePaths,
 		EBGPMaxPaths:        uint32(bgpGlobal.EBGPMaxPaths),
@@ -558,31 +691,173 @@ func (h *BGPHandler) validateBGPGlobal(bgpGlobal *bgpd.BGPGlobal) (gConf config.
 	}
 	return gConf, nil
 }
+func (h *BGPHandler) validateBGPGlobalForPatchUpdate(oldConfig *bgpd.BGPGlobal, newConfig *bgpd.BGPGlobal, op []*bgpd.PatchOpInfo) (gConf config.GlobalConfig, err error) {
+	h.logger.Info("validateBGPGlobalForPatchUpdate")
+	if oldConfig == nil || newConfig == nil {
+		return gConf, err
+	}
+	ip := h.convertStrIPToNetIP(oldConfig.RouterId)
+	if ip == nil {
+		err = errors.New(fmt.Sprintf("BGPGlobal: Router id %s is not valid", oldConfig.RouterId))
+		h.logger.Info("SendBGPGlobal: Router id", oldConfig.RouterId, "is not valid")
+		return gConf, err
+	}
+	oldAsnum, err := bgputils.GetAsNum(oldConfig.ASNum)
+	if err != nil {
+		return gConf, err
+	}
+	gConf = config.GlobalConfig{
+		AS:                  uint32(oldAsnum),
+		RouterId:            ip,
+		UseMultiplePaths:    oldConfig.UseMultiplePaths,
+		EBGPMaxPaths:        uint32(oldConfig.EBGPMaxPaths),
+		EBGPAllowMultipleAS: oldConfig.EBGPAllowMultipleAS,
+		IBGPMaxPaths:        uint32(oldConfig.IBGPMaxPaths),
+	}
+	for idx := 0; idx < len(op); idx++ {
+		h.logger.Debug("patch update")
+		switch op[idx].Path {
+		case "Redistribution":
+			h.logger.Debug("Patch update for redistribution")
+			if len(op[idx].Value) == 0 {
+				/*
+					If redistribution update is trying to update redistribution, non zero value is expected
+				*/
+				h.logger.Err("Must specify sources")
+				return gConf, errors.New("Redistribution update list not specified")
+			}
+			h.logger.Debug("value = ", op[idx].Value)
+			valueObjArr := []bgpd.SourcePolicyList{}
+			err = json.Unmarshal([]byte(op[idx].Value), &valueObjArr)
+			if err != nil {
+				h.logger.Err("error unmarshaling value:", err)
+				return gConf, errors.New(fmt.Sprintln("error unmarshaling value:", err))
+			}
+			h.logger.Debug("Number of redistribution soures:", len(valueObjArr))
+			for _, _ = range valueObjArr {
+				switch op[idx].Op {
+				case "add":
+					h.logger.Debug("add op")
+				case "remove":
+					h.logger.Debug("remove op")
+				default:
+					h.logger.Err("operation ", op[idx].Op, " not supported")
+					return gConf, errors.New(fmt.Sprintln("operation ", op[idx].Op, " not supported"))
+				}
+			}
+		default:
+			h.logger.Err("Patch update for attribute:", op[idx].Path, " not supported")
+			return gConf, errors.New("Invalid attribute for patch update")
+		}
+	}
+	return gConf, err
+}
 
-func (h *BGPHandler) SendBGPGlobal(oldConfig *bgpd.BGPGlobal, newConfig *bgpd.BGPGlobal, attrSet []bool) (bool, error) {
+func (h *BGPHandler) validateBGPGlobalForUpdate(oldConfig *bgpd.BGPGlobal, newConfig *bgpd.BGPGlobal, attrSet []bool) (gConf config.GlobalConfig, err error) {
+	h.logger.Info("validateBGPGlobalForUpdate")
+	if oldConfig == nil || newConfig == nil {
+		return gConf, err
+	}
+	ip := h.convertStrIPToNetIP(newConfig.RouterId)
+	if ip == nil {
+		err = errors.New(fmt.Sprintf("BGPGlobal: Router id %s is not valid", oldConfig.RouterId))
+		h.logger.Info("SendBGPGlobal: Router id", oldConfig.RouterId, "is not valid")
+		return gConf, err
+	}
+	newASNum, err := bgputils.GetAsNum(newConfig.ASNum)
+	if err != nil {
+		return gConf, err
+	}
+	gConf = config.GlobalConfig{
+		AS:                  uint32(newASNum),
+		RouterId:            ip,
+		UseMultiplePaths:    newConfig.UseMultiplePaths,
+		EBGPMaxPaths:        uint32(newConfig.EBGPMaxPaths),
+		EBGPAllowMultipleAS: newConfig.EBGPAllowMultipleAS,
+		IBGPMaxPaths:        uint32(newConfig.IBGPMaxPaths),
+	}
+	if attrSet != nil {
+		objTyp := reflect.TypeOf(*newConfig)
+		for i := 0; i < objTyp.NumField(); i++ {
+			objName := objTyp.Field(i).Name
+			if attrSet[i] {
+				h.logger.Debug("validateBGPGlobalForUpdate : changed ", objName)
+				if objName == "Redistribution" {
+					if len(newConfig.Redistribution) == 0 {
+						h.logger.Err("Must specify redistribution")
+						return gConf, err
+					}
+					if newConfig.Redistribution != nil {
+						gConf.Redistribution = make([]config.SourcePolicyMap, 0)
+						for i := 0; i < len(newConfig.Redistribution); i++ {
+							redistribution := config.SourcePolicyMap{newConfig.Redistribution[i].Sources, newConfig.Redistribution[i].Policy}
+							gConf.Redistribution = append(gConf.Redistribution, redistribution)
+						}
+					}
+				}
+				if objName == "RouterId" {
+					newip := h.convertStrIPToNetIP(newConfig.RouterId)
+					if newip == nil {
+						err = errors.New(fmt.Sprintf("BGPGlobal: Router id %s is not valid", newConfig.RouterId))
+						h.logger.Info("SendBGPGlobal: Router id", newConfig.RouterId, "is not valid")
+						return gConf, err
+					}
+					gConf.RouterId = newip
+				}
+				if objName == "ASNum" {
+					if (newASNum == (0)) || newASNum == (math.MaxUint16) ||
+						newASNum == (math.MaxUint32) || newASNum == int(packet.BGPASTrans) {
+						err = errors.New(fmt.Sprintf("BGPGlobal: AS number %d is not valid", newConfig.ASNum))
+						h.logger.Info("SendBGPGlobal: AS number", newConfig.ASNum, "is not valid")
+						return gConf, err
+					}
+					gConf.AS = uint32(newASNum)
+				}
+			}
+		}
+	}
+	return gConf, err
+}
+func (h *BGPHandler) SendBGPGlobal(oldConfig *bgpd.BGPGlobal, newConfig *bgpd.BGPGlobal, attrSet []bool, patchOp []*bgpd.PatchOpInfo, op string) (bool, error) {
+	var newGlobal config.GlobalConfig
 	oldGlobal, err := h.validateBGPGlobal(oldConfig)
 	if err != nil {
 		return false, err
 	}
-
-	newGlobal, err := h.validateBGPGlobal(newConfig)
-	if err != nil {
-		return false, err
+	if op != "update" {
+		newGlobal, err = h.validateBGPGlobal(newConfig)
+		if err != nil {
+			return false, err
+		}
+	} else {
+		if patchOp == nil || len(patchOp) == 0 {
+			newGlobal, err = h.validateBGPGlobalForUpdate(oldConfig, newConfig, attrSet)
+			if err != nil {
+				h.logger.Err("validateBGPGlobalForUpdate failed with err:", err)
+				return false, err
+			}
+		} else {
+			newGlobal, err = h.validateBGPGlobalForPatchUpdate(oldConfig, newConfig, patchOp)
+			if err != nil {
+				h.logger.Err("validateBGPGlobalForPatchUpdate failed with err:", err)
+				return false, err
+			}
+		}
 	}
 
-	h.server.GlobalConfigCh <- server.GlobalUpdate{oldGlobal, newGlobal, attrSet}
+	h.server.GlobalConfigCh <- server.GlobalUpdate{oldConfig, oldGlobal, newGlobal, attrSet, patchOp, op}
 	return true, err
 }
 
 func (h *BGPHandler) CreateBGPGlobal(bgpGlobal *bgpd.BGPGlobal) (bool, error) {
 	h.logger.Info("Create global config attrs:", bgpGlobal)
-	return h.SendBGPGlobal(nil, bgpGlobal, make([]bool, 0))
+	return h.SendBGPGlobal(nil, bgpGlobal, make([]bool, 0), make([]*bgpd.PatchOpInfo, 0), "create")
 }
 
 func (h *BGPHandler) GetBGPGlobalState(rtrId string) (*bgpd.BGPGlobalState, error) {
 	bgpGlobal := h.server.GetBGPGlobalState()
 	bgpGlobalResponse := bgpd.NewBGPGlobalState()
-	bgpGlobalResponse.AS = int32(bgpGlobal.AS)
+	bgpGlobalResponse.AS, _ = bgputils.GetAsDot(int(bgpGlobal.AS)) //int32(bgpGlobal.AS)
 	bgpGlobalResponse.RouterId = bgpGlobal.RouterId.String()
 	bgpGlobalResponse.UseMultiplePaths = bgpGlobal.UseMultiplePaths
 	bgpGlobalResponse.EBGPMaxPaths = int32(bgpGlobal.EBGPMaxPaths)
@@ -607,17 +882,31 @@ func (h *BGPHandler) GetBulkBGPGlobalState(index bgpd.Int,
 
 func (h *BGPHandler) UpdateBGPGlobal(origG *bgpd.BGPGlobal, updatedG *bgpd.BGPGlobal,
 	attrSet []bool, op []*bgpd.PatchOpInfo) (bool, error) {
-	h.logger.Info("Update global config attrs:", updatedG, "old config:", origG)
-	return h.SendBGPGlobal(origG, updatedG, attrSet)
+	h.logger.Info("Update global config attrs:", updatedG, "old config:", origG, " new config:", updatedG)
+	return h.SendBGPGlobal(origG, updatedG, attrSet, op, "update")
 }
 
 func (h *BGPHandler) DeleteBGPGlobal(bgpGlobal *bgpd.BGPGlobal) (bool, error) {
 	h.logger.Info("Delete global config attrs:", bgpGlobal)
-	return true, nil
+	return false, errors.New(fmt.Sprintf("Can't delete BGP global object"))
+}
+
+func (h *BGPHandler) checkBGPGlobal() error {
+	created := h.server.VerifyBgpGlobalConfig()
+	if !created {
+		return errors.New("BGP Global object not created yet")
+	}
+
+	global := h.server.GetBGPGlobalState()
+	if global.AS == 0 {
+		return errors.New(fmt.Sprintf("The default BGP AS number 0 is not updated yet."))
+	}
+
+	return nil
 }
 
 func (h *BGPHandler) getIPAndIfIndexForV4Neighbor(neighborIP string, neighborIntfRef string) (ip net.IP, ifIndex int32,
-	err error) {
+	ifName string, err error) {
 	if strings.TrimSpace(neighborIP) != "" {
 		ip = net.ParseIP(strings.TrimSpace(neighborIP))
 		ifIndex = -1
@@ -626,48 +915,34 @@ func (h *BGPHandler) getIPAndIfIndexForV4Neighbor(neighborIP string, neighborInt
 		}
 	} else if neighborIntfRef != "" {
 		//neighbor address is a intfRef
-		ifIndexStr, err := h.server.ConvertIntfStrToIfIndexStr(neighborIntfRef)
+		ifIndex, _, err = h.server.ConvertIntfStrToIfIndex(neighborIntfRef)
 		if err != nil {
 			h.logger.Err("Invalid intfref:", neighborIntfRef)
-			return ip, ifIndex, err
+			return ip, ifIndex, ifName, err
 		}
-		ifIndexInt, _ := strconv.Atoi(ifIndexStr)
-		neighborIfIndex := int32(ifIndexInt)
-		//var ipv4Intf string
-		// @TODO: this needs to be interface once we decide to move listener
-		//ipv4Intf, err = h.server.IntfMgr.GetIPv4Information(neighborIfIndex)
-		ipInfo, err := h.server.GetIfaceIP(neighborIfIndex)
-		h.logger.Info("ipInfo:", ipInfo, " err:", err)
-		ifIP := ipInfo.IpAddr
-		ipMask := ipInfo.IpMask
+
+		var ipInfo bgputils.IPInfo
+		ipInfo, err = h.server.GetIfaceIP(ifIndex)
+		h.logger.Info("getIPAndIfIndexForV4Neighbor - ipInfo:", ipInfo, " err:", err)
 		if err == nil {
-			h.logger.Info("Call ASICd to get IPv4 address for interface with ifIndex:", neighborIfIndex)
-			/*	ifIP, ipMask, err := net.ParseCIDR(ipv4Intf)
-				if err != nil {
-					h.logger.Err("IPv4Addr", ipv4Intf, "of the interface", neighborIfIndex, "is not valid, error:", err)
-					err = errors.New(fmt.Sprintf("IPv4Addr %s of the interface %d is not valid, error: %s", ipv4Intf,
-						neighborIfIndex, err))
-					return ip, ifIndex, err
-				}*/
-			//if ipMask.Mask[len(ipMask.Mask)-1] < 252 {
+			ifIP := make(net.IP, len(ipInfo.IpAddr))
+			copy(ifIP, ipInfo.IpAddr)
+			ipMask := ipInfo.IpMask
 			if ipMask[len(ipMask)-1] < 252 {
-				h.logger.Err("IPv4Addr", ifIP, "of the interface", neighborIfIndex, "is not /30 or /31 address")
-				err = errors.New(fmt.Sprintln("IPv4Addr", ifIP, "of the interface", neighborIfIndex,
+				h.logger.Err("IPv4Addr", ifIP, "of the interface", ifIndex, "is not /30 or /31 address")
+				err = errors.New(fmt.Sprintln("IPv4Addr", ifIP, "of the interface", ifIndex,
 					"is not /30 or /31 address"))
-				return ip, ifIndex, err
+				return ip, ifIndex, ifName, err
 			}
-			h.logger.Info("IPv4Addr of the v4Neighbor local interface", neighborIfIndex, "is", ifIP)
-			//ifIP[len(ifIP)-1] = ifIP[len(ifIP)-1] ^ (^ipMask.Mask[len(ipMask.Mask)-1])
+			h.logger.Info("IPv4Addr of the v4Neighbor local interface", ifIndex, "is", ifIP)
 			ifIP[len(ifIP)-1] = ifIP[len(ifIP)-1] ^ (^ipMask[len(ipMask)-1])
-			h.logger.Info("IPv4Addr of the v4Neighbor remote interface is", ifIP)
+			h.logger.Info("IPv4Addr of the v4Neighbor peer interface is", ifIP)
 			ip = ifIP
-			ifIndex = neighborIfIndex
-			h.logger.Info("v4Neighbor IP address:", ip.String())
 		} else {
-			h.logger.Err("v4Neighbor IP", neighborIP, "or interface", neighborIfIndex, "not configured ")
+			h.logger.Err("v4Neighbor IP", neighborIP, "or interface", ifIndex, "not configured ")
 		}
 	}
-	return ip, ifIndex, err
+	return ip, ifIndex, ifName, err
 }
 
 func (h *BGPHandler) isValidIP(ip string) bool {
@@ -681,40 +956,23 @@ func (h *BGPHandler) isValidIP(ip string) bool {
 	return true
 }
 
-// Set BGP Default values.. This needs to move to API Layer once Northbound interfaces are implemented
-// for all the listeners
-func (h *BGPHandler) setDefault(pconf *config.NeighborConfig) {
-	if pconf.BaseConfig.HoldTime == 0 { // default hold time is 180 seconds
-		pconf.BaseConfig.HoldTime = 180
-	}
-	if pconf.BaseConfig.KeepaliveTime == 0 { // default keep alive time is 60 seconds
-		pconf.BaseConfig.KeepaliveTime = 60
-	}
-}
+func (h *BGPHandler) ConvertV4NeighborFromThrift(bgpNeighbor *bgpd.BGPv4Neighbor, ip net.IP, ifIndex int32) (
+	pConf config.NeighborConfig, err error) {
 
-func (h *BGPHandler) ValidateV4Neighbor(bgpNeighbor *bgpd.BGPv4Neighbor) (pConf config.NeighborConfig, err error) {
-	if bgpNeighbor == nil {
-		return pConf, err
-	}
-
-	var ip net.IP
-	var ifIndex int32
-	ip, ifIndex, err = h.getIPAndIfIndexForV4Neighbor(bgpNeighbor.NeighborAddress, bgpNeighbor.IntfRef)
+	peerAS, err := bgputils.GetAsNum(bgpNeighbor.PeerAS)
 	if err != nil {
-		h.logger.Info("ValidateBGPNeighbor: getIPAndIfIndexForNeighbor failed for neighbor address",
-			bgpNeighbor.NeighborAddress, "and ifIndex", bgpNeighbor.IntfRef)
+		h.logger.Err("peer AS invalid, err:", err)
 		return pConf, err
 	}
-
-	if !h.isValidIP(bgpNeighbor.UpdateSource) {
-		err = errors.New(fmt.Sprintf("Update source %s not a valid IP", bgpNeighbor.UpdateSource))
+	localAS, err := bgputils.GetAsNum(bgpNeighbor.LocalAS)
+	if err != nil {
+		h.logger.Err("local AS invalid, err:", err)
 		return pConf, err
 	}
-
 	pConf = config.NeighborConfig{
 		BaseConfig: config.BaseConfig{
-			PeerAS:                  uint32(bgpNeighbor.PeerAS),
-			LocalAS:                 uint32(bgpNeighbor.LocalAS),
+			PeerAS:                  uint32(peerAS),
+			LocalAS:                 uint32(localAS),
 			PeerAddressType:         config.PeerAddressV4,
 			UpdateSource:            bgpNeighbor.UpdateSource,
 			AuthPassword:            bgpNeighbor.AuthPassword,
@@ -741,34 +999,100 @@ func (h *BGPHandler) ValidateV4Neighbor(bgpNeighbor *bgpd.BGPv4Neighbor) (pConf 
 		IfIndex:         ifIndex,
 		PeerGroup:       bgpNeighbor.PeerGroup,
 	}
-	h.setDefault(&pConf)
 	return pConf, err
 }
 
-func (h *BGPHandler) SendBGPv4Neighbor(oldNeigh *bgpd.BGPv4Neighbor, newNeigh *bgpd.BGPv4Neighbor, attrSet []bool) (
+func (h *BGPHandler) ValidateV4Neighbor(bgpNeighbor *bgpd.BGPv4Neighbor) (pConf config.NeighborConfig, err error) {
+	if bgpNeighbor == nil {
+		return pConf, errors.New("NeighborConfig nil")
+	}
+
+	var ip net.IP
+	var ifIndex int32
+	ip, ifIndex, _, err = h.getIPAndIfIndexForV4Neighbor(bgpNeighbor.NeighborAddress, bgpNeighbor.IntfRef)
+	if err != nil {
+		h.logger.Info("ValidateBGPNeighbor: getIPAndIfIndexForNeighbor failed for neighbor address",
+			bgpNeighbor.NeighborAddress, "and ifIndex", bgpNeighbor.IntfRef)
+		return pConf, err
+	}
+	h.logger.Info("ValidateV4Neighbor: getIPAndIfIndexForNeighbor returned ip", ip, "ifIndex", ifIndex)
+
+	if !h.isValidIP(bgpNeighbor.UpdateSource) {
+		err = errors.New(fmt.Sprintf("Update source %s not a valid IP", bgpNeighbor.UpdateSource))
+		return pConf, err
+	}
+	pConf, _ = h.ConvertV4NeighborFromThrift(bgpNeighbor, ip, ifIndex)
+	return pConf, err
+}
+
+func (h *BGPHandler) ValidateV4NeighborForUpdate(oldNeigh *bgpd.BGPv4Neighbor, oldNeighConfig config.NeighborConfig,
+	newNeigh *bgpd.BGPv4Neighbor, attrSet []bool) (pConf config.NeighborConfig, err error) {
+	pConf, _ = h.ConvertV4NeighborFromThrift(oldNeigh, oldNeighConfig.NeighborAddress, oldNeighConfig.IfIndex)
+	h.logger.Info("ValidateV4NeighborForUpdate: AttrSet", attrSet)
+	if attrSet != nil {
+		objTyp := reflect.TypeOf(*oldNeigh)
+		for i := 0; i < objTyp.NumField(); i++ {
+			objName := objTyp.Field(i).Name
+			if attrSet[i] {
+				h.logger.Debug("ValidateV4NeighborForUpdate : changed ", objName)
+				if objName == "UpdateSource" {
+					if !h.isValidIP(newNeigh.UpdateSource) {
+						err = errors.New(fmt.Sprintf("Update source %s not a valid IP", newNeigh.UpdateSource))
+						return pConf, err
+					}
+					pConf.UpdateSource = newNeigh.UpdateSource
+				}
+				if objName == "AdjRIBInFilter" {
+					h.logger.Info("Update AdjRIBInFilter to ", newNeigh.AdjRIBInFilter)
+					pConf.AdjRIBInFilter = newNeigh.AdjRIBInFilter
+				}
+			}
+		}
+	}
+	return pConf, err
+}
+
+func (h *BGPHandler) SendBGPv4Neighbor(oldNeigh *bgpd.BGPv4Neighbor, newNeigh *bgpd.BGPv4Neighbor, attrSet []bool,
+	patchOp []*bgpd.PatchOpInfo, op string) (
 	bool, error) {
-	created := h.server.VerifyBgpGlobalConfig()
-	if !created {
-		return created, errors.New("BGP Global object not created yet")
+	h.logger.Info("SendBGPv4Neighbor, op:", op)
+	if err := h.checkBGPGlobal(); err != nil {
+		h.logger.Err("checkBGPGlobal failed with err:", err)
+		return false, err
 	}
 
 	oldNeighConf, err := h.ValidateV4Neighbor(oldNeigh)
-	if err != nil {
+	if err != nil && op != "create" {
+		h.logger.Err("validation of old neighbor failed with err:", err)
 		return false, err
 	}
-
-	newNeighConf, err := h.ValidateV4Neighbor(newNeigh)
-	if err != nil {
-		return false, err
+	var newNeighConf config.NeighborConfig
+	if op != "update" {
+		h.logger.Info("not an update op")
+		newNeighConf, err = h.ValidateV4Neighbor(newNeigh)
+		if err != nil {
+			h.logger.Err("validation of newNeigh failed with err:", err)
+			return false, err
+		}
+	} else if patchOp == nil || len(patchOp) == 0 {
+		h.logger.Info("update op on v4 neighbor")
+		newNeighConf, err = h.ValidateV4NeighborForUpdate(oldNeigh, oldNeighConf, newNeigh, attrSet)
+		if err != nil {
+			h.logger.Err("validation of v4beighborforupdate failed with err:", err)
+			return false, err
+		}
+	} else {
+		//no-op because there are no list objects for neighbor
+		h.logger.Info("patch update of v4 neighbor")
 	}
 
-	h.server.AddPeerCh <- server.PeerUpdate{oldNeighConf, newNeighConf, attrSet}
+	h.server.AddPeerCh <- server.PeerUpdate{oldNeigh, "v4", oldNeighConf, newNeighConf, attrSet, patchOp, op}
 	return true, nil
 }
 
 func (h *BGPHandler) CreateBGPv4Neighbor(bgpNeighbor *bgpd.BGPv4Neighbor) (bool, error) {
 	h.logger.Info("Create BGP neighbor attrs:", bgpNeighbor)
-	return h.SendBGPv4Neighbor(nil, bgpNeighbor, make([]bool, 0))
+	return h.SendBGPv4Neighbor(nil, bgpNeighbor, make([]bool, 0), nil, "create")
 }
 
 func (h *BGPHandler) convertToThriftV4Neighbor(neighborState *config.NeighborState) *bgpd.BGPv4NeighborState {
@@ -781,8 +1105,18 @@ func (h *BGPHandler) convertToThriftV4Neighbor(neighborState *config.NeighborSta
 		h.logger.Info("Map foud for ifndex : ", neighborState.IfIndex, "Name = ", intfEntry.Name)
 		bgpNeighborResponse.IntfRef = intfEntry.Name
 	}
-	bgpNeighborResponse.PeerAS = int32(neighborState.PeerAS)
-	bgpNeighborResponse.LocalAS = int32(neighborState.LocalAS)
+	peerAS, err := bgputils.GetAsDot(int(neighborState.PeerAS))
+	if err != nil {
+		h.logger.Err("peer AS invalid, err:", err)
+		return bgpNeighborResponse
+	}
+	localAS, err := bgputils.GetAsDot(int(neighborState.LocalAS))
+	if err != nil {
+		h.logger.Err("local AS invalid, err:", err)
+		return bgpNeighborResponse
+	}
+	bgpNeighborResponse.PeerAS = peerAS   //int32(neighborState.PeerAS)
+	bgpNeighborResponse.LocalAS = localAS //int32(neighborState.LocalAS)
 	bgpNeighborResponse.UpdateSource = neighborState.UpdateSource
 	bgpNeighborResponse.AuthPassword = neighborState.AuthPassword
 	bgpNeighborResponse.PeerType = int8(neighborState.PeerType)
@@ -828,7 +1162,7 @@ func (h *BGPHandler) convertToThriftV4Neighbor(neighborState *config.NeighborSta
 }
 
 func (h *BGPHandler) GetBGPv4NeighborState(neighborAddr string, intfref string) (*bgpd.BGPv4NeighborState, error) {
-	ip, _, err := h.getIPAndIfIndexForV4Neighbor(neighborAddr, intfref)
+	ip, _, _, err := h.getIPAndIfIndexForV4Neighbor(neighborAddr, intfref)
 	if err != nil {
 		h.logger.Info("GetBGPv4NeighborState: getIPAndIfIndexForV4Neighbor failed for neighbor address", neighborAddr,
 			"and ifIndex", intfref)
@@ -862,97 +1196,71 @@ func (h *BGPHandler) GetBulkBGPv4NeighborState(index bgpd.Int, count bgpd.Int) (
 func (h *BGPHandler) UpdateBGPv4Neighbor(origN *bgpd.BGPv4Neighbor, updatedN *bgpd.BGPv4Neighbor, attrSet []bool,
 	op []*bgpd.PatchOpInfo) (bool, error) {
 	h.logger.Info("Update peer attrs:", updatedN)
-	return h.SendBGPv4Neighbor(origN, updatedN, attrSet)
+	return h.SendBGPv4Neighbor(origN, updatedN, attrSet, op, "update")
 }
 
 func (h *BGPHandler) DeleteBGPv4Neighbor(bgpNeighbor *bgpd.BGPv4Neighbor) (bool, error) {
-	h.logger.Info("Delete BGP neighbor:", bgpNeighbor.NeighborAddress)
-	ip, _, err := h.getIPAndIfIndexForV4Neighbor(bgpNeighbor.NeighborAddress, bgpNeighbor.IntfRef)
+	h.logger.Info("Delete BGPv4 neighbor:", bgpNeighbor.NeighborAddress)
+	if err := h.checkBGPGlobal(); err != nil {
+		return false, err
+	}
+
+	neighConf, err := h.ValidateV4Neighbor(bgpNeighbor)
 	if err != nil {
-		h.logger.Info("DeleteBGPv4Neighbor: getIPAndIfIndexForV4Neighbor failed for neighbor address",
+		h.logger.Info("DeleteBGPv4Neighbor: ValidateV6Neighbor failed for neighbor address",
 			bgpNeighbor.NeighborAddress, "and ifIndex", bgpNeighbor.IntfRef)
 		return false, err
 	}
 
-	h.server.RemPeerCh <- ip.String()
+	h.server.RemPeerCh <- neighConf
 	return true, nil
 }
 
 func (h *BGPHandler) getIPAndIfIndexForV6Neighbor(neighborIP string, neighborIntfRef string) (ip net.IP, ifIndex int32,
-	err error) {
+	ifName string, err error) {
 	if strings.TrimSpace(neighborIP) != "" {
+		ifIndex = -1
 		ip = net.ParseIP(strings.TrimSpace(neighborIP))
-		ifIndex = 0
 		if ip == nil {
 			err = errors.New(fmt.Sprintf("v6Neighbor address %s not valid", neighborIP))
 		}
 	} else if neighborIntfRef != "" {
 		//neighbor address is a intfRef
-		ifIndexStr, err := h.server.ConvertIntfStrToIfIndexStr(neighborIntfRef)
+		ifIndex, ifName, err = h.server.ConvertIntfStrToIfIndex(neighborIntfRef)
+		h.logger.Info("getIPAndIfIndexForV6Neighbor - ifIndex:", ifIndex, "ifName:", ifName)
+
 		if err != nil {
 			h.logger.Err("Invalid intfref:", neighborIntfRef)
-			return ip, ifIndex, err
+			return ip, ifIndex, ifName, err
 		}
-		ifIndexInt, _ := strconv.Atoi(ifIndexStr)
-		neighborIfIndex := int32(ifIndexInt)
-		//var ipv6Intf string
-		// @TODO: this needs to be interface once we decide to move listener
-		//ipv6Intf, err = h.server.IntfMgr.GetIPv6Information(neighborIfIndex)
-		ipInfo, err := h.server.GetIfaceIP(neighborIfIndex)
-		h.logger.Info("getIPAndIfIndexForV6Neighbor:ipInfo.LinkLocalIpAddr :", ipInfo.LinklocalIpAddr, " err:", err, " after GetIfaceIP of neighborIfIndex:", neighborIfIndex)
-		ifIndex = neighborIfIndex
-		ip = net.ParseIP(ipInfo.LinklocalIpAddr)
-		/*		if err == nil {
-					h.logger.Info("Call ASICd to get IPv6 address for interface with ifIndex:", neighborIfIndex)
-					ifIP, ipMask, err := net.ParseCIDR(ipv6Intf)
-					if err != nil {
-						h.logger.Err("IPv6Addr", ipv6Intf, "of the interface", neighborIfIndex, "is not valid, error:", err)
-						err = errors.New(fmt.Sprintf("IPv6Addr %s of the interface %d is not valid, error: %s", ipv6Intf,
-							neighborIfIndex, err))
-						return ip, ifIndex, err
-					}
-					if ipMask.Mask[len(ipMask.Mask)-1] < 252 {
-						h.logger.Err("IPv6Addr", ipv6Intf, "of the interface", neighborIfIndex, "is not /126 or /127 address")
-						err = errors.New(fmt.Sprintln("IPv6Addr", ipv6Intf, "of the interface", neighborIfIndex,
-							"is not /126 or /127 address"))
-						return ip, ifIndex, err
-					}
-					h.logger.Info("IPv6Addr of the v6Neighbor local interface", neighborIfIndex, "is", ifIP)
-					ifIP[len(ifIP)-1] = ifIP[len(ifIP)-1] ^ (^ipMask.Mask[len(ipMask.Mask)-1])
-					h.logger.Info("IPv6Addr of the v6Neighbor remote interface is", ifIP)
-					ip = ifIP
-					ifIndex = neighborIfIndex
-					h.logger.Info("v6Neighbor IP address:", ip.String())
-				} else {
-					h.logger.Err("v6Neighbor IP", neighborIP, "or interface", neighborIfIndex, "not configured ")
-				}*/
+
+		ipInfo, err1 := h.server.GetIfaceIP(ifIndex)
+		h.logger.Info("ipInfo:", ipInfo, " err:", err1)
+		if err1 == nil {
+			h.logger.Info("getIPAndIfIndexForV6Neighbor - ipInfo.LinkLocalIpAddr:", ipInfo.LinklocalIpAddr,
+				"after GetIfaceIP of neighborIfIndex:", ifIndex)
+			ip = net.ParseIP(ipInfo.LinklocalIpAddr)
+		}
 	}
-	return ip, ifIndex, err
+	return ip, ifIndex, ifName, err
 }
 
-func (h *BGPHandler) ValidateV6Neighbor(bgpNeighbor *bgpd.BGPv6Neighbor) (pConf config.NeighborConfig, err error) {
-	if bgpNeighbor == nil {
-		return pConf, err
-	}
-
-	var ip net.IP
-	var ifIndex int32
-	ip, ifIndex, err = h.getIPAndIfIndexForV6Neighbor(bgpNeighbor.NeighborAddress, bgpNeighbor.IntfRef)
+func (h *BGPHandler) ConvertV6NeighborFromThrift(bgpNeighbor *bgpd.BGPv6Neighbor, ip net.IP, ifIndex int32,
+	ifName string) (pConf config.NeighborConfig, err error) {
+	peerAS, err := bgputils.GetAsNum(bgpNeighbor.PeerAS)
 	if err != nil {
-		h.logger.Info("ValidateV6Neighbor: getIPAndIfIndexForNeighbor failed for neighbor address",
-			bgpNeighbor.NeighborAddress, "and ifIndex", bgpNeighbor.IntfRef)
+		h.logger.Err("peer AS invalid, err:", err)
 		return pConf, err
 	}
-
-	if !h.isValidIP(bgpNeighbor.UpdateSource) {
-		err = errors.New(fmt.Sprintf("Update source %s not a valid IP", bgpNeighbor.UpdateSource))
+	localAS, err := bgputils.GetAsNum(bgpNeighbor.LocalAS)
+	if err != nil {
+		h.logger.Err("local AS invalid, err:", err)
 		return pConf, err
 	}
-
 	pConf = config.NeighborConfig{
 		BaseConfig: config.BaseConfig{
-			PeerAS:                  uint32(bgpNeighbor.PeerAS),
-			LocalAS:                 uint32(bgpNeighbor.LocalAS),
+			PeerAS:                  uint32(peerAS),
+			LocalAS:                 uint32(localAS),
 			PeerAddressType:         config.PeerAddressV6,
 			UpdateSource:            bgpNeighbor.UpdateSource,
 			Description:             bgpNeighbor.Description,
@@ -976,36 +1284,95 @@ func (h *BGPHandler) ValidateV6Neighbor(bgpNeighbor *bgpd.BGPv6Neighbor) (pConf 
 		},
 		NeighborAddress: ip,
 		IfIndex:         ifIndex,
+		IfName:          ifName,
 		PeerGroup:       bgpNeighbor.PeerGroup,
 	}
-	h.setDefault(&pConf)
 	return pConf, err
 }
 
-func (h *BGPHandler) SendBGPv6Neighbor(oldNeigh *bgpd.BGPv6Neighbor, newNeigh *bgpd.BGPv6Neighbor, attrSet []bool) (
+func (h *BGPHandler) ValidateV6Neighbor(bgpNeighbor *bgpd.BGPv6Neighbor) (pConf config.NeighborConfig, err error) {
+	if bgpNeighbor == nil {
+		return pConf, err
+	}
+
+	var ip net.IP
+	var ifIndex int32
+	var ifName string
+	ifIndex = -1
+	ip, ifIndex, ifName, err = h.getIPAndIfIndexForV6Neighbor(bgpNeighbor.NeighborAddress, bgpNeighbor.IntfRef)
+	if err != nil {
+		h.logger.Info("ValidateV6Neighbor: getIPAndIfIndexForNeighbor failed for neighbor address",
+			bgpNeighbor.NeighborAddress, "and ifIndex", bgpNeighbor.IntfRef)
+		return pConf, err
+	}
+	h.logger.Info("ValidateV6Neighbor: getIPAndIfIndexForNeighbor returned ip", ip, "ifIndex", ifIndex, "ifName", ifName)
+
+	if !h.isValidIP(bgpNeighbor.UpdateSource) {
+		err = errors.New(fmt.Sprintf("Update source %s not a valid IP", bgpNeighbor.UpdateSource))
+		return pConf, err
+	}
+
+	pConf, _ = h.ConvertV6NeighborFromThrift(bgpNeighbor, ip, ifIndex, ifName)
+	return pConf, err
+}
+
+func (h *BGPHandler) ValidateV6NeighborForUpdate(oldNeigh *bgpd.BGPv6Neighbor, oldNeighConfig config.NeighborConfig,
+	newNeigh *bgpd.BGPv6Neighbor, attrSet []bool) (pConf config.NeighborConfig, err error) {
+	pConf, _ = h.ConvertV6NeighborFromThrift(oldNeigh, oldNeighConfig.NeighborAddress, oldNeighConfig.IfIndex,
+		oldNeighConfig.IfName)
+	if attrSet != nil {
+		objTyp := reflect.TypeOf(*oldNeigh)
+		for i := 0; i < objTyp.NumField(); i++ {
+			objName := objTyp.Field(i).Name
+			if attrSet[i] {
+				h.logger.Debug("ValidateV6NeighborForUpdate : changed ", objName)
+				if objName == "UpdateSource" {
+					if !h.isValidIP(newNeigh.UpdateSource) {
+						err = errors.New(fmt.Sprintf("Update source %s not a valid IP", newNeigh.UpdateSource))
+						return pConf, err
+					}
+					pConf.UpdateSource = newNeigh.UpdateSource
+				}
+				if objName == "AdjRIBInFilter" {
+					pConf.AdjRIBInFilter = newNeigh.AdjRIBInFilter
+				}
+			}
+		}
+	}
+	return pConf, err
+}
+
+func (h *BGPHandler) SendBGPv6Neighbor(oldNeigh *bgpd.BGPv6Neighbor, newNeigh *bgpd.BGPv6Neighbor, attrSet []bool, patchOp []*bgpd.PatchOpInfo, op string) (
 	bool, error) {
-	created := h.server.VerifyBgpGlobalConfig()
-	if !created {
-		return created, errors.New("BGP Global object not created yet")
+	if err := h.checkBGPGlobal(); err != nil {
+		return false, err
 	}
 
 	oldNeighConf, err := h.ValidateV6Neighbor(oldNeigh)
 	if err != nil {
 		return false, err
 	}
-
-	newNeighConf, err := h.ValidateV6Neighbor(newNeigh)
-	if err != nil {
-		return false, err
+	var newNeighConf config.NeighborConfig
+	if op != "update" {
+		newNeighConf, err = h.ValidateV6Neighbor(newNeigh)
+		if err != nil {
+			return false, err
+		}
+	} else if patchOp == nil || len(patchOp) == 0 {
+		//no-op because there are no list objects for neighbor
+	} else {
+		newNeighConf, err = h.ValidateV6NeighborForUpdate(oldNeigh, newNeighConf, newNeigh, attrSet)
+		if err != nil {
+			return false, err
+		}
 	}
-
-	h.server.AddPeerCh <- server.PeerUpdate{oldNeighConf, newNeighConf, attrSet}
+	h.server.AddPeerCh <- server.PeerUpdate{oldNeigh, "v6", oldNeighConf, newNeighConf, attrSet, patchOp, op}
 	return true, nil
 }
 
 func (h *BGPHandler) CreateBGPv6Neighbor(bgpNeighbor *bgpd.BGPv6Neighbor) (bool, error) {
 	h.logger.Info("Create BGP neighbor attrs:", bgpNeighbor)
-	return h.SendBGPv6Neighbor(nil, bgpNeighbor, make([]bool, 0))
+	return h.SendBGPv6Neighbor(nil, bgpNeighbor, make([]bool, 0), nil, "create")
 }
 
 func (h *BGPHandler) convertToThriftV6Neighbor(neighborState *config.NeighborState) *bgpd.BGPv6NeighborState {
@@ -1018,8 +1385,18 @@ func (h *BGPHandler) convertToThriftV6Neighbor(neighborState *config.NeighborSta
 		h.logger.Info("Map foud for ifndex : ", neighborState.IfIndex, "Name = ", intfEntry.Name)
 		bgpNeighborResponse.IntfRef = intfEntry.Name
 	}
-	bgpNeighborResponse.PeerAS = int32(neighborState.PeerAS)
-	bgpNeighborResponse.LocalAS = int32(neighborState.LocalAS)
+	peerAS, err := bgputils.GetAsDot(int(neighborState.PeerAS))
+	if err != nil {
+		h.logger.Err("peer AS invalid, err:", err)
+		return bgpNeighborResponse
+	}
+	localAS, err := bgputils.GetAsDot(int(neighborState.LocalAS))
+	if err != nil {
+		h.logger.Err("local AS invalid, err:", err)
+		return bgpNeighborResponse
+	}
+	bgpNeighborResponse.PeerAS = peerAS   // int32(neighborState.PeerAS)
+	bgpNeighborResponse.LocalAS = localAS //int32(neighborState.LocalAS)
 	bgpNeighborResponse.UpdateSource = neighborState.UpdateSource
 	bgpNeighborResponse.PeerType = int8(neighborState.PeerType)
 	bgpNeighborResponse.Description = neighborState.Description
@@ -1064,7 +1441,7 @@ func (h *BGPHandler) convertToThriftV6Neighbor(neighborState *config.NeighborSta
 }
 
 func (h *BGPHandler) GetBGPv6NeighborState(neighborAddr string, intfref string) (*bgpd.BGPv6NeighborState, error) {
-	ip, _, err := h.getIPAndIfIndexForV6Neighbor(neighborAddr, intfref)
+	ip, _, _, err := h.getIPAndIfIndexForV6Neighbor(neighborAddr, intfref)
 	if err != nil {
 		h.logger.Info("GetBGPv4NeighborState: getIPAndIfIndexForV4Neighbor failed for neighbor address", neighborAddr,
 			"and ifIndex", intfref)
@@ -1099,19 +1476,21 @@ func (h *BGPHandler) GetBulkBGPv6NeighborState(index bgpd.Int, count bgpd.Int) (
 func (h *BGPHandler) UpdateBGPv6Neighbor(origN *bgpd.BGPv6Neighbor, updatedN *bgpd.BGPv6Neighbor, attrSet []bool,
 	op []*bgpd.PatchOpInfo) (bool, error) {
 	h.logger.Info("Update peer attrs:", updatedN)
-	return h.SendBGPv6Neighbor(origN, updatedN, attrSet)
+	return h.SendBGPv6Neighbor(origN, updatedN, attrSet, op, "update")
 }
 
 func (h *BGPHandler) DeleteBGPv6Neighbor(bgpNeighbor *bgpd.BGPv6Neighbor) (bool, error) {
-	h.logger.Info("Delete BGP neighbor:", bgpNeighbor.NeighborAddress)
-	ip, _, err := h.getIPAndIfIndexForV6Neighbor(bgpNeighbor.NeighborAddress, bgpNeighbor.IntfRef)
-	if err != nil {
-		h.logger.Info("DeleteBGPv6Neighbor: getIPAndIfIndexForV6Neighbor failed for neighbor address",
-			bgpNeighbor.NeighborAddress, "and ifIndex", bgpNeighbor.IntfRef)
+	h.logger.Info("Delete BGPv6 neighbor:", bgpNeighbor.NeighborAddress)
+	if err := h.checkBGPGlobal(); err != nil {
 		return false, err
 	}
 
-	h.server.RemPeerCh <- ip.String()
+	neighConf, err := h.ValidateV6Neighbor(bgpNeighbor)
+	if err != nil {
+		return false, err
+	}
+
+	h.server.RemPeerCh <- neighConf
 	return true, nil
 }
 
@@ -1132,11 +1511,21 @@ func (h *BGPHandler) ValidateBGPv4PeerGroup(peerGroup *bgpd.BGPv4PeerGroup) (gro
 		err = errors.New(fmt.Sprintf("Update source %s not a valid IP", peerGroup.UpdateSource))
 		return group, err
 	}
+	peerAS, err := bgputils.GetAsNum(peerGroup.PeerAS)
+	if err != nil {
+		h.logger.Err("peer AS invalid, err:", err)
+		return group, err
+	}
+	localAS, err := bgputils.GetAsNum(peerGroup.LocalAS)
+	if err != nil {
+		h.logger.Err("local AS invalid, err:", err)
+		return group, err
+	}
 
 	group = config.PeerGroupConfig{
 		BaseConfig: config.BaseConfig{
-			PeerAS:                  uint32(peerGroup.PeerAS),
-			LocalAS:                 uint32(peerGroup.LocalAS),
+			PeerAS:                  uint32(peerAS),
+			LocalAS:                 uint32(localAS),
 			PeerAddressType:         config.PeerAddressV4,
 			UpdateSource:            peerGroup.UpdateSource,
 			AuthPassword:            peerGroup.AuthPassword,
@@ -1165,6 +1554,10 @@ func (h *BGPHandler) ValidateBGPv4PeerGroup(peerGroup *bgpd.BGPv4PeerGroup) (gro
 
 func (h *BGPHandler) SendBGPv4PeerGroup(oldGroup *bgpd.BGPv4PeerGroup, newGroup *bgpd.BGPv4PeerGroup, attrSet []bool) (
 	bool, error) {
+	if err := h.checkBGPGlobal(); err != nil {
+		return false, err
+	}
+
 	oldGroupConf, err := h.ValidateBGPv4PeerGroup(oldGroup)
 	if err != nil {
 		return false, err
@@ -1180,19 +1573,27 @@ func (h *BGPHandler) SendBGPv4PeerGroup(oldGroup *bgpd.BGPv4PeerGroup, newGroup 
 }
 
 func (h *BGPHandler) CreateBGPv4PeerGroup(peerGroup *bgpd.BGPv4PeerGroup) (bool, error) {
-	h.logger.Info("Create BGP peer group attrs:", peerGroup)
+	h.logger.Infof("Create BGP v4 peer group:%+v", peerGroup)
 	return h.SendBGPv4PeerGroup(nil, peerGroup, make([]bool, 0))
 }
 
 func (h *BGPHandler) UpdateBGPv4PeerGroup(origG *bgpd.BGPv4PeerGroup, updatedG *bgpd.BGPv4PeerGroup, attrSet []bool,
 	op []*bgpd.PatchOpInfo) (bool, error) {
-	h.logger.Info("Update peer attrs:", updatedG)
+	h.logger.Infof("Update BGP v4 peer group:%+v", updatedG)
 	return h.SendBGPv4PeerGroup(origG, updatedG, attrSet)
 }
 
 func (h *BGPHandler) DeleteBGPv4PeerGroup(peerGroup *bgpd.BGPv4PeerGroup) (bool, error) {
-	h.logger.Info("Delete BGP peer group:", peerGroup.Name)
-	h.server.RemPeerGroupCh <- peerGroup.Name
+	h.logger.Info("Delete BGP v4 peer group:%+v", peerGroup.Name)
+	if err := h.checkBGPGlobal(); err != nil {
+		return false, err
+	}
+
+	gConf, err := h.ValidateBGPv4PeerGroup(peerGroup)
+	if err != nil {
+		return false, err
+	}
+	h.server.RemPeerGroupCh <- gConf
 	return true, nil
 }
 
@@ -1206,11 +1607,21 @@ func (h *BGPHandler) ValidateBGPv6PeerGroup(peerGroup *bgpd.BGPv6PeerGroup) (gro
 		err = errors.New(fmt.Sprintf("Update source %s not a valid IP", peerGroup.UpdateSource))
 		return group, err
 	}
+	peerAS, err := bgputils.GetAsNum(peerGroup.PeerAS)
+	if err != nil {
+		h.logger.Err("peer AS invalid, err:", err)
+		return group, err
+	}
+	localAS, err := bgputils.GetAsNum(peerGroup.LocalAS)
+	if err != nil {
+		h.logger.Err("local AS invalid, err:", err)
+		return group, err
+	}
 
 	group = config.PeerGroupConfig{
 		BaseConfig: config.BaseConfig{
-			PeerAS:                  uint32(peerGroup.PeerAS),
-			LocalAS:                 uint32(peerGroup.LocalAS),
+			PeerAS:                  uint32(peerAS),
+			LocalAS:                 uint32(localAS),
 			PeerAddressType:         config.PeerAddressV6,
 			UpdateSource:            peerGroup.UpdateSource,
 			Description:             peerGroup.Description,
@@ -1238,6 +1649,10 @@ func (h *BGPHandler) ValidateBGPv6PeerGroup(peerGroup *bgpd.BGPv6PeerGroup) (gro
 
 func (h *BGPHandler) SendBGPv6PeerGroup(oldGroup *bgpd.BGPv6PeerGroup, newGroup *bgpd.BGPv6PeerGroup, attrSet []bool) (
 	bool, error) {
+	if err := h.checkBGPGlobal(); err != nil {
+		return false, err
+	}
+
 	oldGroupConf, err := h.ValidateBGPv6PeerGroup(oldGroup)
 	if err != nil {
 		return false, err
@@ -1253,24 +1668,32 @@ func (h *BGPHandler) SendBGPv6PeerGroup(oldGroup *bgpd.BGPv6PeerGroup, newGroup 
 }
 
 func (h *BGPHandler) CreateBGPv6PeerGroup(peerGroup *bgpd.BGPv6PeerGroup) (bool, error) {
-	h.logger.Info("Create BGP peer group attrs:", peerGroup)
+	h.logger.Info("Create BGP v6 peer group:", peerGroup)
 	return h.SendBGPv6PeerGroup(nil, peerGroup, make([]bool, 0))
 }
 
 func (h *BGPHandler) UpdateBGPv6PeerGroup(origG *bgpd.BGPv6PeerGroup, updatedG *bgpd.BGPv6PeerGroup, attrSet []bool,
 	op []*bgpd.PatchOpInfo) (bool, error) {
-	h.logger.Info("Update peer attrs:", updatedG)
+	h.logger.Info("Update BGP v6 peer group:", updatedG)
 	return h.SendBGPv6PeerGroup(origG, updatedG, attrSet)
 }
 
 func (h *BGPHandler) DeleteBGPv6PeerGroup(peerGroup *bgpd.BGPv6PeerGroup) (bool, error) {
-	h.logger.Info("Delete BGP peer group:", peerGroup.Name)
-	h.server.RemPeerGroupCh <- peerGroup.Name
+	h.logger.Info("Delete BGP v6 peer group:", peerGroup.Name)
+	if err := h.checkBGPGlobal(); err != nil {
+		return false, err
+	}
+
+	gConf, err := h.ValidateBGPv6PeerGroup(peerGroup)
+	if err != nil {
+		return false, err
+	}
+	h.server.RemPeerGroupCh <- gConf
 	return true, nil
 }
 
-func (h *BGPHandler) GetBGPRouteState(network string, cidrLen int16) (*bgpd.BGPRouteState, error) {
-	bgpRoute := h.server.LocRib.GetBGPRoute(network)
+func (h *BGPHandler) GetBGPv4RouteState(network string, cidrLen int16) (*bgpd.BGPv4RouteState, error) {
+	bgpRoute := h.server.LocRib.GetBGPv4Route(network)
 	var err error = nil
 	if bgpRoute == nil {
 		err = errors.New(fmt.Sprintf("Route not found for destination %s", network))
@@ -1278,15 +1701,35 @@ func (h *BGPHandler) GetBGPRouteState(network string, cidrLen int16) (*bgpd.BGPR
 	return bgpRoute, err
 }
 
-func (h *BGPHandler) GetBulkBGPRouteState(index bgpd.Int,
-	count bgpd.Int) (*bgpd.BGPRouteStateGetInfo, error) {
-	nextIdx, currCount, bgpRoutes := h.server.LocRib.BulkGetBGPRoutes(int(index), int(count))
+func (h *BGPHandler) GetBulkBGPv4RouteState(index bgpd.Int, count bgpd.Int) (*bgpd.BGPv4RouteStateGetInfo, error) {
+	nextIdx, currCount, bgpRoutes := h.server.LocRib.BulkGetBGPv4Routes(int(index), int(count))
 
-	bgpRoutesBulk := bgpd.NewBGPRouteStateGetInfo()
+	bgpRoutesBulk := bgpd.NewBGPv4RouteStateGetInfo()
 	bgpRoutesBulk.EndIdx = bgpd.Int(nextIdx)
 	bgpRoutesBulk.Count = bgpd.Int(currCount)
 	bgpRoutesBulk.More = (nextIdx != 0)
-	bgpRoutesBulk.BGPRouteStateList = bgpRoutes
+	bgpRoutesBulk.BGPv4RouteStateList = bgpRoutes
+
+	return bgpRoutesBulk, nil
+}
+
+func (h *BGPHandler) GetBGPv6RouteState(network string, cidrLen int16) (*bgpd.BGPv6RouteState, error) {
+	bgpRoute := h.server.LocRib.GetBGPv6Route(network)
+	var err error = nil
+	if bgpRoute == nil {
+		err = errors.New(fmt.Sprintf("Route not found for destination %s", network))
+	}
+	return bgpRoute, err
+}
+
+func (h *BGPHandler) GetBulkBGPv6RouteState(index bgpd.Int, count bgpd.Int) (*bgpd.BGPv6RouteStateGetInfo, error) {
+	nextIdx, currCount, bgpRoutes := h.server.LocRib.BulkGetBGPv6Routes(int(index), int(count))
+
+	bgpRoutesBulk := bgpd.NewBGPv6RouteStateGetInfo()
+	bgpRoutesBulk.EndIdx = bgpd.Int(nextIdx)
+	bgpRoutesBulk.Count = bgpd.Int(currCount)
+	bgpRoutesBulk.More = (nextIdx != 0)
+	bgpRoutesBulk.BGPv6RouteStateList = bgpRoutes
 
 	return bgpRoutesBulk, nil
 }
@@ -1477,7 +1920,7 @@ func (h *BGPHandler) DeleteBGPPolicyDefinition(cfg *bgpd.BGPPolicyDefinition) (v
 	return val, err
 }
 
-func (h *BGPHandler) validateBGPAggregate(bgpAgg *bgpd.BGPAggregate) (aggConf config.BGPAggregate, err error) {
+func (h *BGPHandler) validateBGPAggregate(bgpAgg *bgpd.BGPv4Aggregate) (aggConf config.BGPAggregate, err error) {
 	if bgpAgg == nil {
 		return aggConf, err
 	}
@@ -1505,8 +1948,12 @@ func (h *BGPHandler) validateBGPAggregate(bgpAgg *bgpd.BGPAggregate) (aggConf co
 	return aggConf, nil
 }
 
-func (h *BGPHandler) SendBGPAggregate(oldConfig *bgpd.BGPAggregate, newConfig *bgpd.BGPAggregate, attrSet []bool) (
+func (h *BGPHandler) SendBGPAggregate(oldConfig *bgpd.BGPv4Aggregate, newConfig *bgpd.BGPv4Aggregate, attrSet []bool) (
 	bool, error) {
+	if err := h.checkBGPGlobal(); err != nil {
+		return false, err
+	}
+
 	oldAgg, err := h.validateBGPAggregate(oldConfig)
 	if err != nil {
 		return false, err
@@ -1521,26 +1968,29 @@ func (h *BGPHandler) SendBGPAggregate(oldConfig *bgpd.BGPAggregate, newConfig *b
 	return true, err
 }
 
-func (h *BGPHandler) CreateBGPAggregate(bgpAgg *bgpd.BGPAggregate) (bool, error) {
-	h.logger.Info("Create aggregate attrs:", bgpAgg)
+func (h *BGPHandler) CreateBGPv4Aggregate(bgpAgg *bgpd.BGPv4Aggregate) (bool, error) {
+	h.logger.Info("Create BGP v4 aggregate:", bgpAgg)
 	return h.SendBGPAggregate(nil, bgpAgg, make([]bool, 0))
 }
 
-func (h *BGPHandler) UpdateBGPAggregate(origA *bgpd.BGPAggregate, updatedA *bgpd.BGPAggregate, attrSet []bool,
+func (h *BGPHandler) UpdateBGPv4Aggregate(origA *bgpd.BGPv4Aggregate, updatedA *bgpd.BGPv4Aggregate, attrSet []bool,
 	op []*bgpd.PatchOpInfo) (bool, error) {
-	h.logger.Info("Update aggregate attrs:", updatedA, "old config:", origA)
+	h.logger.Info("Update BGP v4 aggregate:", updatedA, "old:", origA)
 	return h.SendBGPAggregate(origA, updatedA, attrSet)
 }
 
-func (h *BGPHandler) DeleteBGPAggregate(bgpAgg *bgpd.BGPAggregate) (bool, error) {
-	h.logger.Info("Delete aggregate attrs:", bgpAgg)
+func (h *BGPHandler) DeleteBGPv4Aggregate(bgpAgg *bgpd.BGPv4Aggregate) (bool, error) {
+	h.logger.Info("Delete BGP v4 aggregate:", bgpAgg)
+	if err := h.checkBGPGlobal(); err != nil {
+		return false, err
+	}
+
 	agg, _ := h.validateBGPAggregate(bgpAgg)
 	h.server.RemAggCh <- agg
 	return true, nil
 }
 
-func (h *BGPHandler) validateBGPIPv6Aggregate(bgpAgg *bgpd.BGPIPv6Aggregate) (aggConf config.BGPAggregate,
-	err error) {
+func (h *BGPHandler) validateBGPv6Aggregate(bgpAgg *bgpd.BGPv6Aggregate) (aggConf config.BGPAggregate, err error) {
 	if bgpAgg == nil {
 		return aggConf, err
 	}
@@ -1568,14 +2018,18 @@ func (h *BGPHandler) validateBGPIPv6Aggregate(bgpAgg *bgpd.BGPIPv6Aggregate) (ag
 	return aggConf, nil
 }
 
-func (h *BGPHandler) SendBGPIPv6Aggregate(oldConfig *bgpd.BGPIPv6Aggregate, newConfig *bgpd.BGPIPv6Aggregate,
+func (h *BGPHandler) SendBGPv6Aggregate(oldConfig *bgpd.BGPv6Aggregate, newConfig *bgpd.BGPv6Aggregate,
 	attrSet []bool) (bool, error) {
-	oldAgg, err := h.validateBGPIPv6Aggregate(oldConfig)
+	if err := h.checkBGPGlobal(); err != nil {
+		return false, err
+	}
+
+	oldAgg, err := h.validateBGPv6Aggregate(oldConfig)
 	if err != nil {
 		return false, err
 	}
 
-	newAgg, err := h.validateBGPIPv6Aggregate(newConfig)
+	newAgg, err := h.validateBGPv6Aggregate(newConfig)
 	if err != nil {
 		return false, err
 	}
@@ -1584,26 +2038,34 @@ func (h *BGPHandler) SendBGPIPv6Aggregate(oldConfig *bgpd.BGPIPv6Aggregate, newC
 	return true, err
 }
 
-func (h *BGPHandler) CreateBGPIPv6Aggregate(bgpAgg *bgpd.BGPIPv6Aggregate) (bool, error) {
-	h.logger.Info("Create IPv6 aggregate attrs:", bgpAgg)
-	return h.SendBGPIPv6Aggregate(nil, bgpAgg, make([]bool, 0))
+func (h *BGPHandler) CreateBGPv6Aggregate(bgpAgg *bgpd.BGPv6Aggregate) (bool, error) {
+	h.logger.Info("Create BGP IPv6 aggregate:", bgpAgg)
+	return h.SendBGPv6Aggregate(nil, bgpAgg, make([]bool, 0))
 }
 
-func (h *BGPHandler) UpdateBGPIPv6Aggregate(origA *bgpd.BGPIPv6Aggregate, updatedA *bgpd.BGPIPv6Aggregate, attrSet []bool,
+func (h *BGPHandler) UpdateBGPv6Aggregate(origA *bgpd.BGPv6Aggregate, updatedA *bgpd.BGPv6Aggregate, attrSet []bool,
 	op []*bgpd.PatchOpInfo) (bool, error) {
-	h.logger.Info("Update IPv6 aggregate attrs:", updatedA, "old config:", origA)
-	return h.SendBGPIPv6Aggregate(origA, updatedA, attrSet)
+	h.logger.Info("Update BGP IPv6 aggregate:", updatedA, "old:", origA)
+	return h.SendBGPv6Aggregate(origA, updatedA, attrSet)
 }
 
-func (h *BGPHandler) DeleteBGPIPv6Aggregate(bgpAgg *bgpd.BGPIPv6Aggregate) (bool, error) {
-	h.logger.Info("Delete IPv6 aggregate attrs:", bgpAgg)
-	agg, _ := h.validateBGPIPv6Aggregate(bgpAgg)
+func (h *BGPHandler) DeleteBGPv6Aggregate(bgpAgg *bgpd.BGPv6Aggregate) (bool, error) {
+	h.logger.Info("Delete BGP IPv6 aggregate:", bgpAgg)
+	if err := h.checkBGPGlobal(); err != nil {
+		return false, err
+	}
+
+	agg, _ := h.validateBGPv6Aggregate(bgpAgg)
 	h.server.RemAggCh <- agg
 	return true, nil
 }
 
 func (h *BGPHandler) ExecuteActionResetBGPv4NeighborByIPAddr(resetIP *bgpd.ResetBGPv4NeighborByIPAddr) (bool, error) {
-	h.logger.Info("Reset IPv4 neighbor by IP address", resetIP.IPAddr)
+	h.logger.Info("Reset BGP v4 neighbor by IP address", resetIP.IPAddr)
+	if err := h.checkBGPGlobal(); err != nil {
+		return false, err
+	}
+
 	ip := net.ParseIP(strings.TrimSpace(resetIP.IPAddr))
 	if ip == nil {
 		return false, errors.New(fmt.Sprintf("IPv4 Neighbor address %s is not a valid IP", resetIP.IPAddr))
@@ -1614,15 +2076,19 @@ func (h *BGPHandler) ExecuteActionResetBGPv4NeighborByIPAddr(resetIP *bgpd.Reset
 
 func (h *BGPHandler) ExecuteActionResetBGPv4NeighborByInterface(resetIf *bgpd.ResetBGPv4NeighborByInterface) (bool,
 	error) {
-	h.logger.Info("Reset IPv4 neighbor by interface", resetIf.IntfRef)
-	ifIndexStr, err := h.server.ConvertIntfStrToIfIndexStr(resetIf.IntfRef)
+	h.logger.Info("Reset BGP v4 neighbor by interface", resetIf.IntfRef)
+	if err := h.checkBGPGlobal(); err != nil {
+		return false, err
+	}
+
+	ifIndexInt, _, err := h.server.ConvertIntfStrToIfIndex(resetIf.IntfRef)
 	if err != nil {
 		h.logger.Err("Invalid intfref:", resetIf.IntfRef)
 		return false, errors.New(fmt.Sprintf("Invalid IntfRef", resetIf.IntfRef))
 	}
 
-	ifIndexInt, _ := strconv.Atoi(ifIndexStr)
 	ipInfo, err := h.server.GetIfaceIP(int32(ifIndexInt))
+	h.logger.Info("ipInfo:", ipInfo, " err:", err)
 	if err != nil {
 		h.logger.Err("Failed to get IP for interface", resetIf.IntfRef)
 		return false, errors.New(fmt.Sprintf("Failed to get IP for interface %s", resetIf.IntfRef))
@@ -1650,7 +2116,11 @@ func (h *BGPHandler) ExecuteActionResetBGPv4NeighborByInterface(resetIf *bgpd.Re
 }
 
 func (h *BGPHandler) ExecuteActionResetBGPv6NeighborByIPAddr(resetIP *bgpd.ResetBGPv6NeighborByIPAddr) (bool, error) {
-	h.logger.Info("Reset IPv6 neighbor by IP address", resetIP.IPAddr)
+	h.logger.Info("Reset BGP v6 neighbor by IP address", resetIP.IPAddr)
+	if err := h.checkBGPGlobal(); err != nil {
+		return false, err
+	}
+
 	ip := net.ParseIP(strings.TrimSpace(resetIP.IPAddr))
 	if ip == nil {
 		return false, errors.New(fmt.Sprintf("IPv6 Neighbor address %s is not a valid IP", resetIP.IPAddr))
@@ -1661,15 +2131,19 @@ func (h *BGPHandler) ExecuteActionResetBGPv6NeighborByIPAddr(resetIP *bgpd.Reset
 
 func (h *BGPHandler) ExecuteActionResetBGPv6NeighborByInterface(resetIf *bgpd.ResetBGPv6NeighborByInterface) (bool,
 	error) {
-	h.logger.Info("Reset IPv6 neighbor by interface", resetIf.IntfRef)
-	ifIndexStr, err := h.server.ConvertIntfStrToIfIndexStr(resetIf.IntfRef)
+	h.logger.Info("Reset BGP v6 neighbor by interface", resetIf.IntfRef)
+	if err := h.checkBGPGlobal(); err != nil {
+		return false, err
+	}
+
+	ifIndexInt, _, err := h.server.ConvertIntfStrToIfIndex(resetIf.IntfRef)
 	if err != nil {
 		h.logger.Err("Invalid intfref:", resetIf.IntfRef)
 		return false, errors.New(fmt.Sprintf("Invalid IntfRef", resetIf.IntfRef))
 	}
 
-	ifIndexInt, _ := strconv.Atoi(ifIndexStr)
 	ipInfo, err := h.server.GetIfaceIP(int32(ifIndexInt))
+	h.logger.Info("ipInfo:", ipInfo, " err:", err)
 	if err != nil {
 		h.logger.Err("Failed to get IP for interface", resetIf.IntfRef)
 		return false, errors.New(fmt.Sprintf("Failed to get IP for interface %s", resetIf.IntfRef))

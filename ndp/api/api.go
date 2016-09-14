@@ -23,6 +23,7 @@
 package api
 
 import (
+	"errors"
 	"l3/ndp/config"
 	"l3/ndp/server"
 	"sync"
@@ -57,10 +58,19 @@ func SendL2PortNotification(ifIndex int32, state string) {
 }
 
 func SendL3PortNotification(ifIndex int32, state, ipAddr string) {
-	ndpApi.server.IpStateCh <- &config.StateNotification{
-		IfIndex: ifIndex,
-		State:   state,
-		IpAddr:  ipAddr,
+	ndpApi.server.IpIntfCh <- &config.IPIntfNotification{
+		IfIndex:   ifIndex,
+		Operation: state,
+		IpAddr:    ipAddr,
+	}
+}
+
+func SendIPIntfNotfication(ifIndex int32, ipaddr, intfRef, msgType string) {
+	ndpApi.server.IpIntfCh <- &config.IPIntfNotification{
+		IfIndex:   ifIndex,
+		IpAddr:    ipaddr,
+		IntfRef:   intfRef,
+		Operation: msgType,
 	}
 }
 
@@ -73,14 +83,6 @@ func SendVlanNotification(oper string, vlanId int32, vlanName string, untagPorts
 	}
 }
 
-func SendIPIntfNotfication(ifIndex int32, ipaddr, msgType string) {
-	ndpApi.server.IpIntfCh <- &config.IPIntfNotification{
-		IfIndex:   ifIndex,
-		IpAddr:    ipaddr,
-		Operation: msgType,
-	}
-}
-
 func GetAllNeigborEntries(from, count int) (int, int, []config.NeighborConfig) {
 	n, c, result := ndpApi.server.GetNeighborEntries(from, count)
 	return n, c, result
@@ -88,4 +90,16 @@ func GetAllNeigborEntries(from, count int) (int, int, []config.NeighborConfig) {
 
 func GetNeighborEntry(ipAddr string) *config.NeighborConfig {
 	return ndpApi.server.GetNeighborEntry(ipAddr)
+}
+
+func CreateGlobalConfig(vrf string, retransmit uint32, reachableTime uint32, raTime uint8) (bool, error) {
+	if ndpApi.server == nil {
+		return false, errors.New("Server is not initialized")
+	}
+	rv, err := ndpApi.server.NdpConfig.Validate(vrf, retransmit, reachableTime, raTime)
+	if err != nil {
+		return rv, err
+	}
+	ndpApi.server.GlobalCfg <- server.NdpConfig{vrf, reachableTime, retransmit, raTime}
+	return true, nil
 }
