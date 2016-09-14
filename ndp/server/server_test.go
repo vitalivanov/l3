@@ -33,6 +33,7 @@ import (
 	"log/syslog"
 	"reflect"
 	"testing"
+	"time"
 	asicdmock "utils/asicdClient/mock"
 	"utils/logging"
 )
@@ -665,5 +666,62 @@ func TestInvalidDB(t *testing.T) {
 	if testNdpServer.NdpConfig.Vrf != "" {
 		t.Error("Db should not be read as the handler is nil")
 		return
+	}
+}
+
+func testNilTransmitPacket(t *testing.T) {
+	l3Port, _ := testNdpServer.L3Port[testIfIndex]
+	l3Port, exists := testNdpServer.L3Port[testIfIndex]
+	if !exists {
+		t.Error("l3 interface should exists for ifIndex:", testIfIndex)
+		return
+	}
+	err := l3Port.writePkt(raServerBaseTestPkt)
+	if err == nil {
+		t.Error("Failure writing packet", err)
+		return
+	}
+}
+
+func testTransmitPacket(t *testing.T) {
+	l3Port, _ := testNdpServer.L3Port[testIfIndex]
+	l3Port, exists := testNdpServer.L3Port[testIfIndex]
+	if !exists {
+		t.Error("l3 interface should exists for ifIndex:", testIfIndex)
+		return
+	}
+	err := l3Port.writePkt(raServerBaseTestPkt)
+	if err != nil {
+		t.Error("Failure writing packet", err)
+	}
+	// sleep for 2 second and then send control channel
+	time.Sleep(2 * time.Second)
+	l3Port.PcapBase.PcapCtrl <- true
+}
+
+func TestPktRxTx(t *testing.T) {
+	TestIPv6IntfCreate(t)
+	go testNilTransmitPacket(t)
+	teststateUpHelperFunc(t)
+	l3Port, exists := testNdpServer.L3Port[testIfIndex]
+	if !exists {
+		t.Error("l3 interface should exists for ifIndex:", testIfIndex)
+		return
+	}
+	go l3Port.ReceiveNdpPkts(testNdpServer.RxPktCh)
+	go testTransmitPacket(t)
+	for {
+		select {
+		case rxChInfo, ok := <-testNdpServer.RxPktCh:
+			if !ok {
+				continue
+			}
+			testNdpServer.counter.Rcvd++
+			testNdpServer.ProcessRxPkt(rxChInfo.ifIndex, rxChInfo.pkt)
+		case <-l3Port.PcapBase.PcapCtrl:
+			t.Log("Done with testing RX/TX")
+			break
+		}
+		break
 	}
 }
