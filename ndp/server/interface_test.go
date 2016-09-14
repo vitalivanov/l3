@@ -96,3 +96,12 @@ func TestTimerUpdate(t *testing.T) {
 	intf.UpdateTimer(gCfg)
 	validateTimerUpdate(t, gCfg, intf)
 }
+
+func TestInvalidReceiveNdpPkt(t *testing.T) {
+	intf := Interface{}
+	err := intf.ReceiveNdpPkts(nil)
+	if err == nil {
+		t.Error("no pcap handler and starting rx for ndp packet should fail")
+		return
+	}
+}

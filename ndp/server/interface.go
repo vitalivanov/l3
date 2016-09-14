@@ -326,10 +326,10 @@ func (intf *Interface) writePkt(pkt []byte) error {
 /*
  * Receive Ndp Packet and push it on the pktCh
  */
-func (intf *Interface) ReceiveNdpPkts(pktCh chan *RxPktInfo) {
+func (intf *Interface) ReceiveNdpPkts(pktCh chan *RxPktInfo) error {
 	if intf.PcapBase.PcapHandle == nil {
 		debug.Logger.Err("pcap handler for port:", intf.IntfRef, "is not valid. ABORT!!!!")
-		return
+		return errors.New(fmt.Sprintln("pcap handler for port:", intf.IntfRef, "is not valid. ABORT!!!!"))
 	}
 	src := gopacket.NewPacketSource(intf.PcapBase.PcapHandle, layers.LayerTypeEthernet)
 	in := src.Packets()
@@ -342,10 +342,10 @@ func (intf *Interface) ReceiveNdpPkts(pktCh chan *RxPktInfo) {
 		case <-intf.PcapBase.PcapCtrl:
 			debug.Logger.Debug("Pcap closed and hence exiting go routine for port:", intf.IntfRef)
 			intf.PcapBase.PcapCtrl <- true
-			return
+			return nil
 		}
 	}
-	return
+	return nil
 }
 
 /*
