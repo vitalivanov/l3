@@ -644,3 +644,13 @@ func TestDeleteNeighborInfo(t *testing.T) {
 		return
 	}
 }
+
+func TestInvalidDB(t *testing.T) {
+	InitNDPTestServer()
+	testNdpServer.ReadDB()
+	testNdpServer.readNdpGblCfg(nil)
+	if testNdpServer.NdpConfig.Vrf != "" {
+		t.Error("Db should not be read as the handler is nil")
+		return
+	}
+}
