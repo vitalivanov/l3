@@ -207,7 +207,7 @@ func IsRoutePresent(routeInfoRecordList RouteInfoRecordList,
 }
 
 func getV4ConnectedRoutes() {
-	//logger.Debug("Getting v4 connected routes from asicd")
+	logger.Debug("Getting v4 Intfs from asicd")
 	var currMarker asicdServices.Int
 	var count asicdServices.Int
 	count = 100
@@ -221,6 +221,7 @@ func getV4ConnectedRoutes() {
 			//logger.Info("0 objects returned from GetBulkIPv4IntfState")
 			return
 		}
+		logger.Info("len(IPIntfBulk.IPv4IntfStateList)  = ", len(IPIntfBulk.IPv4IntfStateList), " num objects returned = ", IPIntfBulk.Count)
 		for i := 0; i < int(IPIntfBulk.Count); i++ {
 			var ipMask net.IP
 			ip, ipNet, err := net.ParseCIDR(IPIntfBulk.IPv4IntfStateList[i].IpAddr)
@@ -231,7 +232,7 @@ func getV4ConnectedRoutes() {
 			copy(ipMask, ipNet.Mask)
 			ipAddrStr := ip.String()
 			ipMaskStr := net.IP(ipMask).String()
-			//logger.Debug("Calling createv4Route with ipaddr ", ipAddrStr, " mask ", ipMaskStr, "ifIndex : ", IPIntfBulk.IPv4IntfStateList[i].IfIndex)
+			logger.Debug("Calling createv4Route with ipaddr ", ipAddrStr, " mask ", ipMaskStr, "ifIndex : ", IPIntfBulk.IPv4IntfStateList[i].IfIndex)
 			cfg := ribd.IPv4Route{
 				DestinationNw: ipAddrStr,
 				Protocol:      "CONNECTED",
@@ -261,7 +262,7 @@ func getV4ConnectedRoutes() {
 	}
 }
 func getV6ConnectedRoutes() {
-	//logger.Debug("Gettingv6  connected routes from asicd")
+	logger.Debug("Getting v6  intfs from asicd")
 	var currMarker asicdServices.Int
 	var count asicdServices.Int
 	count = 100
@@ -275,6 +276,7 @@ func getV6ConnectedRoutes() {
 			logger.Info("0 objects returned from GetBulkIPv6IntfState")
 			return
 		}
+		logger.Info("len(IPIntfBulk.IPv6IntfStateList)  = ", len(IPIntfBulk.IPv6IntfStateList), " num objects returned = ", IPIntfBulk.Count)
 		for i := 0; i < int(IPIntfBulk.Count); i++ {
 			var ipMask net.IP
 			ip, ipNet, err := net.ParseCIDR(IPIntfBulk.IPv6IntfStateList[i].IpAddr)
@@ -1045,6 +1047,13 @@ func addNewRoute(destNetPrefix patriciaDB.Prefix,
 	   Update route info in RouteMap
 	*/
 	RouteInfoMapSet(routeInfoRecord.ipType, patriciaDB.Prefix(destNetPrefix), routeInfoRecordList)
+	if routeInfoRecord.ipType == ribdCommonDefs.IPv4 {
+		v4rtCount++
+		v4routeCreatedTimeMap[v4rtCount] = routeInfoRecord.routeCreatedTime
+	} else if routeInfoRecord.ipType == ribdCommonDefs.IPv6 {
+		v6rtCount++
+		v6routeCreatedTimeMap[v6rtCount] = routeInfoRecord.routeCreatedTime
+	}
 	ecmp := false
 	if !found {
 		ecmp = true
@@ -1449,13 +1458,6 @@ func createRoute(routeInfo RouteParams) (rc ribd.Int, err error) {
 	//logger.Info("nhIntf ipaddr/mask: ", nhIntf.Ipaddr, ":", nhIntf.Mask, " resolvedNex ", resolvedNextHopIntf.NextHopIp, " nexthop ", nextHopIp, " reachable:", resolvedNextHopIntf.IsReachable)
 
 	routeInfoRecord.routeCreatedTime = time.Now().String()
-	if ipType == ribdCommonDefs.IPv4 {
-		v4rtCount++
-		v4routeCreatedTimeMap[v4rtCount] = routeInfoRecord.routeCreatedTime
-	} else if ipType == ribdCommonDefs.IPv6 {
-		v6rtCount++
-		v6routeCreatedTimeMap[v6rtCount] = routeInfoRecord.routeCreatedTime
-	}
 	routeInfoRecordListItem := RouteInfoMapGet(ipType, destNet)
 	if routeInfoRecordListItem == nil {
 		/*
@@ -1481,6 +1483,13 @@ func createRoute(routeInfo RouteParams) (rc ribd.Int, err error) {
 		if ok := RouteInfoMapInsert(ipType, destNet, newRouteInfoRecordList); ok != true {
 			logger.Err("Route map insert return value not ok")
 			return 0, err
+		}
+		if ipType == ribdCommonDefs.IPv4 {
+			v4rtCount++
+			v4routeCreatedTimeMap[v4rtCount] = routeInfoRecord.routeCreatedTime
+		} else if ipType == ribdCommonDefs.IPv6 {
+			v6rtCount++
+			v6routeCreatedTimeMap[v6rtCount] = routeInfoRecord.routeCreatedTime
 		}
 		UpdateProtocolRouteMap(ReverseRouteProtoTypeMapDB[int(routeType)], "add", ipType, string(destNet), false)
 		UpdateInterfaceRouteMap(int(routeInfoRecord.nextHopIfIndex), "add", routeInfoRecord.ipType, string(destNet), false)
