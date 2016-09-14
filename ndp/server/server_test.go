@@ -33,6 +33,7 @@ import (
 	"log/syslog"
 	"reflect"
 	"testing"
+	"time"
 	asicdmock "utils/asicdClient/mock"
 	"utils/logging"
 )
@@ -679,6 +680,9 @@ func testTransmitPacket(t *testing.T) {
 	if err != nil {
 		t.Error("Failure writing packet", err)
 	}
+	// sleep for 2 second and then send control channel
+	time.Sleep(2 * time.Second)
+	l3Port.PcapBase.PcapCtrl <- true
 }
 
 func TestPktRxTx(t *testing.T) {
@@ -699,9 +703,9 @@ func TestPktRxTx(t *testing.T) {
 			}
 			testNdpServer.counter.Rcvd++
 			testNdpServer.ProcessRxPkt(rxChInfo.ifIndex, rxChInfo.pkt)
-			if testNdpServer.counter.Rcvd == 1 {
-				break
-			}
+		case <-l3Port.PcapBase.PcapCtrl:
+			t.Log("Done with testing RX/TX")
+			break
 		}
 		break
 	}
