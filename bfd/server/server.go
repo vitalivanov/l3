@@ -35,6 +35,7 @@ import (
 	"os/signal"
 	"ribd"
 	"strconv"
+	"sync"
 	"syscall"
 	"time"
 	"utils/dbutils"
@@ -102,6 +103,7 @@ type BfdSession struct {
 	movedToDownState    bool
 	notifiedState       bool
 	server              *BFDServer
+	sessionLock         sync.RWMutex
 }
 
 type BfdSessionParam struct {

@@ -75,6 +75,7 @@ func (session *BfdSession) StartSessionClient(server *BFDServer) error {
 		server.FailedSessionClientCh <- session.state.SessionId
 		return err
 	}
+	session.sessionLock.Lock()
 	session.txConn = Conn
 	server.logger.Info("Started session client for ", destAddr, localAddr)
 	defer session.txConn.Close()
@@ -83,6 +84,7 @@ func (session *BfdSession) StartSessionClient(server *BFDServer) error {
 	defer session.txTimer.Stop()
 	defer session.sessionTimer.Stop()
 	session.isClientActive = true
+	session.sessionLock.Unlock()
 	for {
 		select {
 		case <-session.SessionStopClientCh:

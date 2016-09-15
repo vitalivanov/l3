@@ -31,6 +31,7 @@ import (
 	"net"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 	"utils/commonDefs"
 )
@@ -77,10 +78,14 @@ func (server *BFDServer) DispatchReceivedBfdPacket(ipAddr string, bfdPacket *Bfd
 		session, exist = server.bfdGlobal.SessionsByIp[ipAddr]
 	}
 	if exist && session != nil {
+		session.sessionLock.Lock()
 		if session.IsSessionActive() && session.rxInterval != 0 {
-			session.sessionTimer.Reset(time.Duration(session.rxInterval) * time.Millisecond)
-			session.ReceivedPacketCh <- bfdPacket
+			if session.sessionTimer != nil {
+				session.sessionTimer.Reset(time.Duration(session.rxInterval) * time.Millisecond)
+				session.ReceivedPacketCh <- bfdPacket
+			}
 		}
+		session.sessionLock.Unlock()
 	} else {
 		/*
 			// Create a session as discovered. This can be enabled for active mode of bfd.
@@ -332,8 +337,9 @@ func (server *BFDServer) NewNormalBfdSession(Interface string, LocalIp string, D
 	bfdSession.authKeyId = uint32(sessionParam.state.AuthenticationKeyId)
 	bfdSession.authData = sessionParam.state.AuthenticationData
 	bfdSession.paramChanged = true
-	bfdSession.server = server
 	bfdSession.bfdPacket = NewBfdControlPacketDefault()
+	bfdSession.server = server
+	bfdSession.sessionLock = sync.RWMutex{}
 	server.bfdGlobal.Sessions[sessionId] = bfdSession
 	server.bfdGlobal.SessionsByIp[DestIp] = bfdSession
 	server.bfdGlobal.NumSessions++
