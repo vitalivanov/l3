@@ -46,7 +46,7 @@ var V4RouteInfoMap *patriciaDB.Trie //Routes are stored in patricia trie
    Returns the longest prefix match route to reach the destination network destNet
 */
 func (m RIBDServer) GetV4RouteReachabilityInfo(destNet string, ifIndex ribdInt.Int) (nextHopIntf *ribdInt.NextHopInfo, err error) {
-	logger.Debug("GetV4RouteReachabilityInfo of ", destNet, " ifIndex:", ifIndex)
+	//logger.Debug("GetV4RouteReachabilityInfo of ", destNet, " ifIndex:", ifIndex)
 	//t1 := time.Now()
 	var retnextHopIntf ribdInt.NextHopInfo
 	nextHopIntf = &retnextHopIntf

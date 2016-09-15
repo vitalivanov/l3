@@ -218,7 +218,7 @@ func (m RIBDServer) GetV4ConnectedRoutes() {
 			logger.Info("0 objects returned from GetBulkIPv4IntfState")
 			break
 		}
-		logger.Info("len(IPIntfBulk.IPv4IntfStateList)  = ", len(IPIntfBulk.IPv4IntfStateList), " num objects returned = ", IPIntfBulk.Count)
+		//logger.Info("len(IPIntfBulk.IPv4IntfStateList)  = ", len(IPIntfBulk.IPv4IntfStateList), " num objects returned = ", IPIntfBulk.Count)
 		ret_count = ret_count + int(IPIntfBulk.Count)
 		ipv4IntfList = append(ipv4IntfList, IPIntfBulk.IPv4IntfStateList...)
 		if IPIntfBulk.More == false {
