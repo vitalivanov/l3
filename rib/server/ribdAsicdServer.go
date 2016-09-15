@@ -26,6 +26,7 @@ package server
 
 import (
 	"asicdInt"
+	"asicdServices"
 	//"fmt"
 	"l3/rib/ribdCommonDefs"
 )
@@ -200,6 +201,64 @@ func delAsicdRoute(routeInfoRecord RouteInfoRecord) {
 		}
 	}
 }
+func (m RIBDServer) GetV4ConnectedRoutes() {
+	logger.Info("Getting v4 Intfs from asicd")
+	var currMarker asicdServices.Int
+	var count asicdServices.Int
+	ipv4IntfList := make([]*asicdServices.IPv4IntfState, 0)
+	count = 100
+	ret_count := 0
+	for {
+		IPIntfBulk, err := asicdclnt.ClientHdl.GetBulkIPv4IntfState(currMarker, count)
+		if err != nil {
+			logger.Debug("GetBulkIPv4IntfState with err ", err)
+			break
+		}
+		if IPIntfBulk.Count == 0 {
+			logger.Info("0 objects returned from GetBulkIPv4IntfState")
+			break
+		}
+		logger.Info("len(IPIntfBulk.IPv4IntfStateList)  = ", len(IPIntfBulk.IPv4IntfStateList), " num objects returned = ", IPIntfBulk.Count)
+		ret_count = ret_count + int(IPIntfBulk.Count)
+		ipv4IntfList = append(ipv4IntfList, IPIntfBulk.IPv4IntfStateList...)
+		if IPIntfBulk.More == false {
+			logger.Debug("more returned as false, so no more get bulks")
+			break
+		}
+		currMarker = asicdServices.Int(IPIntfBulk.EndIdx)
+	}
+	m.V4IntfsGetDone <- V4IntfGetInfo{ret_count, ipv4IntfList}
+}
+
+func (m RIBDServer) GetV6ConnectedRoutes() {
+	logger.Info("Getting v6  intfs from asicd")
+	var currMarker asicdServices.Int
+	var count asicdServices.Int
+	ipv6IntfList := make([]*asicdServices.IPv6IntfState, 0)
+	count = 100
+	ret_count := 0
+	for {
+		IPIntfBulk, err := asicdclnt.ClientHdl.GetBulkIPv6IntfState(currMarker, count)
+		if err != nil {
+			logger.Debug("GetBulkIPv6IntfState with err ", err)
+			break
+		}
+		if IPIntfBulk.Count == 0 {
+			logger.Info("0 objects returned from GetBulkIPv6IntfState")
+			break
+		}
+		logger.Info("len(IPIntfBulk.IPv6IntfStateList)  = ", len(IPIntfBulk.IPv6IntfStateList), " num objects returned = ", IPIntfBulk.Count)
+		ret_count = ret_count + int(IPIntfBulk.Count)
+		ipv6IntfList = append(ipv6IntfList, IPIntfBulk.IPv6IntfStateList...)
+		if IPIntfBulk.More == false {
+			logger.Debug("more returned as false, so no more get bulks")
+			break
+		}
+		currMarker = asicdServices.Int(IPIntfBulk.EndIdx)
+	}
+	m.V6IntfsGetDone <- V6IntfGetInfo{ret_count, ipv6IntfList}
+}
+
 func (ribdServiceHandler *RIBDServer) StartAsicdServer() {
 	logger.Info("Starting the asicdserver loop")
 	asicdv4Route = make([]asicdInt.IPv4Route, asicdBulkCount)
@@ -207,7 +266,7 @@ func (ribdServiceHandler *RIBDServer) StartAsicdServer() {
 	for {
 		select {
 		case route := <-ribdServiceHandler.AsicdRouteCh:
-			//logger.Debug(" received message on AsicdRouteCh, op:", route.Op, " ip type:", route.OrigConfigObject.(RouteInfoRecord).ipType, " bulk:", route.Bulk, " bulkEnd:", route.BulkEnd)
+			logger.Info(" received message on AsicdRouteCh, op:", route.Op)
 			if route.Op == "add" {
 				if route.Bulk {
 					addAsicdRouteBulk(route.OrigConfigObject.(RouteInfoRecord), route.BulkEnd)
@@ -216,6 +275,12 @@ func (ribdServiceHandler *RIBDServer) StartAsicdServer() {
 				}
 			} else if route.Op == "del" {
 				delAsicdRoute(route.OrigConfigObject.(RouteInfoRecord))
+			} else if route.Op == "fetchv4" {
+				logger.Info("AsicdServer loop fetchv4, call getv4connectedroutes")
+				ribdServiceHandler.GetV4ConnectedRoutes()
+			} else if route.Op == "fetchv6" {
+				logger.Info("AsicdServer loop fetchv6, call getv6connectedroutes")
+				ribdServiceHandler.GetV6ConnectedRoutes()
 			}
 		}
 	}

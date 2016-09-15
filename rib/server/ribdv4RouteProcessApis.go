@@ -46,7 +46,7 @@ var V4RouteInfoMap *patriciaDB.Trie //Routes are stored in patricia trie
    Returns the longest prefix match route to reach the destination network destNet
 */
 func (m RIBDServer) GetV4RouteReachabilityInfo(destNet string, ifIndex ribdInt.Int) (nextHopIntf *ribdInt.NextHopInfo, err error) {
-	//logger.Debug("GetV4RouteReachabilityInfo of ", destNet)
+	logger.Debug("GetV4RouteReachabilityInfo of ", destNet, " ifIndex:", ifIndex)
 	//t1 := time.Now()
 	var retnextHopIntf ribdInt.NextHopInfo
 	nextHopIntf = &retnextHopIntf
@@ -72,14 +72,14 @@ func (m RIBDServer) GetV4RouteReachabilityInfo(destNet string, ifIndex ribdInt.I
 			routeInfoList, ok := rmapInfoList.routeInfoProtocolMap[rmapInfoList.selectedRouteProtocol]
 			if !ok || len(routeInfoList) == 0 {
 				//fmt.Println("Madhavi!! GetV4RouteReachabilityInfo: ok:", ok, " len(routeInfoList):", len(routeInfoList))
-				logger.Err("Selected route not found")
+				logger.Err("Selected route not found because len(routeInfoList) = 0")
 				return nil, errors.New("dest ip address not reachable")
 			}
 			//v := routeInfoList[0]
 			nhFound, v, _ := findRouteWithNextHop(routeInfoList, ribdCommonDefs.IPv4, "", ribd.Int(ifIndex))
 			//fmt.Println("Madhavi!! GetV4RouteReachabilityInfo: nhFound:", nhFound, " v:", v)
 			if !nhFound {
-				logger.Err("Selected route not found")
+				logger.Err("Next hop for ifIndex:", ifIndex, " not found")
 				return nil, errors.New(fmt.Sprintln("dest ip address not reachable via ifIndex", ifIndex))
 			}
 			nextHopIntf.NextHopIp = v.nextHopIp.String()
@@ -402,7 +402,6 @@ func (m RIBDServer) RouteConfigValidationCheckForPatchUpdate(oldcfg *ribd.IPv4Ro
 		   - if the nexthopIntf is valid L3 intf and if so, convert to string value
 */
 func (m RIBDServer) RouteConfigValidationCheck(cfg *ribd.IPv4Route, op string) (err error) {
-	logger.Debug("RouteConfigValidationCheck")
 	isCidr := strings.Contains(cfg.DestinationNw, "/")
 	if isCidr {
 		/*
@@ -415,7 +414,7 @@ func (m RIBDServer) RouteConfigValidationCheck(cfg *ribd.IPv4Route, op string) (
 		}
 		_, err = getNetworkPrefixFromCIDR(cfg.DestinationNw)
 		if err != nil {
-			return errors.New("Invalid destination ip/network Mask")
+			return errors.New(fmt.Sprintln("RouteConfigValidationCheck for route:", cfg, " Invalid destination ip/network Mask"))
 		}
 		/*
 		   Convert the CIDR format address to IP and mask strings
@@ -442,7 +441,7 @@ func (m RIBDServer) RouteConfigValidationCheck(cfg *ribd.IPv4Route, op string) (
 	}
 	_, err = validateNetworkPrefix(cfg.DestinationNw, cfg.NetworkMask)
 	if err != nil {
-		logger.Err(" getNetowrkPrefixFromStrings returned err ", err)
+		logger.Err("RouteConfigValidationCheck for route:", cfg, " validateNetworkPrefix() returned err ", err)
 		return err
 	}
 	/*
@@ -480,18 +479,25 @@ func (m RIBDServer) RouteConfigValidationCheck(cfg *ribd.IPv4Route, op string) (
 			   Validate if nextHopIntRef is a valid L3 interface
 			*/
 			if cfg.NextHop[i].NextHopIntRef == "" {
-				logger.Info("NextHopIntRef not set")
+				logger.Info("RouteConfigValidationCheck for route:", cfg, "NextHopIntRef not set")
 				nhIntf, err := RouteServiceHandler.GetV4RouteReachabilityInfo(cfg.NextHop[i].NextHopIp, -1)
 				if err != nil {
-					logger.Err("next hop ip ", cfg.NextHop[i].NextHopIp, " not reachable")
+					logger.Err("RouteConfigValidationCheck for route:", cfg, "next hop ip ", cfg.NextHop[i].NextHopIp, " not reachable")
 					return errors.New(fmt.Sprintln("next hop ip ", cfg.NextHop[i].NextHopIp, " not reachable"))
 				}
 				cfg.NextHop[i].NextHopIntRef = strconv.Itoa(int(nhIntf.NextHopIfIndex))
 			} else {
+				nhIntf := cfg.NextHop[i].NextHopIntRef
 				cfg.NextHop[i].NextHopIntRef, err = m.ConvertIntfStrToIfIndexStr(cfg.NextHop[i].NextHopIntRef)
 				if err != nil {
-					logger.Err("Invalid NextHop IntRef ", cfg.NextHop[i].NextHopIntRef)
+					logger.Err("RouteConfigValidationCheck for route:", cfg, "Invalid NextHop IntRef ", cfg.NextHop[i].NextHopIntRef)
 					return err
+				}
+				nextHopIntRef, _ := strconv.Atoi(cfg.NextHop[i].NextHopIntRef)
+				_, err := RouteServiceHandler.GetV4RouteReachabilityInfo(cfg.NextHop[i].NextHopIp, ribdInt.Int(nextHopIntRef))
+				if err != nil {
+					logger.Err("RouteConfigValidationCheck for route:", cfg, "next hop ip ", cfg.NextHop[i].NextHopIp, " not reachable via interface ", nhIntf)
+					return errors.New(fmt.Sprintln("next hop ip ", cfg.NextHop[i].NextHopIp, " not reachable via ", nhIntf))
 				}
 			}
 			//logger.Debug("IntRef after : ", cfg.NextHop[i].NextHopIntRef)

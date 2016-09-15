@@ -56,6 +56,15 @@ type RIBdServerConfig struct {
 	PolicyList                ApplyPolicyList
 }
 
+type V4IntfGetInfo struct {
+	Count        int
+	IPv4IntfList []*asicdServices.IPv4IntfState
+}
+type V6IntfGetInfo struct {
+	Count        int
+	IPv6IntfList []*asicdServices.IPv6IntfState
+}
+
 /*type PatchUpdateRouteInfo struct {
 	OrigRoute *ribd.IPv4Route
 	NewRoute  *ribd.IPv4Route
@@ -81,6 +90,8 @@ type RIBDServer struct {
 	AcceptConfig        bool
 	ServerUpCh          chan bool
 	DBReadDone          chan bool
+	V4IntfsGetDone      chan V4IntfGetInfo
+	V6IntfsGetDone      chan V6IntfGetInfo
 	PolicyConfDone      chan error
 	DbHdl               *dbutils.DBUtil
 	Clients             map[string]ClientIf
@@ -467,8 +478,17 @@ func (ribdServiceHandler *RIBDServer) AcceptConfigActions() {
 	logger.Info("AcceptConfigActions: Setting AcceptConfig to true")
 	RouteServiceHandler.AcceptConfig = true
 	getIntfInfo()
-	getV4ConnectedRoutes()
-	getV6ConnectedRoutes()
+	logger.Info("adding fetchv4 to asicdroutech")
+	ribdServiceHandler.AsicdRouteCh <- RIBdServerConfig{Op: "fetchv4"}
+	v4IntfsGetDone := <-ribdServiceHandler.V4IntfsGetDone
+	logger.Info("adding fetchv6 to asicdroutech")
+	//getV4ConnectedRoutes()
+	ribdServiceHandler.AsicdRouteCh <- RIBdServerConfig{Op: "fetchv6"}
+	v6IntfsGetDone := <-ribdServiceHandler.V6IntfsGetDone
+	//getV6ConnectedRoutes()
+	logger.Info("creating v4 and v6 routes")
+	CreateV4ConnectedRoutes(v4IntfsGetDone.Count, v4IntfsGetDone.IPv4IntfList)
+	CreateV6ConnectedRoutes(v6IntfsGetDone.Count, v6IntfsGetDone.IPv6IntfList)
 	//update dbRouteCh to fetch route data
 	ribdServiceHandler.DBRouteCh <- RIBdServerConfig{Op: "fetch"}
 	dbRead := <-ribdServiceHandler.DBReadDone
@@ -552,6 +572,8 @@ func NewRIBDServicesHandler(dbHdl *dbutils.DBUtil, loggerC *logging.Writer) *RIB
 	ribdServicesHandler.DBRouteCh = make(chan RIBdServerConfig, 100000)
 	ribdServicesHandler.ServerUpCh = make(chan bool)
 	ribdServicesHandler.DBReadDone = make(chan bool)
+	ribdServicesHandler.V4IntfsGetDone = make(chan V4IntfGetInfo)
+	ribdServicesHandler.V6IntfsGetDone = make(chan V6IntfGetInfo)
 	ribdServicesHandler.PolicyConfDone = make(chan error)
 	ribdServicesHandler.DbHdl = dbHdl
 	RouteServiceHandler = ribdServicesHandler
