@@ -47,6 +47,7 @@ type DBRouteKey struct {
 }
 
 var dbRouteMap map[DBRouteKey]bool
+var dbv6RouteMap map[DBRouteKey]bool
 
 func (m RIBDServer) WriteIPv4RouteStateEntryToDB(dbInfo RouteDBInfo) error {
 	//	logger.Info("WriteIPv4RouteStateEntryToDB")
@@ -353,23 +354,78 @@ func (m RIBDServer) ReadAndUpdatev6RoutesFromDB() {
 	var dbObjCfg objects.IPv6Route
 	objList, err := m.DbHdl.GetAllObjFromDb(dbObjCfg)
 	if err == nil {
-		//logger.Debug("Number of v6 routes from DB: ", len((objList)))
-		for idx := 0; idx < len(objList); idx++ {
-			obj := ribd.NewIPv6Route()
-			dbObj := objList[idx].(objects.IPv6Route)
-			objects.ConvertribdIPv6RouteObjToThrift(&dbObj, obj)
-			err = m.IPv6RouteConfigValidationCheck(obj, "add")
-			if err != nil {
-				logger.Err("Route validation failed when reading from db")
-				continue
+		iter_count := 0
+		max_iter_count := len(objList)
+		for {
+			dbv6RouteMap = make(map[DBRouteKey]bool)
+			loop := false
+			logger.Debug("ReadAndUpdatev6RoutesFromDB:Number of routes from DB: ", len((objList)))
+			for idx := 0; idx < len(objList); idx++ {
+				err = nil
+				obj := ribd.NewIPv6Route()
+				dbObj := objList[idx].(objects.IPv6Route)
+				objects.ConvertribdIPv6RouteObjToThrift(&dbObj, obj)
+				logger.Debug("ReadAndUpdatev6RoutesFromDB: Validate route config for :", obj)
+				err = m.IPv6RouteConfigValidationCheck(obj, "add")
+				if err != nil {
+					logger.Err("Route validation failed when reading from db for route:", obj, " err:", err)
+					if strings.Contains(string(err.Error()), "not reachable") {
+						logger.Info("ReadAndUpdateRoutesFromDB:Err message has not reachableset loop to true")
+						nhFound := false
+						for key, _ := range dbv6RouteMap {
+							for _, nh := range obj.NextHop {
+								logger.Info("Check if key", key.ipAddr, ":", key.mask, " contains next hop ", nh.NextHopIp)
+								ipNet := net.IPNet{IP: net.IP(key.ipAddr), Mask: net.IPMask(key.mask)}
+								nhIp := net.ParseIP(nh.NextHopIp)
+								if nhIp == nil {
+									logger.Info("ReadAndUpdatev6RoutesFromDB: nhip nil ", nh.NextHopIp)
+									break
+								}
+								if ipNet.Contains(nhIp) == true {
+									logger.Info(key.ipAddr, ":", key.mask, " contains next hop ", nh.NextHopIp)
+									nhFound = true
+								}
+							}
+						}
+						if nhFound == false {
+							loop = true
+						}
+					}
+					continue
+				}
+				m.RouteConfCh <- RIBdServerConfig{
+					OrigConfigObject: obj,
+					Op:               "addv6",
+				}
+				ip := net.ParseIP(obj.DestinationNw)
+				if ip == nil {
+					logger.Info("ReadAndUpdatev6RoutesFromDB: ip nil ", obj.DestinationNw)
+					continue
+				}
+				mask := net.ParseIP(obj.NetworkMask)
+				if ip == nil {
+					logger.Info("ReadAndUpdatev6RoutesFromDB: mask nil ", obj.NetworkMask)
+					continue
+				}
+				dbRouteKey := DBRouteKey{string(ip), string(mask)}
+				dbv6RouteMap[dbRouteKey] = true
+				//delete this route from the routelist
+				objList[idx] = objList[len(objList)-1]
+				objList = objList[:len(objList)-1]
+				idx--
 			}
-			m.RouteConfCh <- RIBdServerConfig{
-				OrigConfigObject: obj,
-				Op:               "addv6",
+			if loop == false {
+				logger.Info("ReadAndUpdatev6RoutesFromDB no more loops, all routes configured")
+				break
+			}
+			iter_count++
+			if iter_count >= max_iter_count {
+				logger.Info("ReadAndUpdateRv6outesFromDB: current iteration count :", iter_count, " exceeded the max iter count ", max_iter_count)
+				break
 			}
 		}
 	} else {
-		logger.Err("DB Query failed during IPv6Route query: RIBd init")
+		logger.Err("DB Query failed during IPv4Route query: RIBd init")
 	}
 }
 func (ribdServiceHandler *RIBDServer) StartDBServer() {
