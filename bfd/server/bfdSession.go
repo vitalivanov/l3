@@ -62,8 +62,7 @@ func (session *BfdSession) StartSessionClient(server *BFDServer) error {
 		server.FailedSessionClientCh <- session.state.SessionId
 		return err
 	}
-	//localAddr := net.JoinHostPort("", strconv.Itoa(int(SRC_PORT+session.state.SessionId)))
-	localAddr := ""
+	localAddr := net.JoinHostPort(session.state.LocalAddr, strconv.Itoa(int(SRC_PORT+session.state.SessionId)))
 	ClientAddr, err := net.ResolveUDPAddr("udp", localAddr)
 	if err != nil {
 		server.logger.Info("Failed ResolveUDPAddr ", localAddr, err)
@@ -81,6 +80,8 @@ func (session *BfdSession) StartSessionClient(server *BFDServer) error {
 	defer session.txConn.Close()
 	session.txTimer = time.AfterFunc(time.Duration(session.txInterval)*time.Millisecond, func() { session.SendPeriodicControlPackets() })
 	session.sessionTimer = time.AfterFunc(time.Duration(session.rxInterval)*time.Millisecond, func() { session.HandleSessionTimeout() })
+	defer session.txTimer.Stop()
+	defer session.sessionTimer.Stop()
 	session.isClientActive = true
 	for {
 		select {
@@ -432,6 +433,15 @@ func (session *BfdSession) IsSessionActive() bool {
 	} else {
 		return false
 	}
+}
+
+func (session *BfdSession) ResetLocalSessionParams() error {
+	session.state.SessionState = STATE_DOWN
+	session.state.NumRxPackets = 0
+	session.state.NumTxPackets = 0
+	session.state.ToUpCount = 0
+	session.state.ToDownCount = 0
+	return nil
 }
 
 func (session *BfdSession) ResetRemoteSessionParams() error {

@@ -73,6 +73,7 @@ func (ribdServiceHandler *RIBDServer) UpdateGlobalPolicyPrefixSetsFromDB(dbHdl *
 					OrigConfigObject: obj,
 					Op:               "addPolicyPrefixSet",
 				}
+				err = <-ribdServiceHandler.PolicyConfDone
 			}
 		} else {
 			logger.Err("DB Query failed during PolicyPrefixSet query: RIBd init")
@@ -95,6 +96,7 @@ func (ribdServiceHandler *RIBDServer) UpdateGlobalPolicyConditionsFromDB(dbHdl *
 					OrigConfigObject: obj,
 					Op:               "addPolicyCondition",
 				}
+				err = <-ribdServiceHandler.PolicyConfDone
 			}
 		} else {
 			logger.Err("DB Query failed during PolicyCondition query: RIBd init")
@@ -116,6 +118,7 @@ func (ribdServiceHandler *RIBDServer) UpdateGlobalPolicyStmtsFromDB(dbHdl *dbuti
 					OrigConfigObject: obj,
 					Op:               "addPolicyStmt",
 				}
+				err = <-ribdServiceHandler.PolicyConfDone
 			}
 		} else {
 			logger.Err("DB Query failed during PolicyStmt query: RIBd init")
@@ -137,6 +140,7 @@ func (ribdServiceHandler *RIBDServer) UpdateGlobalPolicyFromDB(dbHdl *dbutils.DB
 					OrigConfigObject: obj,
 					Op:               "addPolicyDefinition",
 				}
+				err = <-ribdServiceHandler.PolicyConfDone
 			}
 		} else {
 			logger.Err("DB Query failed during PolicyDefinition query: RIBd init")

@@ -72,9 +72,11 @@ func StartServer(logger *logging.Writer, handler *BGPHandler, filePath string) {
 	fileName := filePath + ClientsFileName
 	clientJson, err := getClient(logger, fileName, "bgpd")
 	if err != nil || clientJson == nil {
+		logger.Err("Client info not found for bgpd")
 		return
 	}
 
+	logger.Info("Client info for bgpd", clientJson)
 	protocolFactory := thrift.NewTBinaryProtocolFactoryDefault()
 	transportFactory := thrift.NewTBufferedTransportFactory(8192)
 	serverTransport, err := thrift.NewTServerSocket("localhost:" + strconv.Itoa(clientJson.Port))
@@ -84,11 +86,12 @@ func StartServer(logger *logging.Writer, handler *BGPHandler, filePath string) {
 	}
 	processor := bgpd.NewBGPDServicesProcessor(handler)
 	server := thrift.NewTSimpleServer4(processor, serverTransport, transportFactory, protocolFactory)
+	logger.Info("Starting thrift server now...")
 	err = server.Serve()
 	if err != nil {
 		logger.Info("Failed to start the listener, err:", err)
 	}
-	logger.Info("Start the listener successfully")
+	logger.Info("Starting thrift server failed")
 	return
 }
 

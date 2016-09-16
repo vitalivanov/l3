@@ -146,3 +146,29 @@ func TestGetNbrEntry(t *testing.T) {
 	}
 	svr.DeInitGlobalDS()
 }
+
+func TestGetGlobalStateEntry(t *testing.T) {
+	TestIPv6IntfCreate(t)
+	gblCfg := NdpConfig{
+		Vrf:               "default",
+		ReachableTime:     30000,
+		RetransTime:       1,
+		RaRestransmitTime: 5,
+	}
+	wantgblState := &config.GlobalState{
+		Vrf:                         gblCfg.Vrf,
+		RetransmitInterval:          int32(gblCfg.RetransTime),
+		ReachableTime:               int32(gblCfg.ReachableTime),
+		RouterAdvertisementInterval: int32(gblCfg.RaRestransmitTime),
+		Neighbors:                   0,
+		TotalTxPackets:              0,
+		TotalRxPackets:              0,
+	}
+	testGlobalConfigNdpOperations(gblCfg, t)
+	gblState := testNdpServer.GetGlobalState(gblCfg.Vrf)
+
+	if !reflect.DeepEqual(gblState, wantgblState) {
+		t.Error("Get Global State entry failed, want:", *wantgblState, "received:", *gblState)
+		return
+	}
+}

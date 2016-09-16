@@ -81,6 +81,7 @@ type RIBDServer struct {
 	AcceptConfig        bool
 	ServerUpCh          chan bool
 	DBReadDone          chan bool
+	PolicyConfDone      chan error
 	DbHdl               *dbutils.DBUtil
 	Clients             map[string]ClientIf
 	//RouteInstallCh                 chan RouteParams
@@ -551,6 +552,7 @@ func NewRIBDServicesHandler(dbHdl *dbutils.DBUtil, loggerC *logging.Writer) *RIB
 	ribdServicesHandler.DBRouteCh = make(chan RIBdServerConfig, 100000)
 	ribdServicesHandler.ServerUpCh = make(chan bool)
 	ribdServicesHandler.DBReadDone = make(chan bool)
+	ribdServicesHandler.PolicyConfDone = make(chan error)
 	ribdServicesHandler.DbHdl = dbHdl
 	RouteServiceHandler = ribdServicesHandler
 	//ribdServicesHandler.RouteInstallCh = make(chan RouteParams)

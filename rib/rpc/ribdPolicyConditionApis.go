@@ -25,48 +25,53 @@
 package rpc
 
 import (
+	"errors"
 	"l3/rib/server"
 	"ribd"
-	"utils/policy"
+	//"utils/policy"
 )
 
 func (m RIBDServicesHandler) CreatePolicyPrefixSet(cfg *ribd.PolicyPrefixSet) (val bool, err error) {
 	logger.Debug("CreatePolicyPrefixSet: ", cfg.Name)
-	prefixList := make([]policy.PolicyPrefix, 0)
-	for _, ribdPrefix := range cfg.PrefixList {
-		prefix := policy.PolicyPrefix{
-			IpPrefix:        ribdPrefix.Prefix,
-			MasklengthRange: ribdPrefix.MaskLengthRange,
-		}
-		prefixList = append(prefixList, prefix)
-	}
-	newPolicyPrefixSet := policy.PolicyPrefixSetConfig{Name: cfg.Name, PrefixList: prefixList}
-	err = m.server.GlobalPolicyEngineDB.ValidatePolicyPrefixSetCreate(newPolicyPrefixSet)
-	if err != nil {
-		logger.Err("PolicyEngine validation failed for prefix Set ", cfg.Name, " with err:", err)
-		return false, err
-	}
 	m.server.PolicyConfCh <- server.RIBdServerConfig{
 		OrigConfigObject: cfg,
 		Op:               "addPolicyPrefixSet",
 	}
-	return true, err
+	err = <-m.server.PolicyConfDone
+	if err == nil {
+		val = true
+	}
+	return val, err
 }
 func (m RIBDServicesHandler) UpdatePolicyPrefixSet(origconfig *ribd.PolicyPrefixSet, newconfig *ribd.PolicyPrefixSet, attrset []bool, op []*ribd.PatchOpInfo) (val bool, err error) {
+	if op == nil || len(op) == 0 {
+		//update op
+		logger.Info("Update op for policy prefix set definition")
+
+	} else {
+		//patch op
+		logger.Info("patch op:", op, " for policy prefix set definition")
+	}
+	m.server.PolicyConfCh <- server.RIBdServerConfig{
+		OrigConfigObject: origconfig,
+		NewConfigObject:  newconfig,
+		AttrSet:          attrset,
+		PatchOp:          op,
+		Op:               "updatePolicyPrefixSet",
+	}
 	return val, err
 }
 func (m RIBDServicesHandler) DeletePolicyPrefixSet(cfg *ribd.PolicyPrefixSet) (val bool, err error) {
 	logger.Debug("DeletePolicyPrefixSet: ", cfg.Name)
-	err = m.server.GlobalPolicyEngineDB.ValidatePolicyPrefixSetDelete(policy.PolicyPrefixSetConfig{Name: cfg.Name})
-	if err != nil {
-		logger.Err("PolicyEngine validation for prefix set delete failed with err: ", err)
-		return false, err
-	}
 	m.server.PolicyConfCh <- server.RIBdServerConfig{
 		OrigConfigObject: cfg,
 		Op:               "delPolicyPrefixSet",
 	}
-	return true, err
+	err = <-m.server.PolicyConfDone
+	if err == nil {
+		val = true
+	}
+	return val, err
 }
 func (m RIBDServicesHandler) GetBulkPolicyPrefixSetState(fromIndex ribd.Int, count ribd.Int) (state *ribd.PolicyPrefixSetStateGetInfo, err error) {
 	logger.Debug("GetBulkPolicyPrefixSetState")
@@ -80,36 +85,46 @@ func (m RIBDServicesHandler) GetPolicyPrefixSetState(name string) (state *ribd.P
 
 func (m RIBDServicesHandler) CreatePolicyCondition(cfg *ribd.PolicyCondition) (val bool, err error) {
 	logger.Debug("CreatePolicyConditioncfg: ", cfg.Name)
-	newPolicy := policy.PolicyConditionConfig{Name: cfg.Name, ConditionType: cfg.ConditionType, MatchProtocolConditionInfo: cfg.Protocol}
-	matchPrefix := policy.PolicyPrefix{IpPrefix: cfg.IpPrefix, MasklengthRange: cfg.MaskLengthRange}
-	logger.Info("CreatePolicyCondition:,cfg.PrefixSet:", cfg.PrefixSet)
-	newPolicy.MatchDstIpPrefixConditionInfo = policy.PolicyDstIpMatchPrefixSetCondition{Prefix: matchPrefix, PrefixSet: cfg.PrefixSet}
-	err = m.server.GlobalPolicyEngineDB.ValidateConditionConfigCreate(newPolicy)
-	if err != nil {
-		logger.Err("PolicyEngine validation failed with err: ", err)
-		return false, err
-	}
 	m.server.PolicyConfCh <- server.RIBdServerConfig{
 		OrigConfigObject: cfg,
 		Op:               "addPolicyCondition",
 	}
-	return true, err
+	err = <-m.server.PolicyConfDone
+	if err == nil {
+		val = true
+	}
+	return val, err
 }
 func (m RIBDServicesHandler) DeletePolicyCondition(cfg *ribd.PolicyCondition) (val bool, err error) {
 	logger.Debug("DeletePolicyConditionConfig: ", cfg.Name)
-	err = m.server.GlobalPolicyEngineDB.ValidateConditionConfigDelete(policy.PolicyConditionConfig{Name: cfg.Name})
-	if err != nil {
-		logger.Err("PolicyEngine validation failed with err: ", err)
-		return false, err
-	}
 	m.server.PolicyConfCh <- server.RIBdServerConfig{
 		OrigConfigObject: cfg,
 		Op:               "delPolicyCondition",
 	}
-	return true, err
+	err = <-m.server.PolicyConfDone
+	if err == nil {
+		val = true
+	}
+	return val, err
 }
 func (m RIBDServicesHandler) UpdatePolicyCondition(origconfig *ribd.PolicyCondition, newconfig *ribd.PolicyCondition, attrset []bool, op []*ribd.PatchOpInfo) (val bool, err error) {
 	logger.Debug("UpdatePolicyConditionConfig:UpdatePolicyCondition: ", newconfig.Name)
+	if op == nil || len(op) == 0 {
+		//update op
+		logger.Info("Update op for policy condition definition")
+
+	} else {
+		//patch op
+		logger.Err("patch op:", op, " for policy condition definition not supported")
+		return false, errors.New("Patch update for policy condition not supported")
+	}
+	m.server.PolicyConfCh <- server.RIBdServerConfig{
+		OrigConfigObject: origconfig,
+		NewConfigObject:  newconfig,
+		AttrSet:          attrset,
+		PatchOp:          op,
+		Op:               "updatePolicyCondition",
+	}
 	return true, err
 }
 func (m RIBDServicesHandler) GetPolicyConditionState(name string) (*ribd.PolicyConditionState, error) {

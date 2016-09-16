@@ -909,12 +909,20 @@ func (fsm *FSM) StartFSM() {
 		select {
 		case outConnCh := <-fsm.outConnCh:
 			fsm.logger.Info("Neighbor:", fsm.pConf.NeighborAddress, "FSM", fsm.id, "OUT connection SUCCESS")
+			if fsm.outTCPConn == nil {
+				fsm.logger.Info("Neighbor:", fsm.pConf.NeighborAddress, "FSM", fsm.id,
+					"No expecting a connection, closing it")
+				outConnCh.Close()
+				continue
+			}
+			fsm.StopConnToPeer()
 			fsm.outTCPConn = nil
 			out := PeerConnDir{config.ConnDirOut, &outConnCh}
 			fsm.ProcessEvent(BGPEventTcpCrAcked, out)
 
 		case outConnErrCh := <-fsm.outConnErrCh:
 			fsm.logger.Info("Neighbor:", fsm.pConf.NeighborAddress, "FSM", fsm.id, "connection FAIL")
+			fsm.StopConnToPeer()
 			if outConnErrCh.id != 0 && outConnErrCh.id != fsm.connId {
 				fsm.logger.Info("Neighbor:", fsm.pConf.NeighborAddress, "FSM", fsm.id, "connection FAIL, fsm conn id:",
 					fsm.connId, "err conn id:", outConnErrCh.id)
@@ -1045,12 +1053,12 @@ func (fsm *FSM) ChangeState(newState BaseStateIface) {
 	fsm.State.leave()
 	fsm.State = newState
 	fsm.State.enter()
-	fsm.Manager.fsmStateChange(fsm.id, fsm.State.state())
 	if oldState == config.BGPFSMEstablished && fsm.State.state() != config.BGPFSMEstablished {
 		fsm.ConnBroken()
 	} else if oldState != config.BGPFSMEstablished && fsm.State.state() == config.BGPFSMEstablished {
 		fsm.ConnEstablished()
 	}
+	fsm.Manager.fsmStateChange(fsm.id, fsm.State.state())
 }
 
 func (fsm *FSM) sendAutoStartEvent() {
@@ -1296,26 +1304,12 @@ func (fsm *FSM) ClearPeerConn() {
 	fsm.StopKeepAliveTimer()
 	fsm.StopHoldTimer()
 	fsm.connId = 0
-	fsm.peerConn.StopReading()
-	<-fsm.peerConn.exitCh
+	exitCh := make(chan bool)
+	fsm.peerConn.StopReading(exitCh)
+	<-exitCh
+	//<-fsm.peerConn.exitCh
 	fsm.logger.Info("Neighbor:", fsm.pConf.NeighborAddress, "FSM", fsm.id, "Conn exited")
 	fsm.peerConn = nil
-}
-
-func (fsm *FSM) startRxPkts() {
-	fsm.logger.Info("Neighbor:", fsm.pConf.NeighborAddress, "FSM", fsm.id, "startRxPkts called")
-	if fsm.peerConn != nil && !fsm.rxPktsFlag {
-		fsm.rxPktsFlag = true
-		fsm.peerConn.StartReading()
-	}
-}
-
-func (fsm *FSM) stopRxPkts() {
-	fsm.logger.Info("Neighbor:", fsm.pConf.NeighborAddress, "FSM", fsm.id, "stopRxPkts called")
-	if fsm.peerConn != nil && fsm.rxPktsFlag {
-		fsm.rxPktsFlag = false
-		fsm.peerConn.StopReading()
-	}
 }
 
 func (fsm *FSM) ConnEstablished() {

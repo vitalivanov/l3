@@ -758,7 +758,7 @@ func ResolveNextHop(ipAddr string) (nextHopIntf ribdInt.NextHopInfo, resolvedNex
 	nextHopIntf.NextHopIp = ipAddr
 	prev_intf.NextHopIp = ipAddr
 	first := true
-	if ipAddr == "0.0.0.0" {
+	if ipAddr == "0.0.0.0" || ipAddr == "::" {
 		nextHopIntf.IsReachable = true
 		return nextHopIntf, nextHopIntf, err
 	}
@@ -1439,7 +1439,7 @@ func createRoute(routeInfo RouteParams) (rc ribd.Int, err error) {
 	}
 
 	policyRoute := ribdInt.Routes{Ipaddr: destNetIp, IPAddrType: ribdInt.Int(ipType), Mask: networkMask, NextHopIp: nextHopIp, IfIndex: ribdInt.Int(nextHopIfIndex), Metric: ribdInt.Int(metric), Prototype: ribdInt.Int(routeType), Weight: ribdInt.Int(weight)}
-	logger.Info("createroute:,setting ipaddrtype to :", policyRoute.IPAddrType, " from iptype:", ipType)
+	//logger.Info("createroute:,setting ipaddrtype to :", policyRoute.IPAddrType, " from iptype:", ipType)
 	routeInfoRecord.resolvedNextHopIpIntf.NextHopIp = routeInfoRecord.nextHopIp.String()
 	routeInfoRecord.resolvedNextHopIpIntf.NextHopIfIndex = ribdInt.Int(routeInfoRecord.nextHopIfIndex)
 
@@ -1540,7 +1540,7 @@ func createRoute(routeInfo RouteParams) (rc ribd.Int, err error) {
 		params.createType = addType
 		params.deleteType = Invalid
 		policyRoute.IsPolicyBasedStateValid = newRouteInfoRecordList.isPolicyBasedStateValid
-		logger.Info("Createroute:policy route addr type:", policyRoute.IPAddrType)
+		//logger.Info("Createroute:policy route addr type:", policyRoute.IPAddrType)
 		PolicyEngineFilter(policyRoute, policyCommonDefs.PolicyPath_Export, params)
 	} else {
 		logger.Debug("routeInfoRecordListItem not nil")

@@ -637,14 +637,14 @@ func PolicyEngineFilter(route ribdInt.Routes, policyPath int, params interface{}
 }
 
 func policyEngineApplyForRoute(prefix patriciaDB.Prefix, item patriciaDB.Item, traverseAndApplyPolicyDataInfo patriciaDB.Item) (err error) {
-	logger.Info("policyEngineApplyForRoute")
+	logger.Info("policyEngineApplyForRoute for route:", item)
 	traverseAndApplyPolicyData := traverseAndApplyPolicyDataInfo.(TraverseAndApplyPolicyData)
 	rmapInfoRecordList := item.(RouteInfoRecordList)
 	if rmapInfoRecordList.routeInfoProtocolMap == nil {
 		logger.Info(("rmapInfoRecordList.routeInfoProtocolMap) = nil"))
 		return err
 	}
-	logger.Info("Selected route protocol = ", rmapInfoRecordList.selectedRouteProtocol)
+	logger.Debug("rmapInfoRecordList:", rmapInfoRecordList, " Selected route protocol = ", rmapInfoRecordList.selectedRouteProtocol)
 	selectedRouteList := rmapInfoRecordList.routeInfoProtocolMap[rmapInfoRecordList.selectedRouteProtocol]
 	if len(selectedRouteList) == 0 {
 		logger.Info("len(selectedRouteList) == 0")
@@ -653,6 +653,7 @@ func policyEngineApplyForRoute(prefix patriciaDB.Prefix, item patriciaDB.Item, t
 	for i := 0; i < len(selectedRouteList); i++ {
 		selectedRouteInfoRecord := selectedRouteList[i]
 		if destNetSlice[selectedRouteInfoRecord.sliceIdx].isValid == false {
+			logger.Debug("route ", selectedRouteInfoRecord, " not valid, continue")
 			continue
 		}
 		policyRoute := ribdInt.Routes{Ipaddr: selectedRouteInfoRecord.destNetIp.String(), Mask: selectedRouteInfoRecord.networkMask.String(), NextHopIp: selectedRouteInfoRecord.nextHopIp.String(), IfIndex: ribdInt.Int(selectedRouteInfoRecord.nextHopIfIndex), Metric: ribdInt.Int(selectedRouteInfoRecord.metric), Prototype: ribdInt.Int(selectedRouteInfoRecord.protocol), IsPolicyBasedStateValid: rmapInfoRecordList.isPolicyBasedStateValid}
@@ -677,8 +678,9 @@ func policyEngineTraverseAndApply(data interface{}, updatefunc policy.PolicyAppl
 	V6RouteInfoMap.VisitAndUpdate(policyEngineApplyForRoute, traverseAndApplyPolicyData)
 }
 func policyEngineTraverseAndReverse(applyPolicyItem interface{}) {
-	applyPolicyInfo := applyPolicyItem.(policy.ApplyPolicyInfo)
-	policy := applyPolicyInfo.ApplyPolicy //policyItem.(policy.Policy)
+	updateInfo := applyPolicyItem.(policy.PolicyEngineApplyInfo)
+	applyPolicyInfo := updateInfo.ApplyPolicy //.(policy.ApplyPolicyInfo)
+	policy := applyPolicyInfo.ApplyPolicy     //policyItem.(policy.Policy)
 	logger.Info("PolicyEngineTraverseAndReverse - traverse routing table and inverse policy actions", policy.Name)
 	ext := policy.Extensions.(PolicyExtensions)
 	if ext.routeList == nil {
@@ -701,7 +703,7 @@ func policyEngineTraverseAndReverse(applyPolicyItem interface{}) {
 			return
 		}
 		//PolicyEngineDB.PolicyEngineUndoPolicyForEntity(entity, policy, params)
-		success := PolicyEngineDB.PolicyEngineUndoApplyPolicyForEntity(entity, applyPolicyInfo, params)
+		success := PolicyEngineDB.PolicyEngineUndoApplyPolicyForEntity(entity, updateInfo, params)
 		if success {
 			deleteRoutePolicyState(params.ipType, ipPrefix, policy.Name)
 			PolicyEngineDB.DeletePolicyEntityMapEntry(entity, policy.Name)

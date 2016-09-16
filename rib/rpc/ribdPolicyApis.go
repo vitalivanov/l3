@@ -29,48 +29,57 @@ import (
 	"l3/rib/server"
 	"ribd"
 	"ribdInt"
-	"utils/policy"
+	//"utils/policy"
 )
 
 func (m RIBDServicesHandler) CreatePolicyStmt(cfg *ribd.PolicyStmt) (val bool, err error) {
 	logger.Debug("CreatePolicyStatement")
-	newPolicyStmt := policy.PolicyStmtConfig{Name: cfg.Name, MatchConditions: cfg.MatchConditions}
-	if len(cfg.Conditions) != 0 {
-		newPolicyStmt.Conditions = make([]string, 0)
-		for i := 0; i < len(cfg.Conditions); i++ {
-			newPolicyStmt.Conditions = append(newPolicyStmt.Conditions, cfg.Conditions[i])
-		}
-	}
-	newPolicyStmt.Actions = make([]string, 0)
-	newPolicyStmt.Actions = append(newPolicyStmt.Actions, cfg.Action)
-	err = m.server.GlobalPolicyEngineDB.ValidatePolicyStatementCreate(newPolicyStmt)
-	if err != nil {
-		logger.Err(fmt.Sprintln("PolicyEngine validation failed with err: ", err))
-		return false, err
-	}
 	m.server.PolicyConfCh <- server.RIBdServerConfig{
 		OrigConfigObject: cfg,
 		Op:               "addPolicyStmt",
 	}
-	return true, err
+	err = <-m.server.PolicyConfDone
+	if err == nil {
+		val = true
+	}
+	return val, err
 }
 
 func (m RIBDServicesHandler) DeletePolicyStmt(cfg *ribd.PolicyStmt) (val bool, err error) {
 	logger.Debug(fmt.Sprintln("DeletePolicyStatement for name ", cfg.Name))
-	err = m.server.GlobalPolicyEngineDB.ValidatePolicyStatementDelete(policy.PolicyStmtConfig{Name: cfg.Name})
-	if err != nil {
-		logger.Err(fmt.Sprintln("PolicyEngine validation failed with err: ", err))
-		return false, err
-	}
 	m.server.PolicyConfCh <- server.RIBdServerConfig{
 		OrigConfigObject: cfg,
 		Op:               "delPolicyStmt",
 	}
-	return true, err
+	err = <-m.server.PolicyConfDone
+	if err == nil {
+		val = true
+	}
+	return val, err
 }
 
 func (m RIBDServicesHandler) UpdatePolicyStmt(origconfig *ribd.PolicyStmt, newconfig *ribd.PolicyStmt, attrset []bool, op []*ribd.PatchOpInfo) (val bool, err error) {
-	return true, err
+	if op == nil || len(op) == 0 {
+		//update op
+		logger.Info("Update op for policy stmt definition")
+
+	} else {
+		//patch op
+		logger.Info("patch op:", op, " for policy stmt definition")
+	}
+	m.server.PolicyConfCh <- server.RIBdServerConfig{
+		OrigConfigObject: origconfig,
+		NewConfigObject:  newconfig,
+		AttrSet:          attrset,
+		PatchOp:          op,
+		Op:               "updatePolicyStmt",
+	}
+	err = <-m.server.PolicyConfDone
+	if err == nil {
+		val = true
+	}
+	logger.Debug("updatepolicystmt ,err:", err, " val:", val)
+	return val, err
 }
 func (m RIBDServicesHandler) GetPolicyStmtState(name string) (*ribd.PolicyStmtState, error) {
 	logger.Debug("Get state for Policy Stmt")
@@ -85,44 +94,52 @@ func (m RIBDServicesHandler) GetBulkPolicyStmtState(fromIndex ribd.Int, rcount r
 
 func (m RIBDServicesHandler) CreatePolicyDefinition(cfg *ribd.PolicyDefinition) (val bool, err error) {
 	logger.Debug(fmt.Sprintln("CreatePolicyDefinition"))
-	newPolicy := policy.PolicyDefinitionConfig{Name: cfg.Name, Precedence: int(cfg.Priority), MatchType: cfg.MatchType, PolicyType: cfg.PolicyType}
-	newPolicy.PolicyDefinitionStatements = make([]policy.PolicyDefinitionStmtPrecedence, 0)
-	var policyDefinitionStatement policy.PolicyDefinitionStmtPrecedence
-	for i := 0; i < len(cfg.StatementList); i++ {
-		policyDefinitionStatement.Precedence = int(cfg.StatementList[i].Priority)
-		policyDefinitionStatement.Statement = cfg.StatementList[i].Statement
-		newPolicy.PolicyDefinitionStatements = append(newPolicy.PolicyDefinitionStatements, policyDefinitionStatement)
-	}
-	newPolicy.Extensions = server.PolicyExtensions{}
-	err = m.server.GlobalPolicyEngineDB.ValidatePolicyDefinitionCreate(newPolicy)
-	if err != nil {
-		logger.Err(fmt.Sprintln("validation failed with err ", err))
-		return false, err
-	}
 	m.server.PolicyConfCh <- server.RIBdServerConfig{
 		OrigConfigObject: cfg,
 		Op:               "addPolicyDefinition",
 	}
-	return true, err
+	err = <-m.server.PolicyConfDone
+	if err == nil {
+		val = true
+	}
+	return val, err
 }
 
 func (m RIBDServicesHandler) DeletePolicyDefinition(cfg *ribd.PolicyDefinition) (val bool, err error) {
 	logger.Debug(fmt.Sprintln("DeletePolicyDefinition for name ", cfg.Name))
-	newPolicy := policy.PolicyDefinitionConfig{Name: cfg.Name}
-	err = m.server.GlobalPolicyEngineDB.ValidatePolicyDefinitionDelete(newPolicy)
-	if err != nil {
-		logger.Err(fmt.Sprintln("validation failed with err ", err))
-		return false, err
-	}
 	m.server.PolicyConfCh <- server.RIBdServerConfig{
 		OrigConfigObject: cfg,
 		Op:               "delPolicyDefinition",
 	}
-	return true, err
+	err = <-m.server.PolicyConfDone
+	if err == nil {
+		val = true
+	}
+	return val, err
 }
 
 func (m RIBDServicesHandler) UpdatePolicyDefinition(origconfig *ribd.PolicyDefinition, newconfig *ribd.PolicyDefinition, attrset []bool, op []*ribd.PatchOpInfo) (val bool, err error) {
-	return true, err
+	logger.Debug(fmt.Sprintln("UpdatePolicyDefinition for name ", origconfig.Name))
+	if op == nil || len(op) == 0 {
+		//update op
+		logger.Info("Update op for policy definition")
+
+	} else {
+		//patch op
+		logger.Info("patch op:", op, " for policy definition")
+	}
+	m.server.PolicyConfCh <- server.RIBdServerConfig{
+		OrigConfigObject: origconfig,
+		NewConfigObject:  newconfig,
+		AttrSet:          attrset,
+		PatchOp:          op,
+		Op:               "updatePolicyDefinition",
+	}
+	err = <-m.server.PolicyConfDone
+	if err == nil {
+		val = true
+	}
+	return val, err
 }
 func (m RIBDServicesHandler) GetPolicyDefinitionState(name string) (*ribd.PolicyDefinitionState, error) {
 	logger.Debug("Get state for Policy Definition")
@@ -142,6 +159,7 @@ func (m RIBDServicesHandler) ApplyPolicy(applyList []*ribdInt.ApplyPolicyInfo, u
 		PolicyList: server.ApplyPolicyList{applyList, undoList},
 		Op:         "applyPolicy",
 	}
+	err = <-m.server.PolicyConfDone
 	//m.server.PolicyApplyCh <- server.ApplyPolicyList{applyList, undoList} //source, policy, action, conditions}
 	return nil
 }

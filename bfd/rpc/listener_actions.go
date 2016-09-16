@@ -21,41 +21,22 @@
 // |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
 //
 
-// Main entry point for DHCP_RELAY
-package main
+package rpc
 
 import (
-	"flag"
-	"fmt"
-	"l3/dhcp_relay/server"
-	"utils/keepalive"
-	"utils/logging"
+	"bfdd"
+	"errors"
 )
 
-func main() {
-	fmt.Println("Starting dhcprelay daemon")
-	paramsDir := flag.String("params", "./params", "Params directory")
-	flag.Parse()
-	fileName := *paramsDir
-	if fileName[len(fileName)-1] != '/' {
-		fileName = fileName + "/"
+func (h *BFDHandler) ExecuteActionResetBfdSession(action *bfdd.ResetBfdSession) (bool, error) {
+	var err error
+	h.logger.Info("ResetBfdSession action attrs: ", action)
+	sessionId, found := h.server.FindBfdSession(action.IpAddr)
+	if found {
+		h.server.ResetSessionCh <- sessionId
+		return true, nil
+	} else {
+		err = errors.New("Failed to find session to " + action.IpAddr)
 	}
-	fmt.Println("Start logger")
-	logger, err := logging.NewLogger("dhcprelayd", "DRA", true)
-	if err != nil {
-		fmt.Println("Failed to start the logger. Nothing will be logged...")
-	}
-	logger.Info("Started the logger successfully.")
-
-	// Start keepalive routine
-	go keepalive.InitKeepAlive("dhcprelayd", fileName)
-
-	logger.Info("Starting DHCP RELAY....")
-	// Create a handler
-	handler := relayServer.NewDhcpRelayServer()
-	err = relayServer.StartServer(logger, handler, *paramsDir)
-	if err != nil {
-		logger.Err("DRA: Cannot start dhcp server", err)
-		return
-	}
+	return false, err
 }

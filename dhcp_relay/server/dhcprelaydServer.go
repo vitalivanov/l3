@@ -13,13 +13,13 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 // Main entry point for DHCP_RELAY
 package relayServer
@@ -31,7 +31,6 @@ import (
 	"encoding/json"
 	"errors"
 	_ "flag"
-	"fmt"
 	"git.apache.org/thrift.git/lib/go/thrift"
 	"io/ioutil"
 	"net"
@@ -63,7 +62,7 @@ func DhcpRelaySignalHandler(sigChannel <-chan os.Signal) {
 		logger.Alert("DRA: Received SIGHUP SIGNAL")
 		os.Exit(0)
 	default:
-		logger.Info(fmt.Sprintln("DRA: Unhandled Signal : ", signal))
+		logger.Info("DRA: Unhandled Signal : ", signal)
 	}
 
 }
@@ -121,11 +120,10 @@ func DhcpRelayAgentConnectToClients(client ClientJson) error {
 func InitDhcpRelayPortPktHandler() error {
 	// connecting to asicd
 	configFile := paramsDir + "/clients.json"
-	logger.Info(fmt.Sprintln("DRA: configFile is ", configFile))
+	logger.Debug("DRA: configFile is ", configFile)
 	bytes, err := ioutil.ReadFile(configFile)
 	if err != nil {
-		logger.Err(fmt.Sprintln("DRA:Error while reading",
-			"configuration file", configFile))
+		logger.Err("DRA:Error while reading configuration file", configFile)
 		return err
 	}
 	var unConnectedClients []ClientJson
@@ -135,7 +133,7 @@ func InitDhcpRelayPortPktHandler() error {
 		return err
 	}
 
-	logger.Info("DRA: Connecting to Clients")
+	logger.Debug("DRA: Connecting to Clients")
 	re_connect := 25
 	count := 0
 	// connect to client
@@ -145,7 +143,7 @@ func InitDhcpRelayPortPktHandler() error {
 			err := DhcpRelayAgentConnectToClients(
 				unConnectedClients[i])
 			if err == nil {
-				logger.Info("DRA: Connected to " +
+				logger.Debug("DRA: Connected to " +
 					unConnectedClients[i].Name)
 				unConnectedClients = append(
 					unConnectedClients[:i],
@@ -158,9 +156,7 @@ func InitDhcpRelayPortPktHandler() error {
 			} else {
 				count++
 				if count == re_connect {
-					logger.Err(fmt.Sprintln("Connecting to",
-						unConnectedClients[i].Name,
-						"failed ", err))
+					logger.Err("Connecting to", unConnectedClients[i].Name, "failed ", err)
 					count = 0
 				}
 			}
@@ -195,7 +191,7 @@ func DhcpRelayAgentInitIntfServerState(serverIp string, id int32) {
 
 func DhcpRelayAgentInitIntfState(IntfId int32) {
 	intfEntry := dhcprelayIntfStateMap[IntfId]
-	intfEntry.IntfId = IntfId
+	intfEntry.IfIndex = IntfId
 	intfEntry.TotalDrops = 0
 	intfEntry.TotalDhcpClientRx = 0
 	intfEntry.TotalDhcpClientTx = 0
@@ -206,7 +202,7 @@ func DhcpRelayAgentInitIntfState(IntfId int32) {
 }
 
 func DhcpRelayAgentInitGblHandling(ifNum int32, enable bool) {
-	//logger.Info("DRA: Initializaing Global Info for " + strconv.Itoa(int(ifNum)))
+	//logger.Debug("DRA: Initializaing Global Info for " + strconv.Itoa(int(ifNum)))
 	// Created a global Entry for Interface
 	gblEntry := dhcprelayGblInfo[ifNum]
 	// Setting up default values for globalEntry
@@ -218,8 +214,7 @@ func DhcpRelayAgentInitGblHandling(ifNum int32, enable bool) {
 }
 
 func DhcpRelayAgentUpdateIntfServerIp(ifNum int32, serverIp string) {
-	logger.Info("DRA: Updating Interface " + strconv.Itoa(int(ifNum)) +
-		" with server ip " + serverIp)
+	logger.Debug("DRA: Updating Interface", ifNum, "with server ip", serverIp)
 	gblEntry, ok := dhcprelayGblInfo[ifNum]
 	if !ok {
 		logger.Err("No entry found in database")
@@ -230,15 +225,14 @@ func DhcpRelayAgentUpdateIntfServerIp(ifNum int32, serverIp string) {
 }
 
 func DhcpRelayAgentUpdateIntfIpAddr(ifIndexList []int32) {
-	logger.Info(fmt.Sprintln("DRA: updating address for ", ifIndexList))
+	logger.Debug("DRA: updating address for ", ifIndexList)
 	DhcpRelayAgentGetIpv4IntfList()
 	//@TODO: Once asicd supports Get then replace GetBulk with Get
 
 	for i := 0; i < len(ifIndexList); i++ {
 		obj, ok := dhcprelayIntfIpv4Map[ifIndexList[i]]
 		if !ok {
-			logger.Err(fmt.Sprintln("DRA: Get bulkd didn't return any info for",
-				ifIndexList[i]))
+			logger.Err("DRA: Get bulkd didn't return any info for", ifIndexList[i])
 			continue
 		}
 		logicalId := int32(asicdCommonDefs.GetIntfIdFromIfIndex(obj.IfIndex))
@@ -246,26 +240,23 @@ func DhcpRelayAgentUpdateIntfIpAddr(ifIndexList []int32) {
 		gblEntry := dhcprelayGblInfo[ifIndexList[i]]
 		ip, ipnet, err := net.ParseCIDR(obj.IpAddr)
 		if err != nil {
-			logger.Err(fmt.Sprintln("DRA: Parsing ipadd and netmask failed:", err))
+			logger.Err("DRA: Parsing ipadd and netmask failed:", err)
 			continue
 		}
 		gblEntry.IpAddr = ip.String()
 		gblEntry.Netmask = ipnet.IP.String()
 		dhcprelayGblInfo[ifIndexList[i]] = gblEntry
-		logger.Info(fmt.Sprintln("DRA: Updated interface:", obj.IfIndex,
-			" Ip address:", gblEntry.IpAddr,
-			" netmask:", gblEntry.Netmask))
+		logger.Debug("DRA: Updated interface:", obj.IfIndex, " Ip address:", gblEntry.IpAddr, " netmask:", gblEntry.Netmask)
 	}
 }
 
 func DhcpRelayAgentInitVlanInfo(VlanName string, VlanId int32) {
-	logger.Info(fmt.Sprintln("DRA: Vlan update message for ",
-		VlanName, "vlan id is ", VlanId))
+	logger.Debug("DRA: Vlan update message for ", VlanName, "vlan id is ", VlanId)
 	var linuxInterface *net.Interface
 	var err error
 	linuxInterface, err = net.InterfaceByName(VlanName)
 	if err != nil {
-		logger.Err(fmt.Sprintln("DRA: getting interface by name failed", err))
+		logger.Err("DRA: getting interface by name failed", err)
 		return
 	}
 	dhcprelayLogicalIntfId2LinuxIntId[linuxInterface.Index] = VlanId
@@ -277,8 +268,7 @@ func DhcpRelayGetClient(logger *logging.Writer, fileName string,
 
 	data, err := ioutil.ReadFile(fileName)
 	if err != nil {
-		logger.Err(fmt.Sprintln("Failed to open dhcpd config file",
-			err, fileName))
+		logger.Err("Failed to open dhcpd config file", err, fileName)
 		return nil, err
 	}
 	json.Unmarshal(data, &allClients)
@@ -298,7 +288,7 @@ func DhcpRelayGlobalInit(enable bool) {
 		}
 		dhcprelayEnable = enable
 		if dhcprelayClientConn != nil {
-			logger.Info("DRA: no need to create pcap as its already created")
+			logger.Debug("DRA: no need to create pcap as its already created")
 			return
 		} else {
 			DhcpRelayAgentCreateClientServerConn()
@@ -320,7 +310,7 @@ func StartServer(log *logging.Writer, handler *DhcpRelayServiceHandler, params s
 	} else {
 		DhcpRelayAgentReadDB()
 	}
-	logger.Info("DRA: Continuining with port init")
+	logger.Debug("DRA: Continuining with port init")
 	// Initialize port information and packet handler for dhcp
 	go InitDhcpRelayPortPktHandler()
 	dhcprelayEnable = false
@@ -330,8 +320,7 @@ func StartServer(log *logging.Writer, handler *DhcpRelayServiceHandler, params s
 		return err
 	}
 
-	logger.Info(fmt.Sprintln("Got Client info for", clientJson.Name, "port",
-		clientJson.Port))
+	logger.Debug("Got Client info for", clientJson.Name, "port", clientJson.Port)
 
 	// create transport and protocol for server
 	transportFactory := thrift.NewTBufferedTransportFactory(8192)
@@ -339,8 +328,7 @@ func StartServer(log *logging.Writer, handler *DhcpRelayServiceHandler, params s
 	transport, err := thrift.NewTServerSocket("localhost:" +
 		strconv.Itoa(clientJson.Port))
 	if err != nil {
-		logger.Info(fmt.Sprintln("DRA: StartServer: NewTServerSocket "+
-			"failed with error:", err))
+		logger.Err("DRA: StartServer: NewTServerSocket failed with error:", err)
 		return err
 	}
 	processor := dhcprelayd.NewDHCPRELAYDServicesProcessor(handler)
@@ -348,7 +336,7 @@ func StartServer(log *logging.Writer, handler *DhcpRelayServiceHandler, params s
 		transportFactory, protocolFactory)
 	err = server.Serve()
 	if err != nil {
-		logger.Err(fmt.Sprintln("DRA: Failed to start the listener, err:", err))
+		logger.Err("DRA: Failed to start the listener, err:", err)
 		return err
 	}
 

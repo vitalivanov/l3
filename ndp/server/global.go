@@ -95,6 +95,9 @@ type NDPServer struct {
 
 	// Notification Channel for Publisher
 	notifyChan chan<- []byte
+
+	// counter for packets send and received
+	counter PktCounter
 }
 
 const (

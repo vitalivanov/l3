@@ -168,6 +168,10 @@ func getTypeFromPathAttrs(pathAttrs []BGPPathAttr, code BGPPathAttrType) BGPPath
 	return nil
 }
 
+func GetAtomicAggregatePathAttr(pathAttrs []BGPPathAttr) BGPPathAttr {
+	return getTypeFromPathAttrs(pathAttrs, BGPPathAttrTypeAtomicAggregate)
+}
+
 func GetMPAttrs(pathAttrs []BGPPathAttr) (mpReach *BGPPathAttrMPReachNLRI, mpUnreach *BGPPathAttrMPUnreachNLRI) {
 	reach := getTypeFromPathAttrs(pathAttrs, BGPPathAttrTypeMPReachNLRI)
 	if reach != nil {

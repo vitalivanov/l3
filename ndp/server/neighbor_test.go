@@ -20,42 +20,17 @@
 // |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
 // |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
 //
-
-// Main entry point for DHCP_RELAY
-package main
+package server
 
 import (
-	"flag"
-	"fmt"
-	"l3/dhcp_relay/server"
-	"utils/keepalive"
-	"utils/logging"
+	"testing"
 )
 
-func main() {
-	fmt.Println("Starting dhcprelay daemon")
-	paramsDir := flag.String("params", "./params", "Params directory")
-	flag.Parse()
-	fileName := *paramsDir
-	if fileName[len(fileName)-1] != '/' {
-		fileName = fileName + "/"
-	}
-	fmt.Println("Start logger")
-	logger, err := logging.NewLogger("dhcprelayd", "DRA", true)
-	if err != nil {
-		fmt.Println("Failed to start the logger. Nothing will be logged...")
-	}
-	logger.Info("Started the logger successfully.")
-
-	// Start keepalive routine
-	go keepalive.InitKeepAlive("dhcprelayd", fileName)
-
-	logger.Info("Starting DHCP RELAY....")
-	// Create a handler
-	handler := relayServer.NewDhcpRelayServer()
-	err = relayServer.StartServer(logger, handler, *paramsDir)
-	if err != nil {
-		logger.Err("DRA: Cannot start dhcp server", err)
+func TestComputeBase(t *testing.T) {
+	newBase := computeBase(35)
+	//t.Log("New base calculated is", newBase)
+	if newBase == 0 {
+		t.Error("Failed Caluclating New Base")
 		return
 	}
 }
