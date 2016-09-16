@@ -15,10 +15,10 @@ func main() {
 		return
 	}
 
-	routeThriftTest.Createv4RouteList()
+	//routeThriftTest.Createv4RouteList()
 
 	route_ops := os.Args[1:]
-
+	fmt.Println("op:", route_ops)
 	for i := 0; i < len(route_ops); i++ {
 		op := route_ops[i]
 		switch op {

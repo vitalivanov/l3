@@ -479,7 +479,7 @@ func (m RIBDServer) RouteConfigValidationCheck(cfg *ribd.IPv4Route, op string) (
 			   Validate if nextHopIntRef is a valid L3 interface
 			*/
 			if cfg.NextHop[i].NextHopIntRef == "" {
-				logger.Info("RouteConfigValidationCheck for route:", cfg, "NextHopIntRef not set")
+				//logger.Info("RouteConfigValidationCheck for route:", cfg, "NextHopIntRef not set")
 				nhIntf, err := RouteServiceHandler.GetV4RouteReachabilityInfo(cfg.NextHop[i].NextHopIp, -1)
 				if err != nil {
 					logger.Err("RouteConfigValidationCheck for route:", cfg, "next hop ip ", cfg.NextHop[i].NextHopIp, " not reachable")
@@ -788,7 +788,7 @@ func (m RIBDServer) Getv4RouteCreatedTime(number int) (time string, err error) {
 }
 
 func (m RIBDServer) ProcessV4RouteCreateConfig(cfg *ribd.IPv4Route, addType int) (val bool, err error) {
-	logger.Debug("ProcessV4RouteCreateConfig: Received create route request for ip ", cfg.DestinationNw, " mask ", cfg.NetworkMask, " number of next hops: ", len(cfg.NextHop), " null Route:", cfg.NullRoute)
+	//logger.Debug("ProcessV4RouteCreateConfig: Received create route request for ip ", cfg.DestinationNw, " mask ", cfg.NetworkMask, " number of next hops: ", len(cfg.NextHop), " null Route:", cfg.NullRoute)
 	newCfg := ribd.IPv4Route{
 		DestinationNw: cfg.DestinationNw,
 		NetworkMask:   cfg.NetworkMask,
@@ -797,7 +797,7 @@ func (m RIBDServer) ProcessV4RouteCreateConfig(cfg *ribd.IPv4Route, addType int)
 		NullRoute:     cfg.NullRoute,
 	}
 	for i := 0; i < len(cfg.NextHop); i++ {
-		logger.Debug("nexthop info: ip: ", cfg.NextHop[i].NextHopIp, " intref: ", cfg.NextHop[i].NextHopIntRef)
+		//logger.Debug("nexthop info: ip: ", cfg.NextHop[i].NextHopIp, " intref: ", cfg.NextHop[i].NextHopIntRef)
 		nh := ribd.NextHopInfo{
 			NextHopIp:     cfg.NextHop[i].NextHopIp,
 			NextHopIntRef: cfg.NextHop[i].NextHopIntRef,

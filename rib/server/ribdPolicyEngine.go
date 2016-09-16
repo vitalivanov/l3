@@ -641,7 +641,7 @@ func policyEngineApplyForRoute(prefix patriciaDB.Prefix, item patriciaDB.Item, t
 	}
 	for i := 0; i < len(selectedRouteList); i++ {
 		selectedRouteInfoRecord := selectedRouteList[i]
-		if selectedRouteInfoRecord.sliceIdx != -1 || selectedRouteInfoRecord.sliceIdx >= len(destNetSlice) || destNetSlice[selectedRouteInfoRecord.sliceIdx].isValid == false {
+		if selectedRouteInfoRecord.sliceIdx == -1 || selectedRouteInfoRecord.sliceIdx >= len(destNetSlice) || destNetSlice[selectedRouteInfoRecord.sliceIdx].isValid == false {
 			logger.Debug("route ", selectedRouteInfoRecord, " not valid, continue, sliceIdx:", selectedRouteInfoRecord.sliceIdx, " len(destNetSlice):", len(destNetSlice))
 			continue
 		}
