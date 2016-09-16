@@ -35,6 +35,7 @@ func (server *BFDServer) processGlobalConfig(gConf GlobalConfig) {
 		server.logger.Info("Disabled BFD")
 	}
 	wasEnabled := server.bfdGlobal.Enabled
+	server.bfdGlobal.Vrf = gConf.Vrf
 	server.bfdGlobal.Enabled = gConf.Enable
 	isEnabled := server.bfdGlobal.Enabled
 	length := len(server.bfdGlobal.SessionsIdSlice)

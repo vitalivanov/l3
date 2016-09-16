@@ -32,6 +32,7 @@ import (
 
 func (h *BFDHandler) SendBfdGlobalConfig(bfdGlobalConfig *bfdd.BfdGlobal) bool {
 	gConf := server.GlobalConfig{
+		Vrf:    bfdGlobalConfig.Vrf,
 		Enable: bfdGlobalConfig.Enable,
 	}
 	h.server.GlobalConfigCh <- gConf

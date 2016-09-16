@@ -30,10 +30,12 @@ import (
 )
 
 type GlobalConfig struct {
+	Vrf    string
 	Enable bool
 }
 
 type GlobalState struct {
+	Vrf                  string
 	Enable               bool
 	NumSessions          uint32
 	NumUpSessions        uint32

@@ -111,6 +111,7 @@ type BfdSessionParam struct {
 }
 
 type BfdGlobal struct {
+	Vrf                     string
 	Enabled                 bool
 	NumSessions             uint32
 	Sessions                map[int32]*BfdSession
