@@ -34,6 +34,7 @@ import (
 
 func (h *BFDHandler) convertGlobalStateToThrift(ent server.GlobalState) *bfdd.BfdGlobalState {
 	gState := bfdd.NewBfdGlobalState()
+	gState.Vrf = string(ent.Vrf)
 	gState.Enable = ent.Enable
 	gState.NumUpSessions = int32(ent.NumUpSessions)
 	gState.NumDownSessions = int32(ent.NumDownSessions)
