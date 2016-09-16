@@ -136,39 +136,46 @@ func deleteV6RoutesOfType(protocol string, destNet string) {
 	}
 }
 func DeleteRoutesOfType(protocol string) {
+	func_mesg := "DeleteRoutesOfType of type:" + protocol
 	protocolRouteMap, ok := ProtocolRouteMap[protocol]
 	if !ok {
-		logger.Info("No routes of ", protocol, " type configured")
+		logger.Info(func_mesg, "No routes of ", protocol, " type configured")
 		return
 	}
-	for destNet, count := range protocolRouteMap.v4routeMap {
-		if count.totalcount > 0 {
-			//logger.Info(count, " number of routes for destNet IP:", string(destNet))
-			deleteV4RoutesOfType(protocol, destNet)
-			//deleteV6RoutesOfType(protocol, destNet)
-			protocolRouteMap.totalcount.totalcount = protocolRouteMap.totalcount.totalcount - count.totalcount
-			protocolRouteMap.totalcount.ecmpcount = protocolRouteMap.totalcount.ecmpcount - count.ecmpcount
-			totalCount := protocolRouteMap.v4routeMap[destNet]
-			totalCount.totalcount = 0
-			totalCount.ecmpcount = 0
-			protocolRouteMap.v4routeMap[destNet] = totalCount
-			//			protocolRouteMap.routeMap[destNet].ecmpcount = 0
-			ProtocolRouteMap[protocol] = protocolRouteMap
+	if protocolRouteMap.v4routeMap != nil {
+		logger.Info(func_mesg, " number of v4 routes:", len(protocolRouteMap.v4routeMap))
+		for destNet, count := range protocolRouteMap.v4routeMap {
+			if count.totalcount > 0 {
+				logger.Info(func_mesg, ":", count, " number of v4 routes for destNet IP:", string(destNet))
+				deleteV4RoutesOfType(protocol, destNet)
+				//deleteV6RoutesOfType(protocol, destNet)
+				protocolRouteMap.totalcount.totalcount = protocolRouteMap.totalcount.totalcount - count.totalcount
+				protocolRouteMap.totalcount.ecmpcount = protocolRouteMap.totalcount.ecmpcount - count.ecmpcount
+				totalCount := protocolRouteMap.v4routeMap[destNet]
+				totalCount.totalcount = 0
+				totalCount.ecmpcount = 0
+				protocolRouteMap.v4routeMap[destNet] = totalCount
+				//			protocolRouteMap.routeMap[destNet].ecmpcount = 0
+				ProtocolRouteMap[protocol] = protocolRouteMap
+			}
 		}
 	}
-	for destNet, count := range protocolRouteMap.v6routeMap {
-		if count.totalcount > 0 {
-			//logger.Info(count, " number of routes for destNet IP:", string(destNet))
-			//deleteV4RoutesOfType(protocol, destNet)
-			deleteV6RoutesOfType(protocol, destNet)
-			protocolRouteMap.totalcount.totalcount = protocolRouteMap.totalcount.totalcount - count.totalcount
-			protocolRouteMap.totalcount.ecmpcount = protocolRouteMap.totalcount.ecmpcount - count.ecmpcount
-			totalCount := protocolRouteMap.v6routeMap[destNet]
-			totalCount.totalcount = 0
-			totalCount.ecmpcount = 0
-			protocolRouteMap.v6routeMap[destNet] = totalCount
-			//			protocolRouteMap.routeMap[destNet].ecmpcount = 0
-			ProtocolRouteMap[protocol] = protocolRouteMap
+	if protocolRouteMap.v6routeMap != nil {
+		logger.Info(func_mesg, " number of v6 routes:", len(protocolRouteMap.v6routeMap))
+		for destNet, count := range protocolRouteMap.v6routeMap {
+			if count.totalcount > 0 {
+				logger.Info(count, " number of v6 routes for destNet IP:", string(destNet))
+				//deleteV4RoutesOfType(protocol, destNet)
+				deleteV6RoutesOfType(protocol, destNet)
+				protocolRouteMap.totalcount.totalcount = protocolRouteMap.totalcount.totalcount - count.totalcount
+				protocolRouteMap.totalcount.ecmpcount = protocolRouteMap.totalcount.ecmpcount - count.ecmpcount
+				totalCount := protocolRouteMap.v6routeMap[destNet]
+				totalCount.totalcount = 0
+				totalCount.ecmpcount = 0
+				protocolRouteMap.v6routeMap[destNet] = totalCount
+				//			protocolRouteMap.routeMap[destNet].ecmpcount = 0
+				ProtocolRouteMap[protocol] = protocolRouteMap
+			}
 		}
 	}
 }
@@ -196,6 +203,7 @@ func (clnt *OSPFdClient) DmnDownHandler() {
 	DeleteRoutesOfType("OSPF")
 }
 func (mgr *RIBDServer) DmnDownHandler(name string) error {
+	logger.Info("In DmnDownHandler call DmnDownHandler for client: ", name)
 	client, exist := mgr.Clients[name]
 	if exist {
 		client.DmnDownHandler()
@@ -247,10 +255,10 @@ func (mgr *RIBDServer) ListenToClientStateChanges() {
 				switch clientStatus.Status {
 				case sysdCommonDefs.STOPPED, sysdCommonDefs.RESTARTING:
 					logger.Info(clientStatus.Name, " stopped or restarting")
-					go mgr.DmnDownHandler(clientStatus.Name)
+					mgr.DmnDownHandler(clientStatus.Name)
 				case sysdCommonDefs.UP:
 					logger.Info(clientStatus.Name, " up now")
-					go mgr.DmnUpHandler(clientStatus.Name)
+					mgr.DmnUpHandler(clientStatus.Name)
 				}
 			}
 		}
@@ -371,6 +379,9 @@ func (ribdServiceHandler *RIBDServer) ConnectToClients(paramsFile string) {
 		logger.Info("#### Client name is ", client.Name)
 		if client.Name == "bgpd" {
 			ribdServiceHandler.Clients["bgpd"] = &bgpdclnt
+		}
+		if client.Name == "ospfd" {
+			ribdServiceHandler.Clients["ospfd"] = &ospfdclnt
 		}
 		if client.Name == "asicd" {
 			logger.Info("found asicd at port ", client.Port)
