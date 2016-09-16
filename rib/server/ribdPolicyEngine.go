@@ -642,7 +642,7 @@ func policyEngineApplyForRoute(prefix patriciaDB.Prefix, item patriciaDB.Item, t
 	for i := 0; i < len(selectedRouteList); i++ {
 		selectedRouteInfoRecord := selectedRouteList[i]
 		if selectedRouteInfoRecord.sliceIdx == -1 || selectedRouteInfoRecord.sliceIdx >= len(destNetSlice) || destNetSlice[selectedRouteInfoRecord.sliceIdx].isValid == false {
-			logger.Debug("route ", selectedRouteInfoRecord, " not valid, continue, sliceIdx:", selectedRouteInfoRecord.sliceIdx, " len(destNetSlice):", len(destNetSlice))
+			logger.Info("route ", selectedRouteInfoRecord, " not valid, continue, sliceIdx:", selectedRouteInfoRecord.sliceIdx, " len(destNetSlice):", len(destNetSlice))
 			continue
 		}
 		policyRoute := ribdInt.Routes{Ipaddr: selectedRouteInfoRecord.destNetIp.String(), Mask: selectedRouteInfoRecord.networkMask.String(), NextHopIp: selectedRouteInfoRecord.nextHopIp.String(), IfIndex: ribdInt.Int(selectedRouteInfoRecord.nextHopIfIndex), Metric: ribdInt.Int(selectedRouteInfoRecord.metric), Prototype: ribdInt.Int(selectedRouteInfoRecord.protocol), IsPolicyBasedStateValid: rmapInfoRecordList.isPolicyBasedStateValid}
