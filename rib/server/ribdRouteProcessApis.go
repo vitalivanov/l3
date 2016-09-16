@@ -205,109 +205,64 @@ func IsRoutePresent(routeInfoRecordList RouteInfoRecordList,
 	}
 	return found
 }
-
-func getV4ConnectedRoutes() {
-	//logger.Debug("Getting v4 connected routes from asicd")
-	var currMarker asicdServices.Int
-	var count asicdServices.Int
-	count = 100
-	for {
-		IPIntfBulk, err := asicdclnt.ClientHdl.GetBulkIPv4IntfState(currMarker, count)
+func CreateV4ConnectedRoutes(count int, iPv4IntfStateList []*asicdServices.IPv4IntfState) {
+	for i := 0; i < int(count); i++ {
+		var ipMask net.IP
+		ip, ipNet, err := net.ParseCIDR(iPv4IntfStateList[i].IpAddr)
 		if err != nil {
-			//logger.Debug("GetBulkIPv4IntfState with err ", err)
 			return
 		}
-		if IPIntfBulk.Count == 0 {
-			//logger.Info("0 objects returned from GetBulkIPv4IntfState")
-			return
+		ipMask = make(net.IP, 4)
+		copy(ipMask, ipNet.Mask)
+		ipAddrStr := ip.String()
+		ipMaskStr := net.IP(ipMask).String()
+		logger.Debug("Calling createv4Route with ipaddr ", ipAddrStr, " mask ", ipMaskStr, "ifIndex : ", iPv4IntfStateList[i].IfIndex)
+		cfg := ribd.IPv4Route{
+			DestinationNw: ipAddrStr,
+			Protocol:      "CONNECTED",
+			Cost:          0,
+			NetworkMask:   ipMaskStr,
 		}
-		for i := 0; i < int(IPIntfBulk.Count); i++ {
-			var ipMask net.IP
-			ip, ipNet, err := net.ParseCIDR(IPIntfBulk.IPv4IntfStateList[i].IpAddr)
-			if err != nil {
-				return
-			}
-			ipMask = make(net.IP, 4)
-			copy(ipMask, ipNet.Mask)
-			ipAddrStr := ip.String()
-			ipMaskStr := net.IP(ipMask).String()
-			//logger.Debug("Calling createv4Route with ipaddr ", ipAddrStr, " mask ", ipMaskStr, "ifIndex : ", IPIntfBulk.IPv4IntfStateList[i].IfIndex)
-			cfg := ribd.IPv4Route{
-				DestinationNw: ipAddrStr,
-				Protocol:      "CONNECTED",
-				Cost:          0,
-				NetworkMask:   ipMaskStr,
-			}
-			nextHop := ribd.NextHopInfo{
-				NextHopIp:     "0.0.0.0",
-				NextHopIntRef: strconv.Itoa(int(IPIntfBulk.IPv4IntfStateList[i].IfIndex)), //strconv.Itoa(int(asicdCommonDefs.GetIntfIdFromIfIndex(IPIntfBulk.IPv4IntfStateList[i].IfIndex))),
-			}
-			cfg.NextHop = make([]*ribd.NextHopInfo, 0)
-			cfg.NextHop = append(cfg.NextHop, &nextHop)
-			RouteServiceHandler.RouteConfCh <- RIBdServerConfig{
-				OrigConfigObject: &cfg,
-				Op:               "add",
-			}
-			/*_, err = RouteServiceHandler.ProcessRouteCreateConfig(&cfg) //ipAddrStr, ipMaskStr, 0, "0.0.0.0", ribd.Int(asicdCommonDefs.GetIntfTypeFromIfIndex(IPIntfBulk.IPv4IntfList[i].IfIndex)), ribd.Int(asicdCommonDefs.GetIntfIdFromIfIndex(IPIntfBulk.IPv4IntfList[i].IfIndex)), "CONNECTED") // FIBAndRIB, ribd.Int(len(destNetSlice)))
-			if err != nil {
-				//logger.Debug(fmt.Sprintf("Failed to create connected route for ip Addr %s/%s intfType %d intfId %d\n", ipAddrStr, ipMaskStr, ribd.Int(asicdCommonDefs.GetIntfTypeFromIfIndex(IPIntfBulk.IPv4IntfStateList[i].IfIndex)), ribd.Int(asicdCommonDefs.GetIntfIdFromIfIndex(IPIntfBulk.IPv4IntfStateList[i].IfIndex))))
-			}*/
+		nextHop := ribd.NextHopInfo{
+			NextHopIp:     "0.0.0.0",
+			NextHopIntRef: strconv.Itoa(int(iPv4IntfStateList[i].IfIndex)), //strconv.Itoa(int(asicdCommonDefs.GetIntfIdFromIfIndex(IPIntfBulk.IPv4IntfStateList[i].IfIndex))),
 		}
-		if IPIntfBulk.More == false {
-			//logger.Debug("more returned as false, so no more get bulks")
-			return
+		cfg.NextHop = make([]*ribd.NextHopInfo, 0)
+		cfg.NextHop = append(cfg.NextHop, &nextHop)
+		RouteServiceHandler.RouteConfCh <- RIBdServerConfig{
+			OrigConfigObject: &cfg,
+			Op:               "add",
 		}
-		currMarker = asicdServices.Int(IPIntfBulk.EndIdx)
 	}
 }
-func getV6ConnectedRoutes() {
-	//logger.Debug("Gettingv6  connected routes from asicd")
-	var currMarker asicdServices.Int
-	var count asicdServices.Int
-	count = 100
-	for {
-		IPIntfBulk, err := asicdclnt.ClientHdl.GetBulkIPv6IntfState(currMarker, count)
+func CreateV6ConnectedRoutes(count int, iPv6IntfStateList []*asicdServices.IPv6IntfState) {
+	for i := 0; i < int(count); i++ {
+		var ipMask net.IP
+		ip, ipNet, err := net.ParseCIDR(iPv6IntfStateList[i].IpAddr)
 		if err != nil {
-			logger.Debug("GetBulkIPv6IntfState with err ", err)
 			return
 		}
-		if IPIntfBulk.Count == 0 {
-			logger.Info("0 objects returned from GetBulkIPv6IntfState")
-			return
+		ipMask = make(net.IP, 16)
+		copy(ipMask, ipNet.Mask)
+		ipAddrStr := ip.String()
+		ipMaskStr := net.IP(ipMask).String()
+		logger.Debug("Calling createv6Route with ipaddr ", ipAddrStr, " mask ", ipMaskStr, "ifIndex : ", iPv6IntfStateList[i].IfIndex)
+		cfg := ribd.IPv6Route{
+			DestinationNw: ipAddrStr,
+			Protocol:      "CONNECTED",
+			Cost:          0,
+			NetworkMask:   ipMaskStr,
 		}
-		for i := 0; i < int(IPIntfBulk.Count); i++ {
-			var ipMask net.IP
-			ip, ipNet, err := net.ParseCIDR(IPIntfBulk.IPv6IntfStateList[i].IpAddr)
-			if err != nil {
-				return
-			}
-			ipMask = make(net.IP, 16)
-			copy(ipMask, ipNet.Mask)
-			ipAddrStr := ip.String()
-			ipMaskStr := net.IP(ipMask).String()
-			logger.Debug("Calling createv6Route with ipaddr ", ipAddrStr, " mask ", ipMaskStr, "ifIndex : ", IPIntfBulk.IPv6IntfStateList[i].IfIndex)
-			cfg := ribd.IPv6Route{
-				DestinationNw: ipAddrStr,
-				Protocol:      "CONNECTED",
-				Cost:          0,
-				NetworkMask:   ipMaskStr,
-			}
-			nextHop := ribd.NextHopInfo{
-				NextHopIp:     "0.0.0.0",
-				NextHopIntRef: strconv.Itoa(int(IPIntfBulk.IPv6IntfStateList[i].IfIndex)), //strconv.Itoa(int(asicdCommonDefs.GetIntfIdFromIfIndex(IPIntfBulk.IPv4IntfStateList[i].IfIndex))),
-			}
-			cfg.NextHop = make([]*ribd.NextHopInfo, 0)
-			cfg.NextHop = append(cfg.NextHop, &nextHop)
-			RouteServiceHandler.RouteConfCh <- RIBdServerConfig{
-				OrigConfigObject: &cfg,
-				Op:               "addv6",
-			}
+		nextHop := ribd.NextHopInfo{
+			NextHopIp:     "::",
+			NextHopIntRef: strconv.Itoa(int(iPv6IntfStateList[i].IfIndex)), //strconv.Itoa(int(asicdCommonDefs.GetIntfIdFromIfIndex(IPIntfBulk.IPv4IntfStateList[i].IfIndex))),
 		}
-		if IPIntfBulk.More == false {
-			logger.Debug("more returned as false, so no more get bulks")
-			return
+		cfg.NextHop = make([]*ribd.NextHopInfo, 0)
+		cfg.NextHop = append(cfg.NextHop, &nextHop)
+		RouteServiceHandler.RouteConfCh <- RIBdServerConfig{
+			OrigConfigObject: &cfg,
+			Op:               "addv6",
 		}
-		currMarker = asicdServices.Int(IPIntfBulk.EndIdx)
 	}
 }
 
@@ -753,6 +708,7 @@ func UpdateRouteReachabilityStatus(prefix patriciaDB.Prefix, //prefix of the nod
    Resolve and determine the immediate next hop info for a given ipAddr
 */
 func ResolveNextHop(ipAddr string) (nextHopIntf ribdInt.NextHopInfo, resolvedNextHopIntf ribdInt.NextHopInfo, err error) {
+	func_mesg := "ResolveNextHop() for " + ipAddr
 	//logger.Debug("ResolveNextHop for ", ipAddr)
 	var prev_intf ribdInt.NextHopInfo
 	nextHopIntf.NextHopIp = ipAddr
@@ -766,7 +722,7 @@ func ResolveNextHop(ipAddr string) (nextHopIntf ribdInt.NextHopInfo, resolvedNex
 	for {
 		intf, err := RouteServiceHandler.GetRouteReachabilityInfo(ip, -1)
 		if err != nil {
-			logger.Err("next hop ", ip, " not reachable via ipv4 network")
+			logger.Err(func_mesg, "next hop ", ip, " not reachable")
 			return nextHopIntf, nextHopIntf, err
 		}
 		if first {
@@ -777,7 +733,7 @@ func ResolveNextHop(ipAddr string) (nextHopIntf ribdInt.NextHopInfo, resolvedNex
 		//logger.Debug("intf.nextHopIp ", intf.NextHopIp, " intf.Ipaddr:", intf.Ipaddr, " intf.IsReachable:", intf.IsReachable)
 		isZeroes, err := netUtils.IsZerosIPString(intf.NextHopIp)
 		if err != nil {
-			logger.Err("nextHopIP ", intf.NextHopIp, " not valid")
+			logger.Err(func_mesg, "nextHopIP ", intf.NextHopIp, " not valid")
 			return nextHopIntf, nextHopIntf, err
 		}
 		if isZeroes { //intf.NextHopIp == "0.0.0.0" {
@@ -1045,6 +1001,13 @@ func addNewRoute(destNetPrefix patriciaDB.Prefix,
 	   Update route info in RouteMap
 	*/
 	RouteInfoMapSet(routeInfoRecord.ipType, patriciaDB.Prefix(destNetPrefix), routeInfoRecordList)
+	if routeInfoRecord.ipType == ribdCommonDefs.IPv4 {
+		v4rtCount++
+		v4routeCreatedTimeMap[v4rtCount] = routeInfoRecord.routeCreatedTime
+	} else if routeInfoRecord.ipType == ribdCommonDefs.IPv6 {
+		v6rtCount++
+		v6routeCreatedTimeMap[v6rtCount] = routeInfoRecord.routeCreatedTime
+	}
 	ecmp := false
 	if !found {
 		ecmp = true
@@ -1446,16 +1409,9 @@ func createRoute(routeInfo RouteParams) (rc ribd.Int, err error) {
 	nhIntf, resolvedNextHopIntf, res_err := ResolveNextHop(routeInfoRecord.nextHopIp.String())
 	//_, resolvedNextHopIntf, _ := ResolveNextHop(routeInfoRecord.nextHopIp.String())
 	routeInfoRecord.resolvedNextHopIpIntf = resolvedNextHopIntf
-	//logger.Info("nhIntf ipaddr/mask: ", nhIntf.Ipaddr, ":", nhIntf.Mask, " resolvedNex ", resolvedNextHopIntf.NextHopIp, " nexthop ", nextHopIp, " reachable:", resolvedNextHopIntf.IsReachable)
+	//logger.Info("nhIntf ipaddr/mask: ", nhIntf.Ipaddr, ":", nhIntf.Mask, " resolvedNex ", resolvedNextHopIntf.NextHopIp, " nexthop ", nextHopIp, "Is reachable:", resolvedNextHopIntf.IsReachable)
 
 	routeInfoRecord.routeCreatedTime = time.Now().String()
-	if ipType == ribdCommonDefs.IPv4 {
-		v4rtCount++
-		v4routeCreatedTimeMap[v4rtCount] = routeInfoRecord.routeCreatedTime
-	} else if ipType == ribdCommonDefs.IPv6 {
-		v6rtCount++
-		v6routeCreatedTimeMap[v6rtCount] = routeInfoRecord.routeCreatedTime
-	}
 	routeInfoRecordListItem := RouteInfoMapGet(ipType, destNet)
 	if routeInfoRecordListItem == nil {
 		/*
@@ -1481,6 +1437,13 @@ func createRoute(routeInfo RouteParams) (rc ribd.Int, err error) {
 		if ok := RouteInfoMapInsert(ipType, destNet, newRouteInfoRecordList); ok != true {
 			logger.Err("Route map insert return value not ok")
 			return 0, err
+		}
+		if ipType == ribdCommonDefs.IPv4 {
+			v4rtCount++
+			v4routeCreatedTimeMap[v4rtCount] = routeInfoRecord.routeCreatedTime
+		} else if ipType == ribdCommonDefs.IPv6 {
+			v6rtCount++
+			v6routeCreatedTimeMap[v6rtCount] = routeInfoRecord.routeCreatedTime
 		}
 		UpdateProtocolRouteMap(ReverseRouteProtoTypeMapDB[int(routeType)], "add", ipType, string(destNet), false)
 		UpdateInterfaceRouteMap(int(routeInfoRecord.nextHopIfIndex), "add", routeInfoRecord.ipType, string(destNet), false)
