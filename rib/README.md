@@ -11,13 +11,13 @@ Summary of functionality implemented by this module is as follows:
    b. policy statements create/delete/updates
    c. policy definitions create/delete/updates
 
-3. Implement policy engine 
-   a. Based on the policy objects configured and applied on the device, the policy engine filter will match on the conditions provisioned and implement actions based on the application location. 
+3. Implement policy engine
+   a. Based on the policy objects configured and applied on the device, the policy engine filter will match on the conditions provisioned and implement actions based on the application location.
 For instance, the policy engine filter may result in redistributing certain (route type based/ network prefix based) routes into other applications (BGP,OSPF, etc.,)
 4. Responsible for calling ASICd thrift APIs to program the routes in the FIB.
 
 ### Architecture
-![alt text](https://github.com/SnapRoute/l3/blob/master/rib/docs/RIB_Daemon_Architecture.png "Architecture")
+![RIB Architecture](docs/RIB_Daemon_Architecture.png "RIB Architecture")
 
 ### Interfaces
 Exposed Interfaces
