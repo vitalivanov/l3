@@ -5,7 +5,7 @@ The address resolution protocol (arp) is a protocol used by the Internet Protoco
 
 
 ### Architecture
-![alt text](https://github.com/SnapRoute/l3/blob/master/arp/docs/ARP.png "Architecture")
+![ARP Architecture](docs/ARP.png "ARP Architecture")
 
 ### Description
 
@@ -28,15 +28,15 @@ Configutation Object Name: **ArpGlobal**
 
 
 >  - Update ARP Gloabl Config:
-	
+
 		bool UpdateArpGlobal(1: ArpGlobal origconfig, 2: ArpGlobal newconfig, 3: list<bool> attrset);
 
 
->  - Delete ARP Global Config: 
+>  - Delete ARP Global Config:
 
 		bool DeleteArpGlobal(1: ArpGlobal config);
 
-State Object Name: **ArpEntryState**, **ArpLinuxEntryState** 
+State Object Name: **ArpEntryState**, **ArpLinuxEntryState**
 
 >  - Get the list of ARP Entries (Object Name: ArpEntryState):
 

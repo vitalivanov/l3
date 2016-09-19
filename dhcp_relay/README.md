@@ -7,7 +7,7 @@ current dependencies with a configuration daemon CONFD and programability of HW 
 The Relay Agent will have an instance running per interface.
 
 ### Architecture
-![alt_text] (docs/Dhcp_Relay_Agent.png)
+![DHCP Relay Agent Architecture](docs/Dhcp_Relay_Agent.png "DHCP Relay Agent Architecture")
 
 ### Interfaces
 Dhcp Relay Agent is a standalone protocol daemon with configuration dependant to configuration daemon CONFD
@@ -20,7 +20,7 @@ Dhcp Relay Agent is a standalone protocol daemon with configuration dependant to
     3. Vlan Create/Delete from ASICD via Nano-Msg
 #####Packet Rx/Tx
     1. Server -> Relay Agent -> Client, we will use GoPacket
-    2. Client -> Relay Agent -> Server, we will write to UDP directly using golang net interface package 
+    2. Client -> Relay Agent -> Server, we will write to UDP directly using golang net interface package
 
 #####Dhcp Relay has following state:
   1. Receive DISCOVER Packet

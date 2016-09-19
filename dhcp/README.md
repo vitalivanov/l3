@@ -5,7 +5,7 @@ Dynamic Host Configuration Protocol (DHCP) is a client/server protocol that auto
 
 
 ### Architecture
-![alt text](https://github.com/SnapRoute/l3/blob/master/dhcp/docs/DHCP.png "Architecture")
+![DHCP Architecture](docs/DHCP.png "DHCP Architecture")
 
 ### Interfaces
 Configuration Object Name: **DhcpGlobalConfig**

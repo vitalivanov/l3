@@ -14,7 +14,7 @@ The following RFCs have been implemented with plan to add more:
     6. https://tools.ietf.org/html/draft-ietf-idr-add-paths-14: Advertisement of Multiple Paths in BGP
 
 ### Architecture
-![alt text](https://github.com/SnapRoute/l3/blob/master/bgp/docs/BGP_Module.png "Architecture")
+![BGP Architecture](docs/BGP_Module.png "BGP Architecture")
 
 ### Interfaces
 Exposed Interfaces
