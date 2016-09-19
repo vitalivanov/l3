@@ -179,20 +179,6 @@ func (ribdServiceHandler *RIBDServer) ProcessIPv6IntfDeleteEvent(msg asicdCommon
 		Op:               "delv6",
 	}
 }
-func (ribdServiceHandler *RIBDServer) ProcessL3IntfUpEvent(ipAddr string, ipType int, ifIndex int32) {
-	if ipType == asicdCommonDefs.IP_TYPE_IPV4 {
-		ribdServiceHandler.ProcessIPv4IntfUpEvent(ipAddr, ifIndex)
-	} else {
-		ribdServiceHandler.ProcessIPv6IntfUpEvent(ipAddr, ifIndex)
-	}
-}
-func (ribdServiceHandler *RIBDServer) ProcessL3IntfDownEvent(ipAddr string, ipType int, ifIndex int32) {
-	if ipType == asicdCommonDefs.IP_TYPE_IPV4 {
-		ribdServiceHandler.ProcessIPv4IntfDownEvent(ipAddr, ifIndex)
-	} else {
-		ribdServiceHandler.ProcessIPv6IntfDownEvent(ipAddr, ifIndex)
-	}
-}
 func (ribdServiceHandler *RIBDServer) ProcessAsicdEvents(sub *nanomsg.SubSocket) {
 
 	ribdServiceHandler.Logger.Info("in process Asicd events")
@@ -231,9 +217,9 @@ func (ribdServiceHandler *RIBDServer) ProcessAsicdEvents(sub *nanomsg.SubSocket)
 			}
 			ribdServiceHandler.ProcessVlanCreateEvent(vlanNotifyMsg)
 			break
-		case asicdCommonDefs.NOTIFY_L3INTF_STATE_CHANGE:
-			ribdServiceHandler.Logger.Info("NOTIFY_L3INTF_STATE_CHANGE event")
-			var msg asicdCommonDefs.L3IntfStateNotifyMsg
+		case asicdCommonDefs.NOTIFY_IPV4_L3INTF_STATE_CHANGE:
+			ribdServiceHandler.Logger.Info("NOTIFY_IPV4_L3INTF_STATE_CHANGE event")
+			var msg asicdCommonDefs.IPv4L3IntfStateNotifyMsg
 			err = json.Unmarshal(Notif.Msg, &msg)
 			if err != nil {
 				ribdServiceHandler.Logger.Info("Error in reading msg ", err)
@@ -242,10 +228,27 @@ func (ribdServiceHandler *RIBDServer) ProcessAsicdEvents(sub *nanomsg.SubSocket)
 			ribdServiceHandler.Logger.Info("Msg linkstatus = ", msg.IfState, " msg  ifId ", msg.IfIndex)
 			if msg.IfState == asicdCommonDefs.INTF_STATE_DOWN {
 				//processLinkDownEvent(ribd.Int(msg.IfType), ribd.Int(msg.IfId))
-				ribdServiceHandler.ProcessL3IntfDownEvent(msg.IpAddr, msg.IpType, msg.IfIndex)
+				ribdServiceHandler.ProcessIPv4IntfDownEvent(msg.IpAddr, msg.IfIndex)
 			} else {
 				//processLinkUpEvent(ribd.Int(msg.IfType), ribd.Int(msg.IfId))
-				ribdServiceHandler.ProcessL3IntfUpEvent(msg.IpAddr, msg.IpType, msg.IfIndex)
+				ribdServiceHandler.ProcessIPv4IntfUpEvent(msg.IpAddr, msg.IfIndex)
+			}
+			break
+		case asicdCommonDefs.NOTIFY_IPV6_L3INTF_STATE_CHANGE:
+			ribdServiceHandler.Logger.Info("NOTIFY_IPV6_L3INTF_STATE_CHANGE event")
+			var msg asicdCommonDefs.IPv6L3IntfStateNotifyMsg
+			err = json.Unmarshal(Notif.Msg, &msg)
+			if err != nil {
+				ribdServiceHandler.Logger.Info("Error in reading msg ", err)
+				return
+			}
+			ribdServiceHandler.Logger.Info("Msg linkstatus = ", msg.IfState, " msg  ifId ", msg.IfIndex)
+			if msg.IfState == asicdCommonDefs.INTF_STATE_DOWN {
+				//processLinkDownEvent(ribd.Int(msg.IfType), ribd.Int(msg.IfId))
+				ribdServiceHandler.ProcessIPv6IntfDownEvent(msg.IpAddr, msg.IfIndex)
+			} else {
+				//processLinkUpEvent(ribd.Int(msg.IfType), ribd.Int(msg.IfId))
+				ribdServiceHandler.ProcessIPv6IntfUpEvent(msg.IpAddr, msg.IfIndex)
 			}
 			break
 		case asicdCommonDefs.NOTIFY_IPV4INTF_CREATE:
