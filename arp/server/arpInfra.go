@@ -246,7 +246,7 @@ func (server *ARPServer) updateIpv4Infra(msg commonDefs.IPv4IntfNotifyMsg) {
 	}
 }
 
-func (server *ARPServer) processL3StateChange(msg commonDefs.L3IntfStateNotifyMsg) {
+func (server *ARPServer) processIPv4L3StateChange(msg commonDefs.IPv4L3IntfStateNotifyMsg) {
 	ifIdx := int(msg.IfIndex)
 	ifType := asicdCommonDefs.GetIntfTypeFromIfIndex(msg.IfIndex)
 	if msg.IfState == 0 {

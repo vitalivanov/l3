@@ -13,13 +13,13 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 package server
 
@@ -104,10 +104,10 @@ func (server *DHCPServer) processAsicdNotification(asicdrxBuf []byte) {
 			return
 		}
 		server.updateIpv4Infra(v4Msg, rxMsg.MsgType)
-	case asicdCommonDefs.NOTIFY_L3INTF_STATE_CHANGE:
+	case asicdCommonDefs.NOTIFY_IPV4_L3INTF_STATE_CHANGE:
 		//L3_INTF_STATE_CHANGE
 		server.logger.Debug("Recvd INTF_STATE_CHANGE notification")
-		var l3IntfMsg asicdCommonDefs.L3IntfStateNotifyMsg
+		var l3IntfMsg asicdCommonDefs.IPv4L3IntfStateNotifyMsg
 		err = json.Unmarshal(rxMsg.Msg, &l3IntfMsg)
 		if err != nil {
 			server.logger.Err(fmt.Sprintln("Unable to unmashal l3IntfStateNotifyMsg:", rxMsg.Msg))

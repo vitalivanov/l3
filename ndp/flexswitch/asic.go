@@ -28,7 +28,6 @@ import (
 	"l3/ndp/config"
 	"l3/ndp/debug"
 	"sync"
-	"syscall"
 	"utils/commonDefs"
 )
 
@@ -39,7 +38,8 @@ func initAsicdNotification() commonDefs.AsicdNotification {
 	nMap := make(commonDefs.AsicdNotification)
 	nMap = commonDefs.AsicdNotification{
 		commonDefs.NOTIFY_L2INTF_STATE_CHANGE:       true,
-		commonDefs.NOTIFY_L3INTF_STATE_CHANGE:       true,
+		commonDefs.NOTIFY_IPV4_L3INTF_STATE_CHANGE:  false,
+		commonDefs.NOTIFY_IPV6_L3INTF_STATE_CHANGE:  true,
 		commonDefs.NOTIFY_VLAN_CREATE:               true,
 		commonDefs.NOTIFY_VLAN_DELETE:               true,
 		commonDefs.NOTIFY_VLAN_UPDATE:               true,
@@ -84,20 +84,16 @@ func (notifyHdl *AsicNotificationHdl) ProcessNotification(msg commonDefs.AsicdNo
 			debug.Logger.Debug("Received Asicd IPV6 INTF Notfication DELETE:", ipv6Msg)
 			api.SendIPIntfNotfication(ipv6Msg.IfIndex, ipv6Msg.IpAddr, ipv6Msg.IntfRef, config.CONFIG_DELETE)
 		}
-	case commonDefs.L3IntfStateNotifyMsg:
+	case commonDefs.IPv6L3IntfStateNotifyMsg:
 		// state up/down for ipv6 interface case
-		l3Msg := msg.(commonDefs.L3IntfStateNotifyMsg)
+		l3Msg := msg.(commonDefs.IPv6L3IntfStateNotifyMsg)
 		// only get state notification if ip type is v6
-		if l3Msg.IpType == syscall.AF_INET6 {
-			if l3Msg.IfState == asicdCommonDefs.INTF_STATE_UP {
-				debug.Logger.Debug("Received Asicd L3 State Notfication UP:", l3Msg)
-				api.SendL3PortNotification(l3Msg.IfIndex, config.STATE_UP, l3Msg.IpAddr)
-			} else {
-				debug.Logger.Debug("Received Asicd L3 State Notfication DOWN:", l3Msg)
-				api.SendL3PortNotification(l3Msg.IfIndex, config.STATE_DOWN, l3Msg.IpAddr)
-			}
+		if l3Msg.IfState == asicdCommonDefs.INTF_STATE_UP {
+			debug.Logger.Debug("Received Asicd L3 State Notfication UP:", l3Msg)
+			api.SendL3PortNotification(l3Msg.IfIndex, config.STATE_UP, l3Msg.IpAddr)
 		} else {
-			debug.Logger.Debug("Ignoring asicd l3 state notification for:", l3Msg)
+			debug.Logger.Debug("Received Asicd L3 State Notfication DOWN:", l3Msg)
+			api.SendL3PortNotification(l3Msg.IfIndex, config.STATE_DOWN, l3Msg.IpAddr)
 		}
 	case commonDefs.L2IntfStateNotifyMsg:
 		l2Msg := msg.(commonDefs.L2IntfStateNotifyMsg)

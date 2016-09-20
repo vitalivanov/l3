@@ -122,7 +122,7 @@ func DhcpRelayAgentUpdateIntfPortMap(msg asicdCommonDefs.IPv4IntfNotifyMsg, msgT
 	}
 }
 
-func DhcpRelayAgentUpdateL3IntfStateChange(msg asicdCommonDefs.L3IntfStateNotifyMsg) {
+func DhcpRelayAgentUpdateL3IntfStateChange(msg asicdCommonDefs.IPv4L3IntfStateNotifyMsg) {
 	if msg.IfState == asicdCommonDefs.INTF_STATE_UP {
 		logger.Debug("DRA: Got intf state up notification")
 
@@ -164,9 +164,9 @@ func DhcpRelayAsicdSubscriber() {
 				continue
 			}
 			DhcpRelayAgentUpdateIntfPortMap(ipv4IntfNotifyMsg, msg.MsgType)
-		} else if msg.MsgType == asicdCommonDefs.NOTIFY_L3INTF_STATE_CHANGE {
+		} else if msg.MsgType == asicdCommonDefs.NOTIFY_IPV4_L3INTF_STATE_CHANGE {
 			//INTF_STATE_CHANGE
-			var l3IntfStateNotifyMsg asicdCommonDefs.L3IntfStateNotifyMsg
+			var l3IntfStateNotifyMsg asicdCommonDefs.IPv4L3IntfStateNotifyMsg
 			err = json.Unmarshal(msg.Msg, &l3IntfStateNotifyMsg)
 			if err != nil {
 				logger.Err("DRA: unable to Unmarshal l3 intf state change:", msg.Msg)

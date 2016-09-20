@@ -13,13 +13,13 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 package vrrpServer
 
@@ -124,7 +124,7 @@ func (svr *VrrpServer) VrrpUpdateIPv4GblInfo(msg asicdCommonDefs.IPv4IntfNotifyM
 	}
 }
 
-func (svr *VrrpServer) VrrpUpdateL3IntfStateChange(msg asicdCommonDefs.L3IntfStateNotifyMsg) {
+func (svr *VrrpServer) VrrpUpdateL3IntfStateChange(msg asicdCommonDefs.IPv4L3IntfStateNotifyMsg) {
 	ifType := asicdCommonDefs.GetIntfTypeFromIfIndex(msg.IfIndex)
 	if ifType == commonDefs.IfTypeVirtual || ifType == commonDefs.IfTypeSecondary {
 		svr.logger.Info("Ignoring ipv4 interface notifcation for sub interface")
@@ -177,9 +177,9 @@ func (svr *VrrpServer) VrrpAsicdSubscriber() {
 				continue
 			}
 			svr.VrrpUpdateIPv4GblInfo(ipv4IntfNotifyMsg, msg.MsgType)
-		} else if msg.MsgType == asicdCommonDefs.NOTIFY_L3INTF_STATE_CHANGE {
+		} else if msg.MsgType == asicdCommonDefs.NOTIFY_IPV4_L3INTF_STATE_CHANGE {
 			//INTF_STATE_CHANGE
-			var l3IntfStateNotifyMsg asicdCommonDefs.L3IntfStateNotifyMsg
+			var l3IntfStateNotifyMsg asicdCommonDefs.IPv4L3IntfStateNotifyMsg
 			err = json.Unmarshal(msg.Msg, &l3IntfStateNotifyMsg)
 			if err != nil {
 				svr.logger.Err(fmt.Sprintln("unable to Unmarshal l3 intf",
