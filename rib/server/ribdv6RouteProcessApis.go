@@ -14,6 +14,7 @@ import (
 	"ribdInt"
 	"strconv"
 	"strings"
+	netutils "utils/netUtils"
 	"utils/patriciaDB"
 	//"utils/policy/policyCommonDefs"
 )
@@ -181,6 +182,10 @@ func UpdateV6RouteReachabilityStatus(prefix patriciaDB.Prefix, //prefix of the n
 */
 func (m RIBDServer) IPv6RouteConfigValidationCheckForUpdate(oldcfg *ribd.IPv6Route, cfg *ribd.IPv6Route, attrset []bool) (err error) {
 	logger.Info("IPv6RouteConfigValidationCheckForUpdate")
+	if !netutils.IsIPv6Addr(cfg.DestinationNw) {
+		logger.Err("Cannot update ipv4 route (destination:", cfg.DestinationNw, ") using Ipv6Route API")
+		return errors.New(fmt.Sprintln("Cannot update ipv4 route (destination:", cfg.DestinationNw, ") using Ipv6Route API"))
+	}
 	isCidr := strings.Contains(cfg.DestinationNw, "/")
 	if isCidr {
 		/*
@@ -279,6 +284,10 @@ func (m RIBDServer) IPv6RouteConfigValidationCheckForUpdate(oldcfg *ribd.IPv6Rou
 
 func (m RIBDServer) IPv6RouteConfigValidationCheckForPatchUpdate(oldcfg *ribd.IPv6Route, cfg *ribd.IPv6Route, op []*ribd.PatchOpInfo) (err error) {
 	logger.Info(fmt.Sprintln("IPv6RouteConfigValidationCheckForPatchUpdate"))
+	if !netutils.IsIPv6Addr(cfg.DestinationNw) {
+		logger.Err("Cannot patch update ipv4 route (destination:", cfg.DestinationNw, ") using Ipv6Route API")
+		return errors.New(fmt.Sprintln("Cannot add/remove from ipv4 route (destination:", cfg.DestinationNw, ") using Ipv6Route API"))
+	}
 	isCidr := strings.Contains(cfg.DestinationNw, "/")
 	if isCidr {
 		logger.Debug("cidr address")
@@ -390,6 +399,10 @@ func (m RIBDServer) IPv6RouteConfigValidationCheckForPatchUpdate(oldcfg *ribd.IP
 */
 func (m RIBDServer) IPv6RouteConfigValidationCheck(cfg *ribd.IPv6Route, op string) (err error) {
 	logger.Debug(fmt.Sprintln("IPv6RouteConfigValidationCheck"))
+	if !netutils.IsIPv6Addr(cfg.DestinationNw) {
+		logger.Err("Cannot create/delete ipv4 route (destination:", cfg.DestinationNw, ") using Ipv6Route API")
+		return errors.New(fmt.Sprintln("Cannot create/delete ipv4 route (destination:", cfg.DestinationNw, ") using Ipv6Route API"))
+	}
 	isCidr := strings.Contains(cfg.DestinationNw, "/")
 	if isCidr {
 		/*
@@ -475,13 +488,20 @@ func (m RIBDServer) IPv6RouteConfigValidationCheck(cfg *ribd.IPv6Route, op strin
 				}
 				cfg.NextHop[i].NextHopIntRef = strconv.Itoa(int(nhIntf.NextHopIfIndex))
 			} else {
+				nhIntf := cfg.NextHop[i].NextHopIntRef
 				cfg.NextHop[i].NextHopIntRef, err = m.ConvertIntfStrToIfIndexStr(cfg.NextHop[i].NextHopIntRef)
 				if err != nil {
 					logger.Err(fmt.Sprintln("Invalid NextHop IntRef ", cfg.NextHop[i].NextHopIntRef))
 					return err
 				}
+				nextHopIntRef, _ := strconv.Atoi(cfg.NextHop[i].NextHopIntRef)
+				_, err := RouteServiceHandler.GetRouteReachabilityInfo(cfg.NextHop[i].NextHopIp, ribdInt.Int(nextHopIntRef))
+				if err != nil {
+					logger.Err("RouteConfigValidationCheck for route:", cfg, "next hop ip ", cfg.NextHop[i].NextHopIp, " not reachable via interface ", nhIntf)
+					return errors.New(fmt.Sprintln("next hop ip ", cfg.NextHop[i].NextHopIp, " not reachable via ", nhIntf))
+				}
 			}
-			logger.Debug(fmt.Sprintln("IntRef after : ", cfg.NextHop[i].NextHopIntRef))
+			//logger.Debug(fmt.Sprintln("IntRef after : ", cfg.NextHop[i].NextHopIntRef))
 		}
 	}
 	return nil

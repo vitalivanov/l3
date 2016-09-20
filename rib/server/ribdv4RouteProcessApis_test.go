@@ -46,6 +46,7 @@ var patchOpList []*ribd.PatchOpInfo
 func InitIpv4AddrInfoList() {
 	ipv4AddrList = make([]testIpInfo, 0)
 	ipv4AddrList = append(ipv4AddrList, testIpInfo{"11.1.10.2", "255.255.255.0", "11.1.10.0/24"})
+	ipv4AddrList = append(ipv4AddrList, testIpInfo{"21.1.10.2", "255.255.255.0", "21.1.10.0/24"})
 	ipv4AddrList = append(ipv4AddrList, testIpInfo{"12.1.10.2/24", "255.255.255.0", "12.1.10.2/24"})
 	ipv4AddrList = append(ipv4AddrList, testIpInfo{"12.1.10.20/24", "255.255.255.0", "12.1.10.20/24"})
 	ipv4AddrList = append(ipv4AddrList, testIpInfo{"13.1.10.2", "255.255.255.0", "13.1.10.0/24"})

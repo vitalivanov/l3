@@ -72,19 +72,19 @@ func InitVlanList() {
 func InitIPv4IntfList() {
 	ipv4IntfList = make([]asicdCommonDefs.IPv4IntfNotifyMsg, 0)
 	ipv4IntfList = append(ipv4IntfList, asicdCommonDefs.IPv4IntfNotifyMsg{
-		IpAddr:  "11.1.10.2/24",
+		IpAddr:  "11.1.10.1/24",
 		IfIndex: 1,
 	})
 	ipv4IntfList = append(ipv4IntfList, asicdCommonDefs.IPv4IntfNotifyMsg{
-		IpAddr:  "21.1.10.2/24",
+		IpAddr:  "21.1.10.1/24",
 		IfIndex: 2,
 	})
 	ipv4IntfList = append(ipv4IntfList, asicdCommonDefs.IPv4IntfNotifyMsg{
-		IpAddr:  "31.1.10.2/24",
+		IpAddr:  "31.1.10.1/24",
 		IfIndex: 3,
 	})
 	ipv4IntfList = append(ipv4IntfList, asicdCommonDefs.IPv4IntfNotifyMsg{
-		IpAddr:  "35.1.10.2/24",
+		IpAddr:  "35.1.10.1/24",
 		IfIndex: 35,
 	})
 }
@@ -159,27 +159,27 @@ func TestIPv6IntfCreateEvent(t *testing.T) {
 	fmt.Println("***************************************")
 }
 func TestProcessIPv4IntfStateChangeEvents(t *testing.T) {
-	fmt.Println("****TestProcessL3IntfStateChangeEvents()****")
+	fmt.Println("****TestProcessIPv4IntfStateChangeEvents()****")
 	TestGetRouteReachability(t)
 	for _, ipInfo := range ipv4AddrList {
-		server.ProcessL3IntfDownEvent(ipInfo.ipAddr, int(ribdCommonDefs.IPv4), -1)
+		server.ProcessIPv4IntfDownEvent(ipInfo.ipAddr, -1)
 	}
 	TestGetRouteReachability(t)
 	for _, ipInfo := range ipv4AddrList {
-		server.ProcessL3IntfUpEvent(ipInfo.ipAddr, int(ribdCommonDefs.IPv4), -1)
+		server.ProcessIPv4IntfUpEvent(ipInfo.ipAddr, -1)
 	}
 	TestGetRouteReachability(t)
 	fmt.Println("********************************************")
 }
 func TestProcessIPv6IntfStateChangeEvents(t *testing.T) {
-	fmt.Println("****TestProcessL3IntfStateChangeEvents()****")
+	fmt.Println("****TestProcessIPv6IntfStateChangeEvents()****")
 	TestGetRouteReachability(t)
 	for _, ipInfo := range ipv6AddrList {
-		server.ProcessL3IntfDownEvent(ipInfo.ipAddr, int(ribdCommonDefs.IPv6), -1)
+		server.ProcessIPv6IntfDownEvent(ipInfo.ipAddr, -1)
 	}
 	TestGetRouteReachability(t)
 	for _, ipInfo := range ipv6AddrList {
-		server.ProcessL3IntfUpEvent(ipInfo.ipAddr, int(ribdCommonDefs.IPv6), -1)
+		server.ProcessIPv6IntfUpEvent(ipInfo.ipAddr, -1)
 	}
 	TestGetRouteReachability(t)
 	fmt.Println("********************************************")
