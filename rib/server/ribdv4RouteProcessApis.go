@@ -36,6 +36,7 @@ import (
 	"ribdInt"
 	"strconv"
 	"strings"
+	netutils "utils/netUtils"
 	"utils/patriciaDB"
 	//"utils/policy/policyCommonDefs"
 )
@@ -207,6 +208,10 @@ func UpdateV4RouteReachabilityStatus(prefix patriciaDB.Prefix, //prefix of the n
 */
 func (m RIBDServer) RouteConfigValidationCheckForUpdate(oldcfg *ribd.IPv4Route, cfg *ribd.IPv4Route, attrset []bool) (err error) {
 	//logger.Info("RouteConfigValidationCheckForUpdate")
+	if netutils.IsIPv6Addr(cfg.DestinationNw) {
+		logger.Err("Cannot update ipv6 route (destination:", cfg.DestinationNw, ") using Ipv4Route API")
+		return errors.New(fmt.Sprintln("Cannot update ipv6 route (destination:", cfg.DestinationNw, ") using Ipv4Route API"))
+	}
 	isCidr := strings.Contains(cfg.DestinationNw, "/")
 	if isCidr {
 		/*
@@ -305,6 +310,10 @@ func (m RIBDServer) RouteConfigValidationCheckForUpdate(oldcfg *ribd.IPv4Route, 
 
 func (m RIBDServer) RouteConfigValidationCheckForPatchUpdate(oldcfg *ribd.IPv4Route, cfg *ribd.IPv4Route, op []*ribd.PatchOpInfo) (err error) {
 	//logger.Info("RouteConfigValidationCheckForPatchUpdate")
+	if netutils.IsIPv6Addr(cfg.DestinationNw) {
+		logger.Err("Cannot patch update ipv6 route (destination:", cfg.DestinationNw, ") using Ipv4Route API")
+		return errors.New(fmt.Sprintln("Cannot add/remove from ipv6 route (destination:", cfg.DestinationNw, ") using Ipv4Route API"))
+	}
 	isCidr := strings.Contains(cfg.DestinationNw, "/")
 	if isCidr {
 		/*
@@ -402,6 +411,10 @@ func (m RIBDServer) RouteConfigValidationCheckForPatchUpdate(oldcfg *ribd.IPv4Ro
 		   - if the nexthopIntf is valid L3 intf and if so, convert to string value
 */
 func (m RIBDServer) RouteConfigValidationCheck(cfg *ribd.IPv4Route, op string) (err error) {
+	if netutils.IsIPv6Addr(cfg.DestinationNw) {
+		logger.Err("Cannot create/delete ipv6 route (destination:", cfg.DestinationNw, ") using Ipv4Route API")
+		return errors.New(fmt.Sprintln("Cannot create/delete ipv6 route (destination:", cfg.DestinationNw, ") using Ipv4Route API"))
+	}
 	isCidr := strings.Contains(cfg.DestinationNw, "/")
 	if isCidr {
 		/*
@@ -479,7 +492,7 @@ func (m RIBDServer) RouteConfigValidationCheck(cfg *ribd.IPv4Route, op string) (
 			   Validate if nextHopIntRef is a valid L3 interface
 			*/
 			if cfg.NextHop[i].NextHopIntRef == "" {
-				logger.Info("RouteConfigValidationCheck for route:", cfg, "NextHopIntRef not set")
+				//logger.Info("RouteConfigValidationCheck for route:", cfg, "NextHopIntRef not set")
 				nhIntf, err := RouteServiceHandler.GetV4RouteReachabilityInfo(cfg.NextHop[i].NextHopIp, -1)
 				if err != nil {
 					logger.Err("RouteConfigValidationCheck for route:", cfg, "next hop ip ", cfg.NextHop[i].NextHopIp, " not reachable")
@@ -797,7 +810,7 @@ func (m RIBDServer) ProcessV4RouteCreateConfig(cfg *ribd.IPv4Route, addType int)
 		NullRoute:     cfg.NullRoute,
 	}
 	for i := 0; i < len(cfg.NextHop); i++ {
-		logger.Debug("nexthop info: ip: ", cfg.NextHop[i].NextHopIp, " intref: ", cfg.NextHop[i].NextHopIntRef)
+		//logger.Debug("nexthop info: ip: ", cfg.NextHop[i].NextHopIp, " intref: ", cfg.NextHop[i].NextHopIntRef)
 		nh := ribd.NextHopInfo{
 			NextHopIp:     cfg.NextHop[i].NextHopIp,
 			NextHopIntRef: cfg.NextHop[i].NextHopIntRef,
@@ -808,26 +821,6 @@ func (m RIBDServer) ProcessV4RouteCreateConfig(cfg *ribd.IPv4Route, addType int)
 		//policyRoute := BuildPolicyRouteFromribdIPv4Route(&newCfg)
 		params := BuildRouteParamsFromribdIPv4Route(&newCfg, addType, Invalid, len(destNetSlice))
 		_, err = createRoute(params)
-		//PolicyEngineFilter(policyRoute, policyCommonDefs.PolicyPath_Import, params)
-		//policyEngineActionAcceptRoute(params)
-		/*		nextHopIp := newCfg.NextHop[0].NextHopIp
-				if cfg.NullRoute == true { //commonDefs.IfTypeNull {
-					//logger.Info("null route create request")
-					nextHopIp = "255.255.255.255"
-				}
-				nextHopIntRef, _ := strconv.Atoi(newCfg.NextHop[0].NextHopIntRef)
-				_, err = createRoute(ipv4,
-					newCfg.DestinationNw,
-					newCfg.NetworkMask,
-					ribd.Int(cfg.Cost),
-					ribd.Int(newCfg.NextHop[0].Weight),
-					nextHopIp,
-					ribd.Int(nextHopIntRef),
-					ribd.Int(RouteProtocolTypeMapDB[newCfg.Protocol]),
-					FIBAndRIB,
-					ribdCommonDefs.RoutePolicyStateChangetoValid,
-					ribd.Int(len(destNetSlice)))*/
-
 	}
 
 	return true, err
