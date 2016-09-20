@@ -14,6 +14,7 @@ import (
 	"ribdInt"
 	"strconv"
 	"strings"
+	netutils "utils/netUtils"
 	"utils/patriciaDB"
 	//"utils/policy/policyCommonDefs"
 )
@@ -181,6 +182,10 @@ func UpdateV6RouteReachabilityStatus(prefix patriciaDB.Prefix, //prefix of the n
 */
 func (m RIBDServer) IPv6RouteConfigValidationCheckForUpdate(oldcfg *ribd.IPv6Route, cfg *ribd.IPv6Route, attrset []bool) (err error) {
 	logger.Info("IPv6RouteConfigValidationCheckForUpdate")
+	if !netutils.IsIPv6Addr(cfg.DestinationNw) {
+		logger.Err("Cannot update ipv4 route (destination:", cfg.DestinationNw, ") using Ipv6Route API")
+		return errors.New(fmt.Sprintln("Cannot update ipv4 route (destination:", cfg.DestinationNw, ") using Ipv6Route API"))
+	}
 	isCidr := strings.Contains(cfg.DestinationNw, "/")
 	if isCidr {
 		/*
@@ -279,6 +284,10 @@ func (m RIBDServer) IPv6RouteConfigValidationCheckForUpdate(oldcfg *ribd.IPv6Rou
 
 func (m RIBDServer) IPv6RouteConfigValidationCheckForPatchUpdate(oldcfg *ribd.IPv6Route, cfg *ribd.IPv6Route, op []*ribd.PatchOpInfo) (err error) {
 	logger.Info(fmt.Sprintln("IPv6RouteConfigValidationCheckForPatchUpdate"))
+	if !netutils.IsIPv6Addr(cfg.DestinationNw) {
+		logger.Err("Cannot patch update ipv4 route (destination:", cfg.DestinationNw, ") using Ipv6Route API")
+		return errors.New(fmt.Sprintln("Cannot add/remove from ipv4 route (destination:", cfg.DestinationNw, ") using Ipv6Route API"))
+	}
 	isCidr := strings.Contains(cfg.DestinationNw, "/")
 	if isCidr {
 		logger.Debug("cidr address")
@@ -390,6 +399,10 @@ func (m RIBDServer) IPv6RouteConfigValidationCheckForPatchUpdate(oldcfg *ribd.IP
 */
 func (m RIBDServer) IPv6RouteConfigValidationCheck(cfg *ribd.IPv6Route, op string) (err error) {
 	logger.Debug(fmt.Sprintln("IPv6RouteConfigValidationCheck"))
+	if !netutils.IsIPv6Addr(cfg.DestinationNw) {
+		logger.Err("Cannot create/delete ipv4 route (destination:", cfg.DestinationNw, ") using Ipv6Route API")
+		return errors.New(fmt.Sprintln("Cannot create/delete ipv4 route (destination:", cfg.DestinationNw, ") using Ipv6Route API"))
+	}
 	isCidr := strings.Contains(cfg.DestinationNw, "/")
 	if isCidr {
 		/*

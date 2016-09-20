@@ -30,6 +30,7 @@ import (
 	"reflect"
 	"ribd"
 	"ribdInt"
+	"strings"
 	"utils/patriciaDB"
 	"utils/policy"
 	"utils/policy/policyCommonDefs"
@@ -558,6 +559,10 @@ func (m RIBDServer) GetBulkPolicyConditionState(fromIndex ribd.Int, rcount ribd.
 		prefixNodeGet := PolicyConditionsDB.Get(localPolicyConditionsDB[i+fromIndex].Prefix)
 		if prefixNodeGet != nil {
 			prefixNode := prefixNodeGet.(policy.PolicyCondition)
+			if strings.HasPrefix(prefixNode.Name, "__Internal") && strings.HasSuffix(prefixNode.Name, "__") {
+				//this is implicitly created condition as a part of apply config
+				continue
+			}
 			nextNode = &tempNode[validCount]
 			nextNode.Name = prefixNode.Name
 			nextNode.ConditionInfo = prefixNode.ConditionGetBulkInfo
@@ -816,7 +821,7 @@ func (m RIBDServer) UpdateApplyPolicy(info *ribdInt.ApplyPolicyInfo, apply bool,
 		switch conditions[j].ConditionType {
 		case "MatchProtocol":
 			logger.Debug(conditions[j].Protocol)
-			conditionName = "Match" + conditions[j].Protocol
+			conditionName = "__InternalMatch" + conditions[j].Protocol + "__"
 			ok := policyConditionsDB.Match(patriciaDB.Prefix(conditionName))
 			if !ok {
 				logger.Debug("Define condition ", conditionName)

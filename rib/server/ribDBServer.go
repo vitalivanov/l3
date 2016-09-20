@@ -291,7 +291,7 @@ func (m RIBDServer) ReadAndUpdateRoutesFromDB() {
 				if err != nil {
 					logger.Err("Route validation failed when reading from db for route:", obj, " err:", err)
 					if strings.Contains(string(err.Error()), "not reachable") {
-						logger.Info("ReadAndUpdateRoutesFromDB:Err message has not reachableset loop to true")
+						logger.Info("ReadAndUpdateRoutesFromDB:Err message has :not reachableset. loop to true")
 						nhFound := false
 						for key, _ := range dbRouteMap {
 							for _, nh := range obj.NextHop {
