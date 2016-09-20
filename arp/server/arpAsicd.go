@@ -32,9 +32,9 @@ func (server *ARPServer) processAsicdNotification(msg commonDefs.AsicdNotifyMsg)
 	case commonDefs.L2IntfStateNotifyMsg:
 		l2Msg := msg.(commonDefs.L2IntfStateNotifyMsg)
 		server.processL2StateChange(l2Msg)
-	case commonDefs.L3IntfStateNotifyMsg:
-		l3Msg := msg.(commonDefs.L3IntfStateNotifyMsg)
-		server.processL3StateChange(l3Msg)
+	case commonDefs.IPv4L3IntfStateNotifyMsg:
+		l3Msg := msg.(commonDefs.IPv4L3IntfStateNotifyMsg)
+		server.processIPv4L3StateChange(l3Msg)
 	case commonDefs.VlanNotifyMsg:
 		vlanMsg := msg.(commonDefs.VlanNotifyMsg)
 		server.updateVlanInfra(vlanMsg)

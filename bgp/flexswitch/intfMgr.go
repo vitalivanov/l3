@@ -194,15 +194,30 @@ func (mgr *FSIntfMgr) listenForAsicdEvents() {
 			}
 			api.SendIntfMapNotification(asicdCommonDefs.GetIfIndexFromIntfIdAndIntfType(int(vlanNotifyMsg.VlanId), commonDefs.IfTypeVlan), vlanNotifyMsg.VlanName)
 			break
-		case asicdCommonDefs.NOTIFY_L3INTF_STATE_CHANGE:
-			var msg asicdCommonDefs.L3IntfStateNotifyMsg
+		case asicdCommonDefs.NOTIFY_IPV4_L3INTF_STATE_CHANGE:
+			var msg asicdCommonDefs.IPv4L3IntfStateNotifyMsg
 			err = json.Unmarshal(event.Msg, &msg)
 			if err != nil {
-				mgr.logger.Errf("Unmarshal Asicd L3INTF event failed with err %s", err)
+				mgr.logger.Errf("Unmarshal Asicd IPV4L3INTF event failed with err %s", err)
 				return
 			}
 
-			mgr.logger.Infof("Asicd L3INTF event idx %d ip %s state %d", msg.IfIndex, msg.IpAddr, msg.IfState)
+			mgr.logger.Infof("Asicd IPv4L3INTF event idx %d ip %s state %d", msg.IfIndex, msg.IpAddr, msg.IfState)
+			if msg.IfState == asicdCommonDefs.INTF_STATE_DOWN {
+				api.SendIntfNotification(msg.IfIndex, msg.IpAddr, "", config.INTF_STATE_DOWN)
+			} else {
+				api.SendIntfNotification(msg.IfIndex, msg.IpAddr, "", config.INTF_STATE_UP)
+			}
+
+		case asicdCommonDefs.NOTIFY_IPV6_L3INTF_STATE_CHANGE:
+			var msg asicdCommonDefs.IPv6L3IntfStateNotifyMsg
+			err = json.Unmarshal(event.Msg, &msg)
+			if err != nil {
+				mgr.logger.Errf("Unmarshal Asicd IPV6L3INTF event failed with err %s", err)
+				return
+			}
+
+			mgr.logger.Infof("Asicd IPV6L3INTF event idx %d ip %s state %d", msg.IfIndex, msg.IpAddr, msg.IfState)
 			if msg.IfState == asicdCommonDefs.INTF_STATE_DOWN {
 				api.SendIntfNotification(msg.IfIndex, msg.IpAddr, "", config.INTF_STATE_DOWN)
 			} else {
