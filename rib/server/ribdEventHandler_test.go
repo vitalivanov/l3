@@ -26,7 +26,7 @@ package server
 import (
 	"asicd/asicdCommonDefs"
 	"fmt"
-	"l3/rib/ribdCommonDefs"
+	//"l3/rib/ribdCommonDefs"
 	"testing"
 )
 

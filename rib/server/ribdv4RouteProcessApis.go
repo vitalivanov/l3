@@ -257,6 +257,10 @@ func (m RIBDServer) RouteConfigValidationCheckForUpdate(oldcfg *ribd.IPv4Route, 
 					logger.Err("Cannot update Protocol value of a route")
 					return errors.New("Cannot set Protocol field")
 				}
+				if objName == "NullRoute" {
+					logger.Err("Cannot update null route attribute, please delete and create the route with the correct value")
+					return errors.New("Cannot update null route attribute, please delete and create the route with the correct value")
+				}
 				if objName == "NextHop" {
 					/*
 					   Next hop info is being updated
@@ -469,6 +473,10 @@ func (m RIBDServer) RouteConfigValidationCheck(cfg *ribd.IPv4Route, op string) (
 			logger.Err("route type ", cfg.Protocol, " invalid")
 			err = errors.New("Invalid route protocol type")
 			return err
+		}
+		if cfg.NullRoute == true {
+			logger.Debug("this is a null route, so dont validate nexthop attribute")
+			return nil
 		}
 		//logger.Debug("Number of nexthops = ", len(cfg.NextHop))
 		if len(cfg.NextHop) == 0 {
@@ -1007,11 +1015,6 @@ func (m RIBDServer) Processv4RouteUpdateConfig(origconfig *ribd.IPv4Route, newco
 				if objName == "Cost" {
 					routeInfoRecord.metric = ribd.Int(newconfig.Cost)
 				}
-				/*				if objName == "OutgoingInterface" {
-								nextHopIfIndex, _ := strconv.Atoi(newconfig.OutgoingInterface)
-								routeInfoRecord.nextHopIfIndex = ribd.Int(nextHopIfIndex)
-								callUpdate = false
-							}*/
 			}
 		}
 		routeInfoRecordList.routeInfoProtocolMap[origconfig.Protocol][index] = routeInfoRecord
