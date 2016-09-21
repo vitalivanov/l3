@@ -160,7 +160,7 @@ func TestIPv6IntfCreateEvent(t *testing.T) {
 }
 func TestProcessIPv4IntfStateChangeEvents(t *testing.T) {
 	fmt.Println("****TestProcessIPv4IntfStateChangeEvents()****")
-	TestGetRouteReachability(t)
+	//TestGetRouteReachability(t)
 	for _, ipInfo := range ipv4AddrList {
 		server.ProcessIPv4IntfDownEvent(ipInfo.ipAddr, -1)
 	}
@@ -173,7 +173,7 @@ func TestProcessIPv4IntfStateChangeEvents(t *testing.T) {
 }
 func TestProcessIPv6IntfStateChangeEvents(t *testing.T) {
 	fmt.Println("****TestProcessIPv6IntfStateChangeEvents()****")
-	TestGetRouteReachability(t)
+	//TestGetRouteReachability(t)
 	for _, ipInfo := range ipv6AddrList {
 		server.ProcessIPv6IntfDownEvent(ipInfo.ipAddr, -1)
 	}
