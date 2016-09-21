@@ -567,7 +567,6 @@ func Getv4RoutesPerProtocol(protocol string) []*ribd.RouteInfoSummary {
 			nextHopList = append(nextHopList, &nextHopInfo[i])
 			i++
 		}
-		fmt.Println("Appending routes for protocol ", protocol)
 		routes = append(routes, &ribd.RouteInfoSummary{
 			DestinationNw:   destNet,
 			IsInstalledInHw: isInstalledinHw,
