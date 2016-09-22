@@ -346,7 +346,7 @@ func (l *LocRib) TestNHAndProcessRoutes(peerIP string, add, remove []packet.NLRI
 		}
 
 		if reachabilityInfo == nil {
-			l.logger.Infof("ProcessUpdate - next hop %s is not reachable", nextHopStr)
+			l.logger.Infof("TestNHAndProcessRoutes - next hop %s is not reachable", nextHopStr)
 
 			if _, ok := l.unreachablePaths[nextHopStr]; !ok {
 				l.unreachablePaths[nextHopStr] = make(map[*Path]map[*Destination][]uint32)
@@ -362,7 +362,7 @@ func (l *LocRib) TestNHAndProcessRoutes(peerIP string, add, remove []packet.NLRI
 		addPathCount, protoFamily, updated, withdrawn, updatedAddPaths)
 
 	if reachabilityInfo != nil {
-		l.logger.Infof("ProcessUpdate - next hop %s is reachable, so process previously unreachable routes",
+		l.logger.Infof("TestNHAndProcessRoutes - next hop %s is reachable, so process previously unreachable routes",
 			nextHopStr)
 		updated, withdrawn, updatedAddPaths = l.ProcessRoutesForReachableRoutes(nextHopStr, reachabilityInfo,
 			addPathCount, updated, withdrawn, updatedAddPaths)

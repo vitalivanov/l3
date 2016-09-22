@@ -163,8 +163,17 @@ func TestProcessUpdate(t *testing.T) {
 	nlri := constructIPPrefix(t, "30.1.10.0/24", "40.1.0.0/16")
 	msg := packet.NewBGPUpdateMessage(nil, pathAttrs, nlri)
 	bgpPktSrc := packet.BGPPktSrc{Src: neighbor, Msg: msg}
-	updated, withdrawn, updatedAddPaths, addedAllPrefixes := locRib.ProcessUpdate(nConf, &bgpPktSrc, 0)
+
+	body := bgpPktSrc.Msg.Body.(*packet.BGPUpdate)
+	path := NewPath(locRib, nConf, body.PathAttributes, nil, RouteTypeEGP)
+	updated := make(map[uint32]map[*Path][]*Destination)
+	withdrawn := make([]*Destination, 0)
+	updatedAddPaths := make([]*Destination, 0)
+	addedAllPrefixes := true
 	protoFamily := packet.GetProtocolFamily(packet.AfiIP, packet.SafiUnicast)
+
+	updated, withdrawn, updatedAddPaths, addedAllPrefixes = locRib.ProcessUpdate(nConf, path, nlri, nil, protoFamily,
+		0, updated, withdrawn, updatedAddPaths)
 	if len(updated[protoFamily]) != 1 {
 		t.Fatal("LocRib:ProcessUpdate - Found more path in protocol family", protoFamily)
 	}
@@ -188,10 +197,20 @@ func TestProcessUpdate(t *testing.T) {
 	nlri = constructIPPrefix(t, "30.1.10.0/24", "60.1.0.0/16")
 	msg = packet.NewBGPUpdateMessage(removeNLRI, pathAttrs, nlri)
 	bgpPktSrc = packet.BGPPktSrc{Src: neighbor, Msg: msg}
-	updated, withdrawn, updatedAddPaths, addedAllPrefixes = locRib.ProcessUpdate(nConf, &bgpPktSrc, 0)
+
+	body = bgpPktSrc.Msg.Body.(*packet.BGPUpdate)
+	path = NewPath(locRib, nConf, body.PathAttributes, nil, RouteTypeEGP)
+	updated = make(map[uint32]map[*Path][]*Destination)
+	withdrawn = make([]*Destination, 0)
+	updatedAddPaths = make([]*Destination, 0)
+	addedAllPrefixes = true
+
+	updated, withdrawn, updatedAddPaths, addedAllPrefixes = locRib.ProcessUpdate(nConf, path, nlri, removeNLRI,
+		protoFamily, 0, updated, withdrawn, updatedAddPaths)
 	if len(updated[protoFamily]) != 1 {
 		t.Fatal("LocRib:ProcessUpdate - Found more path in protocol family", protoFamily)
 	}
+
 	for path, destinations := range updated[protoFamily] {
 		if len(destinations) != 2 {
 			t.Fatalf("LocRib:ProcessUpdate - Did not find 2 destinations %+v for path %+v", destinations, path)
