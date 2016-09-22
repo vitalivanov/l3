@@ -370,41 +370,69 @@ func (l *LocRib) TestNHAndProcessRoutes(peerIP string, add, remove []packet.NLRI
 	return updated, withdrawn, updatedAddPaths, addedAllPrefixes
 }
 
-func (l *LocRib) ProcessUpdate(neighborConf *base.NeighborConf, pktInfo *packet.BGPPktSrc, addPathCount int) (
-	map[uint32]map[*Path][]*Destination, []*Destination, []*Destination, bool) {
-	body := pktInfo.Msg.Body.(*packet.BGPUpdate)
+func (l *LocRib) ProcessUpdate(neighborConf *base.NeighborConf, path *Path, add, rem []packet.NLRI, protoFamily uint32,
+	addPathCount int, updated map[uint32]map[*Path][]*Destination, withdrawn []*Destination,
+	updatedAddPaths []*Destination) (map[uint32]map[*Path][]*Destination, []*Destination, []*Destination, bool) {
+	//body := pktInfo.Msg.Body.(*packet.BGPUpdate)
+	//	updated := make(map[uint32]map[*Path][]*Destination)
+	//	withdrawn := make([]*Destination, 0)
+	//	updatedAddPaths := make([]*Destination, 0)
+	addedAllPrefixes := true
+	remPath := path.Clone()
+
+	//	mpReach, mpUnreach := packet.RemoveMPAttrs(&body.PathAttributes)
+	//	remPath := NewPath(l, neighborConf, body.PathAttributes, mpReach, RouteTypeEGP)
+	//	addPath := NewPath(l, neighborConf, body.PathAttributes, mpReach, RouteTypeEGP)
+
+	if len(add) > 0 || len(rem) > 0 {
+		//		protoFamily := packet.GetProtocolFamily(packet.AfiIP, packet.SafiUnicast)
+		updated, withdrawn, updatedAddPaths, addedAllPrefixes = l.TestNHAndProcessRoutes(
+			neighborConf.Neighbor.NeighborAddress.String(), add, rem, path, remPath, addPathCount, protoFamily,
+			updated, withdrawn, updatedAddPaths)
+	}
+
+	//	reachNLRIDone := false
+	//	if mpUnreach != nil {
+	//		var reachNLRI []packet.NLRI
+	//		if mpReach != nil && mpReach.AFI == mpUnreach.AFI && mpReach.SAFI == mpUnreach.SAFI {
+	//			reachNLRIDone = true
+	//			reachNLRI = mpReach.NLRI
+	//		}
+	//		protoFamily := packet.GetProtocolFamily(mpUnreach.AFI, mpUnreach.SAFI)
+	//		updated, withdrawn, updatedAddPaths, addedAllPrefixes = l.TestNHAndProcessRoutes(pktInfo.Src, reachNLRI,
+	//			mpUnreach.NLRI, addPath, remPath, addPathCount, protoFamily, updated, withdrawn, updatedAddPaths)
+	//	}
+
+	//	if !reachNLRIDone && mpReach != nil {
+	//		protoFamily := packet.GetProtocolFamily(mpReach.AFI, mpReach.SAFI)
+	//		updated, withdrawn, updatedAddPaths, addedAllPrefixes = l.TestNHAndProcessRoutes(pktInfo.Src, mpReach.NLRI,
+	//			nil, addPath, remPath, addPathCount, protoFamily, updated, withdrawn, updatedAddPaths)
+	//	}
+	return updated, withdrawn, updatedAddPaths, addedAllPrefixes
+}
+
+func (l *LocRib) ProcessFilteredRoutes(neighborConf *base.NeighborConf,
+	filteredRoutes map[*Path]map[uint32]*FilteredRoutes, addPathCount int) (map[uint32]map[*Path][]*Destination,
+	[]*Destination, []*Destination, bool) {
 	updated := make(map[uint32]map[*Path][]*Destination)
 	withdrawn := make([]*Destination, 0)
 	updatedAddPaths := make([]*Destination, 0)
 	addedAllPrefixes := true
 
-	mpReach, mpUnreach := packet.RemoveMPAttrs(&body.PathAttributes)
-	remPath := NewPath(l, neighborConf, body.PathAttributes, mpReach, RouteTypeEGP)
-	addPath := NewPath(l, neighborConf, body.PathAttributes, mpReach, RouteTypeEGP)
-
-	if len(body.NLRI) > 0 || len(body.WithdrawnRoutes) > 0 {
-		protoFamily := packet.GetProtocolFamily(packet.AfiIP, packet.SafiUnicast)
-		updated, withdrawn, updatedAddPaths, addedAllPrefixes = l.TestNHAndProcessRoutes(pktInfo.Src, body.NLRI,
-			body.WithdrawnRoutes, addPath, remPath, addPathCount, protoFamily, updated, withdrawn, updatedAddPaths)
-	}
-
-	reachNLRIDone := false
-	if mpUnreach != nil {
-		var reachNLRI []packet.NLRI
-		if mpReach != nil && mpReach.AFI == mpUnreach.AFI && mpReach.SAFI == mpUnreach.SAFI {
-			reachNLRIDone = true
-			reachNLRI = mpReach.NLRI
+	for path, pfNLRIs := range filteredRoutes {
+		for protoFamily, routes := range pfNLRIs {
+			updated, withdrawn, updatedAddPaths, addedAllPrefixes = l.TestNHAndProcessRoutes(
+				neighborConf.Neighbor.NeighborAddress.String(), routes.Add, routes.Remove, path, path, addPathCount,
+				protoFamily, updated, withdrawn, updatedAddPaths)
+			if !addedAllPrefixes {
+				break
+			}
 		}
-		protoFamily := packet.GetProtocolFamily(mpUnreach.AFI, mpUnreach.SAFI)
-		updated, withdrawn, updatedAddPaths, addedAllPrefixes = l.TestNHAndProcessRoutes(pktInfo.Src, reachNLRI,
-			mpUnreach.NLRI, addPath, remPath, addPathCount, protoFamily, updated, withdrawn, updatedAddPaths)
+		if !addedAllPrefixes {
+			break
+		}
 	}
 
-	if !reachNLRIDone && mpReach != nil {
-		protoFamily := packet.GetProtocolFamily(mpReach.AFI, mpReach.SAFI)
-		updated, withdrawn, updatedAddPaths, addedAllPrefixes = l.TestNHAndProcessRoutes(pktInfo.Src, mpReach.NLRI,
-			nil, addPath, remPath, addPathCount, protoFamily, updated, withdrawn, updatedAddPaths)
-	}
 	return updated, withdrawn, updatedAddPaths, addedAllPrefixes
 }
 

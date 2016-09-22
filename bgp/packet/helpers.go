@@ -520,6 +520,15 @@ func CopyPathAttrs(pathAttrs []BGPPathAttr) []BGPPathAttr {
 	return newPathAttrs
 }
 
+func ConstructNLRIFromPathIdAndNLRI(nlri NLRI, pathId uint32) NLRI {
+	newNLRI := nlri.Clone()
+	if extNLRI, ok := newNLRI.(*ExtNLRI); ok {
+		extNLRI.PathId = pathId
+	}
+
+	return newNLRI
+}
+
 func ConstructIPPrefix(ipStr string, maskStr string) *IPPrefix {
 	ip := net.ParseIP(ipStr)
 	var mask net.IPMask
