@@ -52,19 +52,19 @@ func (eng *AdjRibPPolicyEngine) AdjRIBDeleteRoutePolicyState(route *bgprib.AdjRI
 }
 
 func deleteAdjRIBRoutePolicyStateAll(route *bgprib.AdjRIBRoute) {
-	utils.Logger.Info("deleteRoutePolicyStateAll")
+	utils.Logger.Debug("deleteAdjRIBRoutePolicyStateAll")
 	route.PolicyList = nil
 	return
 }
 
 func addAdjRIBRoutePolicyState(route *bgprib.AdjRIBRoute, policy string, policyStmt string) {
-	utils.Logger.Info("addRoutePolicyState")
+	utils.Logger.Debug("addAdjRIBRoutePolicyState")
 	route.PolicyList = append(route.PolicyList, policy)
 	return
 }
 
 func UpdateAdjRIBRoutePolicyState(route *bgprib.AdjRIBRoute, op int, policy string, policyStmt string) {
-	utils.Logger.Info("updateRoutePolicyState")
+	utils.Logger.Debug("UpdateAdjRIBRoutePolicyState - op=%d", op)
 	if op == DelAll {
 		deleteAdjRIBRoutePolicyStateAll(route)
 		//deletePolicyRouteMapEntry(route, policy)
@@ -74,7 +74,7 @@ func UpdateAdjRIBRoutePolicyState(route *bgprib.AdjRIBRoute, op int, policy stri
 }
 
 func (eng *AdjRibPPolicyEngine) addAdjRIBPolicyRouteMap(route *bgprib.AdjRIBRoute, policy string) {
-	utils.Logger.Info("addAdjRIBPolicyRouteMap")
+	utils.Logger.Debugf("addAdjRIBPolicyRouteMap - route=%+v, policy=%s", route, policy)
 	var newRoute string
 	newRoute = route.NLRI.GetPrefix().String() + "/" + strconv.Itoa(int(route.NLRI.GetLength()))
 	ipPrefix, err := GetNetworkPrefixFromCIDR(newRoute)
@@ -129,7 +129,7 @@ func deleteAdjRIBPolicyRouteMap(route *bgprib.AdjRIBRoute, policy string) {
 }
 
 func (eng *AdjRibPPolicyEngine) UpdateAdjRIBPolicyRouteMap(route *bgprib.AdjRIBRoute, policy string, op int) {
-	utils.Logger.Info("updatePolicyRouteMap")
+	utils.Logger.Debugf("UpdateAdjRIBPolicyRouteMap - op=%d", op)
 	if op == Add {
 		eng.addAdjRIBPolicyRouteMap(route, policy)
 	} else if op == Del {
