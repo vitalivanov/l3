@@ -106,6 +106,7 @@ var localRouteEventsDB []RouteEventInfo
    RoutInfoMap operations functions
 */
 func RouteInfoMapInsert(ipType ribdCommonDefs.IPType, prefix patriciaDB.Prefix, routeInfoRecordList interface{}) (ok bool) {
+	logger.Debug("RouteInfoMapInsert prefix: %v", prefix, "ipType:", ipType)
 	if ipType == ribdCommonDefs.IPv4 {
 		ok = V4RouteInfoMap.Insert(prefix, routeInfoRecordList)
 	} else {
@@ -114,6 +115,7 @@ func RouteInfoMapInsert(ipType ribdCommonDefs.IPType, prefix patriciaDB.Prefix, 
 	return ok
 }
 func RouteInfoMapSet(ipType ribdCommonDefs.IPType, prefix patriciaDB.Prefix, routeInfoRecordList interface{}) {
+	logger.Debug("RouteInfoMapSet prefix: %v", prefix, "ipType:", ipType)
 	if ipType == ribdCommonDefs.IPv4 {
 		V4RouteInfoMap.Set(prefix, routeInfoRecordList)
 	} else {
@@ -121,6 +123,7 @@ func RouteInfoMapSet(ipType ribdCommonDefs.IPType, prefix patriciaDB.Prefix, rou
 	}
 }
 func RouteInfoMapDelete(ipType ribdCommonDefs.IPType, prefix patriciaDB.Prefix) {
+	logger.Debug("RouteInfoMapDelete prefix: %v", prefix, "ipType:", ipType)
 	if ipType == ribdCommonDefs.IPv4 {
 		V4RouteInfoMap.Delete(prefix)
 	} else {
@@ -128,6 +131,7 @@ func RouteInfoMapDelete(ipType ribdCommonDefs.IPType, prefix patriciaDB.Prefix) 
 	}
 }
 func RouteInfoMapGet(ipType ribdCommonDefs.IPType, prefix patriciaDB.Prefix) (item interface{}) {
+	logger.Debug("RouteInfoMapGet prefix: %v", prefix, "ipType:", ipType)
 	if ipType == ribdCommonDefs.IPv4 {
 		item = V4RouteInfoMap.Get(prefix)
 	} else {
@@ -136,6 +140,7 @@ func RouteInfoMapGet(ipType ribdCommonDefs.IPType, prefix patriciaDB.Prefix) (it
 	return item
 }
 func RouteInfoMapVisitAndUpdate(ipType ribdCommonDefs.IPType, routeReachabilityStatusInfo RouteReachabilityStatusInfo) {
+	logger.Debug("RouteInfoMapVisitAndUpdate() routeReachabilityStatusInfo", routeReachabilityStatusInfo, "ipType:", ipType)
 	if ipType == ribdCommonDefs.IPv4 {
 		V4RouteInfoMap.VisitAndUpdate(UpdateV4RouteReachabilityStatus, routeReachabilityStatusInfo)
 	} else {

@@ -160,60 +160,60 @@ func TestInitv4RtProcessApiTestServer(t *testing.T) {
 }
 
 func TestGetRouteReachability(t *testing.T) {
-	fmt.Println("**** Test GetRouteReachability****")
+	//fmt.Println("**** Test GetRouteReachability****")
 	for _, ipAddr := range ipv4AddrList {
-		fmt.Println("check route reachability of ipv4Addr:", ipAddr.ipAddr)
+		//fmt.Println("check route reachability of ipv4Addr:", ipAddr.ipAddr)
 		nh, err := server.GetRouteReachabilityInfo(ipAddr.ipAddr, -1)
 		if err != nil {
-			fmt.Println("error ", err, " getting route reachability for ip:", ipAddr)
+			fmt.Println("TestGetRouteReachability:error ", err, " getting route reachability for ip:", ipAddr, " nh:", nh)
 			continue
 		}
-		fmt.Println("getting route reachability for ip:", ipAddr.ipAddr, ": nh:", nh)
+		//fmt.Println("TestGetRouteReachability: for ip:", ipAddr.ipAddr, ": nh:", nh)
 	}
 	for _, ipAddr := range ipv6AddrList {
 		nh, err := server.GetRouteReachabilityInfo(ipAddr.ipAddr, -1)
 		if err != nil {
-			fmt.Println("error ", err, " getting route reachability for ip:", ipAddr)
+			fmt.Println("TestGetRouteReachability:error ", err, " getting route reachability for ip:", ipAddr, " nh:", nh)
 			continue
 		}
-		fmt.Println("getting route reachability for ip:", ipAddr.ipAddr, ": nh:", nh)
+		//fmt.Println("TestGetRouteReachability: for ip:", ipAddr.ipAddr, ": nh:", nh)
 	}
-	fmt.Println("*************************************")
+	//fmt.Println("*************************************")
 }
 func TestResolveNextHop(t *testing.T) {
-	fmt.Println("****TestResolveNextHop****")
+	//fmt.Println("****TestResolveNextHop****")
 	for _, ipAddr := range ipv4AddrList {
 		nh, rnh, err := ResolveNextHop(ipAddr.ipAddr)
-		fmt.Println("nh:", nh, " rnh:", rnh, " err:", err, " for ipAddr:", ipAddr.ipAddr)
+		fmt.Println("TestResolveNextHop:nh:", nh, " rnh:", rnh, " err:", err, " for ipAddr:", ipAddr.ipAddr)
 	}
 	for _, ipAddr := range ipv6AddrList {
 		nh, rnh, err := ResolveNextHop(ipAddr.ipAddr)
-		fmt.Println("nh:", nh, " rnh:", rnh, " err:", err, " for ipAddr:", ipAddr.ipAddr)
+		fmt.Println("TestResolveNextHop;nh:", nh, " rnh:", rnh, " err:", err, " for ipAddr:", ipAddr.ipAddr)
 	}
-	fmt.Println("****************************")
+	//fmt.Println("****************************")
 }
 func TestGetRoute(t *testing.T) {
-	fmt.Println("**** TestGetRoute****")
+	//fmt.Println("**** TestGetRoute****")
 	for _, ipInfo := range ipv4AddrList {
 		rt, err := server.Getv4Route(ipInfo.cidr)
 		if err != nil {
-			fmt.Println("error getting ip info for ip:", ipInfo.cidr, " err:", err)
+			fmt.Println("TestGetRoute:error getting ip info for ip:", ipInfo.cidr, " err:", err, " routeInfo:", rt)
 			continue
 		}
-		fmt.Println("rt info:", rt)
+		//fmt.Println("TestGetRoute:rt info:", rt)
 	}
 	for _, ipInfo := range ipv6AddrList {
 		rt, err := server.Getv6Route(ipInfo.cidr)
 		if err != nil {
-			fmt.Println("error getting ip info for ip:", ipInfo.cidr, "err:", err)
+			fmt.Println("TestGetRoute;error getting ip info for ip:", ipInfo.cidr, "err:", err, " routeInfo:", rt)
 			continue
 		}
-		fmt.Println("rt info:", rt)
+		//fmt.Println("TestGetRoute;rt info:", rt)
 	}
-	fmt.Println("Routes per protocol**************")
+	fmt.Println("TestGetRoute:Routes per protocol**************")
 	stats, _ := server.GetBulkRouteStatsPerProtocolState(0, 10)
 	fmt.Println(stats)
-	fmt.Println("*********************************")
+	//fmt.Println("*********************************")
 }
 func TestProcessV4RouteCreateConfig(t *testing.T) {
 	fmt.Println("****TestProcessRouteCreateConfig****")
@@ -353,7 +353,7 @@ func TestProcessv4RoutePatchUpdateConfig(t *testing.T) {
 	fmt.Println("****TestProcessRoutePatchUpdateConfig****")
 	for _, v4Route := range ipv4RouteList {
 		for _, op := range patchOpList {
-			fmt.Println("Applying patch:", op, " to route:", v4Route)
+			//fmt.Println("Applying patch:", op, " to route:", v4Route)
 			testRoute := *v4Route
 			val_err := server.RouteConfigValidationCheckForPatchUpdate(&testRoute, &testRoute, []*ribd.PatchOpInfo{op})
 			if val_err != nil {

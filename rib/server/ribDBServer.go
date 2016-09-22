@@ -435,16 +435,22 @@ func (ribdServiceHandler *RIBDServer) StartDBServer() {
 		case info := <-ribdServiceHandler.DBRouteCh:
 			if info.Op == "add" {
 				dbInfo := info.OrigConfigObject.(RouteDBInfo)
-				routeList := dbInfo.routeList
-				routeInfoList := routeList.routeInfoProtocolMap[routeList.selectedRouteProtocol]
-				for sel := 0; sel < len(routeInfoList); sel++ {
-					if routeInfoList[sel].protocol == int8(RouteProtocolTypeMapDB[routeList.selectedRouteProtocol]) {
-						//logger.Debug("add case iptype = ", routeInfoList[sel].ipType)
-						if routeInfoList[sel].ipType == ribdCommonDefs.IPv6 {
-							info.Op = "addv6"
-						}
-					}
+				logger.Debug("DBServer add for route:", dbInfo.entry)
+				entry := dbInfo.entry
+				if entry.ipType == ribdCommonDefs.IPv6 {
+					info.Op = "addv6"
 				}
+				/*				routeList := dbInfo.routeList
+								routeInfoList := routeList.routeInfoProtocolMap[routeList.selectedRouteProtocol]
+								for sel := 0; sel < len(routeInfoList); sel++ {
+									logger.Debug("sel:", sel, " routeInfoList[sel].protocol:", routeInfoList[sel].protocol, "RouteProtocolTypeMapDB[routeList.selectedRouteProtocol]:", RouteProtocolTypeMapDB[routeList.selectedRouteProtocol])
+									if routeInfoList[sel].protocol == int8(RouteProtocolTypeMapDB[routeList.selectedRouteProtocol]) {
+										logger.Debug("DBServer add case iptype = ", routeInfoList[sel].ipType, " for routeInfoList[", sel, "]:", routeInfoList[sel])
+										if routeInfoList[sel].ipType == ribdCommonDefs.IPv6 {
+											info.Op = "addv6"
+										}
+									}
+								}*/
 			} else if info.Op == "del" {
 				//logger.Debug("del case")
 				dbInfo := info.OrigConfigObject.(RouteDBInfo)

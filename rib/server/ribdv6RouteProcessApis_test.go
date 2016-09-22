@@ -90,7 +90,7 @@ func TestProcessv6RoutePatchUpdateConfig(t *testing.T) {
 	fmt.Println("****TestProcessv6RoutePatchUpdateConfig****")
 	for _, v6Route := range ipv6RouteList {
 		for _, op := range patchOpList {
-			fmt.Println("Applying patch:", op, " to route:", v6Route)
+			//	fmt.Println("Applying patch:", op, " to route:", v6Route)
 			testRoute := *v6Route
 			val_err := server.IPv6RouteConfigValidationCheckForPatchUpdate(&testRoute, &testRoute, []*ribd.PatchOpInfo{op})
 			if val_err != nil {

@@ -231,6 +231,10 @@ func (m RIBDServer) IPv6RouteConfigValidationCheckForUpdate(oldcfg *ribd.IPv6Rou
 					logger.Err("Cannot update Protocol value of a route")
 					return errors.New("Cannot set Protocol field")
 				}
+				if objName == "NullRoute" {
+					logger.Err("Cannot update null route attribute, please delete and create the route with the correct value")
+					return errors.New("Cannot update null route attribute, please delete and create the route with the correct value")
+				}
 				if objName == "NextHop" {
 					/*
 					   Next hop info is being updated
@@ -459,6 +463,10 @@ func (m RIBDServer) IPv6RouteConfigValidationCheck(cfg *ribd.IPv6Route, op strin
 			return err
 		}
 		logger.Debug(fmt.Sprintln("Number of nexthops = ", len(cfg.NextHop)))
+		if cfg.NullRoute == true {
+			logger.Debug("this is a null route, so dont validate nexthop attribute")
+			return nil
+		}
 		if len(cfg.NextHop) == 0 {
 			/*
 				Expects non-zero nexthop info
