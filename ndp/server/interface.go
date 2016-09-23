@@ -295,10 +295,10 @@ func (intf *Interface) DeletePcap() {
 		if intf.PcapBase.PcapHandle != nil {
 			// Inform go routine spawned for intf to exit..
 			// @TODO: jgheewala: fix this after walmart
-			//intf.PcapBase.PcapCtrl <- true
-			//<-intf.PcapBase.PcapCtrl
 			intf.PcapBase.PcapHandle.Close()
 			intf.PcapBase.PcapHandle = nil
+			intf.PcapBase.PcapCtrl <- true
+			<-intf.PcapBase.PcapCtrl
 		}
 		// deleted ctrl channel to avoid any memory usage
 		intf.PcapBase.PcapCtrl = nil
@@ -400,7 +400,6 @@ func (intf *Interface) createNbrKey(ndInfo *packet.NDInfo) (nbrkey string) {
  * process nd will be called during received message
  */
 func (intf *Interface) ProcessND(ndInfo *packet.NDInfo) (*config.NeighborConfig, NDP_OPERATION) {
-	intf.counter.Rcvd++
 	if intf.Neighbor == nil {
 		debug.Logger.Alert("!!!!Neighbor Initialization for intf:", intf.IntfRef, "didn't happen properly!!!!!")
 		intf.Neighbor = make(map[string]NeighborInfo, 10)
@@ -421,7 +420,6 @@ func (intf *Interface) ProcessND(ndInfo *packet.NDInfo) (*config.NeighborConfig,
  * send neighbor discover messages on timer expiry
  */
 func (intf *Interface) SendND(pktData config.PacketData, mac string) NDP_OPERATION {
-	intf.counter.Send++
 	switch pktData.SendPktType {
 	case layers.ICMPv6TypeNeighborSolicitation:
 		return intf.SendNS(mac, pktData.NeighborMac, pktData.NeighborIp)
