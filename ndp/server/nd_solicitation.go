@@ -70,15 +70,18 @@ func (intf *Interface) sendUnicastNS(srcMac, nbrMac, nbrIp string) NDP_OPERATION
 	if nbr.State == REACHABLE {
 		// This means that Reachable Timer has expierd and hence we are sending Unicast Message..
 		// Lets set the time for delay first probe
+		debug.Logger.Debug("Reachable timer expired for nbr:", nbrIp, "setting delay proble timer")
 		nbr.DelayProbe()
 		nbr.State = DELAY
 		nbr.ProbesSent = 0
-	} else {
+	} else if nbr.State == DELAY || nbr.State == PROBE {
 		// Probes Sent can still be zero but the state has changed to Delay..
 		// Start Timer for Probe and move the state from delay to Probe
+		debug.Logger.Debug("Delay Probe timer expired for nbr:", nbrIp, "setting re-transmite timer")
 		nbr.Timer()
 		nbr.State = PROBE
 		nbr.ProbesSent += 1
+		debug.Logger.Debug("Total probes send out to nbr:", nbrIp, "are", nbr.ProbesSent)
 	}
 	intf.Neighbor[nbrKey] = nbr
 	return IGNORE
