@@ -31,6 +31,7 @@ import (
 	_ "models/objects"
 	"os"
 	"os/signal"
+	"runtime/pprof"
 	"sync"
 	"syscall"
 	"time"
@@ -42,6 +43,11 @@ func NDPNewServer(sPlugin asicdClient.AsicdClientIntf, dmnBase *dmnBase.FSBaseDm
 	svr := &NDPServer{}
 	svr.SwitchPlugin = sPlugin
 	svr.dmnBase = dmnBase
+	// Profiling code for lldp
+	prof, err := os.Create(NDP_CPU_PROFILE_FILE)
+	if err == nil {
+		pprof.StartCPUProfile(prof)
+	}
 	return svr
 }
 
@@ -53,12 +59,9 @@ func (svr *NDPServer) SignalHandler(sigChannel <-chan os.Signal) {
 	signal := <-sigChannel
 	switch signal {
 	case syscall.SIGHUP:
-		//svr.lldpExit <- true
 		debug.Logger.Alert("Received SIGHUP Signal")
-		//svr.CloseAllPktHandlers()
 		svr.DeInitGlobalDS()
-		//svr.CloseDB()
-		//pprof.StopCPUProfile()
+		pprof.StopCPUProfile()
 		debug.Logger.Alert("Exiting!!!!!")
 		os.Exit(0)
 	default:
@@ -88,7 +91,7 @@ func (svr *NDPServer) InitGlobalDS() {
 	svr.RxPktCh = make(chan *RxPktInfo, 30)
 	svr.PktDataCh = make(chan config.PacketData, 30)
 	svr.SnapShotLen = 1024
-	svr.Promiscuous = true
+	svr.Promiscuous = false
 	svr.Timeout = 1 * time.Second
 	svr.NeigborEntryLock = &sync.RWMutex{}
 	svr.Packet = packet.Init()
@@ -158,19 +161,19 @@ func (svr *NDPServer) EventsListener() {
 				continue
 			}
 			svr.counter.Rcvd++
+			debug.Logger.Debug("ProcessRxPkt for ifIndex:", rxChInfo.ifIndex)
 			svr.ProcessRxPkt(rxChInfo.ifIndex, rxChInfo.pkt)
 		case pktData, ok := <-svr.PktDataCh:
 			if !ok {
 				continue
 			}
+			debug.Logger.Debug("Processing timer expiry:", pktData)
 			svr.ProcessTimerExpiry(pktData)
-
 		case vlanInfo, ok := <-svr.VlanCh:
 			if !ok {
 				continue
 			}
 			debug.Logger.Debug("Need to support vlan Notifications:", vlanInfo)
-
 		case globalCfg, ok := <-svr.GlobalCfg:
 			if !ok {
 				continue

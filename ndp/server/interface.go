@@ -109,6 +109,7 @@ func (intf *Interface) addIP(ipAddr string) {
 }
 
 func (intf *Interface) removeIP(ipAddr string) {
+	debug.Logger.Debug("Removing IP Addres:", ipAddr, "from interface:", intf.IntfRef)
 	if isLinkLocal(ipAddr) {
 		intf.LinkLocalIp = ""
 		intf.linkScope = ""
@@ -191,6 +192,7 @@ func (intf *Interface) CreateIntf(obj *config.IPIntfNotification, pktCh chan con
  */
 func (intf *Interface) UpdateIntf(ipAddr string) {
 	intf.addIP(ipAddr)
+	intf.addPcapUser()
 	debug.Logger.Debug("UpdateIntf port:", intf.IntfRef, "ifIndex:", intf.IfIndex, "GS:", intf.IpAddr, "LS:", intf.LinkLocalIp)
 }
 
@@ -404,7 +406,6 @@ func (intf *Interface) ProcessND(ndInfo *packet.NDInfo) (*config.NeighborConfig,
 		debug.Logger.Alert("!!!!Neighbor Initialization for intf:", intf.IntfRef, "didn't happen properly!!!!!")
 		intf.Neighbor = make(map[string]NeighborInfo, 10)
 	}
-	debug.Logger.Debug("Total pcap user for", intf.IntfRef, "are", intf.PcapBase.PcapUsers)
 	switch ndInfo.PktType {
 	case layers.ICMPv6TypeNeighborSolicitation:
 		return intf.processNS(ndInfo)
@@ -421,7 +422,6 @@ func (intf *Interface) ProcessND(ndInfo *packet.NDInfo) (*config.NeighborConfig,
  * send neighbor discover messages on timer expiry
  */
 func (intf *Interface) SendND(pktData config.PacketData, mac string) NDP_OPERATION {
-	debug.Logger.Debug("Total pcap user for", intf.IntfRef, "are", intf.PcapBase.PcapUsers)
 	switch pktData.SendPktType {
 	case layers.ICMPv6TypeNeighborSolicitation:
 		return intf.SendNS(mac, pktData.NeighborMac, pktData.NeighborIp)

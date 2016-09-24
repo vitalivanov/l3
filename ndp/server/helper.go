@@ -120,6 +120,10 @@ func (svr *NDPServer) GetIPIntf() {
 		return
 	}
 	for _, obj := range ipsInfo {
+		// ndp will not listen on loopback interfaces
+		if svr.SwitchPlugin.IsLoopbackType(obj.IfIndex) {
+			continue
+		}
 		ipInfo, exists := svr.L3Port[obj.IfIndex]
 		if !exists {
 			ipInfo.InitIntf(obj, svr.PktDataCh, svr.NdpConfig)
