@@ -194,7 +194,6 @@ func (intf *Interface) CreateIntf(obj *config.IPIntfNotification, pktCh chan con
  */
 func (intf *Interface) UpdateIntf(ipAddr string) {
 	intf.addIP(ipAddr)
-	intf.addPcapUser()
 	debug.Logger.Debug("UpdateIntf port:", intf.IntfRef, "ifIndex:", intf.IfIndex, "GS:", intf.IpAddr, "LS:", intf.LinkLocalIp)
 }
 
