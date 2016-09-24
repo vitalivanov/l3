@@ -161,13 +161,11 @@ func (svr *NDPServer) EventsListener() {
 				continue
 			}
 			svr.counter.Rcvd++
-			debug.Logger.Debug("ProcessRxPkt for ifIndex:", rxChInfo.ifIndex)
 			svr.ProcessRxPkt(rxChInfo.ifIndex, rxChInfo.pkt)
 		case pktData, ok := <-svr.PktDataCh:
 			if !ok {
 				continue
 			}
-			debug.Logger.Debug("Processing timer expiry:", pktData)
 			svr.ProcessTimerExpiry(pktData)
 		case vlanInfo, ok := <-svr.VlanCh:
 			if !ok {
