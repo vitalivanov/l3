@@ -43,6 +43,7 @@ func (intf *Interface) processNA(ndInfo *packet.NDInfo) (nbrInfo *config.Neighbo
 	nbrKey := intf.createNbrKey(ndInfo)
 	nbr, exists := intf.Neighbor[nbrKey]
 	if exists {
+		debug.Logger.Debug("Nbr entry exists and hence marking", nbr.IpAddr, "as REACHABLE")
 		// update existing neighbor timers and move
 		nbr.State = REACHABLE
 		nbr.UpdateProbe()
@@ -50,6 +51,7 @@ func (intf *Interface) processNA(ndInfo *packet.NDInfo) (nbrInfo *config.Neighbo
 		oper = UPDATE
 	} else {
 		// create new neighbor
+		debug.Logger.Debug("Nbr entry learned via NA and hence marking", nbr.IpAddr, "as REACHABLE")
 		nbr.InitCache(intf.reachableTime, intf.retransTime, nbrKey, intf.PktDataCh, intf.IfIndex)
 		nbr.State = REACHABLE
 		oper = CREATE

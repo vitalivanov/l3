@@ -24,6 +24,7 @@ package server
 
 import (
 	"l3/ndp/config"
+	"l3/ndp/debug"
 	"math/rand"
 	"strings"
 	"time"
@@ -80,6 +81,7 @@ type NeighborInfo struct {
  */
 func (c *NeighborInfo) DeInit() {
 	// stopping all three timers in accending order
+	debug.Logger.Debug("De-Init neighbor", c.IpAddr)
 	c.StopReTransmitTimer()
 	c.StopReachableTimer()
 	c.StopDelayProbeTimer()
@@ -111,6 +113,8 @@ func (c *NeighborInfo) InitCache(reachableTime, retransTime uint32, nbrKey strin
 	// Once initalized start reachable timer... And also start one hour timer for re-computing BaseReachableTimer
 	c.RchTimer()
 	c.ReComputeBaseReachableTimer()
+	debug.Logger.Debug("Neighbor timers are ReachableTimeConfig:", c.ReachableTimeConfig, "RetransTimerConfig:", c.RetransTimerConfig,
+		"BaseReachableTimer:", c.BaseReachableTimer)
 }
 
 func (nbr *NeighborInfo) populateNbrInfo(ifIndex int32, intfRef string) *config.NeighborConfig {
