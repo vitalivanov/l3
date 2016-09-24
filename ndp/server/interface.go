@@ -300,7 +300,6 @@ func (intf *Interface) DeletePcap() {
 		// once go routine is exited, delete pcap handler
 		if intf.PcapBase.PcapHandle != nil {
 			// Inform go routine spawned for intf to exit..
-			// @TODO: jgheewala: fix this after walmart
 			intf.PcapBase.PcapHandle.Close()
 			intf.PcapBase.PcapHandle = nil
 			//intf.PcapBase.PcapCtrl <- true
