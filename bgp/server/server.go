@@ -897,8 +897,8 @@ func (s *BGPServer) UpdateAdjRIBOutRouteAndPolicyDB(policyDetails utilspolicy.Po
 	s.UpdateAdjRIBRouteAndPolicyDB(policyDetails, params, s.ribOutPE)
 }
 
-func (s *BGPServer) TraverseAndApplyAdjRib(data interface{}, updateFunc utilspolicy.PolicyApplyfunc,
-	pe *bgppolicy.AdjRibPPolicyEngine, adjRibDir bgprib.AdjRIBDir) {
+func (s *BGPServer) getPeerForPolicy(data interface{}, updateFunc utilspolicy.PolicyApplyfunc,
+	pe *bgppolicy.AdjRibPPolicyEngine) *Peer {
 	s.logger.Infof("BGPServer:TraverseAndApplyAdjRib - start")
 	policyInfo := data.(utilspolicy.PolicyEngineApplyInfo)
 	conditionsDB := pe.PolicyEngine.PolicyConditionsDB
@@ -911,7 +911,7 @@ func (s *BGPServer) TraverseAndApplyAdjRib(data interface{}, updateFunc utilspol
 		nodeGet := conditionsDB.Get(patriciaDB.Prefix(condition))
 		if nodeGet == nil {
 			s.logger.Err("Condition", condition, "not defined")
-			return
+			return nil
 		}
 		node := nodeGet.(utilspolicy.PolicyCondition)
 		if node.ConditionType == policyCommonDefs.PolicyConditionTypeNeighborMatch {
@@ -921,10 +921,10 @@ func (s *BGPServer) TraverseAndApplyAdjRib(data interface{}, updateFunc utilspol
 
 	if peer, ok = s.PeerMap[neighborIP]; !ok {
 		s.logger.Err("Can't apply policy... Neighbor %s not found", neighborIP)
-		return
+		return nil
 	}
 
-	peer.AdjRIBPolicyUpdated(adjRibDir, data, updateFunc)
+	return peer
 	/*
 		adjRIB := s.GetAdjRIB(peer, adjRibDir)
 		for _, prefixRouteMap := range adjRIB {
@@ -954,11 +954,24 @@ func (s *BGPServer) TraverseAndApplyAdjRib(data interface{}, updateFunc utilspol
 }
 
 func (s *BGPServer) TraverseAndApplyAdjRibIn(data interface{}, updateFunc utilspolicy.PolicyApplyfunc) {
-	s.TraverseAndApplyAdjRib(data, updateFunc, s.ribInPE, bgprib.AdjRIBDirIn)
+	peer := s.getPeerForPolicy(data, updateFunc, s.ribInPE)
+	if peer == nil {
+		s.logger.Infof("BGPServer:TraverseAndApplyAdjRibIn - peer not found")
+		return
+	}
+	updated, withdrawn, updatedAddPaths := peer.AdjRIBInPolicyUpdated(bgprib.AdjRIBDirIn, data, updateFunc)
+	updated, withdrawn, updatedAddPaths = s.CheckForAggregation(updated, withdrawn, updatedAddPaths)
+	s.SendUpdate(updated, withdrawn, updatedAddPaths)
 }
 
 func (s *BGPServer) TraverseAndApplyAdjRibOut(data interface{}, updateFunc utilspolicy.PolicyApplyfunc) {
-	s.TraverseAndApplyAdjRib(data, updateFunc, s.ribOutPE, bgprib.AdjRIBDirOut)
+	peer := s.getPeerForPolicy(data, updateFunc, s.ribOutPE)
+	if peer == nil {
+		s.logger.Infof("BGPServer:TraverseAndApplyAdjRibOut - peer not found")
+		return
+	}
+
+	peer.AdjRIBOutPolicyUpdated(data, updateFunc)
 }
 
 func (s *BGPServer) TraverseAndReverseAdjRIB(policyData interface{}, pe *bgppolicy.AdjRibPPolicyEngine) {

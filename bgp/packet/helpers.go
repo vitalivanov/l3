@@ -108,6 +108,10 @@ func AddMPReachNLRIToPathAttrs(pathAttrs []BGPPathAttr, mpReach *BGPPathAttrMPRe
 	return AddPathAttrToPathAttrs(pathAttrs, BGPPathAttrTypeMPReachNLRI, mpReach)
 }
 
+func AddMPUnreachNLRIToPathAttrs(pathAttrs []BGPPathAttr, mpUnreach *BGPPathAttrMPUnreachNLRI) []BGPPathAttr {
+	return AddPathAttrToPathAttrs(pathAttrs, BGPPathAttrTypeMPUnreachNLRI, mpUnreach)
+}
+
 func addPathAttr(updateMsg *BGPMessage, code BGPPathAttrType, attr BGPPathAttr) {
 	body := updateMsg.Body.(*BGPUpdate)
 	body.PathAttributes = AddPathAttrToPathAttrs(body.PathAttributes, code, attr)
