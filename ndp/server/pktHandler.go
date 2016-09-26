@@ -146,8 +146,7 @@ func (svr *NDPServer) insertNeigborInfo(nbrInfo *config.NeighborConfig) {
 func (svr *NDPServer) deleteNeighborInfo(nbrIp string) {
 	for idx, _ := range svr.neighborKey {
 		if svr.neighborKey[idx] == nbrIp {
-			svr.neighborKey = append(svr.neighborKey[:idx],
-				svr.neighborKey[idx+1:]...)
+			svr.neighborKey = append(svr.neighborKey[:idx], svr.neighborKey[idx+1:]...)
 			break
 		}
 	}
@@ -225,7 +224,6 @@ func (svr *NDPServer) ProcessRxPkt(ifIndex int32, pkt gopacket.Packet) error {
 	if nbrInfo == nil || operation == IGNORE {
 		return nil
 	}
-	nbrInfo.ReceivedPackets = ipPort.counter.Rcvd
 	switch operation {
 	case CREATE:
 		svr.PopulateVlanInfo(nbrInfo, ifIndex)
@@ -242,7 +240,6 @@ func (svr *NDPServer) ProcessTimerExpiry(pktData config.PacketData) error {
 		return errors.New(fmt.Sprintln("Entry for ifIndex:", pktData.IfIndex,
 			"doesn't exists and hence cannot process timer expiry event for neighbor:", pktData))
 	}
-	l3Port.counter.Send++
 	// fix this when we have per port mac addresses
 	operation := l3Port.SendND(pktData, svr.SwitchMac)
 	if operation == DELETE {
@@ -250,7 +247,6 @@ func (svr *NDPServer) ProcessTimerExpiry(pktData config.PacketData) error {
 	}
 	svr.L3Port[pktData.IfIndex] = l3Port
 	nbrInfo := svr.NeighborInfo[pktData.NeighborIp]
-	nbrInfo.SendPackets = l3Port.counter.Send
 	svr.NeighborInfo[pktData.NeighborIp] = nbrInfo
 	svr.counter.Send++
 	return nil

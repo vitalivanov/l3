@@ -77,10 +77,9 @@ type NDPServer struct {
 	//Package packet informs server over PktDataCh saying that send this packet..
 	PktDataCh chan config.PacketData
 
-	ndpIntfStateSlice     []int32
-	ndpUpIntfStateSlice   []int32
 	ndpL3IntfStateSlice   []int32
 	ndpUpL3IntfStateSlice []int32
+	L3IfIntfRefToIfIndex  map[string]int32
 
 	//Pcap Default config values
 	SnapShotLen int32
@@ -102,7 +101,8 @@ type NDPServer struct {
 
 const (
 	NDP_CPU_PROFILE_FILE                  = "/var/log/ndpd.prof"
-	NDP_SERVER_MAP_INITIAL_CAP            = 50
-	NDP_SERVER_ASICD_NOTIFICATION_CH_SIZE = 1
+	NDP_SERVER_MAP_INITIAL_CAP            = 30
+	NDP_SERVER_ASICD_NOTIFICATION_CH_SIZE = 5
+	NDP_SERVER_INITIAL_CHANNEL_SIZE       = 1
 	INTF_REF_NOT_FOUND                    = "Not Found"
 )

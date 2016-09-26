@@ -111,3 +111,12 @@ func UpdateGlobalConfig(vrf string, retransmit uint32, reachableTime uint32, raT
 func GetNDPGlobalState(vrf string) (*config.GlobalState, error) {
 	return ndpApi.server.GetGlobalState(vrf), nil
 }
+
+func GetAllNdpIntfState(from, count int) (int, int, []config.InterfaceEntries) {
+	n, c, result := ndpApi.server.GetInterfaceNeighborEntries(from, count)
+	return n, c, result
+}
+
+func GetNdpIntfState(intfRef string) *config.InterfaceEntries {
+	return ndpApi.server.GetInterfaceNeighborEntry(intfRef)
+}

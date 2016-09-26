@@ -449,3 +449,29 @@ func (intf *Interface) UpdateTimer(gCfg NdpConfig) {
 	intf.raRestransmitTime = gCfg.RaRestransmitTime
 	intf.retransTime = gCfg.RetransTime
 }
+
+/*
+ *  Get Neighbor Information
+ */
+func (intf *Interface) PopulateNeighborInfo(nbr NeighborInfo, nbrState *config.NeighborEntry) {
+	nbrState.IpAddr = nbr.IpAddr
+	nbrState.MacAddr = nbr.LinkLayerAddress
+	baseReachableTime := time.Duration(nbr.BaseReachableTimer) * time.Millisecond
+	elapsedTime := time.Since(nbr.pktRcvdTime)
+	expiryTime := baseReachableTime - elapsedTime
+	nbrState.ExpiryTimeLeft = expiryTime.String()
+	nbrState.ReceivedPackets = nbr.counter.Rcvd
+	nbrState.SendPackets = nbr.counter.Send
+	switch nbr.State {
+	case INCOMPLETE:
+		nbrState.State = "Incomplete"
+	case REACHABLE:
+		nbrState.State = "Reachable"
+	case STALE:
+		nbrState.State = "Stale"
+	case DELAY:
+		nbrState.State = "Stale"
+	case PROBE:
+		nbrState.State = "Stale"
+	}
+}

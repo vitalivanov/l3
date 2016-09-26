@@ -68,6 +68,7 @@ func (intf *Interface) processRA(ndInfo *packet.NDInfo) (nbrInfo *config.Neighbo
 		nbrInfo = nbr.populateNbrInfo(intf.IfIndex, intf.IntfRef)
 		oper = CREATE
 	}
+	nbr.updatePktRxStateInfo()
 	intf.Neighbor[nbrKey] = nbr
 	debug.Logger.Debug("Neighbor Info is:", nbr, "operation from interface to server is:", oper)
 	return nbrInfo, oper
@@ -88,12 +89,13 @@ func (intf *Interface) SendRA(srcMac string) {
 		pkt.SrcIp = intf.linkScope
 		pktToSend := pkt.Encode()
 		intf.writePkt(pktToSend)
-
+		intf.counter.Send++
 	}
 	if intf.globalScope != "" {
 		pkt.SrcIp = intf.globalScope
 		pktToSend := pkt.Encode()
 		intf.writePkt(pktToSend)
+		intf.counter.Send++
 	}
 
 	intf.RAResTransmitTimer()

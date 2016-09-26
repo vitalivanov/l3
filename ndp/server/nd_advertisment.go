@@ -57,6 +57,7 @@ func (intf *Interface) processNA(ndInfo *packet.NDInfo) (nbrInfo *config.Neighbo
 		oper = CREATE
 		nbrInfo = nbr.populateNbrInfo(intf.IfIndex, intf.IntfRef)
 	}
+	nbr.updatePktRxStateInfo()
 	intf.Neighbor[nbrKey] = nbr
 	return nbrInfo, oper
 }

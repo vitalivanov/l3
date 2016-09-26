@@ -43,17 +43,6 @@ func (h *ConfigHandler) DeleteNDPGlobal(config *ndpd.NDPGlobal) (bool, error) {
 	return false, errors.New("Delete of Global Object is not supported")
 }
 
-/*
-	IpAddr          string `SNAPROUTE: "KEY", ACCESS:"r", MULTIPLICITY:"*", DESCRIPTION: "Neighbor's IP Address"`
-	MacAddr         string `DESCRIPTION: "MAC address of the neighbor machine with corresponding IP Address"`
-	Vlan            string `DESCRIPTION: "Vlan ID of the Router Interface to which neighbor is attached to"`
-	Intf            string `DESCRIPTION: "Router Interface to which neighbor is attached to"`
-	IfIndex         int32  `DESCRIPTION: "ifIndex where neighbor is learned"`
-	ExpiryTimeLeft  string `DESCRIPTION: "Time left before entry expires in case neighbor departs"`
-	SendPackets     int32  `DESCRIPTION: "Total Packets send to the neighbor"`
-	ReceivedPackets int32  `DESCRIPTION: "Total Packets received from neighbor"`
-*/
-
 func convertNDPEntryStateToThriftEntry(state config.NeighborConfig) *ndpd.NDPEntryState {
 	entry := ndpd.NewNDPEntryState()
 	entry.IpAddr = state.IpAddr
@@ -65,9 +54,6 @@ func convertNDPEntryStateToThriftEntry(state config.NeighborConfig) *ndpd.NDPEnt
 	}
 	entry.Intf = state.Intf
 	entry.IfIndex = state.IfIndex
-	entry.ExpiryTimeLeft = state.ExpiryTimeLeft
-	entry.SendPackets = state.SendPackets
-	entry.ReceivedPackets = state.ReceivedPackets
 	return entry
 }
 
@@ -124,4 +110,51 @@ func (h *ConfigHandler) GetBulkNDPGlobalState(fromIndex ndpd.Int, count ndpd.Int
 func (h *ConfigHandler) GetNDPGlobalState(vrf string) (*ndpd.NDPGlobalState, error) {
 	gblEntry, _ := api.GetNDPGlobalState(vrf)
 	return h.convertNDPGlobalStateEntryToThriftEntry(gblEntry), nil
+}
+
+func (h *ConfigHandler) convertNDPIntfStateEntryToThriftEntry(state config.InterfaceEntries) *ndpd.NDPIntfState {
+	entry := ndpd.NewNDPIntfState()
+	entry.IntfRef = state.IntfRef
+	entry.IfIndex = state.IfIndex
+	entry.LinkScopeIp = state.LinkScopeIp
+	entry.GlobalScopeIp = state.GlobalScopeIp
+	entry.ReceivedPackets = state.ReceivedPackets
+	entry.SendPackets = state.SendPackets
+	for _, nbrEntry := range state.Neighbor {
+		nbr := ndpd.NewNeighborEntry()
+		nbr.IpAddr = nbrEntry.IpAddr
+		nbr.MacAddr = nbrEntry.MacAddr
+		nbr.ExpiryTimeLeft = nbrEntry.ExpiryTimeLeft
+		nbr.SendPackets = nbrEntry.SendPackets
+		nbr.ReceivedPackets = nbrEntry.ReceivedPackets
+		nbr.State = nbrEntry.State
+		entry.Neighbors = append(entry.Neighbors, nbr)
+	}
+	return entry
+}
+
+func (h *ConfigHandler) GetBulkNDPIntfState(fromIdx ndpd.Int, count ndpd.Int) (*ndpd.NDPIntfStateGetInfo, error) {
+	nextIdx, currCount, ndpIntfEntries := api.GetAllNdpIntfState(int(fromIdx), int(count))
+	if len(ndpIntfEntries) == 0 || ndpIntfEntries == nil {
+		return nil, errors.New("No Neighbor Entries Learned")
+	}
+	ndpResp := make([]*ndpd.NDPIntfState, len(ndpIntfEntries))
+	for idx, ndpEntry := range ndpIntfEntries {
+		ndpResp[idx] = h.convertNDPIntfStateEntryToThriftEntry(ndpEntry)
+	}
+	ndpIntfStateBulk := ndpd.NewNDPIntfStateGetInfo()
+	ndpIntfStateBulk.StartIdx = fromIdx
+	ndpIntfStateBulk.EndIdx = ndpd.Int(nextIdx)
+	ndpIntfStateBulk.Count = ndpd.Int(currCount)
+	ndpIntfStateBulk.More = (nextIdx != 0)
+	ndpIntfStateBulk.NDPIntfStateList = ndpResp
+	return ndpIntfStateBulk, nil
+}
+
+func (h *ConfigHandler) GetNDPIntfState(intfRef string) (*ndpd.NDPIntfState, error) {
+	ndpEntry := api.GetNdpIntfState(intfRef)
+	if ndpEntry == nil {
+		return nil, errors.New("No Neighbor Found for Port " + intfRef)
+	}
+	return h.convertNDPIntfStateEntryToThriftEntry(*ndpEntry), nil
 }
