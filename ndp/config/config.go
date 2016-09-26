@@ -76,16 +76,31 @@ type GlobalState struct {
 }
 
 type NeighborConfig struct {
-	MacAddr         string
-	VlanId          int32
-	IfIndex         int32
-	Intf            string
+	MacAddr     string
+	VlanId      int32
+	IfIndex     int32
+	Intf        string
+	IpAddr      string
+	LinkLocalIp string
+}
+
+type NeighborEntry struct {
 	IpAddr          string
-	LinkLocalIp     string
+	MacAddr         string
 	ExpiryTimeLeft  string
-	State           int
 	SendPackets     int64
 	ReceivedPackets int64
+	State           string
+}
+
+type InterfaceEntries struct {
+	IntfRef         string
+	IfIndex         int32
+	LinkScopeIp     string
+	GlobalScopeIp   string
+	SendPackets     int64
+	ReceivedPackets int64
+	Neighbor        []NeighborEntry
 }
 
 type VlanInfo struct {

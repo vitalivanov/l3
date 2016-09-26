@@ -85,11 +85,12 @@ func (svr *NDPServer) InitGlobalDS() {
 	svr.VlanInfo = make(map[int32]config.VlanInfo, NDP_SERVER_MAP_INITIAL_CAP)
 	svr.VlanIfIdxVlanIdMap = make(map[int32]int32, NDP_SERVER_MAP_INITIAL_CAP)
 	svr.NeighborInfo = make(map[string]config.NeighborConfig, NDP_SERVER_MAP_INITIAL_CAP)
+	svr.L3IfIntfRefToIfIndex = make(map[string]int32, NDP_SERVER_MAP_INITIAL_CAP)
 	svr.PhyPortStateCh = make(chan *config.PortState, NDP_SERVER_ASICD_NOTIFICATION_CH_SIZE)
 	svr.IpIntfCh = make(chan *config.IPIntfNotification, NDP_SERVER_ASICD_NOTIFICATION_CH_SIZE)
 	svr.VlanCh = make(chan *config.VlanNotification)
-	svr.RxPktCh = make(chan *RxPktInfo, 30)
-	svr.PktDataCh = make(chan config.PacketData, 30)
+	svr.RxPktCh = make(chan *RxPktInfo, NDP_SERVER_INITIAL_CHANNEL_SIZE)
+	svr.PktDataCh = make(chan config.PacketData, NDP_SERVER_INITIAL_CHANNEL_SIZE)
 	svr.SnapShotLen = 1024
 	svr.Promiscuous = false
 	svr.Timeout = 1 * time.Second

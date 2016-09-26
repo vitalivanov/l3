@@ -74,6 +74,8 @@ type NeighborInfo struct {
 	IpAddr               string
 	ReturnCh             chan config.PacketData // NDP Server communicator
 	IfIndex              int32                  // Physical Port where to send the packet on timer expiry
+	counter              PktCounter
+	pktRcvdTime          time.Time // last received packet time
 }
 
 /*
@@ -87,6 +89,8 @@ func (c *NeighborInfo) DeInit() {
 	c.StopDelayProbeTimer()
 	c.StopInvalidTimer()
 	c.StopReComputeBaseTimer()
+	c.counter.Rcvd = 0
+	c.counter.Send = 0
 }
 
 /*
@@ -113,6 +117,8 @@ func (c *NeighborInfo) InitCache(reachableTime, retransTime uint32, nbrKey strin
 	// Once initalized start reachable timer... And also start one hour timer for re-computing BaseReachableTimer
 	c.RchTimer()
 	c.ReComputeBaseReachableTimer()
+	c.counter.Rcvd = 0
+	c.counter.Send = 0
 	debug.Logger.Debug("Neighbor timers are ReachableTimeConfig:", c.ReachableTimeConfig, "RetransTimerConfig:", c.RetransTimerConfig,
 		"BaseReachableTimer:", c.BaseReachableTimer)
 }
@@ -124,4 +130,9 @@ func (nbr *NeighborInfo) populateNbrInfo(ifIndex int32, intfRef string) *config.
 	nbrInfo.IfIndex = ifIndex
 	nbrInfo.Intf = intfRef
 	return nbrInfo
+}
+
+func (nbr *NeighborInfo) updatePktRxStateInfo() {
+	nbr.pktRcvdTime = time.Now()
+	nbr.counter.Rcvd++
 }

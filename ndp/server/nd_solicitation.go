@@ -83,6 +83,8 @@ func (intf *Interface) sendUnicastNS(srcMac, nbrMac, nbrIp string) NDP_OPERATION
 		nbr.ProbesSent += 1
 		debug.Logger.Debug("Total probes send out to nbr:", nbrIp, "are", nbr.ProbesSent)
 	}
+	intf.counter.Send++
+	nbr.counter.Send++
 	intf.Neighbor[nbrKey] = nbr
 	return IGNORE
 }
@@ -137,6 +139,7 @@ func (intf *Interface) processNS(ndInfo *packet.NDInfo) (nbrInfo *config.Neighbo
 		nbrInfo = nbr.populateNbrInfo(intf.IfIndex, intf.IntfRef)
 		oper = CREATE
 	}
+	nbr.updatePktRxStateInfo()
 	intf.Neighbor[nbrKey] = nbr
 	return nbrInfo, oper
 }
