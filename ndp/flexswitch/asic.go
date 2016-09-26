@@ -24,6 +24,7 @@ package flexswitch
 
 import (
 	"asicd/asicdCommonDefs"
+	"asicd/pluginManager/pluginCommon"
 	"l3/ndp/api"
 	"l3/ndp/config"
 	"l3/ndp/debug"
@@ -77,23 +78,27 @@ func (notifyHdl *AsicNotificationHdl) ProcessNotification(msg commonDefs.AsicdNo
 	case commonDefs.IPv6IntfNotifyMsg:
 		// create/delete ipv6 interface notification case
 		ipv6Msg := msg.(commonDefs.IPv6IntfNotifyMsg)
-		if ipv6Msg.MsgType == commonDefs.NOTIFY_IPV6INTF_CREATE {
-			debug.Logger.Debug("Received Asicd IPV6 INTF Notfication CREATE:", ipv6Msg)
-			api.SendIPIntfNotfication(ipv6Msg.IfIndex, ipv6Msg.IpAddr, ipv6Msg.IntfRef, config.CONFIG_CREATE)
-		} else {
-			debug.Logger.Debug("Received Asicd IPV6 INTF Notfication DELETE:", ipv6Msg)
-			api.SendIPIntfNotfication(ipv6Msg.IfIndex, ipv6Msg.IpAddr, ipv6Msg.IntfRef, config.CONFIG_DELETE)
+		if pluginCommon.GetTypeFromIfIndex(ipv6Msg.IfIndex) != commonDefs.IfTypeLoopback {
+			if ipv6Msg.MsgType == commonDefs.NOTIFY_IPV6INTF_CREATE {
+				debug.Logger.Debug("Received Asicd IPV6 INTF Notfication CREATE:", ipv6Msg)
+				api.SendIPIntfNotfication(ipv6Msg.IfIndex, ipv6Msg.IpAddr, ipv6Msg.IntfRef, config.CONFIG_CREATE)
+			} else {
+				debug.Logger.Debug("Received Asicd IPV6 INTF Notfication DELETE:", ipv6Msg)
+				api.SendIPIntfNotfication(ipv6Msg.IfIndex, ipv6Msg.IpAddr, ipv6Msg.IntfRef, config.CONFIG_DELETE)
+			}
 		}
 	case commonDefs.IPv6L3IntfStateNotifyMsg:
 		// state up/down for ipv6 interface case
 		l3Msg := msg.(commonDefs.IPv6L3IntfStateNotifyMsg)
-		// only get state notification if ip type is v6
-		if l3Msg.IfState == asicdCommonDefs.INTF_STATE_UP {
-			debug.Logger.Debug("Received Asicd L3 State Notfication UP:", l3Msg)
-			api.SendL3PortNotification(l3Msg.IfIndex, config.STATE_UP, l3Msg.IpAddr)
-		} else {
-			debug.Logger.Debug("Received Asicd L3 State Notfication DOWN:", l3Msg)
-			api.SendL3PortNotification(l3Msg.IfIndex, config.STATE_DOWN, l3Msg.IpAddr)
+		// only get state notification if ip type is v6 && not loopback
+		if pluginCommon.GetTypeFromIfIndex(l3Msg.IfIndex) != commonDefs.IfTypeLoopback {
+			if l3Msg.IfState == asicdCommonDefs.INTF_STATE_UP {
+				debug.Logger.Debug("Received Asicd L3 State Notfication UP:", l3Msg)
+				api.SendL3PortNotification(l3Msg.IfIndex, config.STATE_UP, l3Msg.IpAddr)
+			} else {
+				debug.Logger.Debug("Received Asicd L3 State Notfication DOWN:", l3Msg)
+				api.SendL3PortNotification(l3Msg.IfIndex, config.STATE_DOWN, l3Msg.IpAddr)
+			}
 		}
 	case commonDefs.L2IntfStateNotifyMsg:
 		l2Msg := msg.(commonDefs.L2IntfStateNotifyMsg)

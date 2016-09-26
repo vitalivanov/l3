@@ -55,7 +55,7 @@ const (
 type PcapBase struct {
 	// Pcap Handler for Each Port
 	PcapHandle *pcap.Handle
-	PcapCtrl   chan bool
+	//PcapCtrl   chan bool
 	// at any give time there can be two users for Pcap..
 	// if 0 then only start rx/tx
 	// if 1 then only stop rx/tx
@@ -109,6 +109,7 @@ func (intf *Interface) addIP(ipAddr string) {
 }
 
 func (intf *Interface) removeIP(ipAddr string) {
+	debug.Logger.Debug("Removing IP Addres:", ipAddr, "from interface:", intf.IntfRef)
 	if isLinkLocal(ipAddr) {
 		intf.LinkLocalIp = ""
 		intf.linkScope = ""
@@ -126,10 +127,12 @@ func (intf *Interface) commonInit(ipAddr string, pktCh chan config.PacketData, g
 	// Pcap Init
 	intf.PcapBase.PcapHandle = nil
 	// create pcap ctrl channel if not created
-	if intf.PcapBase.PcapCtrl == nil {
-		debug.Logger.Debug("Pcap Ctrl channel created for port:", intf.IntfRef)
-		intf.PcapBase.PcapCtrl = make(chan bool)
-	}
+	/*
+		if intf.PcapBase.PcapCtrl == nil {
+			debug.Logger.Debug("Pcap Ctrl channel created for port:", intf.IntfRef)
+			intf.PcapBase.PcapCtrl = make(chan bool)
+		}
+	*/
 	intf.PcapBase.PcapUsers = 0
 	// Timers Value Init
 	intf.retransTime = gCfg.RetransTime             //1       // config value ms
@@ -164,7 +167,7 @@ func (intf *Interface) InitIntf(obj *commonDefs.IPv6IntfState, pktCh chan config
 func (intf *Interface) DeInitIntf() []string {
 	deleteEntries, _ := intf.DeleteAll()
 	intf.PcapBase.PcapHandle = nil
-	intf.PcapBase.PcapCtrl = nil
+	//intf.PcapBase.PcapCtrl = nil
 	intf.PcapBase.PcapUsers = 0
 	intf.removeIP(intf.IpAddr)
 	intf.removeIP(intf.LinkLocalIp)
@@ -246,10 +249,12 @@ func (intf *Interface) CreatePcap() (err error) {
 			intf.PcapBase.PcapHandle = nil
 			return err
 		}
-		// just validate that pcap ctrl channel is inititalize if not then do init over here
-		if intf.PcapBase.PcapCtrl == nil {
-			intf.PcapBase.PcapCtrl = make(chan bool, 1)
-		}
+		/*
+			// just validate that pcap ctrl channel is inititalize if not then do init over here
+			if intf.PcapBase.PcapCtrl == nil {
+				intf.PcapBase.PcapCtrl = make(chan bool, 1)
+			}
+		*/
 	}
 	intf.addPcapUser()
 	debug.Logger.Info("Total pcap user for", intf.IntfRef, "to", intf.PcapBase.PcapUsers)
@@ -294,14 +299,13 @@ func (intf *Interface) DeletePcap() {
 		// once go routine is exited, delete pcap handler
 		if intf.PcapBase.PcapHandle != nil {
 			// Inform go routine spawned for intf to exit..
-			// @TODO: jgheewala: fix this after walmart
-			//intf.PcapBase.PcapCtrl <- true
-			//<-intf.PcapBase.PcapCtrl
 			intf.PcapBase.PcapHandle.Close()
 			intf.PcapBase.PcapHandle = nil
+			//intf.PcapBase.PcapCtrl <- true
+			//<-intf.PcapBase.PcapCtrl
 		}
 		// deleted ctrl channel to avoid any memory usage
-		intf.PcapBase.PcapCtrl = nil
+		//intf.PcapBase.PcapCtrl = nil
 		intf.PcapBase.PcapUsers = 0 // set to zero
 		// flushing the counter values after the pcap is deleted
 		intf.counter.Send = 0
@@ -338,11 +342,17 @@ func (intf *Interface) ReceiveNdpPkts(pktCh chan *RxPktInfo) error {
 		case pkt, ok := <-in:
 			if ok {
 				pktCh <- &RxPktInfo{pkt, intf.IfIndex}
+			} else {
+				debug.Logger.Debug("Pcap closed as in is invalid exiting go routine for port:", intf.IntfRef)
+				return nil
 			}
-		case <-intf.PcapBase.PcapCtrl:
-			debug.Logger.Debug("Pcap closed and hence exiting go routine for port:", intf.IntfRef)
-			intf.PcapBase.PcapCtrl <- true
-			return nil
+			/*
+				case <-intf.PcapBase.PcapCtrl:
+					debug.Logger.Debug("Pcap closed and hence exiting go routine for port:", intf.IntfRef)
+					src = nil
+					intf.PcapBase.PcapCtrl <- true
+					return nil
+			*/
 		}
 	}
 	return nil
@@ -400,7 +410,6 @@ func (intf *Interface) createNbrKey(ndInfo *packet.NDInfo) (nbrkey string) {
  * process nd will be called during received message
  */
 func (intf *Interface) ProcessND(ndInfo *packet.NDInfo) (*config.NeighborConfig, NDP_OPERATION) {
-	intf.counter.Rcvd++
 	if intf.Neighbor == nil {
 		debug.Logger.Alert("!!!!Neighbor Initialization for intf:", intf.IntfRef, "didn't happen properly!!!!!")
 		intf.Neighbor = make(map[string]NeighborInfo, 10)
@@ -421,7 +430,6 @@ func (intf *Interface) ProcessND(ndInfo *packet.NDInfo) (*config.NeighborConfig,
  * send neighbor discover messages on timer expiry
  */
 func (intf *Interface) SendND(pktData config.PacketData, mac string) NDP_OPERATION {
-	intf.counter.Send++
 	switch pktData.SendPktType {
 	case layers.ICMPv6TypeNeighborSolicitation:
 		return intf.SendNS(mac, pktData.NeighborMac, pktData.NeighborIp)

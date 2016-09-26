@@ -55,11 +55,14 @@ func (svr *NDPServer) StartRxTx(ifIndex int32) {
 	}
 	debug.Logger.Info("Start rx/tx for port:", ipPort.IntfRef, "ifIndex:",
 		ipPort.IfIndex, "ip GS:", ipPort.IpAddr, "LS:", ipPort.LinkLocalIp, "is done")
-
-	// Spawn go routines for rx & tx
-	go ipPort.ReceiveNdpPkts(svr.RxPktCh)
-	svr.ndpUpL3IntfStateSlice = append(svr.ndpUpL3IntfStateSlice, ifIndex)
-
+	// go routine will be spawned only on first pcap user
+	// @FIX for WD-190 NDP HIGH CPU usage on WM Clos
+	if ipPort.PcapBase.PcapUsers == 1 {
+		// Spawn go routines for rx & tx
+		debug.Logger.Debug("Start ReceiveNdpPkts for port:", ipPort.IntfRef)
+		go ipPort.ReceiveNdpPkts(svr.RxPktCh)
+		svr.ndpUpL3IntfStateSlice = append(svr.ndpUpL3IntfStateSlice, ifIndex)
+	}
 	// On Port Up Send RA packets
 	pktData := config.PacketData{
 		SendPktType: layers.ICMPv6TypeRouterAdvertisement,
@@ -212,6 +215,7 @@ func (svr *NDPServer) ProcessRxPkt(ifIndex int32, pkt gopacket.Packet) error {
 	if !exists {
 		return errors.New(fmt.Sprintln("Entry for ifIndex:", ifIndex, "doesn't exists"))
 	}
+	ipPort.counter.Rcvd++
 	ndInfo, err := svr.Packet.DecodeND(pkt)
 	if err != nil || ndInfo == nil {
 		return errors.New(fmt.Sprintln("Failed decoding ND packet, error:", err))
@@ -238,6 +242,7 @@ func (svr *NDPServer) ProcessTimerExpiry(pktData config.PacketData) error {
 		return errors.New(fmt.Sprintln("Entry for ifIndex:", pktData.IfIndex,
 			"doesn't exists and hence cannot process timer expiry event for neighbor:", pktData))
 	}
+	l3Port.counter.Send++
 	// fix this when we have per port mac addresses
 	operation := l3Port.SendND(pktData, svr.SwitchMac)
 	if operation == DELETE {
