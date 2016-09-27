@@ -363,7 +363,7 @@ func (n *NeighborConf) FSMStateChange(state uint32) {
 	n.logger.Infof("Neighbor %s: FSMStateChange %d", n.Neighbor.NeighborAddress, state)
 	n.PublishEvents(state)
 	n.Neighbor.State.SessionState = uint32(state)
-	n.Neighbor.State.SessionStateUpdatedTime = time.Now().String()
+	n.Neighbor.State.SessionStateUpdatedTime = time.Now()
 }
 
 func (n *NeighborConf) SetPeerAttrs(bgpId net.IP, asSize uint8, holdTime uint32, keepaliveTime uint32,
