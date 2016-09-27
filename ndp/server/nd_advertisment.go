@@ -24,7 +24,7 @@ package server
 
 import (
 	"l3/ndp/config"
-	"l3/ndp/debug"
+	_ "l3/ndp/debug"
 	"l3/ndp/packet"
 )
 
@@ -39,11 +39,11 @@ import (
  * @TODO: handle un-solicited Neighbor Advertisemtn
  */
 func (intf *Interface) processNA(ndInfo *packet.NDInfo) (nbrInfo *config.NeighborConfig, oper NDP_OPERATION) {
-	debug.Logger.Debug("Processing NA packet", *ndInfo)
+	//debug.Logger.Debug("Processing NA packet", *ndInfo)
 	nbrKey := intf.createNbrKey(ndInfo)
 	nbr, exists := intf.Neighbor[nbrKey]
 	if exists {
-		debug.Logger.Debug("Nbr entry exists and hence marking", nbr.IpAddr, "as REACHABLE")
+		//debug.Logger.Debug("Nbr entry exists and hence marking", nbr.IpAddr, "as REACHABLE")
 		// update existing neighbor timers and move
 		nbr.State = REACHABLE
 		nbr.UpdateProbe()
@@ -51,7 +51,7 @@ func (intf *Interface) processNA(ndInfo *packet.NDInfo) (nbrInfo *config.Neighbo
 		oper = UPDATE
 	} else {
 		// create new neighbor
-		debug.Logger.Debug("Nbr entry learned via NA and hence marking", nbr.IpAddr, "as REACHABLE")
+		//debug.Logger.Debug("Nbr entry learned via NA and hence marking", nbr.IpAddr, "as REACHABLE")
 		nbr.InitCache(intf.reachableTime, intf.retransTime, nbrKey, intf.PktDataCh, intf.IfIndex)
 		nbr.State = REACHABLE
 		oper = CREATE

@@ -40,7 +40,6 @@ func (pkt *Packet) constructEthLayer() *layers.Ethernet {
 		DstMAC:       dstMAC,
 		EthernetType: layers.EthernetTypeIPv6,
 	}
-	//debug.Logger.Debug("ethernet layer is", *eth)
 
 	return eth
 }
@@ -58,7 +57,6 @@ func (pkt *Packet) constructIPv6Layer() *layers.IPv6 {
 		DstIP:        dip,
 		HopLimit:     HOP_LIMIT,
 	}
-	//debug.Logger.Debug("ipv6 layer is", *ipv6)
 
 	return ipv6
 }
@@ -82,7 +80,6 @@ func constructICMPv6NS(srcMac net.HardwareAddr, ipv6 *layers.IPv6) []byte {
 	payload = append(payload, srcOption.Length)
 	payload = append(payload, srcOption.Value...)
 	binary.BigEndian.PutUint16(payload[2:4], getCheckSum(ipv6, payload))
-	//debug.Logger.Debug("icmpv6 info is", payload)
 	return payload
 }
 
@@ -119,7 +116,6 @@ func constructICMPv6RA(srcMac net.HardwareAddr, ipv6 *layers.IPv6) []byte {
 	payload = append(payload, mtuOption.Length)
 	payload = append(payload, mtuOption.Value...)
 	binary.BigEndian.PutUint16(payload[2:4], getCheckSum(ipv6, payload))
-	//debug.Logger.Debug("icmpv6 info is", payload)
 	return payload
 }
 
@@ -136,8 +132,6 @@ func (pkt *Packet) Encode() []byte {
 	}
 
 	ipv6.Length = uint16(len(icmpv6Payload))
-	//fmt.Println("ipv6 layer is", *ipv6)
-	//debug.Logger.Debug("ipv6 layer is", *ipv6)
 	// GoPacket serialized buffer that will be used to send out raw bytes
 	buffer := gopacket.NewSerializeBuffer()
 	options := gopacket.SerializeOptions{
@@ -145,8 +139,7 @@ func (pkt *Packet) Encode() []byte {
 		ComputeChecksums: true,
 	}
 
-	debug.Logger.Debug("Sending pkt (DMAC, SMAC):(", eth.DstMAC.String(), ",", eth.SrcMAC.String(),
-		") and (SIP,DIP):(", ipv6.SrcIP.String(), ",", ipv6.DstIP.String(), ")")
+	debug.Logger.Debug("Sending pkt (DMAC, SMAC):(", eth.DstMAC.String(), ",", eth.SrcMAC.String(), ") and (SIP,DIP):(", ipv6.SrcIP.String(), ",", ipv6.DstIP.String(), ")")
 
 	err := gopacket.SerializeLayers(buffer, options, eth, ipv6, gopacket.Payload(icmpv6Payload))
 	if err != nil {
