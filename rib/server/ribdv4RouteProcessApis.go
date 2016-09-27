@@ -887,9 +887,9 @@ func (m RIBDServer) ProcessV4RouteDeleteConfig(cfg *ribd.IPv4Route, delType int)
 				logger.Err(fmt.Sprintln("Invalid NextHop IntRef ", cfg.NextHop[i].NextHopIntRef))
 				return false, err
 			}
+			nextHopIntRef, _ := strconv.Atoi(cfg.NextHop[i].NextHopIntRef)
+			nextHopIfIndex = ribd.Int(nextHopIntRef)
 		}
-		nextHopIntRef, _ := strconv.Atoi(cfg.NextHop[i].NextHopIntRef)
-		nextHopIfIndex = ribd.Int(nextHopIntRef)
 		_, err = deleteIPRoute(cfg.DestinationNw, ribdCommonDefs.IPv4, cfg.NetworkMask, cfg.Protocol, cfg.NextHop[i].NextHopIp, nextHopIfIndex, ribd.Int(delType), ribdCommonDefs.RoutePolicyStateChangetoInValid)
 	}
 	return true, err
