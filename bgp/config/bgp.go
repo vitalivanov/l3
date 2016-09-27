@@ -26,6 +26,7 @@ package config
 
 import (
 	"net"
+	"time"
 )
 
 type SourcePolicyMap struct {
@@ -156,7 +157,7 @@ type NeighborState struct {
 	TotalPrefixes           uint32
 	AdjRIBInFilter          string
 	AdjRIBOutFilter         string
-	SessionStateUpdatedTime string
+	SessionStateUpdatedTime time.Time
 }
 
 type TransportConfig struct {
