@@ -112,8 +112,8 @@ func (h *ConfigHandler) GetNDPGlobalState(vrf string) (*ndpd.NDPGlobalState, err
 	return h.convertNDPGlobalStateEntryToThriftEntry(gblEntry), nil
 }
 
-func (h *ConfigHandler) convertNDPIntfStateEntryToThriftEntry(state config.InterfaceEntries) *ndpd.NDPIntfState {
-	entry := ndpd.NewNDPIntfState()
+func (h *ConfigHandler) convertIPV6AdjStateEntryToThriftEntry(state config.InterfaceEntries) *ndpd.IPV6AdjState {
+	entry := ndpd.NewIPV6AdjState()
 	entry.IntfRef = state.IntfRef
 	entry.IfIndex = state.IfIndex
 	entry.LinkScopeIp = state.LinkScopeIp
@@ -133,28 +133,28 @@ func (h *ConfigHandler) convertNDPIntfStateEntryToThriftEntry(state config.Inter
 	return entry
 }
 
-func (h *ConfigHandler) GetBulkNDPIntfState(fromIdx ndpd.Int, count ndpd.Int) (*ndpd.NDPIntfStateGetInfo, error) {
+func (h *ConfigHandler) GetBulkIPV6AdjState(fromIdx ndpd.Int, count ndpd.Int) (*ndpd.IPV6AdjStateGetInfo, error) {
 	nextIdx, currCount, ndpIntfEntries := api.GetAllNdpIntfState(int(fromIdx), int(count))
 	if len(ndpIntfEntries) == 0 || ndpIntfEntries == nil {
 		return nil, errors.New("No Neighbor Entries Learned")
 	}
-	ndpResp := make([]*ndpd.NDPIntfState, len(ndpIntfEntries))
+	ndpResp := make([]*ndpd.IPV6AdjState, len(ndpIntfEntries))
 	for idx, ndpEntry := range ndpIntfEntries {
-		ndpResp[idx] = h.convertNDPIntfStateEntryToThriftEntry(ndpEntry)
+		ndpResp[idx] = h.convertIPV6AdjStateEntryToThriftEntry(ndpEntry)
 	}
-	ndpIntfStateBulk := ndpd.NewNDPIntfStateGetInfo()
+	ndpIntfStateBulk := ndpd.NewIPV6AdjStateGetInfo()
 	ndpIntfStateBulk.StartIdx = fromIdx
 	ndpIntfStateBulk.EndIdx = ndpd.Int(nextIdx)
 	ndpIntfStateBulk.Count = ndpd.Int(currCount)
 	ndpIntfStateBulk.More = (nextIdx != 0)
-	ndpIntfStateBulk.NDPIntfStateList = ndpResp
+	ndpIntfStateBulk.IPV6AdjStateList = ndpResp
 	return ndpIntfStateBulk, nil
 }
 
-func (h *ConfigHandler) GetNDPIntfState(intfRef string) (*ndpd.NDPIntfState, error) {
+func (h *ConfigHandler) GetIPV6AdjState(intfRef string) (*ndpd.IPV6AdjState, error) {
 	ndpEntry := api.GetNdpIntfState(intfRef)
 	if ndpEntry == nil {
 		return nil, errors.New("No Neighbor Found for Port " + intfRef)
 	}
-	return h.convertNDPIntfStateEntryToThriftEntry(*ndpEntry), nil
+	return h.convertIPV6AdjStateEntryToThriftEntry(*ndpEntry), nil
 }
