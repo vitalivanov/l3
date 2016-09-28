@@ -103,7 +103,6 @@ func (server *OSPFServer) processAsicdNotification(asicdrxBuf []byte) {
 			server.logger.Err(fmt.Sprintln("Unable to unmarshal msg:", msg.Msg))
 			return
 		}
-		server.logger.Err(fmt.Sprintln("Asic : IPV4 create ", NewIpv4IntfMsg))
 		server.UpdateIPv4Infra(NewIpv4IntfMsg, msg.MsgType)
 	} else if msg.MsgType == asicdCommonDefs.NOTIFY_VLAN_CREATE ||
 		msg.MsgType == asicdCommonDefs.NOTIFY_VLAN_DELETE {
