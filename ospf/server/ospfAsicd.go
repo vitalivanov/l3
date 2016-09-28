@@ -84,6 +84,17 @@ func (server *OSPFServer) processAsicdNotification(asicdrxBuf []byte) {
 		server.logger.Err(fmt.Sprintln("Unable to unmarshal asicdrxBuf:", asicdrxBuf))
 		return
 	}
+	if msg.MsgType == asicdCommonDefs.NOTIFY_LOGICAL_INTF_CREATE ||
+		msg.MsgType == asicdCommonDefs.NOTIFY_LOGICAL_INTF_DELETE {
+		var newLogicalIntfMgs asicdCommonDefs.LogicalIntfNotifyMsg
+		err = json.Unmarshal(msg.Msg, &newLogicalIntfMgs)
+		if err != nil {
+			server.logger.Err(fmt.Sprintln("Unable to unmarshal msg : ", msg.Msg))
+			return
+		}
+		server.UpdateLogicalIntfInfra(newLogicalIntfMgs, msg.MsgType)
+	}
+
 	if msg.MsgType == asicdCommonDefs.NOTIFY_IPV4INTF_CREATE ||
 		msg.MsgType == asicdCommonDefs.NOTIFY_IPV4INTF_DELETE {
 		var NewIpv4IntfMsg asicdCommonDefs.IPv4IntfNotifyMsg
@@ -92,6 +103,7 @@ func (server *OSPFServer) processAsicdNotification(asicdrxBuf []byte) {
 			server.logger.Err(fmt.Sprintln("Unable to unmarshal msg:", msg.Msg))
 			return
 		}
+		server.logger.Err(fmt.Sprintln("Asic : IPV4 create ", NewIpv4IntfMsg))
 		server.UpdateIPv4Infra(NewIpv4IntfMsg, msg.MsgType)
 	} else if msg.MsgType == asicdCommonDefs.NOTIFY_VLAN_CREATE ||
 		msg.MsgType == asicdCommonDefs.NOTIFY_VLAN_DELETE {
