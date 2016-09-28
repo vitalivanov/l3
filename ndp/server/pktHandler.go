@@ -59,7 +59,6 @@ func (svr *NDPServer) StartRxTx(ifIndex int32) {
 	// @FIX for WD-190 NDP HIGH CPU usage on WM Clos
 	if ipPort.PcapBase.PcapUsers == 1 {
 		// Spawn go routines for rx & tx
-		debug.Logger.Debug("Start ReceiveNdpPkts for port:", ipPort.IntfRef)
 		go ipPort.ReceiveNdpPkts(svr.RxPktCh)
 		svr.ndpUpL3IntfStateSlice = append(svr.ndpUpL3IntfStateSlice, ifIndex)
 	}
@@ -98,14 +97,14 @@ func (svr *NDPServer) StopRxTx(ifIndex int32, ipAddr string) {
 	var deleteEntries []string
 	var err error
 	if ipAddr == "ALL" {
-		debug.Logger.Debug("Deleting all entries")
+		//debug.Logger.Debug("Deleting all entries")
 		deleteEntries, err = ipPort.DeleteAll()
 	} else {
-		debug.Logger.Debug("Deleing interface:", ipAddr)
+		//debug.Logger.Debug("Deleing interface:", ipAddr)
 		deleteEntries, err = ipPort.DeleteIntf(ipAddr)
 	}
 	if len(deleteEntries) > 0 && err == nil {
-		debug.Logger.Info("Server Got Neigbor Delete for interface:", ipPort.IntfRef)
+		//debug.Logger.Info("Server Got Neigbor Delete for interface:", ipPort.IntfRef)
 		svr.DeleteNeighborInfo(deleteEntries, ifIndex)
 	}
 
@@ -159,8 +158,8 @@ func (svr *NDPServer) deleteNeighborInfo(nbrIp string) {
  *		        a) It will update ndp server neighbor info cache with the latest information
  */
 func (svr *NDPServer) CreateNeighborInfo(nbrInfo *config.NeighborConfig) {
-	debug.Logger.Debug("Calling create ipv6 neighgor for global nbrinfo is", nbrInfo.IpAddr, nbrInfo.MacAddr,
-		nbrInfo.VlanId, nbrInfo.IfIndex)
+	//debug.Logger.Debug("Calling create ipv6 neighgor for global nbrinfo is", nbrInfo.IpAddr, nbrInfo.MacAddr,
+	//nbrInfo.VlanId, nbrInfo.IfIndex)
 	_, err := svr.SwitchPlugin.CreateIPv6Neighbor(nbrInfo.IpAddr, nbrInfo.MacAddr,
 		nbrInfo.VlanId, nbrInfo.IfIndex)
 	if err != nil {
@@ -195,7 +194,7 @@ func (svr *NDPServer) deleteNeighbor(nbrIp string, ifIndex int32) {
 func (svr *NDPServer) DeleteNeighborInfo(deleteEntries []string, ifIndex int32) {
 	svr.NeigborEntryLock.Lock()
 	for _, nbrIp := range deleteEntries {
-		debug.Logger.Debug("Calling delete ipv6 neighbor for nbrIp:", nbrIp)
+		//debug.Logger.Debug("Calling delete ipv6 neighbor for nbrIp:", nbrIp)
 		svr.deleteNeighbor(nbrIp, ifIndex)
 	}
 	svr.NeigborEntryLock.Unlock()

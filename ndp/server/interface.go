@@ -55,7 +55,6 @@ const (
 type PcapBase struct {
 	// Pcap Handler for Each Port
 	PcapHandle *pcap.Handle
-	//PcapCtrl   chan bool
 	// at any give time there can be two users for Pcap..
 	// if 0 then only start rx/tx
 	// if 1 then only stop rx/tx
@@ -109,7 +108,6 @@ func (intf *Interface) addIP(ipAddr string) {
 }
 
 func (intf *Interface) removeIP(ipAddr string) {
-	debug.Logger.Debug("Removing IP Addres:", ipAddr, "from interface:", intf.IntfRef)
 	if isLinkLocal(ipAddr) {
 		intf.LinkLocalIp = ""
 		intf.linkScope = ""
@@ -126,13 +124,6 @@ func (intf *Interface) commonInit(ipAddr string, pktCh chan config.PacketData, g
 	intf.addIP(ipAddr)
 	// Pcap Init
 	intf.PcapBase.PcapHandle = nil
-	// create pcap ctrl channel if not created
-	/*
-		if intf.PcapBase.PcapCtrl == nil {
-			debug.Logger.Debug("Pcap Ctrl channel created for port:", intf.IntfRef)
-			intf.PcapBase.PcapCtrl = make(chan bool)
-		}
-	*/
 	intf.PcapBase.PcapUsers = 0
 	// Timers Value Init
 	intf.retransTime = gCfg.RetransTime             //1       // config value ms
@@ -203,7 +194,6 @@ func (intf *Interface) deleteNbrList() ([]string, error) {
 		deleteEntries, err := intf.FlushNeighbors()
 		return deleteEntries, err
 	}
-	debug.Logger.Debug("No neighbors to be deleted for interface:", intf.IntfRef, intf.IpAddr, intf.LinkLocalIp)
 	return make([]string, 0), nil
 }
 
@@ -212,7 +202,6 @@ func (intf *Interface) deleteNbrList() ([]string, error) {
  */
 func (intf *Interface) DeleteIntf(ipAddr string) ([]string, error) {
 	debug.Logger.Debug("Deleting Interface Called for:", intf.IntfRef, intf.IpAddr, intf.LinkLocalIp)
-	//intf.removeIP(ipAddr)
 	intf.DeletePcap()
 	return intf.deleteNbrList()
 }
@@ -221,9 +210,7 @@ func (intf *Interface) DeleteIntf(ipAddr string) ([]string, error) {
  * Delete All will delete ip address and then remove entire pcap
  */
 func (intf *Interface) DeleteAll() ([]string, error) {
-	//intf.removeIP(intf.LinkLocalIp)
 	intf.DeletePcap()
-	//intf.removeIP(intf.IpAddr)
 	intf.DeletePcap()
 	return intf.deleteNbrList()
 }
@@ -237,7 +224,6 @@ func (intf *Interface) DeleteAll() ([]string, error) {
 func (intf *Interface) CreatePcap() (err error) {
 	if intf.PcapBase.PcapHandle == nil {
 		name := intf.IntfRef
-		debug.Logger.Debug("Creating new pcap for port:", intf.IntfRef)
 		intf.PcapBase.PcapHandle, err = pcap.OpenLive(name, NDP_PCAP_SNAPSHOTlEN, NDP_PCAP_PROMISCUOUS, NDP_PCAP_TIMEOUT)
 		if err != nil {
 			debug.Logger.Err("Creating Pcap Handler failed for interface:", name, "Error:", err)
@@ -249,12 +235,6 @@ func (intf *Interface) CreatePcap() (err error) {
 			intf.PcapBase.PcapHandle = nil
 			return err
 		}
-		/*
-			// just validate that pcap ctrl channel is inititalize if not then do init over here
-			if intf.PcapBase.PcapCtrl == nil {
-				intf.PcapBase.PcapCtrl = make(chan bool, 1)
-			}
-		*/
 	}
 	intf.addPcapUser()
 	debug.Logger.Info("Total pcap user for", intf.IntfRef, "to", intf.PcapBase.PcapUsers)
@@ -289,7 +269,7 @@ func (intf *Interface) deletePcapUser() {
 func (intf *Interface) DeletePcap() {
 	if intf.PcapBase.PcapHandle == nil {
 		// create ip interface but state down will not have pcap handler created
-		debug.Logger.Debug("No pcap created or it might have been deleted during l2 port down returning early")
+		//debug.Logger.Debug("No pcap created or it might have been deleted during l2 port down returning early")
 		return
 	}
 	intf.deletePcapUser()
@@ -301,11 +281,8 @@ func (intf *Interface) DeletePcap() {
 			// Inform go routine spawned for intf to exit..
 			intf.PcapBase.PcapHandle.Close()
 			intf.PcapBase.PcapHandle = nil
-			//intf.PcapBase.PcapCtrl <- true
-			//<-intf.PcapBase.PcapCtrl
 		}
 		// deleted ctrl channel to avoid any memory usage
-		//intf.PcapBase.PcapCtrl = nil
 		intf.PcapBase.PcapUsers = 0 // set to zero
 		// flushing the counter values after the pcap is deleted
 		intf.counter.Send = 0
@@ -346,13 +323,6 @@ func (intf *Interface) ReceiveNdpPkts(pktCh chan *RxPktInfo) error {
 				debug.Logger.Debug("Pcap closed as in is invalid exiting go routine for port:", intf.IntfRef)
 				return nil
 			}
-			/*
-				case <-intf.PcapBase.PcapCtrl:
-					debug.Logger.Debug("Pcap closed and hence exiting go routine for port:", intf.IntfRef)
-					src = nil
-					intf.PcapBase.PcapCtrl <- true
-					return nil
-			*/
 		}
 	}
 	return nil

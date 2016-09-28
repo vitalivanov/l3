@@ -23,12 +23,10 @@
 package server
 
 import (
-	"fmt"
 	"l3/ndp/config"
 	"l3/ndp/debug"
 	"l3/ndp/packet"
 	"l3/ndp/publisher"
-	_ "models/objects"
 	"os"
 	"os/signal"
 	"runtime/pprof"
@@ -65,7 +63,7 @@ func (svr *NDPServer) SignalHandler(sigChannel <-chan os.Signal) {
 		debug.Logger.Alert("Exiting!!!!!")
 		os.Exit(0)
 	default:
-		debug.Logger.Info(fmt.Sprintln("Unhandled Signal:", signal))
+		debug.Logger.Info("Unhandled Signal:", signal)
 	}
 }
 
