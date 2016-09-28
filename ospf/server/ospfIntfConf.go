@@ -33,6 +33,7 @@ import (
 	"errors"
 	"github.com/google/gopacket/pcap"
 	"net"
+	"utils/commonDefs"
 )
 
 type IntfConfKey struct {
@@ -256,9 +257,9 @@ func (server *OSPFServer) createIPIntfConfMap(msg IPv4IntfNotifyMsg, mtu int32, 
 	} else {
 		ifIdx = 0
 	}
-	ifName, err := server.getLinuxIntfName(msg.IfId, msg.IfType)
+	ifName, err := server.getLinuxIntfName(int32(msg.IfId), msg.IfType)
 	if err != nil {
-		server.logger.Err("No Such Interface exists")
+		server.logger.Err("CreateIpIntf: No Such Interface exists ", msg.IfId)
 		return
 	}
 
@@ -267,14 +268,18 @@ func (server *OSPFServer) createIPIntfConfMap(msg IPv4IntfNotifyMsg, mtu int32, 
 		server.logger.Err("Unable to get the cost")
 		return
 	}
-	server.logger.Info(fmt.Sprintln("create IPIntfConfMap for ", msg, "ifIdx:", ifIdx))
 
 	// Set ifIdx = 0 for time being --- Need to be revisited
 	intfConfKey := IntfConfKey{
 		IPAddr:  config.IpAddress(ip.String()),
 		IntfIdx: config.InterfaceIndexOrZero(ifIdx),
 	}
-	macAddr, err := getMacAddrIntfName(ifName)
+	var macAddr net.HardwareAddr
+	if msg.IfType == commonDefs.IfTypeLoopback {
+		macAddr, err = server.getMacAddrLogicalIntf(ifName)
+	} else {
+		macAddr, err = getMacAddrIntfName(ifName)
+	}
 	if err != nil {
 		server.logger.Err(fmt.Sprintln("Unable to get MacAddress of Interface exists", ifName))
 		return
