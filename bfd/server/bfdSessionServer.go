@@ -187,6 +187,7 @@ func (server *BFDServer) StartSessionRetryHandler() error {
 			sessionId := server.bfdGlobal.InactiveSessionsIdSlice[i]
 			session := server.bfdGlobal.Sessions[sessionId]
 			if session != nil {
+				server.logger.Info("Session retry handler restarting session", sessionId, "active", session.isClientActive)
 				if session.isClientActive == false {
 					if session.state.PerLinkSession {
 						server.logger.Info("Starting PerLink client for inactive session ", sessionId)
@@ -195,9 +196,8 @@ func (server *BFDServer) StartSessionRetryHandler() error {
 						server.logger.Info("Starting client for inactive session ", sessionId)
 						go session.StartSessionClient(server)
 					}
-					session.isClientActive = true
-					server.bfdGlobal.InactiveSessionsIdSlice = append(server.bfdGlobal.InactiveSessionsIdSlice[:i], server.bfdGlobal.InactiveSessionsIdSlice[i+1:]...)
 				}
+				server.bfdGlobal.InactiveSessionsIdSlice = append(server.bfdGlobal.InactiveSessionsIdSlice[:i], server.bfdGlobal.InactiveSessionsIdSlice[i+1:]...)
 			}
 		}
 	}
