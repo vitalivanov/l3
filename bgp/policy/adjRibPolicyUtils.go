@@ -27,7 +27,6 @@ package policy
 import (
 	bgprib "l3/bgp/rib"
 	"l3/bgp/utils"
-	"strconv"
 	"utils/patriciaDB"
 	utilspolicy "utils/policy"
 )
@@ -76,7 +75,7 @@ func UpdateAdjRIBRoutePolicyState(route *bgprib.AdjRIBRoute, op int, policy stri
 func (eng *AdjRibPPolicyEngine) addAdjRIBPolicyRouteMap(route *bgprib.AdjRIBRoute, policy string) {
 	utils.Logger.Debugf("addAdjRIBPolicyRouteMap - route=%+v, policy=%s", route, policy)
 	var newRoute string
-	newRoute = route.NLRI.GetPrefix().String() + "/" + strconv.Itoa(int(route.NLRI.GetLength()))
+	newRoute = route.NLRI.GetCIDR()
 	ipPrefix, err := GetNetworkPrefixFromCIDR(newRoute)
 	if err != nil {
 		utils.Logger.Info("Invalid ip prefix")
@@ -108,8 +107,7 @@ func (eng *AdjRibPPolicyEngine) addAdjRIBPolicyRouteMap(route *bgprib.AdjRIBRout
 	found = false
 	utils.Logger.Info("routeInfoList details")
 	for i := 0; i < len(policyExtensions.RouteInfoList); i++ {
-		utils.Logger.Info("IP: ", policyExtensions.RouteInfoList[i].NLRI.GetPrefix().String(), "/",
-			policyExtensions.RouteInfoList[i].NLRI.GetLength(), " neighbor: ",
+		utils.Logger.Info("IP: ", policyExtensions.RouteInfoList[i].NLRI.GetCIDR(), " neighbor: ",
 			policyExtensions.RouteInfoList[i].Neighbor)
 		if policyExtensions.RouteInfoList[i].NLRI.GetPrefix().String() == route.NLRI.GetPrefix().String() &&
 			policyExtensions.RouteInfoList[i].NLRI.GetLength() == route.NLRI.GetLength() &&

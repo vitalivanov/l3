@@ -97,7 +97,7 @@ func (d *Destination) setBGPRouteState(protoFamily uint32, network string, cidrL
 }
 
 func (d *Destination) GetLocRibPathRoute() *Route {
-	d.logger.Infof("GetLocRibPathRoute for %s", d.NLRI.GetPrefix().String())
+	d.logger.Infof("GetLocRibPathRoute for %s", d.NLRI.GetCIDR())
 	return d.LocRibPathRoute
 }
 
@@ -231,6 +231,7 @@ func (d *Destination) AddOrUpdatePath(peerIp string, pathId uint32, path *Path) 
 	ok := false
 	idx := -1
 
+	d.logger.Infof("AddOrUpdatePath: Destination %s peerIP %s pathId %d, path %v", d.NLRI.GetCIDR(), peerIp, pathId, path)
 	if pathMap, ok = d.peerPathMap[peerIp]; !ok {
 		d.peerPathMap[peerIp] = make(map[uint32]*Path)
 	}
@@ -279,7 +280,7 @@ func (d *Destination) RemovePath(peerIP string, pathId uint32, path *Path) *Path
 	var oldPath *Path
 	ok := false
 	if pathMap, ok = d.peerPathMap[peerIP]; !ok {
-		d.logger.Errf("Destination %s Path not found from peer %s", d.NLRI.GetPrefix().String(), peerIP)
+		d.logger.Errf("Destination %s Path not found from peer %s", d.NLRI.GetCIDR(), peerIP)
 		return oldPath
 	}
 
@@ -314,7 +315,7 @@ func (d *Destination) RemovePath(peerIP string, pathId uint32, path *Path) *Path
 			delete(d.peerPathMap, peerIP)
 		}
 	} else {
-		d.logger.Err("Destination", d.NLRI.GetPrefix().String(), "Path with path id", pathId, "not found from peer",
+		d.logger.Err("Destination", d.NLRI.GetCIDR(), "Path with path id", pathId, "not found from peer",
 			peerIP)
 	}
 	return oldPath
@@ -324,11 +325,11 @@ func (d *Destination) RemoveAllPaths(peerIP string, path *Path) {
 	var pathMap map[uint32]*Path
 	ok := false
 	if pathMap, ok = d.peerPathMap[peerIP]; !ok {
-		d.logger.Err("Can't remove paths for", d.NLRI.GetPrefix().String(), "peer not found", peerIP)
+		d.logger.Err("Can't remove paths for", d.NLRI.GetCIDR(), "peer not found", peerIP)
 		return
 	}
 
-	d.logger.Info("Remove all paths for", d.NLRI.GetPrefix().String(), "from peer", peerIP)
+	d.logger.Info("Remove all paths for", d.NLRI.GetCIDR(), "from peer", peerIP)
 	for pathId, _ := range pathMap {
 		d.logger.Info("Remove path id", pathId, "from peer", peerIP)
 		d.RemovePath(peerIP, pathId, path)
@@ -455,8 +456,8 @@ func (d *Destination) SelectRouteForLocRib(addPathCount int) (RouteAction, bool,
 		}
 		routeSrc = getRouteSource(d.LocRibPath.routeType)
 		updatedPaths = append(updatedPaths, d.LocRibPath)
-		d.logger.Infof("Destination %s Add loc rib path from %s to path selection, source=%d",
-			d.NLRI.GetPrefix(), peerIP, routeSrc)
+		d.logger.Infof("Destination %s Add loc rib path %v from %s to path selection, source=%d",
+			d.NLRI.GetPrefix(), d.LocRibPath, peerIP, routeSrc)
 	}
 
 	for peerIP, pathMap := range d.peerPathMap {
@@ -491,7 +492,7 @@ func (d *Destination) SelectRouteForLocRib(addPathCount int) (RouteAction, bool,
 						updatedPaths = append(updatedPaths, path)
 					}
 					d.logger.Info("Destination", d.NLRI.GetPrefix(), "route from", peerIP,
-						"is from a better source type, old type=", routeSrc, "new type=", currPathSource)
+						"is from a better source type, old type=", routeSrc, "new type=", currPathSource, "path=", path)
 					routeSrc = currPathSource
 					continue
 				} else {
@@ -597,11 +598,11 @@ func (d *Destination) SelectRouteForLocRib(addPathCount int) (RouteAction, bool,
 			if !path.IsLocal() || path.IsAggregate() {
 				reachInfo := path.GetReachability(d.protoFamily)
 				d.logger.Info("Remove route from ECMP paths, route =", route, "ip =",
-					d.NLRI.GetPrefix().String(), "next hop =", reachInfo.NextHop)
+					d.NLRI.GetCIDR(), "next hop =", reachInfo.NextHop)
 				cfg := d.ConstructRouteConfig(path, reachInfo, ipLength)
 				d.rib.routeMgr.UpdateRoute(cfg, "remove")
 				d.logger.Info("DeleteV4Route from ECMP paths, route =", route, "ip =",
-					d.NLRI.GetPrefix().String(), "next hop =", reachInfo.NextHop, "DONE")
+					d.NLRI.GetCIDR(), "next hop =", reachInfo.NextHop, "DONE")
 			}
 			route.ResetBestPath()
 			route.ResetMultiPath()
@@ -614,7 +615,7 @@ func (d *Destination) SelectRouteForLocRib(addPathCount int) (RouteAction, bool,
 
 	for _, path := range createRibRoutes {
 		reachInfo := path.GetReachability(d.protoFamily)
-		d.logger.Infof("Add route for ip=%s, mask=%s, next hop=%s", d.NLRI.GetPrefix().String(),
+		d.logger.Infof("Add route for ip=%s, mask=%s, next hop=%s", d.NLRI.GetCIDR(),
 			d.constructNetmaskFromLen(int(d.NLRI.GetLength()), ipLength*8).String(), reachInfo.NextHop)
 		cfg := d.ConstructRouteConfig(path, reachInfo, ipLength)
 		if firstRoute {

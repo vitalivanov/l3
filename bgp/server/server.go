@@ -589,7 +589,7 @@ func (s *BGPServer) CheckForAggregation(updated map[uint32]map[*bgprib.Path][]*b
 		route := dest.GetLocRibPathRoute()
 		if route == nil {
 			s.logger.Infof("BGPServer:checkForAggregate - route not found withdraw dest %s",
-				dest.NLRI.GetPrefix().String())
+				dest.NLRI.GetCIDR())
 			continue
 		}
 		peEntity := utilspolicy.PolicyEngineFilterEntityParams{
@@ -598,7 +598,7 @@ func (s *BGPServer) CheckForAggregation(updated map[uint32]map[*bgprib.Path][]*b
 			DeletePath: true,
 		}
 		s.logger.Infof("BGPServer:checkForAggregate - withdraw dest %s policylist %v hit %v before ",
-			"applying delete policy", dest.NLRI.GetPrefix().String(), route.PolicyList, route.PolicyHitCounter)
+			"applying delete policy", dest.NLRI.GetCIDR(), route.PolicyList, route.PolicyHitCounter)
 		callbackInfo := PolicyParams{
 			CreateType:      utilspolicy.Invalid,
 			DeleteType:      utilspolicy.Valid,
@@ -632,7 +632,7 @@ func (s *BGPServer) CheckForAggregation(updated map[uint32]map[*bgprib.Path][]*b
 				}
 				route := dest.GetLocRibPathRoute()
 				s.logger.Infof("BGPServer:checkForAggregate - update dest %s policylist %v hit %v before "+
-					"applying create policy", dest.NLRI.GetPrefix().String(), route.PolicyList, route.PolicyHitCounter)
+					"applying create policy", dest.NLRI.GetCIDR(), route.PolicyList, route.PolicyHitCounter)
 				if route != nil {
 					peEntity := utilspolicy.PolicyEngineFilterEntityParams{
 						DestNetIp:  route.Dest.BGPRouteState.GetNetwork() + "/" + strconv.Itoa(int(route.Dest.BGPRouteState.GetCIDRLen())),
@@ -650,7 +650,7 @@ func (s *BGPServer) CheckForAggregation(updated map[uint32]map[*bgprib.Path][]*b
 					}
 					pe.PolicyEngine.PolicyEngineFilter(peEntity, policyCommonDefs.PolicyPath_Export, callbackInfo)
 					s.logger.Infof("BGPServer:checkForAggregate - update dest %s policylist %v hit %v "+
-						"after applying create policy", dest.NLRI.GetPrefix().String(), route.PolicyList,
+						"after applying create policy", dest.NLRI.GetCIDR(), route.PolicyList,
 						route.PolicyHitCounter)
 				}
 			}
@@ -936,7 +936,7 @@ func (s *BGPServer) getPeerForPolicy(data interface{}, updateFunc utilspolicy.Po
 				s.logger.Debugf("Peer %s - NLRI %s policylist %v hit %v before applying create policy",
 					adjRoute.NLRI.GetPrefix(), adjRoute.PolicyList, adjRoute.PolicyHitCounter)
 				peEntity := utilspolicy.PolicyEngineFilterEntityParams{
-					DestNetIp:  adjRoute.NLRI.GetPrefix().String() + "/" + strconv.Itoa(int(adjRoute.NLRI.GetLength())),
+					DestNetIp:  adjRoute.NLRI.GetCIDR(),
 					Neighbor:   peer.NeighborConf.RunningConf.NeighborAddress.String(),
 					PolicyList: adjRoute.PolicyList,
 				}
@@ -1005,7 +1005,7 @@ func (s *BGPServer) TraverseAndReverseAdjRIB(policyData interface{}, pe *bgppoli
 			Peer:       peer,
 		}
 		peEntity := utilspolicy.PolicyEngineFilterEntityParams{
-			DestNetIp: route.NLRI.GetPrefix().String() + "/" + strconv.Itoa(int(route.NLRI.GetLength())),
+			DestNetIp: route.NLRI.GetCIDR(),
 			Neighbor:  route.Neighbor.String(),
 		}
 
