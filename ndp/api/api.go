@@ -36,6 +36,16 @@ type NDPApiLayer struct {
 	server *server.NDPServer
 }
 
+func InitComplete() bool {
+	if ndpApi == nil {
+		return false
+	}
+	if ndpApi.server == nil {
+		return false
+	}
+	return true
+}
+
 /*  Singleton instance should be accessible only within api
  */
 func getApiInstance() *NDPApiLayer {
