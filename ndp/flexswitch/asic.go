@@ -74,6 +74,9 @@ func GetSwitchInst() *commonDefs.AsicdClientStruct {
 }
 
 func (notifyHdl *AsicNotificationHdl) ProcessNotification(msg commonDefs.AsicdNotifyMsg) {
+	if !api.InitComplete() {
+		return
+	}
 	switch msg.(type) {
 	case commonDefs.IPv6IntfNotifyMsg:
 		// create/delete ipv6 interface notification case
