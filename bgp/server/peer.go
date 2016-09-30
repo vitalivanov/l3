@@ -34,7 +34,6 @@ import (
 	bgprib "l3/bgp/rib"
 	"net"
 	"runtime"
-	"strconv"
 	"strings"
 	"sync/atomic"
 	"utils/logging"
@@ -478,7 +477,7 @@ func (p *Peer) processWithdraws(protoFamily uint32, nlris *[]packet.NLRI) {
 			continue
 		}
 
-		ip := nlri.GetPrefix().String()
+		ip := nlri.GetCIDR()
 		p.logger.Infof("Neighbor %s: Withdraw Prefix %s protocol family=%d RIB-In=%+v",
 			p.NeighborConf.Neighbor.NeighborAddress, ip, protoFamily, p.ribIn[protoFamily])
 		if route, ok = p.ribIn[protoFamily][ip]; !ok {
@@ -531,7 +530,7 @@ func (p *Peer) checkAdjRIBFilter(nlri packet.NLRI, route *bgprib.AdjRIBRoute, pe
 		}
 
 		peEntity := utilspolicy.PolicyEngineFilterEntityParams{
-			DestNetIp: route.NLRI.GetPrefix().String() + "/" + strconv.Itoa(int(route.NLRI.GetLength())),
+			DestNetIp: route.NLRI.GetCIDR(),
 			Neighbor:  p.NeighborConf.RunningConf.NeighborAddress.String(),
 		}
 
@@ -552,7 +551,7 @@ func (p *Peer) checkAdjRIBFilter(nlri packet.NLRI, route *bgprib.AdjRIBRoute, pe
 
 		pe.PolicyEngine.PolicyEngineFilter(peEntity, policyDir, callbackInfo)
 		p.logger.Infof("checkAdjRIBFilter - NLRI %s policylist %v hit %v after applying create policy, callbackInfo=%+v",
-			nlri.GetPrefix().String(), route.PolicyList, route.PolicyHitCounter, callbackInfo)
+			nlri.GetCIDR(), route.PolicyList, route.PolicyHitCounter, callbackInfo)
 		return callbackInfo.Accept == Accept
 	}
 	return false
@@ -594,7 +593,7 @@ func (p *Peer) processUpdates(protoFamily uint32, nlris *[]packet.NLRI, path *bg
 			continue
 		}
 
-		ip := nlri.GetPrefix().String()
+		ip := nlri.GetCIDR()
 		if route, ok = p.ribIn[protoFamily][ip]; !ok {
 			route = bgprib.NewAdjRIBRoute(p.NeighborConf.Neighbor.NeighborAddress, protoFamily, nlri)
 			p.ribIn[protoFamily][ip] = route
@@ -666,7 +665,7 @@ func (p *Peer) AdjRIBInPolicyUpdated(adjRibDir bgprib.AdjRIBDir, data interface{
 			p.logger.Debugf("Peer %s - NLRI %s policylist %v hit %v before applying create policy",
 				adjRoute.NLRI.GetPrefix(), adjRoute.PolicyList, adjRoute.PolicyHitCounter)
 			peEntity := utilspolicy.PolicyEngineFilterEntityParams{
-				DestNetIp:  adjRoute.NLRI.GetPrefix().String() + "/" + strconv.Itoa(int(adjRoute.NLRI.GetLength())),
+				DestNetIp:  adjRoute.NLRI.GetCIDR(),
 				Neighbor:   p.NeighborConf.RunningConf.NeighborAddress.String(),
 				PolicyList: adjRoute.PolicyList,
 			}
@@ -904,7 +903,7 @@ func (p *Peer) calculateAddPathsAdvertisements(dest *bgprib.Destination, path *b
 	newUpdated map[*bgprib.Path]map[uint32][]packet.NLRI, withdrawList map[uint32][]packet.NLRI, addPathsTx int) (
 	map[*bgprib.Path]map[uint32][]packet.NLRI, map[uint32][]packet.NLRI) {
 	pathIdMap := make(map[uint32]*bgprib.Path)
-	ip := dest.NLRI.GetPrefix().String()
+	ip := dest.NLRI.GetCIDR()
 	protoFamily := dest.GetProtocolFamily()
 
 	if _, ok := p.ribOut[protoFamily][ip]; !ok {
@@ -1019,7 +1018,7 @@ func (p *Peer) SendUpdate(updated map[uint32]map[*bgprib.Path][]*bgprib.Destinat
 				if _, ok := withdrawList[protoFamily]; !ok {
 					withdrawList[protoFamily] = make([]packet.NLRI, 0)
 				}
-				ip := dest.NLRI.GetPrefix().String()
+				ip := dest.NLRI.GetCIDR()
 				if p.ribOut[protoFamily] != nil && p.NeighborConf.AfiSafiMap[protoFamily] {
 					route, ok := p.ribOut[protoFamily][ip]
 					if !ok {
@@ -1027,6 +1026,8 @@ func (p *Peer) SendUpdate(updated map[uint32]map[*bgprib.Path][]*bgprib.Destinat
 							p.NeighborConf.Neighbor.NeighborAddress, ip)
 						continue
 					}
+
+					delete(p.ribOut[protoFamily], ip)
 
 					if !p.checkRIBOutWithdraw(route) {
 						p.logger.Errf("Neighbor %s: processing withdraws, dest %s not advertised",
@@ -1039,10 +1040,8 @@ func (p *Peer) SendUpdate(updated map[uint32]map[*bgprib.Path][]*bgprib.Destinat
 							nlri := packet.NewExtNLRI(pathId, dest.NLRI.GetIPPrefix())
 							withdrawList[protoFamily] = append(withdrawList[protoFamily], nlri)
 						}
-						delete(p.ribOut[protoFamily], ip)
 					} else {
 						withdrawList[protoFamily] = append(withdrawList[protoFamily], dest.NLRI)
-						delete(p.ribOut[protoFamily], ip)
 					}
 					route.RemoveAllPaths()
 				}
@@ -1065,7 +1064,7 @@ func (p *Peer) SendUpdate(updated map[uint32]map[*bgprib.Path][]*bgprib.Destinat
 				if dest == nil {
 					continue
 				}
-				ip := dest.NLRI.GetPrefix().String()
+				ip := dest.NLRI.GetCIDR()
 				if addPathsTx > 0 {
 					newUpdated, withdrawList = p.calculateAddPathsAdvertisements(dest, path, newUpdated,
 						withdrawList, addPathsTx)
@@ -1189,7 +1188,7 @@ func (p *Peer) AdjRIBOutPolicyUpdated(data interface{}, updateFunc utilspolicy.P
 			p.logger.Debugf("Peer %s - NLRI %s policylist %v hit %v before applying create policy",
 				adjRoute.NLRI.GetPrefix(), adjRoute.PolicyList, adjRoute.PolicyHitCounter)
 			peEntity := utilspolicy.PolicyEngineFilterEntityParams{
-				DestNetIp:  adjRoute.NLRI.GetPrefix().String() + "/" + strconv.Itoa(int(adjRoute.NLRI.GetLength())),
+				DestNetIp:  adjRoute.NLRI.GetCIDR(),
 				Neighbor:   p.NeighborConf.RunningConf.NeighborAddress.String(),
 				PolicyList: adjRoute.PolicyList,
 			}
