@@ -41,6 +41,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 	"utils/dbutils"
 	"utils/eventUtils"
 	"utils/logging"
@@ -278,16 +279,44 @@ func (s *BGPServer) createListener(proto string) (*net.TCPListener, error) {
 	return listener, nil
 }
 
-func (s *BGPServer) listenForPeers(listener *net.TCPListener, acceptCh chan *net.TCPConn) {
+func (s *BGPServer) setListener(listener *net.TCPListener, proto string) {
+	switch proto {
+	case "tcp4":
+		s.listener = listener
+	case "tcp6":
+		s.listenerIPv6 = listener
+	default:
+		s.logger.Err("BGPServer:setListener - unknonn protocol type", proto)
+	}
+}
+
+func (s *BGPServer) listenForPeers(listener *net.TCPListener, proto string, acceptCh chan *net.TCPConn) {
 	for {
 		s.logger.Info("Waiting for peer connections...")
 		tcpConn, err := listener.AcceptTCP()
 		if err != nil {
 			s.logger.Info("AcceptTCP failed with", err)
+			if strings.Contains(err.Error(), "use of closed network connection") {
+				newListener, err2 := s.createListener(proto)
+				if err2 != nil {
+					ticker := time.NewTicker(time.Duration(5) * time.Second)
+					for range ticker.C {
+						newListener, err2 = s.createListener(proto)
+						if err2 == nil {
+							ticker.Stop()
+							break
+						}
+						s.logger.Err("Create TCPListener for", proto, "failed with err", err)
+					}
+				}
+				s.logger.Info("Created new TCPListener for", proto)
+				listener = newListener
+				s.setListener(listener, proto)
+			}
 			continue
 		}
 		s.logger.Info("Got a peer connection from %s", tcpConn.RemoteAddr())
-		s.acceptCh <- tcpConn
+		acceptCh <- tcpConn
 	}
 }
 
@@ -2358,10 +2387,10 @@ func (s *BGPServer) StartServer() {
 	s.acceptCh = make(chan *net.TCPConn)
 
 	s.listener, _ = s.createListener("tcp4")
-	go s.listenForPeers(s.listener, s.acceptCh)
+	go s.listenForPeers(s.listener, "tcp4", s.acceptCh)
 
 	s.listenerIPv6, _ = s.createListener("tcp6")
-	go s.listenForPeers(s.listenerIPv6, s.acceptCh)
+	go s.listenForPeers(s.listenerIPv6, "tcp6", s.acceptCh)
 
 	s.logger.Info("Start all managers and initialize API Layer")
 	s.IntfMgr.Start()
