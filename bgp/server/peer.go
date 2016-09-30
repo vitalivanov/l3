@@ -1027,6 +1027,8 @@ func (p *Peer) SendUpdate(updated map[uint32]map[*bgprib.Path][]*bgprib.Destinat
 						continue
 					}
 
+					delete(p.ribOut[protoFamily], ip)
+
 					if !p.checkRIBOutWithdraw(route) {
 						p.logger.Errf("Neighbor %s: processing withdraws, dest %s not advertised",
 							p.NeighborConf.Neighbor.NeighborAddress, ip)
@@ -1038,10 +1040,8 @@ func (p *Peer) SendUpdate(updated map[uint32]map[*bgprib.Path][]*bgprib.Destinat
 							nlri := packet.NewExtNLRI(pathId, dest.NLRI.GetIPPrefix())
 							withdrawList[protoFamily] = append(withdrawList[protoFamily], nlri)
 						}
-						delete(p.ribOut[protoFamily], ip)
 					} else {
 						withdrawList[protoFamily] = append(withdrawList[protoFamily], dest.NLRI)
-						delete(p.ribOut[protoFamily], ip)
 					}
 					route.RemoveAllPaths()
 				}
