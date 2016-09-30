@@ -632,7 +632,8 @@ func (l *LocRib) AddRouteToAggregate(ip *packet.IPPrefix, aggIP *packet.IPPrefix
 		pathAttrs := packet.ConstructPathAttrForAggRoutes(path.PathAttrs, bgpAgg.GenerateASSet)
 		packet.SetNextHopPathAttrs(pathAttrs, net.IPv4zero)
 		packet.SetPathAttrAggregator(pathAttrs, l.gConf.AS, l.gConf.RouterId)
-		mpReachNLRI := packet.ConstructMPReachNLRIForAggRoutes(protoFamily)
+		mpReachNLRI := packet.ConstructMPReachNLRIForAggRoutes(packet.GetProtocolFamily(packet.AfiIP6,
+			packet.SafiUnicast))
 		aggPath = NewPath(path.rib, nil, pathAttrs, mpReachNLRI, RouteTypeAgg)
 		aggPath.setAggregatedPath(ip.Prefix.String(), path)
 		aggDest, _ := l.GetDest(aggIP, protoFamily, true)

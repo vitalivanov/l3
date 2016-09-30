@@ -481,11 +481,11 @@ func (d *Destination) SelectRouteForLocRib(addPathCount int) (RouteAction, bool,
 				} else if currPathSource < routeSrc {
 					if len(updatedPaths) > 0 {
 						removedPaths = append(removedPaths, updatedPaths...)
-						updatedPaths[0] = path
 						// For garbage collection
 						for i := 0; i < len(updatedPaths); i++ {
 							updatedPaths[i] = nil
 						}
+						updatedPaths[0] = path
 						updatedPaths = updatedPaths[:1]
 					} else {
 						updatedPaths = append(updatedPaths, path)
