@@ -173,7 +173,6 @@ func OSPFNewLogger(name string, tag string, listenToConfig bool) (*logging.Write
 		return srLogger, err
 	}
 
-	srLogger.GlobalLogging = true
 	srLogger.MyLogLevel = sysdCommonDefs.DEBUG
 	return srLogger, err
 }
