@@ -47,7 +47,7 @@ var V4RouteInfoMap *patriciaDB.Trie //Routes are stored in patricia trie
    Returns the longest prefix match route to reach the destination network destNet
 */
 func (m RIBDServer) GetV4RouteReachabilityInfo(destNet string, ifIndex ribdInt.Int) (nextHopIntf *ribdInt.NextHopInfo, err error) {
-	//logger.Debug("GetV4RouteReachabilityInfo of ", destNet, " ifIndex:", ifIndex)
+	logger.Debug("GetV4RouteReachabilityInfo of ", destNet, " ifIndex:", ifIndex)
 	//t1 := time.Now()
 	var retnextHopIntf ribdInt.NextHopInfo
 	nextHopIntf = &retnextHopIntf
@@ -89,6 +89,7 @@ func (m RIBDServer) GetV4RouteReachabilityInfo(destNet string, ifIndex ribdInt.I
 			nextHopIntf.Ipaddr = v.destNetIp.String()
 			nextHopIntf.Mask = v.networkMask.String()
 			nextHopIntf.IsReachable = true
+			//nextHopIntf.IsReachable = v.resolvedNextHopIpIntf.IsReachable
 		}
 	}
 
@@ -133,7 +134,7 @@ func UpdateV4RouteReachabilityStatus(prefix patriciaDB.Prefix, //prefix of the n
 		logger.Err("Error getting ip prefix for ip:", ipAddrStr, " mask:", ipMaskStr)
 		return err
 	}
-	//logger.Debug("UpdateRouteReachabilityStatus network: ", routeReachabilityStatusInfo.destNet, " status:", routeReachabilityStatusInfo.status, "ip: ", ip.String(), " destIPPrefix: ", destIpPrefix, " ipMaskStr:", ipMaskStr)
+	logger.Debug("UpdateRouteReachabilityStatus network: ", routeReachabilityStatusInfo.destNet, " status:", routeReachabilityStatusInfo.status, "ip: ", ip.String(), " destIPPrefix: ", destIpPrefix, " ipMaskStr:", ipMaskStr)
 	rmapInfoRecordList := handle.(RouteInfoRecordList)
 	//for each of the routes for this destination, check if the nexthop ip matches destPrefix - which is the route being modified
 	for k, v := range rmapInfoRecordList.routeInfoProtocolMap {
@@ -807,8 +808,8 @@ func (m RIBDServer) Getv4RouteCreatedTime(number int) (time string, err error) {
 	return v4routeCreatedTimeMap[number], err
 }
 
-func (m RIBDServer) ProcessV4RouteCreateConfig(cfg *ribd.IPv4Route, addType int) (val bool, err error) {
-	logger.Debug("ProcessV4RouteCreateConfig: Received create route request for ip ", cfg.DestinationNw, " mask ", cfg.NetworkMask, " number of next hops: ", len(cfg.NextHop), " null Route:", cfg.NullRoute)
+func (m RIBDServer) ProcessV4RouteCreateConfig(cfg *ribd.IPv4Route, addType int, sliceIdx ribd.Int) (val bool, err error) {
+	logger.Debug("ProcessV4RouteCreateConfig: Received create route request for ip ", cfg.DestinationNw, " mask ", cfg.NetworkMask, " number of next hops: ", len(cfg.NextHop), " null Route:", cfg.NullRoute, " sliceIdx:", sliceIdx)
 	newCfg := ribd.IPv4Route{
 		DestinationNw: cfg.DestinationNw,
 		NetworkMask:   cfg.NetworkMask,
@@ -826,7 +827,7 @@ func (m RIBDServer) ProcessV4RouteCreateConfig(cfg *ribd.IPv4Route, addType int)
 		newCfg.NextHop = make([]*ribd.NextHopInfo, 0)
 		newCfg.NextHop = append(newCfg.NextHop, &nh)
 		//policyRoute := BuildPolicyRouteFromribdIPv4Route(&newCfg)
-		params := BuildRouteParamsFromribdIPv4Route(&newCfg, addType, Invalid, len(destNetSlice))
+		params := BuildRouteParamsFromribdIPv4Route(&newCfg, addType, Invalid, sliceIdx)
 		_, err = createRoute(params)
 	}
 
@@ -857,7 +858,7 @@ func (m RIBDServer) ProcessBulkRouteCreateConfig(bulkCfg []*ribdInt.IPv4RouteCon
 		}
 
 		//policyRoute := BuildPolicyRouteFromribdIPv4Route(&newCfg)
-		params := BuildRouteParamsFromribdIPv4Route(&newCfg, FIBAndRIB, Invalid, len(destNetSlice))
+		params := BuildRouteParamsFromribdIPv4Route(&newCfg, FIBAndRIB, Invalid, ribd.Int(len(destNetSlice)))
 		params.bulk = true
 		index++
 		if index == len(bulkCfg) {
@@ -908,7 +909,7 @@ func (m RIBDServer) Processv4RoutePatchUpdateConfig(origconfig *ribd.IPv4Route, 
 	}
 	ok := V4RouteInfoMap.Match(destNet)
 	if !ok {
-		err = errors.New("No route found")
+		err = errors.New("Processv4RoutePatchUpdateConfig:No route found")
 		return ret, err
 	}
 	for idx := 0; idx < len(op); idx++ {
@@ -944,7 +945,7 @@ func (m RIBDServer) Processv4RoutePatchUpdateConfig(origconfig *ribd.IPv4Route, 
 			}
 			switch op[idx].Op {
 			case "add":
-				m.ProcessV4RouteCreateConfig(newconfig, FIBAndRIB)
+				m.ProcessV4RouteCreateConfig(newconfig, FIBAndRIB, ribd.Int(len(destNetSlice)))
 			case "remove":
 				m.ProcessV4RouteDeleteConfig(newconfig, FIBAndRIB)
 			default:

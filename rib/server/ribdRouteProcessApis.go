@@ -714,7 +714,7 @@ func UpdateRouteReachabilityStatus(prefix patriciaDB.Prefix, //prefix of the nod
 */
 func ResolveNextHop(ipAddr string) (nextHopIntf ribdInt.NextHopInfo, resolvedNextHopIntf ribdInt.NextHopInfo, err error) {
 	func_mesg := "ResolveNextHop() for " + ipAddr
-	//logger.Debug("ResolveNextHop for ", ipAddr)
+	logger.Debug("ResolveNextHop for ", ipAddr)
 	var prev_intf ribdInt.NextHopInfo
 	nextHopIntf.NextHopIp = ipAddr
 	prev_intf.NextHopIp = ipAddr
@@ -733,16 +733,16 @@ func ResolveNextHop(ipAddr string) (nextHopIntf ribdInt.NextHopInfo, resolvedNex
 		if first {
 			nextHopIntf = *intf
 			first = false
-			//logger.Debug("First nexthop network is : ", nextHopIntf.Ipaddr)
+			logger.Debug("First nexthop network is : ", nextHopIntf.Ipaddr, "reachability  = ", nextHopIntf.IsReachable)
 		}
-		//logger.Debug("intf.nextHopIp ", intf.NextHopIp, " intf.Ipaddr:", intf.Ipaddr, " intf.IsReachable:", intf.IsReachable)
+		logger.Debug("intf.nextHopIp ", intf.NextHopIp, " intf.Ipaddr:", intf.Ipaddr, " intf.IsReachable:", intf.IsReachable)
 		isZeroes, err := netUtils.IsZerosIPString(intf.NextHopIp)
 		if err != nil {
 			logger.Err(func_mesg, "nextHopIP ", intf.NextHopIp, " not valid")
 			return nextHopIntf, nextHopIntf, err
 		}
 		if isZeroes { //intf.NextHopIp == "0.0.0.0" {
-			//logger.Debug("Marking ip ", ip, " as reachable")
+			logger.Debug("Marking ip ", ip, " as reachable")
 			intf.NextHopIp = intf.Ipaddr
 			//intf.IsReachable = true
 			prev_intf.IsReachable = intf.IsReachable
@@ -964,7 +964,7 @@ func addNewRoute(destNetPrefix patriciaDB.Prefix,
 	} else {
 		policyPathStr = "Import"
 	}
-	logger.Debug(" addNewRoute for nwAddr: ", routeInfoRecord.networkAddr, "protocol ", routeInfoRecord.protocol, " policy path: ", policyPathStr, " next hop ip: ", routeInfoRecord.nextHopIp.String(), "/", routeInfoRecord.nextHopIfIndex)
+	logger.Debug(" addNewRoute for nwAddr: ", routeInfoRecord.networkAddr, "protocol ", routeInfoRecord.protocol, " policy path: ", policyPathStr, " next hop ip: ", routeInfoRecord.nextHopIp.String(), "/", routeInfoRecord.nextHopIfIndex, "sliceIdx ", routeInfoRecord.sliceIdx, " len(destNetSlice):", len(destNetSlice))
 	if destNetSlice != nil && (len(destNetSlice) > int(routeInfoRecord.sliceIdx)) { //&& bytes.Equal(destNetSlice[routeInfoRecord.sliceIdx].prefix, destNet)) {
 		if bytes.Equal(destNetSlice[routeInfoRecord.sliceIdx].prefix, destNetPrefix) == false {
 			logger.Debug("Unexpected destination network prefix ", destNetSlice[routeInfoRecord.sliceIdx].prefix, " found at the slice Idx ", routeInfoRecord.sliceIdx, " expected prefix ", destNetPrefix)
@@ -1081,7 +1081,7 @@ func addNewRoute(destNetPrefix patriciaDB.Prefix,
 			}
 		}
 		if routeInfoRecord.resolvedNextHopIpIntf.IsReachable {
-			logger.Debug("Mark this network reachable")
+			logger.Debug("addNewRoute : Mark this network reachable")
 			nextHopIntf := ribdInt.NextHopInfo{
 				NextHopIp:      routeInfoRecord.nextHopIp.String(),
 				NextHopIfIndex: ribdInt.Int(routeInfoRecord.nextHopIfIndex),
@@ -1414,7 +1414,7 @@ func createRoute(routeInfo RouteParams) (rc ribd.Int, err error) {
 	nhIntf, resolvedNextHopIntf, res_err := ResolveNextHop(routeInfoRecord.nextHopIp.String())
 	//_, resolvedNextHopIntf, _ := ResolveNextHop(routeInfoRecord.nextHopIp.String())
 	routeInfoRecord.resolvedNextHopIpIntf = resolvedNextHopIntf
-	//logger.Info("nhIntf ipaddr/mask: ", nhIntf.Ipaddr, ":", nhIntf.Mask, " resolvedNex ", resolvedNextHopIntf.NextHopIp, " nexthop ", nextHopIp, "Is reachable:", resolvedNextHopIntf.IsReachable)
+	logger.Info("nhIntf ipaddr/mask: ", nhIntf.Ipaddr, ":", nhIntf.Mask, " resolvedNex ", resolvedNextHopIntf.NextHopIp, " nexthop ", nextHopIp, "Is reachable:", resolvedNextHopIntf.IsReachable)
 
 	routeInfoRecord.routeCreatedTime = time.Now().String()
 	routeInfoRecordListItem := RouteInfoMapGet(ipType, destNet)
@@ -1486,7 +1486,7 @@ func createRoute(routeInfo RouteParams) (rc ribd.Int, err error) {
 		if res_err == nil {
 			nhPrefix, err := getNetowrkPrefixFromStrings(nhIntf.Ipaddr, nhIntf.Mask)
 			if err == nil {
-				//logger.Debug("network address of the nh route: ", nhPrefix)
+				logger.Debug("network address of the nh route: ", nhPrefix)
 				updateNextHopMap(NextHopInfoKey{string(nhPrefix)}, add)
 			}
 		}

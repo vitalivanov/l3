@@ -680,8 +680,8 @@ func (m RIBDServer) Getv6Route(destNetIp string) (route *ribdInt.IPv6RouteState,
 	return route, err
 }
 
-func (m RIBDServer) ProcessV6RouteCreateConfig(cfg *ribd.IPv6Route, addType int) (val bool, err error) {
-	logger.Debug("ProcessV6RouteCreate: Received create route request for ip: ", cfg.DestinationNw, " mask ", cfg.NetworkMask, " number of next hops: ", len(cfg.NextHop))
+func (m RIBDServer) ProcessV6RouteCreateConfig(cfg *ribd.IPv6Route, addType int, sliceIdx ribd.Int) (val bool, err error) {
+	logger.Debug("ProcessV6RouteCreate: Received create route request for ip: ", cfg.DestinationNw, " mask ", cfg.NetworkMask, " number of next hops: ", len(cfg.NextHop), " sliceIdx:", sliceIdx)
 	newCfg := ribd.IPv6Route{
 		DestinationNw: cfg.DestinationNw,
 		NetworkMask:   cfg.NetworkMask,
@@ -701,7 +701,7 @@ func (m RIBDServer) ProcessV6RouteCreateConfig(cfg *ribd.IPv6Route, addType int)
 	}
 
 	//	policyRoute := BuildPolicyRouteFromribdIPv6Route(&newCfg)
-	params := BuildRouteParamsFromribdIPv6Route(&newCfg, addType, Invalid, len(destNetSlice))
+	params := BuildRouteParamsFromribdIPv6Route(&newCfg, addType, Invalid, sliceIdx)
 
 	logger.Debug("createType = ", params.createType, "deleteType = ", params.deleteType)
 	//	PolicyEngineFilter(policyRoute, policyCommonDefs.PolicyPath_Import, params)
@@ -793,7 +793,7 @@ func (m RIBDServer) Processv6RoutePatchUpdateConfig(origconfig *ribd.IPv6Route, 
 			}
 			switch op[idx].Op {
 			case "add":
-				m.ProcessV6RouteCreateConfig(newconfig, FIBAndRIB)
+				m.ProcessV6RouteCreateConfig(newconfig, FIBAndRIB, ribd.Int(len(destNetSlice)))
 			case "remove":
 				m.ProcessV6RouteDeleteConfig(newconfig, FIBAndRIB)
 			default:
