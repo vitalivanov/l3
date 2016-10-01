@@ -54,6 +54,7 @@ type RIBdServerConfig struct {
 	Op                        string //"add"/"del"/"update/get"
 	PatchOp                   []*ribd.PatchOpInfo
 	PolicyList                ApplyPolicyList
+	AdditionalParams          interface{}
 }
 
 type V4IntfGetInfo struct {
@@ -309,6 +310,7 @@ func (ribdServiceHandler *RIBDServer) ProcessIPv4IntfUpEvent(ipAddr string, ifIn
 			ribdServiceHandler.RouteConfCh <- RIBdServerConfig{
 				OrigConfigObject: &cfg,
 				Op:               "addFIBOnly",
+				AdditionalParams: ribd.Int(ConnectedRoutes[i].SliceIdx),
 			}
 		}
 	}
@@ -353,6 +355,7 @@ func (ribdServiceHandler *RIBDServer) ProcessIPv6IntfUpEvent(ipAddr string, ifIn
 			ribdServiceHandler.RouteConfCh <- RIBdServerConfig{
 				OrigConfigObject: &cfg,
 				Op:               "addv6FIBOnly",
+				AdditionalParams: ribd.Int(ConnectedRoutes[i].SliceIdx),
 			}
 		}
 	}

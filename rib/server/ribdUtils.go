@@ -271,7 +271,7 @@ func BuildRouteParamsFromRouteInoRecord(routeInfoRecord RouteInfoRecord) RoutePa
 	params.nextHopIfIndex = routeInfoRecord.nextHopIfIndex
 	return params
 }
-func BuildRouteParamsFromribdIPv4Route(cfg *ribd.IPv4Route, createType int, deleteType int, sliceIdx int) RouteParams {
+func BuildRouteParamsFromribdIPv4Route(cfg *ribd.IPv4Route, createType int, deleteType int, sliceIdx ribd.Int) RouteParams {
 	nextHopIp := cfg.NextHop[0].NextHopIp
 	if cfg.NullRoute == true { //commonDefs.IfTypeNull {
 		logger.Info("null route create request")
@@ -292,7 +292,7 @@ func BuildRouteParamsFromribdIPv4Route(cfg *ribd.IPv4Route, createType int, dele
 	}
 	return params
 }
-func BuildRouteParamsFromribdIPv6Route(cfg *ribd.IPv6Route, createType int, deleteType int, sliceIdx int) RouteParams {
+func BuildRouteParamsFromribdIPv6Route(cfg *ribd.IPv6Route, createType int, deleteType int, sliceIdx ribd.Int) RouteParams {
 	nextHopIp := cfg.NextHop[0].NextHopIp
 	if cfg.NullRoute == true { //commonDefs.IfTypeNull {
 		logger.Info("null route create request")

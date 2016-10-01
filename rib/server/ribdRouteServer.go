@@ -324,9 +324,9 @@ func (ribdServiceHandler *RIBDServer) StartRouteProcessServer() {
 		case routeConf := <-ribdServiceHandler.RouteConfCh:
 			//logger.Debug(fmt.Sprintln("received message on RouteConfCh channel, op: ", routeConf.Op)
 			if routeConf.Op == "add" {
-				ribdServiceHandler.ProcessV4RouteCreateConfig(routeConf.OrigConfigObject.(*ribd.IPv4Route), FIBAndRIB)
+				ribdServiceHandler.ProcessV4RouteCreateConfig(routeConf.OrigConfigObject.(*ribd.IPv4Route), FIBAndRIB, ribd.Int(len(destNetSlice)))
 			} else if routeConf.Op == "addFIBOnly" {
-				ribdServiceHandler.ProcessV4RouteCreateConfig(routeConf.OrigConfigObject.(*ribd.IPv4Route), FIBOnly)
+				ribdServiceHandler.ProcessV4RouteCreateConfig(routeConf.OrigConfigObject.(*ribd.IPv4Route), FIBOnly, routeConf.AdditionalParams.(ribd.Int))
 			} else if routeConf.Op == "addBulk" {
 				ribdServiceHandler.ProcessBulkRouteCreateConfig(routeConf.OrigBulkRouteConfigObject) //.([]*ribd.IPv4Route))
 			} else if routeConf.Op == "del" {
@@ -341,10 +341,10 @@ func (ribdServiceHandler *RIBDServer) StartRouteProcessServer() {
 				}
 			} else if routeConf.Op == "addv6" {
 				//create ipv6 route
-				ribdServiceHandler.ProcessV6RouteCreateConfig(routeConf.OrigConfigObject.(*ribd.IPv6Route), FIBAndRIB)
+				ribdServiceHandler.ProcessV6RouteCreateConfig(routeConf.OrigConfigObject.(*ribd.IPv6Route), FIBAndRIB, ribd.Int(len(destNetSlice)))
 			} else if routeConf.Op == "addv6FIBOnly" {
 				//create ipv6 route
-				ribdServiceHandler.ProcessV6RouteCreateConfig(routeConf.OrigConfigObject.(*ribd.IPv6Route), FIBOnly)
+				ribdServiceHandler.ProcessV6RouteCreateConfig(routeConf.OrigConfigObject.(*ribd.IPv6Route), FIBOnly, routeConf.AdditionalParams.(ribd.Int))
 			} else if routeConf.Op == "delv6" {
 				//delete ipv6 route
 				ribdServiceHandler.ProcessV6RouteDeleteConfig(routeConf.OrigConfigObject.(*ribd.IPv6Route), FIBAndRIB)
