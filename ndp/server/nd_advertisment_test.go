@@ -102,3 +102,42 @@ func TestProcessNAPkt(t *testing.T) {
 		return
 	}
 }
+
+func constructInvalidNdInfoNA() *packet.NDInfo {
+	wantNDinfo := &packet.NDInfo{
+		SrcMac:        testNaSrcMac, // Update SRC MAC From ethernet
+		DstMac:        testNaDstMac, // Update DST MAC from ethernet
+		SrcIp:         testRADstIp,
+		DstIp:         testRADstIp,
+		TargetAddress: net.ParseIP(testNaSrcIp),
+		PktType:       layers.ICMPv6TypeNeighborAdvertisement,
+	}
+	ndOpt := &packet.NDOption{
+		Type:   packet.NDOptionTypeTargetLinkLayerAddress,
+		Length: 1,
+		Value:  []byte{0xf6, 0x6d, 0xe4, 0x22, 0x75, 0x9e},
+	}
+	wantNDinfo.Options = append(wantNDinfo.Options, ndOpt)
+	return wantNDinfo
+}
+
+func TestInvalidProcessNA(t *testing.T) {
+	// create ipv6 interface
+	TestIPv6IntfCreate(t)
+
+	ndInfo := constructInvalidNdInfoNA()
+	l3Port, exists := testNdpServer.L3Port[testIfIndex]
+	if !exists {
+		t.Error("Failed to get L3 Port for ifIndex:", testIfIndex)
+		return
+	}
+	nbrInfo, oper := l3Port.processNA(ndInfo)
+	if oper == CREATE || oper == DELETE {
+		t.Error("Failed to ignore NA with ipv6 multicast prefix for ndInfo:", *ndInfo)
+		return
+	}
+	if nbrInfo != nil {
+		t.Error("Failed to ignore NA with ipv6 multicast prefix for ndInfo:", *ndInfo)
+		return
+	}
+}

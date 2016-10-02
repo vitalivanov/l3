@@ -32,6 +32,7 @@ import (
 	"l3/ndp/debug"
 	"l3/ndp/packet"
 	"net"
+	"strings"
 	"time"
 	"utils/commonDefs"
 )
@@ -51,6 +52,8 @@ const (
 	NDP_DEFAULT_RETRANSMIT_INTERVAL        uint32 = 1
 	NDP_DEFAULT_REACHABLE_INTERVAL         uint32 = 30000
 )
+
+var IPV6_MULTICAST_PREFIX = []string{"ff02:", "ff01:", "ff05:", "ff0x:"}
 
 type PcapBase struct {
 	// Pcap Handler for Each Port
@@ -391,6 +394,8 @@ func (intf *Interface) ProcessND(ndInfo *packet.NDInfo) (*config.NeighborConfig,
 		return intf.processNA(ndInfo)
 	case layers.ICMPv6TypeRouterAdvertisement:
 		return intf.processRA(ndInfo)
+	case layers.ICMPv6TypeRouterSolicitation:
+		// @TODO: not supported
 	}
 
 	return nil, IGNORE
@@ -407,6 +412,8 @@ func (intf *Interface) SendND(pktData config.PacketData, mac string) NDP_OPERATI
 		// @TODO: implement this
 	case layers.ICMPv6TypeRouterAdvertisement:
 		intf.SendRA(mac)
+	case layers.ICMPv6TypeRouterSolicitation:
+		// @TODO: ignore router solicitation
 	}
 	return IGNORE
 }
@@ -444,4 +451,16 @@ func (intf *Interface) PopulateNeighborInfo(nbr NeighborInfo, nbrState *config.N
 	case PROBE:
 		nbrState.State = "Stale"
 	}
+}
+
+/*
+ *   Interface validator for nbrKey generated
+ */
+func (intf *Interface) validNbrKey(nbrKey string) bool {
+	for _, value := range IPV6_MULTICAST_PREFIX {
+		if strings.Contains(strings.ToLower(nbrKey), value) {
+			return false
+		}
+	}
+	return true
 }

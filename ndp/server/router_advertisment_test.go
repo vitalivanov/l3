@@ -115,7 +115,6 @@ func TestProcessRA(t *testing.T) {
 		t.Error("Want Neigbor Info:", *wantNbrInfo, "but received nbrInfo:", *nbrInfo)
 		return
 	}
-	//t.Log(testNdpServer.NeighborInfo)
 	testNdpServer.CreateNeighborInfo(nbrInfo)
 	if len(testNdpServer.NeighborInfo) == 0 {
 		t.Error("Failed to add new learned neighbor information after processing router advertisement")
@@ -126,7 +125,6 @@ func TestProcessRA(t *testing.T) {
 		t.Error("Neighbor insert into NeighborInfo map but key is not added into neighborKey slice")
 		return
 	}
-	//t.Log(testNdpServer.NeighborInfo)
 	nbrInfo, oper = l3Port.processRA(ndInfo)
 	if oper != UPDATE {
 		t.Error("Failed to create a new neighbor entry on RA packet")
@@ -157,6 +155,62 @@ func TestProcessRA(t *testing.T) {
 
 	if len(testNdpServer.neighborKey) != 0 {
 		t.Error("Neighbor delete into NeighborInfo map but key is not delete from into neighborKey slice")
+		return
+	}
+}
+
+func constructNDInfo() *packet.NDInfo {
+	wantBaseNDInfo := &packet.NDInfo{
+		CurHopLimit:    64,
+		ReservedFlags:  0,
+		RouterLifetime: 1800,
+		ReachableTime:  0,
+		RetransTime:    0,
+		PktType:        layers.ICMPv6TypeRouterAdvertisement,
+		SrcMac:         testRASrcMac,
+		DstMac:         testRADstMac,
+		DstIp:          testRALinkScopeIp,
+		SrcIp:          testRADstIp,
+	}
+
+	sourcendOpt := &packet.NDOption{
+		Type:   packet.NDOptionTypeSourceLinkLayerAddress,
+		Length: 1,
+	}
+	sourcendOpt.Value = make([]byte, 6)
+	copy(sourcendOpt.Value, raBaseTestPkt[72:78])
+	mtuOpt := &packet.NDOption{
+		Type:   packet.NDOptionTypeMTU,
+		Length: 1,
+	}
+	for i := 0; i < 4; i++ {
+		mtuOpt.Value = append(mtuOpt.Value, 0)
+	}
+	mtuOpt.Value = append(mtuOpt.Value, 0x05)
+	mtuOpt.Value = append(mtuOpt.Value, 0xdc)
+	wantBaseNDInfo.Options = append(wantBaseNDInfo.Options, sourcendOpt)
+	wantBaseNDInfo.Options = append(wantBaseNDInfo.Options, mtuOpt)
+	return wantBaseNDInfo
+}
+
+func TestInvalidProcessRA(t *testing.T) {
+	// create ipv6 interface
+	TestIPv6IntfCreate(t)
+	l3Port, exists := testNdpServer.L3Port[testIfIndex]
+	if !exists {
+		t.Error("Failed to get L3 Port for ifIndex:", testIfIndex)
+		return
+	}
+
+	t.Log(l3Port)
+	ndInfo := constructNDInfo()
+	nbrInfo, oper := l3Port.processRA(ndInfo)
+	if nbrInfo != nil {
+		t.Error("For ndInfo", *ndInfo, "which has ipv6 muticast prefix we should not create nbr Entry", nbrInfo)
+		return
+	}
+	if oper == CREATE || oper == DELETE {
+		t.Error("For ndInfo", *ndInfo, "which has ipv6 muticast prefix we should not have oper as ", oper)
 		return
 	}
 }

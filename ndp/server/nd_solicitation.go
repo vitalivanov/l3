@@ -23,12 +23,9 @@
 package server
 
 import (
-	_ "fmt"
 	"github.com/google/gopacket/layers"
 	"l3/ndp/config"
-	_ "l3/ndp/debug"
 	"l3/ndp/packet"
-	"strings"
 )
 
 /*
@@ -58,8 +55,6 @@ func (intf *Interface) sendUnicastNS(srcMac, nbrMac, nbrIp string) NDP_OPERATION
 		pkt.SrcIp = intf.globalScope
 	}
 
-	//debug.Logger.Debug("Sending Unicast NS message with (DMAC, SMAC)", pkt.DstMac, pkt.SrcMac,
-	//	"and (DIP, SIP)", pkt.DstIp, pkt.SrcIp)
 	pktToSend := pkt.Encode()
 	err := intf.writePkt(pktToSend)
 	if err != nil {
@@ -70,18 +65,15 @@ func (intf *Interface) sendUnicastNS(srcMac, nbrMac, nbrIp string) NDP_OPERATION
 	if nbr.State == REACHABLE {
 		// This means that Reachable Timer has expierd and hence we are sending Unicast Message..
 		// Lets set the time for delay first probe
-		//debug.Logger.Debug("Reachable timer expired for nbr:", nbrIp, "setting delay proble timer")
 		nbr.DelayProbe()
 		nbr.State = DELAY
 		nbr.ProbesSent = 0
 	} else if nbr.State == DELAY || nbr.State == PROBE {
 		// Probes Sent can still be zero but the state has changed to Delay..
 		// Start Timer for Probe and move the state from delay to Probe
-		//debug.Logger.Debug("Delay Probe timer expired for nbr:", nbrIp, "setting re-transmite timer")
 		nbr.Timer()
 		nbr.State = PROBE
 		nbr.ProbesSent += 1
-		//debug.Logger.Debug("Total probes send out to nbr:", nbrIp, "are", nbr.ProbesSent)
 	}
 	intf.counter.Send++
 	nbr.counter.Send++
@@ -112,14 +104,14 @@ func (intf *Interface) SendNS(myMac, nbrMac, nbrIp string) NDP_OPERATION {
  *		    Then update the state to STALE
  */
 func (intf *Interface) processNS(ndInfo *packet.NDInfo) (nbrInfo *config.NeighborConfig, oper NDP_OPERATION) {
-	if ndInfo.SrcIp == "" || ndInfo.SrcIp == "::" || strings.Contains(ndInfo.DstIp, "ff02::1") {
+	if ndInfo.SrcIp == "" || ndInfo.SrcIp == "::" {
 		// NS was generated locally or it is multicast-solicitation message
-		// @TODO: for multicast solicitation add a neigbor entry based of target address and
-		// mark it as inclomple
 		return nil, IGNORE
 	}
-	//debug.Logger.Debug("Processing NS packet:", *ndInfo)
 	nbrKey := intf.createNbrKey(ndInfo)
+	if !intf.validNbrKey(nbrKey) {
+		return nil, IGNORE
+	}
 	nbr, exists := intf.Neighbor[nbrKey]
 	if exists {
 		// update the neighbor ??? what to do in this case moving to stale

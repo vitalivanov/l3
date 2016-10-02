@@ -62,7 +62,6 @@ func NDPTestNewLogger(name string, tag string, listenToConfig bool) (*logging.Wr
 		return srLogger, err
 	}
 
-	srLogger.GlobalLogging = true
 	srLogger.MyLogLevel = sysdCommonDefs.INFO
 	return srLogger, err
 }

@@ -38,6 +38,9 @@ import (
  */
 func (intf *Interface) processRA(ndInfo *packet.NDInfo) (nbrInfo *config.NeighborConfig, oper NDP_OPERATION) {
 	nbrKey := intf.createNbrKey(ndInfo)
+	if !intf.validNbrKey(nbrKey) {
+		return nil, IGNORE
+	}
 	nbr, exists := intf.Neighbor[nbrKey]
 	if exists {
 		if ndInfo.RouterLifetime == 0 {
