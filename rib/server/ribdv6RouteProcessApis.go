@@ -465,6 +465,12 @@ func (m RIBDServer) IPv6RouteConfigValidationCheck(cfg *ribd.IPv6Route, op strin
 		logger.Debug(fmt.Sprintln("Number of nexthops = ", len(cfg.NextHop)))
 		if cfg.NullRoute == true {
 			logger.Debug("this is a null route, so dont validate nexthop attribute")
+			if cfg.NextHop == nil || len(cfg.NextHop) == 0 {
+				cfg.NextHop = make([]*ribd.NextHopInfo, 0)
+				cfg.NextHop = append(cfg.NextHop, &ribd.NextHopInfo{
+					NextHopIp: "255.255.255.255",
+				})
+			}
 			return nil
 		}
 		if len(cfg.NextHop) == 0 {
@@ -511,6 +517,17 @@ func (m RIBDServer) IPv6RouteConfigValidationCheck(cfg *ribd.IPv6Route, op strin
 			}
 			//logger.Debug(fmt.Sprintln("IntRef after : ", cfg.NextHop[i].NextHopIntRef))
 		}
+	} else {
+		if cfg.NullRoute == true {
+			if cfg.NextHop == nil || len(cfg.NextHop) == 0 {
+				cfg.NextHop = make([]*ribd.NextHopInfo, 0)
+				cfg.NextHop = append(cfg.NextHop, &ribd.NextHopInfo{
+					NextHopIp: "255.255.255.255",
+				})
+			}
+			return nil
+		}
+
 	}
 	return nil
 }
@@ -719,6 +736,10 @@ func (m RIBDServer) ProcessV6RouteDeleteConfig(cfg *ribd.IPv6Route, delType int)
 	var nextHopIfIndex ribd.Int
 	for i := 0; i < len(cfg.NextHop); i++ {
 		nextHopIfIndex = -1
+		if cfg.NullRoute == true { //commonDefs.IfTypeNull {
+			logger.Info("null route create request")
+			cfg.NextHop[i].NextHopIp = "255.255.255.255"
+		}
 		logger.Debug("nexthop info: ip: ", cfg.NextHop[i].NextHopIp, " intref: ", cfg.NextHop[i].NextHopIntRef)
 		if cfg.NextHop[i].NextHopIntRef != "" {
 			cfg.NextHop[i].NextHopIntRef, err = m.ConvertIntfStrToIfIndexStr(cfg.NextHop[i].NextHopIntRef)

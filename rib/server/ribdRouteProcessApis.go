@@ -1294,7 +1294,7 @@ func SelectRoute(destNetPrefix patriciaDB.Prefix,
 	op ribd.Int, //add or delete of the route
 	opType int, //whether this operation is at FIB only or RIBAndFIB
 ) (err error) {
-	//logger.Debug("Selecting the best Route for destNetPrefix ", destNetPrefix)
+	logger.Debug("SelectRoute: Selecting the best Route for destNetPrefix ", destNetPrefix)
 	if op == add {
 		//logger.Debug("Op is to add the new route")
 		_, deleteRouteList, newSelectedProtocol := selectBestRouteOnAdd(routeInfoRecordList, routeInfoRecord)
@@ -1307,7 +1307,7 @@ func SelectRoute(destNetPrefix patriciaDB.Prefix,
 		routeInfoRecordList.selectedRouteProtocol = newSelectedProtocol
 		addNewRoute(destNetPrefix, routeInfoRecord, routeInfoRecordList, policyCommonDefs.PolicyPath_Export)
 	} else if op == del {
-		//logger.Debug("Op is to delete new route")
+		logger.Debug("SelectRoute: Op is to delete new route")
 		deleteRoute(destNetPrefix, routeInfoRecord, routeInfoRecordList, policyCommonDefs.PolicyPath_Export, opType)
 		addRouteList, _, newSelectedProtocol := SelectBestRoute(routeInfoRecordList)
 		routeInfoRecordList.selectedRouteProtocol = newSelectedProtocol
@@ -1575,7 +1575,7 @@ func deleteIPRoute(destNetIp string,
 	nextHopIfIndex ribd.Int,
 	delType ribd.Int,
 	policyStateChange int) (rc ribd.Int, err error) {
-	//logger.Debug("deleteIPRoute  with del type ", delType)
+	logger.Debug("deleteIPRoute for destNetIp:", destNetIp, " networkMask:", networkMask, " with routeType:", routeType, " nextHopIP", nextHopIP, " del type ", delType)
 
 	destNetIpAddr, err := getIP(destNetIp)
 	if err != nil {
