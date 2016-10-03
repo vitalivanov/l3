@@ -134,3 +134,59 @@ func TestUnicastNS(t *testing.T) {
 		return
 	}
 }
+
+func constructInvalidNdInfoNS() *packet.NDInfo {
+	ndInfo := &packet.NDInfo{
+		SrcMac: testNsSrcMac,
+		DstMac: testNsDstMac,
+		SrcIp:  testMulticastSolicitationAddr,
+		DstIp:  testMulticastSolicitationAddr,
+	}
+	ndOpt := &packet.NDOption{
+		Type:   packet.NDOptionTypeSourceLinkLayerAddress,
+		Length: 1,
+		Value:  []byte{0x00, 0x1f, 0x16, 0x25, 0x33, 0xce},
+	}
+	ndInfo.Options = append(ndInfo.Options, ndOpt)
+	return ndInfo
+}
+
+func TestInvalidProcessNS(t *testing.T) {
+	// create ipv6 interface
+	TestIPv6IntfCreate(t)
+	l3Port, exists := testNdpServer.L3Port[testIfIndex]
+	if !exists {
+		t.Error("Failed to get L3 Port for ifIndex:", testIfIndex)
+		return
+	}
+	ndInfo := constructInvalidNdInfoNS()
+	nbrInfo, oper := l3Port.processNS(ndInfo)
+	if oper == CREATE || oper == DELETE {
+		t.Error("Failed to ignore NS with ipv6 multicast prefix for ndInfo:", *ndInfo)
+		return
+	}
+	if nbrInfo != nil {
+		t.Error("Failed to ignore NS with ipv6 multicast prefix for ndInfo:", *ndInfo)
+		return
+	}
+	ndInfo.SrcIp = ""
+	nbrInfo, oper = l3Port.processNS(ndInfo)
+	if oper == CREATE || oper == DELETE {
+		t.Error("Failed to ignore NS with ipv6 multicast prefix for ndInfo:", *ndInfo)
+		return
+	}
+	if nbrInfo != nil {
+		t.Error("Failed to ignore NS with ipv6 multicast prefix for ndInfo:", *ndInfo)
+		return
+	}
+	ndInfo.SrcIp = "::"
+	nbrInfo, oper = l3Port.processNS(ndInfo)
+	if oper == CREATE || oper == DELETE {
+		t.Error("Failed to ignore NS with ipv6 multicast prefix for ndInfo:", *ndInfo)
+		return
+	}
+	if nbrInfo != nil {
+		t.Error("Failed to ignore NS with ipv6 multicast prefix for ndInfo:", *ndInfo)
+		return
+	}
+}

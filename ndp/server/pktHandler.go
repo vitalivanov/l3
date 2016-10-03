@@ -220,7 +220,7 @@ func (svr *NDPServer) ProcessRxPkt(ifIndex int32, pkt gopacket.Packet) error {
 	}
 	nbrInfo, operation := ipPort.ProcessND(ndInfo)
 	svr.L3Port[ifIndex] = ipPort
-	if nbrInfo == nil || operation == IGNORE {
+	if nbrInfo == nil || operation != CREATE || operation != DELETE {
 		return nil
 	}
 	switch operation {

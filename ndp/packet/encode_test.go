@@ -92,7 +92,6 @@ func PacketTestNewLogger(name string, tag string, listenToConfig bool) (*logging
 		return srLogger, err
 	}
 
-	srLogger.GlobalLogging = true
 	srLogger.MyLogLevel = sysdCommonDefs.INFO
 	return srLogger, err
 }

@@ -112,7 +112,7 @@ func checkInfraAPIs() {
 	fmt.Println("Mtu size calculated as ", mtu)
 	ospf.updateIpPropertyMap(ipv4Msg, asicdCommonDefs.NOTIFY_IPV4INTF_CREATE)
 
-	ospf.getLinuxIntfName(ipProperty.IfId, ipProperty.IfType)
+	ospf.getLinuxIntfName(int32(ipProperty.IfId), ipProperty.IfType)
 	cost, _ := ospf.getIntfCost(ipProperty.IfId, ipProperty.IfType)
 	fmt.Println("Cost calculated as ", cost)
 	macadd, _ := getMacAddrIntfName(vlanProperty.Name)

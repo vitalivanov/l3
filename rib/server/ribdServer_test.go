@@ -44,7 +44,6 @@ func RIBdNewLogger(name string, tag string) (*logging.Writer, error) {
 		return srLogger, err
 	}
 
-	srLogger.GlobalLogging = true
 	srLogger.MyLogLevel = sysdCommonDefs.DEBUG
 	return srLogger, err
 }

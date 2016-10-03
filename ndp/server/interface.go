@@ -32,6 +32,7 @@ import (
 	"l3/ndp/debug"
 	"l3/ndp/packet"
 	"net"
+	"strings"
 	"time"
 	"utils/commonDefs"
 )
@@ -51,6 +52,31 @@ const (
 	NDP_DEFAULT_RETRANSMIT_INTERVAL        uint32 = 1
 	NDP_DEFAULT_REACHABLE_INTERVAL         uint32 = 30000
 )
+
+/* https://tools.ietf.org/html/rfc7346
+   +------+--------------------------+-------------------------+
+   | scop | NAME                     | REFERENCE               |
+   +------+--------------------------+-------------------------+
+   |  0   | Reserved                 | [RFC4291], RFC 7346     |
+   |  1   | Interface-Local scope    | [RFC4291], RFC 7346     |
+   |  2   | Link-Local scope         | [RFC4291], RFC 7346     |
+   |  3   | Realm-Local scope        | [RFC4291], RFC 7346     |
+   |  4   | Admin-Local scope        | [RFC4291], RFC 7346     |
+   |  5   | Site-Local scope         | [RFC4291], RFC 7346     |
+   |  6   | Unassigned               |                         |
+   |  7   | Unassigned               |                         |
+   |  8   | Organization-Local scope | [RFC4291], RFC 7346     |
+   |  9   | Unassigned               |                         |
+   |  A   | Unassigned               |                         |
+   |  B   | Unassigned               |                         |
+   |  C   | Unassigned               |                         |
+   |  D   | Unassigned               |                         |
+   |  E   | Global scope             | [RFC4291], RFC 7346     |
+   |  F   | Reserved                 | [RFC4291], RFC 7346     |
+   +------+--------------------------+-------------------------+
+*/
+var IPV6_MULTICAST_PREFIXES = []string{"ff00", "ff01", "ff02", "ff03", "ff04", "ff05", "ff06", "ff07",
+	"ff08", "ff09", "ff0a", "ff0b", "ff0c", "ff0d", "ff0e", "ff0f"}
 
 type PcapBase struct {
 	// Pcap Handler for Each Port
@@ -391,6 +417,8 @@ func (intf *Interface) ProcessND(ndInfo *packet.NDInfo) (*config.NeighborConfig,
 		return intf.processNA(ndInfo)
 	case layers.ICMPv6TypeRouterAdvertisement:
 		return intf.processRA(ndInfo)
+	case layers.ICMPv6TypeRouterSolicitation:
+		// @TODO: not supported
 	}
 
 	return nil, IGNORE
@@ -407,6 +435,8 @@ func (intf *Interface) SendND(pktData config.PacketData, mac string) NDP_OPERATI
 		// @TODO: implement this
 	case layers.ICMPv6TypeRouterAdvertisement:
 		intf.SendRA(mac)
+	case layers.ICMPv6TypeRouterSolicitation:
+		// @TODO: ignore router solicitation
 	}
 	return IGNORE
 }
@@ -444,4 +474,17 @@ func (intf *Interface) PopulateNeighborInfo(nbr NeighborInfo, nbrState *config.N
 	case PROBE:
 		nbrState.State = "Stale"
 	}
+}
+
+/*
+ *   Interface validator for nbrKey generated
+ */
+func (intf *Interface) validNbrKey(nbrKey string) bool {
+	splitString := strings.Split(nbrKey, ":")
+	for _, value := range IPV6_MULTICAST_PREFIXES {
+		if strings.Contains(strings.ToLower(splitString[0]), value) {
+			return false
+		}
+	}
+	return true
 }
