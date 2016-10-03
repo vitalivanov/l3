@@ -26,6 +26,7 @@ import (
 	"errors"
 	"l3/ndp/api"
 	"l3/ndp/config"
+	"l3/ndp/debug"
 	"ndpd"
 	"strconv"
 )
@@ -58,6 +59,7 @@ func convertNDPEntryStateToThriftEntry(state config.NeighborConfig) *ndpd.NDPEnt
 }
 
 func (h *ConfigHandler) GetBulkNDPEntryState(fromIdx ndpd.Int, count ndpd.Int) (*ndpd.NDPEntryStateGetInfo, error) {
+	debug.Logger.Debug("Get Bulk NDP Entry state called")
 	nextIdx, currCount, ndpEntries := api.GetAllNeigborEntries(int(fromIdx), int(count))
 	if len(ndpEntries) == 0 || ndpEntries == nil {
 		return nil, errors.New("No Neighbor Found")
