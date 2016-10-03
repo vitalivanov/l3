@@ -24,6 +24,7 @@ package server
 
 import (
 	"l3/ndp/config"
+	"l3/ndp/debug"
 )
 
 func (svr *NDPServer) GetNeighborEntries(idx, cnt int) (int, int, []config.NeighborConfig) {
@@ -33,6 +34,7 @@ func (svr *NDPServer) GetNeighborEntries(idx, cnt int) (int, int, []config.Neigh
 
 	length := len(svr.neighborKey)
 	if length == 0 {
+		debug.Logger.Err("No Neighbors created by server")
 		return 0, 0, nil
 	}
 	var result []config.NeighborConfig
@@ -41,6 +43,7 @@ func (svr *NDPServer) GetNeighborEntries(idx, cnt int) (int, int, []config.Neigh
 	for i, j = 0, idx; i < cnt && j < length; j++ {
 		key := svr.neighborKey[j]
 		result = append(result, svr.NeighborInfo[key])
+		debug.Logger.Debug("Adding Neigbhor:", svr.NeighborInfo[key])
 		i++
 	}
 	svr.NeigborEntryLock.RUnlock()
