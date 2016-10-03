@@ -481,9 +481,7 @@ func (intf *Interface) PopulateNeighborInfo(nbr NeighborInfo, nbrState *config.N
  */
 func (intf *Interface) validNbrKey(nbrKey string) bool {
 	splitString := strings.Split(nbrKey, ":")
-	fmt.Println(splitString)
 	for _, value := range IPV6_MULTICAST_PREFIXES {
-		fmt.Println(splitString[0], value)
 		if strings.Contains(strings.ToLower(splitString[0]), value) {
 			return false
 		}
