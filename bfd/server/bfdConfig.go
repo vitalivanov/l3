@@ -30,10 +30,12 @@ import (
 )
 
 type GlobalConfig struct {
+	Vrf    string
 	Enable bool
 }
 
 type GlobalState struct {
+	Vrf                  string
 	Enable               bool
 	NumSessions          uint32
 	NumUpSessions        uint32
@@ -52,6 +54,7 @@ type SessionConfig struct {
 
 type SessionState struct {
 	IpAddr                    string
+	LocalAddr                 string
 	SessionId                 int32
 	ParamName                 string
 	Interface                 string

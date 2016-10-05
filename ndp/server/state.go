@@ -23,9 +23,8 @@
 package server
 
 import (
-	_ "fmt"
 	"l3/ndp/config"
-	_ "l3/ndp/debug"
+	"l3/ndp/debug"
 )
 
 func (svr *NDPServer) GetNeighborEntries(idx, cnt int) (int, int, []config.NeighborConfig) {
@@ -35,6 +34,7 @@ func (svr *NDPServer) GetNeighborEntries(idx, cnt int) (int, int, []config.Neigh
 
 	length := len(svr.neighborKey)
 	if length == 0 {
+		debug.Logger.Err("No Neighbors created by server")
 		return 0, 0, nil
 	}
 	var result []config.NeighborConfig
@@ -43,6 +43,7 @@ func (svr *NDPServer) GetNeighborEntries(idx, cnt int) (int, int, []config.Neigh
 	for i, j = 0, idx; i < cnt && j < length; j++ {
 		key := svr.neighborKey[j]
 		result = append(result, svr.NeighborInfo[key])
+		debug.Logger.Debug("Adding Neigbhor:", svr.NeighborInfo[key])
 		i++
 	}
 	svr.NeigborEntryLock.RUnlock()
@@ -62,4 +63,71 @@ func (svr *NDPServer) GetNeighborEntry(ipAddr string) *config.NeighborConfig {
 		return &nbrEntry
 	}
 	return nil
+}
+
+func (svr *NDPServer) GetGlobalState(vrf string) *config.GlobalState {
+	gblState := config.GlobalState{}
+	gblState.Vrf = vrf
+	gblState.TotalRxPackets = svr.counter.Rcvd
+	gblState.TotalTxPackets = svr.counter.Send
+	gblState.Neighbors = int32(len(svr.neighborKey))
+	gblState.RetransmitInterval = int32(svr.NdpConfig.RetransTime)
+	gblState.ReachableTime = int32(svr.NdpConfig.ReachableTime)
+	gblState.RouterAdvertisementInterval = int32(svr.NdpConfig.RaRestransmitTime)
+	return &gblState
+}
+
+func (svr *NDPServer) PopulateInterfaceInfo(ifIndex int32, entry *config.InterfaceEntries) {
+	intf, exists := svr.L3Port[ifIndex]
+	if !exists {
+		return
+	}
+	entry.IntfRef = intf.IntfRef
+	entry.IfIndex = intf.IfIndex
+	entry.LinkScopeIp = intf.LinkLocalIp
+	entry.GlobalScopeIp = intf.IpAddr
+	entry.SendPackets = intf.counter.Send
+	entry.ReceivedPackets = intf.counter.Rcvd
+	for _, nbrInfo := range intf.Neighbor {
+		nbrEntry := config.NeighborEntry{}
+		intf.PopulateNeighborInfo(nbrInfo, &nbrEntry)
+		entry.Neighbor = append(entry.Neighbor, nbrEntry)
+	}
+}
+
+func (svr *NDPServer) GetInterfaceNeighborEntries(idx, cnt int) (int, int, []config.InterfaceEntries) {
+	var nextIdx int
+	var count int
+	var i, j int
+
+	length := len(svr.ndpUpL3IntfStateSlice)
+	if length == 0 {
+		return 0, 0, nil
+	}
+
+	var result []config.InterfaceEntries
+	svr.NeigborEntryLock.RLock()
+	for i, j = 0, idx; i < cnt && j < length; j++ {
+		ifIndex := svr.ndpUpL3IntfStateSlice[j]
+		entry := config.InterfaceEntries{}
+		svr.PopulateInterfaceInfo(ifIndex, &entry)
+		result = append(result, entry)
+		i++
+	}
+	svr.NeigborEntryLock.RUnlock()
+	if j == length {
+		nextIdx = 0
+	}
+	count = i
+	return nextIdx, count, result
+}
+
+func (svr *NDPServer) GetInterfaceNeighborEntry(intfRef string) *config.InterfaceEntries {
+	result := config.InterfaceEntries{}
+	ifIndex, exists := svr.L3IfIntfRefToIfIndex[intfRef]
+	if !exists {
+		return &result
+	}
+	svr.PopulateInterfaceInfo(ifIndex, &result)
+	return &result
 }

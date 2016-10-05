@@ -144,10 +144,10 @@ func (l *LocRib) GetDest(nlri packet.NLRI, protoFamily uint32, createIfNotExist 
 			l.destPathMap[protoFamily] = make(map[string]*Destination)
 			nlriDestMap = l.destPathMap[protoFamily]
 		}
-		dest, ok = nlriDestMap[nlri.GetPrefix().String()]
+		dest, ok = nlriDestMap[nlri.GetCIDR()]
 		if !ok && createIfNotExist {
 			dest = NewDestination(l, nlri, protoFamily, l.gConf)
-			l.destPathMap[protoFamily][nlri.GetPrefix().String()] = dest
+			l.destPathMap[protoFamily][nlri.GetCIDR()] = dest
 			l.addRoutesToRouteList(dest, protoFamily)
 		}
 	}
@@ -187,11 +187,11 @@ func (l *LocRib) ProcessRoutes(peerIP string, add, rem []packet.NLRI, addPath, r
 	// process withdrawn routes
 	for _, nlri := range rem {
 		if !isIpInList(add, nlri) {
-			l.logger.Info("Processing withdraw destination", nlri.GetPrefix().String())
+			l.logger.Info("Processing withdraw destination", nlri.GetCIDR())
 			dest, ok := l.GetDest(nlri, protoFamily, false)
 			if !ok {
 				l.logger.Warning("Can't process withdraw field, Destination does not exist, Dest:",
-					nlri.GetPrefix().String())
+					nlri.GetCIDR())
 				continue
 			}
 			op := l.stateDBMgr.UpdateObject
@@ -232,7 +232,7 @@ func (l *LocRib) ProcessRoutes(peerIP string, add, rem []packet.NLRI, addPath, r
 			if oldPath != nil && remPath != nil {
 				if neighborConf := remPath.GetNeighborConf(); neighborConf != nil {
 					l.logger.Infof("Decrement prefix count for destination %s from Peer %s",
-						nlri.GetPrefix().String(), peerIP)
+						nlri.GetCIDR(), peerIP)
 					neighborConf.DecrPrefixCount()
 				}
 			}
@@ -240,12 +240,12 @@ func (l *LocRib) ProcessRoutes(peerIP string, add, rem []packet.NLRI, addPath, r
 				if dest.IsEmpty() {
 					op = l.stateDBMgr.DeleteObject
 					l.removeRoutesFromRouteList(dest, protoFamily)
-					delete(l.destPathMap[protoFamily], nlri.GetPrefix().String())
+					delete(l.destPathMap[protoFamily], nlri.GetCIDR())
 				}
 			}
 			op(l.GetRouteStateConfigObj(dest.GetBGPRoute()))
 		} else {
-			l.logger.Info("Can't withdraw destination", nlri.GetPrefix().String(),
+			l.logger.Info("Can't withdraw destination", nlri.GetCIDR(),
 				"Destination is part of NLRI in the UDPATE")
 		}
 	}
@@ -257,7 +257,7 @@ func (l *LocRib) ProcessRoutes(peerIP string, add, rem []packet.NLRI, addPath, r
 			continue
 		}
 
-		l.logger.Info("Processing nlri", nlri.GetPrefix().String())
+		l.logger.Info("Processing nlri", nlri.GetCIDR())
 		op := l.stateDBMgr.UpdateObject
 		dest, alreadyCreated := l.GetDest(nlri, protoFamily, true)
 		if !alreadyCreated {
@@ -266,11 +266,11 @@ func (l *LocRib) ProcessRoutes(peerIP string, add, rem []packet.NLRI, addPath, r
 		if oldPath := dest.getPathForIP(peerIP, nlri.GetPathId()); oldPath == nil && addPath.NeighborConf != nil {
 			if !addPath.NeighborConf.CanAcceptNewPrefix() {
 				l.logger.Infof("Max prefixes limit reached for peer %s, can't process %s", peerIP,
-					nlri.GetPrefix().String())
+					nlri.GetCIDR())
 				addedAllPrefixes = false
 				continue
 			}
-			l.logger.Infof("Increment prefix count for destination %s from Peer %s", nlri.GetPrefix().String(), peerIP)
+			l.logger.Infof("Increment prefix count for destination %s from Peer %s", nlri.GetCIDR(), peerIP)
 			addPath.NeighborConf.IncrPrefixCount()
 		}
 
@@ -308,7 +308,7 @@ func (l *LocRib) ProcessRoutesForReachableRoutes(nextHop string, reachabilityInf
 			}
 
 			for dest, pathIds := range destinations {
-				l.logger.Info("Processing dest", dest.NLRI.GetPrefix().String())
+				l.logger.Info("Processing dest", dest.NLRI.GetCIDR())
 				for _, pathId := range pathIds {
 					dest.AddOrUpdatePath(peerIP, pathId, path)
 				}
@@ -346,7 +346,7 @@ func (l *LocRib) TestNHAndProcessRoutes(peerIP string, add, remove []packet.NLRI
 		}
 
 		if reachabilityInfo == nil {
-			l.logger.Infof("ProcessUpdate - next hop %s is not reachable", nextHopStr)
+			l.logger.Infof("TestNHAndProcessRoutes - next hop %s is not reachable", nextHopStr)
 
 			if _, ok := l.unreachablePaths[nextHopStr]; !ok {
 				l.unreachablePaths[nextHopStr] = make(map[*Path]map[*Destination][]uint32)
@@ -362,7 +362,7 @@ func (l *LocRib) TestNHAndProcessRoutes(peerIP string, add, remove []packet.NLRI
 		addPathCount, protoFamily, updated, withdrawn, updatedAddPaths)
 
 	if reachabilityInfo != nil {
-		l.logger.Infof("ProcessUpdate - next hop %s is reachable, so process previously unreachable routes",
+		l.logger.Infof("TestNHAndProcessRoutes - next hop %s is reachable, so process previously unreachable routes",
 			nextHopStr)
 		updated, withdrawn, updatedAddPaths = l.ProcessRoutesForReachableRoutes(nextHopStr, reachabilityInfo,
 			addPathCount, updated, withdrawn, updatedAddPaths)
@@ -370,41 +370,69 @@ func (l *LocRib) TestNHAndProcessRoutes(peerIP string, add, remove []packet.NLRI
 	return updated, withdrawn, updatedAddPaths, addedAllPrefixes
 }
 
-func (l *LocRib) ProcessUpdate(neighborConf *base.NeighborConf, pktInfo *packet.BGPPktSrc, addPathCount int) (
-	map[uint32]map[*Path][]*Destination, []*Destination, []*Destination, bool) {
-	body := pktInfo.Msg.Body.(*packet.BGPUpdate)
+func (l *LocRib) ProcessUpdate(neighborConf *base.NeighborConf, path *Path, add, rem []packet.NLRI, protoFamily uint32,
+	addPathCount int, updated map[uint32]map[*Path][]*Destination, withdrawn []*Destination,
+	updatedAddPaths []*Destination) (map[uint32]map[*Path][]*Destination, []*Destination, []*Destination, bool) {
+	//body := pktInfo.Msg.Body.(*packet.BGPUpdate)
+	//	updated := make(map[uint32]map[*Path][]*Destination)
+	//	withdrawn := make([]*Destination, 0)
+	//	updatedAddPaths := make([]*Destination, 0)
+	addedAllPrefixes := true
+	remPath := path.Clone()
+
+	//	mpReach, mpUnreach := packet.RemoveMPAttrs(&body.PathAttributes)
+	//	remPath := NewPath(l, neighborConf, body.PathAttributes, mpReach, RouteTypeEGP)
+	//	addPath := NewPath(l, neighborConf, body.PathAttributes, mpReach, RouteTypeEGP)
+
+	if len(add) > 0 || len(rem) > 0 {
+		//		protoFamily := packet.GetProtocolFamily(packet.AfiIP, packet.SafiUnicast)
+		updated, withdrawn, updatedAddPaths, addedAllPrefixes = l.TestNHAndProcessRoutes(
+			neighborConf.Neighbor.NeighborAddress.String(), add, rem, path, remPath, addPathCount, protoFamily,
+			updated, withdrawn, updatedAddPaths)
+	}
+
+	//	reachNLRIDone := false
+	//	if mpUnreach != nil {
+	//		var reachNLRI []packet.NLRI
+	//		if mpReach != nil && mpReach.AFI == mpUnreach.AFI && mpReach.SAFI == mpUnreach.SAFI {
+	//			reachNLRIDone = true
+	//			reachNLRI = mpReach.NLRI
+	//		}
+	//		protoFamily := packet.GetProtocolFamily(mpUnreach.AFI, mpUnreach.SAFI)
+	//		updated, withdrawn, updatedAddPaths, addedAllPrefixes = l.TestNHAndProcessRoutes(pktInfo.Src, reachNLRI,
+	//			mpUnreach.NLRI, addPath, remPath, addPathCount, protoFamily, updated, withdrawn, updatedAddPaths)
+	//	}
+
+	//	if !reachNLRIDone && mpReach != nil {
+	//		protoFamily := packet.GetProtocolFamily(mpReach.AFI, mpReach.SAFI)
+	//		updated, withdrawn, updatedAddPaths, addedAllPrefixes = l.TestNHAndProcessRoutes(pktInfo.Src, mpReach.NLRI,
+	//			nil, addPath, remPath, addPathCount, protoFamily, updated, withdrawn, updatedAddPaths)
+	//	}
+	return updated, withdrawn, updatedAddPaths, addedAllPrefixes
+}
+
+func (l *LocRib) ProcessFilteredRoutes(neighborConf *base.NeighborConf,
+	filteredRoutes map[*Path]map[uint32]*FilteredRoutes, addPathCount int) (map[uint32]map[*Path][]*Destination,
+	[]*Destination, []*Destination, bool) {
 	updated := make(map[uint32]map[*Path][]*Destination)
 	withdrawn := make([]*Destination, 0)
 	updatedAddPaths := make([]*Destination, 0)
 	addedAllPrefixes := true
 
-	mpReach, mpUnreach := packet.RemoveMPAttrs(&body.PathAttributes)
-	remPath := NewPath(l, neighborConf, body.PathAttributes, mpReach, RouteTypeEGP)
-	addPath := NewPath(l, neighborConf, body.PathAttributes, mpReach, RouteTypeEGP)
-
-	if len(body.NLRI) > 0 || len(body.WithdrawnRoutes) > 0 {
-		protoFamily := packet.GetProtocolFamily(packet.AfiIP, packet.SafiUnicast)
-		updated, withdrawn, updatedAddPaths, addedAllPrefixes = l.TestNHAndProcessRoutes(pktInfo.Src, body.NLRI,
-			body.WithdrawnRoutes, addPath, remPath, addPathCount, protoFamily, updated, withdrawn, updatedAddPaths)
-	}
-
-	reachNLRIDone := false
-	if mpUnreach != nil {
-		var reachNLRI []packet.NLRI
-		if mpReach != nil && mpReach.AFI == mpUnreach.AFI && mpReach.SAFI == mpUnreach.SAFI {
-			reachNLRIDone = true
-			reachNLRI = mpReach.NLRI
+	for path, pfNLRIs := range filteredRoutes {
+		for protoFamily, routes := range pfNLRIs {
+			updated, withdrawn, updatedAddPaths, addedAllPrefixes = l.TestNHAndProcessRoutes(
+				neighborConf.Neighbor.NeighborAddress.String(), routes.Add, routes.Remove, path, path, addPathCount,
+				protoFamily, updated, withdrawn, updatedAddPaths)
+			if !addedAllPrefixes {
+				break
+			}
 		}
-		protoFamily := packet.GetProtocolFamily(mpUnreach.AFI, mpUnreach.SAFI)
-		updated, withdrawn, updatedAddPaths, addedAllPrefixes = l.TestNHAndProcessRoutes(pktInfo.Src, reachNLRI,
-			mpUnreach.NLRI, addPath, remPath, addPathCount, protoFamily, updated, withdrawn, updatedAddPaths)
+		if !addedAllPrefixes {
+			break
+		}
 	}
 
-	if !reachNLRIDone && mpReach != nil {
-		protoFamily := packet.GetProtocolFamily(mpReach.AFI, mpReach.SAFI)
-		updated, withdrawn, updatedAddPaths, addedAllPrefixes = l.TestNHAndProcessRoutes(pktInfo.Src, mpReach.NLRI,
-			nil, addPath, remPath, addPathCount, protoFamily, updated, withdrawn, updatedAddPaths)
-	}
 	return updated, withdrawn, updatedAddPaths, addedAllPrefixes
 }
 
@@ -448,13 +476,13 @@ func (l *LocRib) RemoveUpdatesFromNeighbor(peerIP string, neighborConf *base.Nei
 			op := l.stateDBMgr.UpdateObject
 			dest.RemoveAllPaths(peerIP, remPath)
 			action, addPathsMod, addRoutes, updRoutes, delRoutes := dest.SelectRouteForLocRib(addPathCount)
-			l.logger.Info("RemoveUpdatesFromNeighbor - dest", dest.NLRI.GetPrefix().String(),
+			l.logger.Info("RemoveUpdatesFromNeighbor - dest", dest.NLRI.GetCIDR(),
 				"SelectRouteForLocRib returned action", action, "addRoutes", addRoutes, "updRoutes", updRoutes,
 				"delRoutes", delRoutes)
 			updated, withdrawn, updatedAddPaths = l.updateRibOutInfo(action, addPathsMod, addRoutes, updRoutes,
 				delRoutes, dest, updated, withdrawn, updatedAddPaths)
 			if action == RouteActionDelete && dest.IsEmpty() {
-				l.logger.Info("All routes removed for dest", dest.NLRI.GetPrefix().String())
+				l.logger.Info("All routes removed for dest", dest.NLRI.GetCIDR())
 				l.removeRoutesFromRouteList(dest, protoFamily)
 				delete(l.destPathMap[protoFamily], destIP)
 				op = l.stateDBMgr.DeleteObject
@@ -604,7 +632,8 @@ func (l *LocRib) AddRouteToAggregate(ip *packet.IPPrefix, aggIP *packet.IPPrefix
 		pathAttrs := packet.ConstructPathAttrForAggRoutes(path.PathAttrs, bgpAgg.GenerateASSet)
 		packet.SetNextHopPathAttrs(pathAttrs, net.IPv4zero)
 		packet.SetPathAttrAggregator(pathAttrs, l.gConf.AS, l.gConf.RouterId)
-		mpReachNLRI := packet.ConstructMPReachNLRIForAggRoutes(protoFamily)
+		mpReachNLRI := packet.ConstructMPReachNLRIForAggRoutes(packet.GetProtocolFamily(packet.AfiIP6,
+			packet.SafiUnicast))
 		aggPath = NewPath(path.rib, nil, pathAttrs, mpReachNLRI, RouteTypeAgg)
 		aggPath.setAggregatedPath(ip.Prefix.String(), path)
 		aggDest, _ := l.GetDest(aggIP, protoFamily, true)
@@ -621,7 +650,7 @@ func (l *LocRib) AddRouteToAggregate(ip *packet.IPPrefix, aggIP *packet.IPPrefix
 		dest.aggPath = aggPath
 	}
 
-	op(l.GetRouteStateConfigObj(dest.GetBGPRoute()))
+	op(l.GetRouteStateConfigObj(aggDest.GetBGPRoute()))
 	return updated, withdrawn, updatedAddPaths
 }
 

@@ -27,7 +27,6 @@ import (
 	"fmt"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
-	"l3/ndp/debug"
 	"net"
 )
 
@@ -130,18 +129,15 @@ func (p *Packet) decodeICMPv6Hdr(hdr *layers.ICMPv6, srcIP net.IP, dstIP net.IP)
 	}
 	switch typeCode.Type() {
 	case layers.ICMPv6TypeNeighborSolicitation:
-		debug.Logger.Debug("Neigbor Solicitation Received from", srcIP, "---->", dstIP)
 		ndInfo, err = p.decodeNS(hdr, srcIP, dstIP)
 
 	case layers.ICMPv6TypeNeighborAdvertisement:
-		debug.Logger.Debug("Neigbor Advertisemnt Received from", srcIP, "---->", dstIP)
 		ndInfo, err = p.decodeNA(hdr, srcIP, dstIP)
 
 	case layers.ICMPv6TypeRouterSolicitation:
 		return nil, errors.New("Router Solicitation is not yet supported")
 
 	case layers.ICMPv6TypeRouterAdvertisement:
-		debug.Logger.Debug("Router Advertisement Received from", srcIP, "---->", dstIP)
 		ndInfo, err = p.decodeRA(hdr, srcIP, dstIP)
 	default:
 		return nil, errors.New(fmt.Sprintln("Not Supported ICMPv6 Type:", typeCode.Type()))

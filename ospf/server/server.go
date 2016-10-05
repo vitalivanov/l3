@@ -70,33 +70,34 @@ type LsdbSliceEnt struct {
 }
 
 type OSPFServer struct {
-	logger             *logging.Writer
-	ribdClient         RibdClient
-	asicdClient        AsicdClient
-	portPropertyMap    map[int32]PortProperty
-	vlanPropertyMap    map[uint16]VlanProperty
-	ipPropertyMap      map[uint32]IpProperty
-	ospfGlobalConf     GlobalConf
-	GlobalConfigCh     chan config.GlobalConf
-	AreaConfigCh       chan config.AreaConf
-	IntfConfigCh       chan config.InterfaceConf
-	IfMetricConfCh     chan config.IfMetricConf
-	GlobalConfigRetCh  chan error
-	AreaConfigRetCh    chan error
-	IntfConfigRetCh    chan error
-	AreaLsdb           map[LsdbKey]LSDatabase
-	LsdbSlice          []LsdbSliceEnt
-	LsdbStateTimer     *time.Timer
-	AreaSelfOrigLsa    map[LsdbKey]SelfOrigLsa
-	LsdbUpdateCh       chan LsdbUpdateMsg
-	LsaUpdateRetCodeCh chan bool
-	IntfStateChangeCh  chan NetworkLSAChangeMsg
-	NetworkDRChangeCh  chan DrChangeMsg
-	FlushNetworkLSACh  chan NetworkLSAChangeMsg
-	CreateNetworkLSACh chan ospfNbrMdata
-	AdjOKEvtCh         chan AdjOKEvtMsg
-	maxAgeLsaCh        chan maxAgeLsaMsg
-	ExternalRouteNotif chan RouteMdata
+	logger                 *logging.Writer
+	ribdClient             RibdClient
+	asicdClient            AsicdClient
+	portPropertyMap        map[int32]PortProperty
+	vlanPropertyMap        map[uint16]VlanProperty
+	logicalIntfPropertyMap map[int32]LogicalIntfProperty
+	ipPropertyMap          map[uint32]IpProperty
+	ospfGlobalConf         GlobalConf
+	GlobalConfigCh         chan config.GlobalConf
+	AreaConfigCh           chan config.AreaConf
+	IntfConfigCh           chan config.InterfaceConf
+	IfMetricConfCh         chan config.IfMetricConf
+	GlobalConfigRetCh      chan error
+	AreaConfigRetCh        chan error
+	IntfConfigRetCh        chan error
+	AreaLsdb               map[LsdbKey]LSDatabase
+	LsdbSlice              []LsdbSliceEnt
+	LsdbStateTimer         *time.Timer
+	AreaSelfOrigLsa        map[LsdbKey]SelfOrigLsa
+	LsdbUpdateCh           chan LsdbUpdateMsg
+	LsaUpdateRetCodeCh     chan bool
+	IntfStateChangeCh      chan NetworkLSAChangeMsg
+	NetworkDRChangeCh      chan DrChangeMsg
+	FlushNetworkLSACh      chan NetworkLSAChangeMsg
+	CreateNetworkLSACh     chan ospfNbrMdata
+	AdjOKEvtCh             chan AdjOKEvtMsg
+	maxAgeLsaCh            chan maxAgeLsaMsg
+	ExternalRouteNotif     chan RouteMdata
 
 	//	   connRoutesTimer         *time.Timer
 	ribSubSocket      *nanomsg.SubSocket
@@ -180,6 +181,7 @@ func NewOSPFServer(logger *logging.Writer) *OSPFServer {
 	ospfServer.IntfConfigRetCh = make(chan error)
 	ospfServer.portPropertyMap = make(map[int32]PortProperty)
 	ospfServer.vlanPropertyMap = make(map[uint16]VlanProperty)
+	ospfServer.logicalIntfPropertyMap = make(map[int32]LogicalIntfProperty)
 	ospfServer.ipPropertyMap = make(map[uint32]IpProperty)
 	ospfServer.AreaConfMap = make(map[AreaConfKey]AreaConf)
 	ospfServer.IntfConfMap = make(map[IntfConfKey]IntfConf)

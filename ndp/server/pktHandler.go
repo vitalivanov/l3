@@ -55,11 +55,13 @@ func (svr *NDPServer) StartRxTx(ifIndex int32) {
 	}
 	debug.Logger.Info("Start rx/tx for port:", ipPort.IntfRef, "ifIndex:",
 		ipPort.IfIndex, "ip GS:", ipPort.IpAddr, "LS:", ipPort.LinkLocalIp, "is done")
-
-	// Spawn go routines for rx & tx
-	go ipPort.ReceiveNdpPkts(svr.RxPktCh)
-	svr.ndpUpL3IntfStateSlice = append(svr.ndpUpL3IntfStateSlice, ifIndex)
-
+	// go routine will be spawned only on first pcap user
+	// @FIX for WD-190 NDP HIGH CPU usage on WM Clos
+	if ipPort.PcapBase.PcapUsers == 1 {
+		// Spawn go routines for rx & tx
+		go ipPort.ReceiveNdpPkts(svr.RxPktCh)
+		svr.ndpUpL3IntfStateSlice = append(svr.ndpUpL3IntfStateSlice, ifIndex)
+	}
 	// On Port Up Send RA packets
 	pktData := config.PacketData{
 		SendPktType: layers.ICMPv6TypeRouterAdvertisement,
@@ -95,14 +97,14 @@ func (svr *NDPServer) StopRxTx(ifIndex int32, ipAddr string) {
 	var deleteEntries []string
 	var err error
 	if ipAddr == "ALL" {
-		debug.Logger.Debug("Deleting all entries")
+		//debug.Logger.Debug("Deleting all entries")
 		deleteEntries, err = ipPort.DeleteAll()
 	} else {
-		debug.Logger.Debug("Deleing interface:", ipAddr)
+		//debug.Logger.Debug("Deleing interface:", ipAddr)
 		deleteEntries, err = ipPort.DeleteIntf(ipAddr)
 	}
 	if len(deleteEntries) > 0 && err == nil {
-		debug.Logger.Info("Server Got Neigbor Delete for interface:", ipPort.IntfRef)
+		//debug.Logger.Info("Server Got Neigbor Delete for interface:", ipPort.IntfRef)
 		svr.DeleteNeighborInfo(deleteEntries, ifIndex)
 	}
 
@@ -143,8 +145,7 @@ func (svr *NDPServer) insertNeigborInfo(nbrInfo *config.NeighborConfig) {
 func (svr *NDPServer) deleteNeighborInfo(nbrIp string) {
 	for idx, _ := range svr.neighborKey {
 		if svr.neighborKey[idx] == nbrIp {
-			svr.neighborKey = append(svr.neighborKey[:idx],
-				svr.neighborKey[idx+1:]...)
+			svr.neighborKey = append(svr.neighborKey[:idx], svr.neighborKey[idx+1:]...)
 			break
 		}
 	}
@@ -157,8 +158,8 @@ func (svr *NDPServer) deleteNeighborInfo(nbrIp string) {
  *		        a) It will update ndp server neighbor info cache with the latest information
  */
 func (svr *NDPServer) CreateNeighborInfo(nbrInfo *config.NeighborConfig) {
-	debug.Logger.Debug("Calling create ipv6 neighgor for global nbrinfo is", nbrInfo.IpAddr, nbrInfo.MacAddr,
-		nbrInfo.VlanId, nbrInfo.IfIndex)
+	//debug.Logger.Debug("Calling create ipv6 neighgor for global nbrinfo is", nbrInfo.IpAddr, nbrInfo.MacAddr,
+	//nbrInfo.VlanId, nbrInfo.IfIndex)
 	_, err := svr.SwitchPlugin.CreateIPv6Neighbor(nbrInfo.IpAddr, nbrInfo.MacAddr,
 		nbrInfo.VlanId, nbrInfo.IfIndex)
 	if err != nil {
@@ -171,6 +172,9 @@ func (svr *NDPServer) CreateNeighborInfo(nbrInfo *config.NeighborConfig) {
 }
 
 func (svr *NDPServer) deleteNeighbor(nbrIp string, ifIndex int32) {
+	// Inform clients that neighbor is gonna be deleted
+	svr.SendIPv6DeleteNotification(nbrIp, ifIndex)
+	// Request asicd to delete the neighbor
 	_, err := svr.SwitchPlugin.DeleteIPv6Neighbor(nbrIp)
 	if err != nil {
 		debug.Logger.Err("delete ipv6 neigbor failed for", nbrIp, "error is", err)
@@ -178,7 +182,6 @@ func (svr *NDPServer) deleteNeighbor(nbrIp string, ifIndex int32) {
 	// delete the entry from neighbor map
 	delete(svr.NeighborInfo, nbrIp)
 	svr.deleteNeighborInfo(nbrIp)
-	svr.SendIPv6DeleteNotification(nbrIp, ifIndex)
 }
 
 /*
@@ -191,7 +194,7 @@ func (svr *NDPServer) deleteNeighbor(nbrIp string, ifIndex int32) {
 func (svr *NDPServer) DeleteNeighborInfo(deleteEntries []string, ifIndex int32) {
 	svr.NeigborEntryLock.Lock()
 	for _, nbrIp := range deleteEntries {
-		debug.Logger.Debug("Calling delete ipv6 neighbor for nbrIp:", nbrIp)
+		//debug.Logger.Debug("Calling delete ipv6 neighbor for nbrIp:", nbrIp)
 		svr.deleteNeighbor(nbrIp, ifIndex)
 	}
 	svr.NeigborEntryLock.Unlock()
@@ -210,13 +213,14 @@ func (svr *NDPServer) ProcessRxPkt(ifIndex int32, pkt gopacket.Packet) error {
 	if !exists {
 		return errors.New(fmt.Sprintln("Entry for ifIndex:", ifIndex, "doesn't exists"))
 	}
+	ipPort.counter.Rcvd++
 	ndInfo, err := svr.Packet.DecodeND(pkt)
 	if err != nil || ndInfo == nil {
 		return errors.New(fmt.Sprintln("Failed decoding ND packet, error:", err))
 	}
 	nbrInfo, operation := ipPort.ProcessND(ndInfo)
-	if nbrInfo == nil || operation == IGNORE {
-		//debug.Logger.Warning("nbrInfo:", nbrInfo, "operation:", operation)
+	svr.L3Port[ifIndex] = ipPort
+	if nbrInfo == nil || (operation != CREATE && operation != DELETE) {
 		return nil
 	}
 	switch operation {
@@ -241,5 +245,8 @@ func (svr *NDPServer) ProcessTimerExpiry(pktData config.PacketData) error {
 		svr.deleteNeighbor(pktData.NeighborIp, pktData.IfIndex)
 	}
 	svr.L3Port[pktData.IfIndex] = l3Port
+	nbrInfo := svr.NeighborInfo[pktData.NeighborIp]
+	svr.NeighborInfo[pktData.NeighborIp] = nbrInfo
+	svr.counter.Send++
 	return nil
 }

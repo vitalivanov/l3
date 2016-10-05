@@ -36,6 +36,7 @@ import (
 	"ribdInt"
 	"strconv"
 	"strings"
+	netutils "utils/netUtils"
 	"utils/patriciaDB"
 	//"utils/policy/policyCommonDefs"
 )
@@ -46,7 +47,7 @@ var V4RouteInfoMap *patriciaDB.Trie //Routes are stored in patricia trie
    Returns the longest prefix match route to reach the destination network destNet
 */
 func (m RIBDServer) GetV4RouteReachabilityInfo(destNet string, ifIndex ribdInt.Int) (nextHopIntf *ribdInt.NextHopInfo, err error) {
-	//logger.Debug("GetV4RouteReachabilityInfo of ", destNet)
+	logger.Debug("GetV4RouteReachabilityInfo of ", destNet, " ifIndex:", ifIndex)
 	//t1 := time.Now()
 	var retnextHopIntf ribdInt.NextHopInfo
 	nextHopIntf = &retnextHopIntf
@@ -72,14 +73,14 @@ func (m RIBDServer) GetV4RouteReachabilityInfo(destNet string, ifIndex ribdInt.I
 			routeInfoList, ok := rmapInfoList.routeInfoProtocolMap[rmapInfoList.selectedRouteProtocol]
 			if !ok || len(routeInfoList) == 0 {
 				//fmt.Println("Madhavi!! GetV4RouteReachabilityInfo: ok:", ok, " len(routeInfoList):", len(routeInfoList))
-				logger.Err("Selected route not found")
+				logger.Err("Selected route not found because len(routeInfoList) = 0")
 				return nil, errors.New("dest ip address not reachable")
 			}
 			//v := routeInfoList[0]
 			nhFound, v, _ := findRouteWithNextHop(routeInfoList, ribdCommonDefs.IPv4, "", ribd.Int(ifIndex))
 			//fmt.Println("Madhavi!! GetV4RouteReachabilityInfo: nhFound:", nhFound, " v:", v)
 			if !nhFound {
-				logger.Err("Selected route not found")
+				logger.Err("Next hop for ifIndex:", ifIndex, " not found")
 				return nil, errors.New(fmt.Sprintln("dest ip address not reachable via ifIndex", ifIndex))
 			}
 			nextHopIntf.NextHopIp = v.nextHopIp.String()
@@ -88,6 +89,7 @@ func (m RIBDServer) GetV4RouteReachabilityInfo(destNet string, ifIndex ribdInt.I
 			nextHopIntf.Ipaddr = v.destNetIp.String()
 			nextHopIntf.Mask = v.networkMask.String()
 			nextHopIntf.IsReachable = true
+			//nextHopIntf.IsReachable = v.resolvedNextHopIpIntf.IsReachable
 		}
 	}
 
@@ -132,7 +134,7 @@ func UpdateV4RouteReachabilityStatus(prefix patriciaDB.Prefix, //prefix of the n
 		logger.Err("Error getting ip prefix for ip:", ipAddrStr, " mask:", ipMaskStr)
 		return err
 	}
-	//logger.Debug("UpdateRouteReachabilityStatus network: ", routeReachabilityStatusInfo.destNet, " status:", routeReachabilityStatusInfo.status, "ip: ", ip.String(), " destIPPrefix: ", destIpPrefix, " ipMaskStr:", ipMaskStr)
+	logger.Debug("UpdateRouteReachabilityStatus network: ", routeReachabilityStatusInfo.destNet, " status:", routeReachabilityStatusInfo.status, "ip: ", ip.String(), " destIPPrefix: ", destIpPrefix, " ipMaskStr:", ipMaskStr)
 	rmapInfoRecordList := handle.(RouteInfoRecordList)
 	//for each of the routes for this destination, check if the nexthop ip matches destPrefix - which is the route being modified
 	for k, v := range rmapInfoRecordList.routeInfoProtocolMap {
@@ -207,6 +209,10 @@ func UpdateV4RouteReachabilityStatus(prefix patriciaDB.Prefix, //prefix of the n
 */
 func (m RIBDServer) RouteConfigValidationCheckForUpdate(oldcfg *ribd.IPv4Route, cfg *ribd.IPv4Route, attrset []bool) (err error) {
 	//logger.Info("RouteConfigValidationCheckForUpdate")
+	if netutils.IsIPv6Addr(cfg.DestinationNw) {
+		logger.Err("Cannot update ipv6 route (destination:", cfg.DestinationNw, ") using Ipv4Route API")
+		return errors.New(fmt.Sprintln("Cannot update ipv6 route (destination:", cfg.DestinationNw, ") using Ipv4Route API"))
+	}
 	isCidr := strings.Contains(cfg.DestinationNw, "/")
 	if isCidr {
 		/*
@@ -251,6 +257,10 @@ func (m RIBDServer) RouteConfigValidationCheckForUpdate(oldcfg *ribd.IPv4Route, 
 					*/
 					logger.Err("Cannot update Protocol value of a route")
 					return errors.New("Cannot set Protocol field")
+				}
+				if objName == "NullRoute" {
+					logger.Err("Cannot update null route attribute, please delete and create the route with the correct value")
+					return errors.New("Cannot update null route attribute, please delete and create the route with the correct value")
 				}
 				if objName == "NextHop" {
 					/*
@@ -305,6 +315,10 @@ func (m RIBDServer) RouteConfigValidationCheckForUpdate(oldcfg *ribd.IPv4Route, 
 
 func (m RIBDServer) RouteConfigValidationCheckForPatchUpdate(oldcfg *ribd.IPv4Route, cfg *ribd.IPv4Route, op []*ribd.PatchOpInfo) (err error) {
 	//logger.Info("RouteConfigValidationCheckForPatchUpdate")
+	if netutils.IsIPv6Addr(cfg.DestinationNw) {
+		logger.Err("Cannot patch update ipv6 route (destination:", cfg.DestinationNw, ") using Ipv4Route API")
+		return errors.New(fmt.Sprintln("Cannot add/remove from ipv6 route (destination:", cfg.DestinationNw, ") using Ipv4Route API"))
+	}
 	isCidr := strings.Contains(cfg.DestinationNw, "/")
 	if isCidr {
 		/*
@@ -402,7 +416,10 @@ func (m RIBDServer) RouteConfigValidationCheckForPatchUpdate(oldcfg *ribd.IPv4Ro
 		   - if the nexthopIntf is valid L3 intf and if so, convert to string value
 */
 func (m RIBDServer) RouteConfigValidationCheck(cfg *ribd.IPv4Route, op string) (err error) {
-	logger.Debug("RouteConfigValidationCheck")
+	if netutils.IsIPv6Addr(cfg.DestinationNw) {
+		logger.Err("Cannot create/delete ipv6 route (destination:", cfg.DestinationNw, ") using Ipv4Route API")
+		return errors.New(fmt.Sprintln("Cannot create/delete ipv6 route (destination:", cfg.DestinationNw, ") using Ipv4Route API"))
+	}
 	isCidr := strings.Contains(cfg.DestinationNw, "/")
 	if isCidr {
 		/*
@@ -415,7 +432,7 @@ func (m RIBDServer) RouteConfigValidationCheck(cfg *ribd.IPv4Route, op string) (
 		}
 		_, err = getNetworkPrefixFromCIDR(cfg.DestinationNw)
 		if err != nil {
-			return errors.New("Invalid destination ip/network Mask")
+			return errors.New(fmt.Sprintln("RouteConfigValidationCheck for route:", cfg, " Invalid destination ip/network Mask"))
 		}
 		/*
 		   Convert the CIDR format address to IP and mask strings
@@ -442,7 +459,7 @@ func (m RIBDServer) RouteConfigValidationCheck(cfg *ribd.IPv4Route, op string) (
 	}
 	_, err = validateNetworkPrefix(cfg.DestinationNw, cfg.NetworkMask)
 	if err != nil {
-		logger.Err(" getNetowrkPrefixFromStrings returned err ", err)
+		logger.Err("RouteConfigValidationCheck for route:", cfg, " validateNetworkPrefix() returned err ", err)
 		return err
 	}
 	/*
@@ -457,6 +474,16 @@ func (m RIBDServer) RouteConfigValidationCheck(cfg *ribd.IPv4Route, op string) (
 			logger.Err("route type ", cfg.Protocol, " invalid")
 			err = errors.New("Invalid route protocol type")
 			return err
+		}
+		if cfg.NullRoute == true {
+			logger.Debug("this is a null route, so dont validate nexthop attribute")
+			if cfg.NextHop == nil || len(cfg.NextHop) == 0 {
+				cfg.NextHop = make([]*ribd.NextHopInfo, 0)
+				cfg.NextHop = append(cfg.NextHop, &ribd.NextHopInfo{
+					NextHopIp: "255.255.255.255",
+				})
+			}
+			return nil
 		}
 		//logger.Debug("Number of nexthops = ", len(cfg.NextHop))
 		if len(cfg.NextHop) == 0 {
@@ -480,22 +507,40 @@ func (m RIBDServer) RouteConfigValidationCheck(cfg *ribd.IPv4Route, op string) (
 			   Validate if nextHopIntRef is a valid L3 interface
 			*/
 			if cfg.NextHop[i].NextHopIntRef == "" {
-				logger.Info("NextHopIntRef not set")
+				//logger.Info("RouteConfigValidationCheck for route:", cfg, "NextHopIntRef not set")
 				nhIntf, err := RouteServiceHandler.GetV4RouteReachabilityInfo(cfg.NextHop[i].NextHopIp, -1)
 				if err != nil {
-					logger.Err("next hop ip ", cfg.NextHop[i].NextHopIp, " not reachable")
+					logger.Err("RouteConfigValidationCheck for route:", cfg, "next hop ip ", cfg.NextHop[i].NextHopIp, " not reachable")
 					return errors.New(fmt.Sprintln("next hop ip ", cfg.NextHop[i].NextHopIp, " not reachable"))
 				}
 				cfg.NextHop[i].NextHopIntRef = strconv.Itoa(int(nhIntf.NextHopIfIndex))
 			} else {
+				nhIntf := cfg.NextHop[i].NextHopIntRef
 				cfg.NextHop[i].NextHopIntRef, err = m.ConvertIntfStrToIfIndexStr(cfg.NextHop[i].NextHopIntRef)
 				if err != nil {
-					logger.Err("Invalid NextHop IntRef ", cfg.NextHop[i].NextHopIntRef)
+					logger.Err("RouteConfigValidationCheck for route:", cfg, "Invalid NextHop IntRef ", cfg.NextHop[i].NextHopIntRef)
 					return err
+				}
+				nextHopIntRef, _ := strconv.Atoi(cfg.NextHop[i].NextHopIntRef)
+				_, err := RouteServiceHandler.GetV4RouteReachabilityInfo(cfg.NextHop[i].NextHopIp, ribdInt.Int(nextHopIntRef))
+				if err != nil {
+					logger.Err("RouteConfigValidationCheck for route:", cfg, "next hop ip ", cfg.NextHop[i].NextHopIp, " not reachable via interface ", nhIntf)
+					return errors.New(fmt.Sprintln("next hop ip ", cfg.NextHop[i].NextHopIp, " not reachable via ", nhIntf))
 				}
 			}
 			//logger.Debug("IntRef after : ", cfg.NextHop[i].NextHopIntRef)
 		}
+	} else {
+		if cfg.NullRoute == true {
+			if cfg.NextHop == nil || len(cfg.NextHop) == 0 {
+				cfg.NextHop = make([]*ribd.NextHopInfo, 0)
+				cfg.NextHop = append(cfg.NextHop, &ribd.NextHopInfo{
+					NextHopIp: "255.255.255.255",
+				})
+			}
+			return nil
+		}
+
 	}
 	return nil
 }
@@ -540,7 +585,6 @@ func Getv4RoutesPerProtocol(protocol string) []*ribd.RouteInfoSummary {
 			nextHopList = append(nextHopList, &nextHopInfo[i])
 			i++
 		}
-		fmt.Println("Appending routes for protocol ", protocol)
 		routes = append(routes, &ribd.RouteInfoSummary{
 			DestinationNw:   destNet,
 			IsInstalledInHw: isInstalledinHw,
@@ -781,8 +825,8 @@ func (m RIBDServer) Getv4RouteCreatedTime(number int) (time string, err error) {
 	return v4routeCreatedTimeMap[number], err
 }
 
-func (m RIBDServer) ProcessV4RouteCreateConfig(cfg *ribd.IPv4Route, addType int) (val bool, err error) {
-	logger.Debug("ProcessV4RouteCreateConfig: Received create route request for ip ", cfg.DestinationNw, " mask ", cfg.NetworkMask, " number of next hops: ", len(cfg.NextHop), " null Route:", cfg.NullRoute)
+func (m RIBDServer) ProcessV4RouteCreateConfig(cfg *ribd.IPv4Route, addType int, sliceIdx ribd.Int) (val bool, err error) {
+	logger.Debug("ProcessV4RouteCreateConfig: Received create route request for ip ", cfg.DestinationNw, " mask ", cfg.NetworkMask, " number of next hops: ", len(cfg.NextHop), " null Route:", cfg.NullRoute, " sliceIdx:", sliceIdx)
 	newCfg := ribd.IPv4Route{
 		DestinationNw: cfg.DestinationNw,
 		NetworkMask:   cfg.NetworkMask,
@@ -800,28 +844,8 @@ func (m RIBDServer) ProcessV4RouteCreateConfig(cfg *ribd.IPv4Route, addType int)
 		newCfg.NextHop = make([]*ribd.NextHopInfo, 0)
 		newCfg.NextHop = append(newCfg.NextHop, &nh)
 		//policyRoute := BuildPolicyRouteFromribdIPv4Route(&newCfg)
-		params := BuildRouteParamsFromribdIPv4Route(&newCfg, addType, Invalid, len(destNetSlice))
+		params := BuildRouteParamsFromribdIPv4Route(&newCfg, addType, Invalid, sliceIdx)
 		_, err = createRoute(params)
-		//PolicyEngineFilter(policyRoute, policyCommonDefs.PolicyPath_Import, params)
-		//policyEngineActionAcceptRoute(params)
-		/*		nextHopIp := newCfg.NextHop[0].NextHopIp
-				if cfg.NullRoute == true { //commonDefs.IfTypeNull {
-					//logger.Info("null route create request")
-					nextHopIp = "255.255.255.255"
-				}
-				nextHopIntRef, _ := strconv.Atoi(newCfg.NextHop[0].NextHopIntRef)
-				_, err = createRoute(ipv4,
-					newCfg.DestinationNw,
-					newCfg.NetworkMask,
-					ribd.Int(cfg.Cost),
-					ribd.Int(newCfg.NextHop[0].Weight),
-					nextHopIp,
-					ribd.Int(nextHopIntRef),
-					ribd.Int(RouteProtocolTypeMapDB[newCfg.Protocol]),
-					FIBAndRIB,
-					ribdCommonDefs.RoutePolicyStateChangetoValid,
-					ribd.Int(len(destNetSlice)))*/
-
 	}
 
 	return true, err
@@ -851,7 +875,7 @@ func (m RIBDServer) ProcessBulkRouteCreateConfig(bulkCfg []*ribdInt.IPv4RouteCon
 		}
 
 		//policyRoute := BuildPolicyRouteFromribdIPv4Route(&newCfg)
-		params := BuildRouteParamsFromribdIPv4Route(&newCfg, FIBAndRIB, Invalid, len(destNetSlice))
+		params := BuildRouteParamsFromribdIPv4Route(&newCfg, FIBAndRIB, Invalid, ribd.Int(len(destNetSlice)))
 		params.bulk = true
 		index++
 		if index == len(bulkCfg) {
@@ -873,6 +897,10 @@ func (m RIBDServer) ProcessV4RouteDeleteConfig(cfg *ribd.IPv4Route, delType int)
 	}
 	var nextHopIfIndex ribd.Int
 	for i := 0; i < len(cfg.NextHop); i++ {
+		if cfg.NullRoute == true { //commonDefs.IfTypeNull {
+			logger.Info("null route create request")
+			cfg.NextHop[i].NextHopIp = "255.255.255.255"
+		}
 		logger.Debug("nexthop info: ip: ", cfg.NextHop[i].NextHopIp, " intref: ", cfg.NextHop[i].NextHopIntRef)
 		nextHopIfIndex = -1
 		if cfg.NextHop[i].NextHopIntRef != "" {
@@ -881,9 +909,9 @@ func (m RIBDServer) ProcessV4RouteDeleteConfig(cfg *ribd.IPv4Route, delType int)
 				logger.Err(fmt.Sprintln("Invalid NextHop IntRef ", cfg.NextHop[i].NextHopIntRef))
 				return false, err
 			}
+			nextHopIntRef, _ := strconv.Atoi(cfg.NextHop[i].NextHopIntRef)
+			nextHopIfIndex = ribd.Int(nextHopIntRef)
 		}
-		nextHopIntRef, _ := strconv.Atoi(cfg.NextHop[i].NextHopIntRef)
-		nextHopIfIndex = ribd.Int(nextHopIntRef)
 		_, err = deleteIPRoute(cfg.DestinationNw, ribdCommonDefs.IPv4, cfg.NetworkMask, cfg.Protocol, cfg.NextHop[i].NextHopIp, nextHopIfIndex, ribd.Int(delType), ribdCommonDefs.RoutePolicyStateChangetoInValid)
 	}
 	return true, err
@@ -902,7 +930,7 @@ func (m RIBDServer) Processv4RoutePatchUpdateConfig(origconfig *ribd.IPv4Route, 
 	}
 	ok := V4RouteInfoMap.Match(destNet)
 	if !ok {
-		err = errors.New("No route found")
+		err = errors.New("Processv4RoutePatchUpdateConfig:No route found")
 		return ret, err
 	}
 	for idx := 0; idx < len(op); idx++ {
@@ -938,7 +966,7 @@ func (m RIBDServer) Processv4RoutePatchUpdateConfig(origconfig *ribd.IPv4Route, 
 			}
 			switch op[idx].Op {
 			case "add":
-				m.ProcessV4RouteCreateConfig(newconfig, FIBAndRIB)
+				m.ProcessV4RouteCreateConfig(newconfig, FIBAndRIB, ribd.Int(len(destNetSlice)))
 			case "remove":
 				m.ProcessV4RouteDeleteConfig(newconfig, FIBAndRIB)
 			default:
@@ -1008,11 +1036,6 @@ func (m RIBDServer) Processv4RouteUpdateConfig(origconfig *ribd.IPv4Route, newco
 				if objName == "Cost" {
 					routeInfoRecord.metric = ribd.Int(newconfig.Cost)
 				}
-				/*				if objName == "OutgoingInterface" {
-								nextHopIfIndex, _ := strconv.Atoi(newconfig.OutgoingInterface)
-								routeInfoRecord.nextHopIfIndex = ribd.Int(nextHopIfIndex)
-								callUpdate = false
-							}*/
 			}
 		}
 		routeInfoRecordList.routeInfoProtocolMap[origconfig.Protocol][index] = routeInfoRecord

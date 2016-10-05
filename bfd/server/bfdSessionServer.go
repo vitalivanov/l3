@@ -31,6 +31,7 @@ import (
 	"net"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 	"utils/commonDefs"
 )
@@ -45,6 +46,7 @@ func (server *BFDServer) StartSessionHandler() error {
 	server.DeleteSessionCh = make(chan BfdSessionMgmt)
 	server.AdminUpSessionCh = make(chan BfdSessionMgmt)
 	server.AdminDownSessionCh = make(chan BfdSessionMgmt)
+	server.ResetSessionCh = make(chan int32)
 	server.CreatedSessionCh = make(chan int32, MAX_NUM_SESSIONS)
 	server.FailedSessionClientCh = make(chan int32, MAX_NUM_SESSIONS)
 	server.tobeCreatedSessions = make(map[string]BfdSessionMgmt)
@@ -61,6 +63,8 @@ func (server *BFDServer) StartSessionHandler() error {
 			server.AdminUpBfdSession(sessionMgmt)
 		case sessionMgmt := <-server.AdminDownSessionCh:
 			server.AdminDownBfdSession(sessionMgmt)
+		case sessionId := <-server.ResetSessionCh:
+			server.ResetBfdSession(sessionId)
 
 		}
 	}
@@ -74,10 +78,14 @@ func (server *BFDServer) DispatchReceivedBfdPacket(ipAddr string, bfdPacket *Bfd
 		session, exist = server.bfdGlobal.SessionsByIp[ipAddr]
 	}
 	if exist && session != nil {
+		session.sessionLock.Lock()
 		if session.IsSessionActive() && session.rxInterval != 0 {
-			session.sessionTimer.Reset(time.Duration(session.rxInterval) * time.Millisecond)
-			session.ReceivedPacketCh <- bfdPacket
+			if session.sessionTimer != nil {
+				session.sessionTimer.Reset(time.Duration(session.rxInterval) * time.Millisecond)
+				session.ReceivedPacketCh <- bfdPacket
+			}
 		}
+		session.sessionLock.Unlock()
 	} else {
 		/*
 			// Create a session as discovered. This can be enabled for active mode of bfd.
@@ -179,6 +187,7 @@ func (server *BFDServer) StartSessionRetryHandler() error {
 			sessionId := server.bfdGlobal.InactiveSessionsIdSlice[i]
 			session := server.bfdGlobal.Sessions[sessionId]
 			if session != nil {
+				server.logger.Info("Session retry handler restarting session", sessionId, "active", session.isClientActive)
 				if session.isClientActive == false {
 					if session.state.PerLinkSession {
 						server.logger.Info("Starting PerLink client for inactive session ", sessionId)
@@ -187,9 +196,8 @@ func (server *BFDServer) StartSessionRetryHandler() error {
 						server.logger.Info("Starting client for inactive session ", sessionId)
 						go session.StartSessionClient(server)
 					}
-					session.isClientActive = true
-					server.bfdGlobal.InactiveSessionsIdSlice = append(server.bfdGlobal.InactiveSessionsIdSlice[:i], server.bfdGlobal.InactiveSessionsIdSlice[i+1:]...)
 				}
+				server.bfdGlobal.InactiveSessionsIdSlice = append(server.bfdGlobal.InactiveSessionsIdSlice[:i], server.bfdGlobal.InactiveSessionsIdSlice[i+1:]...)
 			}
 		}
 	}
@@ -262,8 +270,9 @@ func (server *BFDServer) GetNewSessionId() int32 {
 	return sessionId
 }
 
-func (server *BFDServer) GetIfIndexFromDestIp(DestIp string) (int32, error) {
+func (server *BFDServer) GetIfIndexFromDestIp(DestIp string) (int32, string, error) {
 	var ifIndex int32
+	var localAddr string
 	server.ribdClient.ClientHdl.TrackReachabilityStatus(DestIp, "BFD", "add")
 	reachabilityInfo, err := server.ribdClient.ClientHdl.GetRouteReachabilityInfo(DestIp, -1)
 	server.logger.Info("Reachability info ", reachabilityInfo)
@@ -271,9 +280,10 @@ func (server *BFDServer) GetIfIndexFromDestIp(DestIp string) (int32, error) {
 		err = errors.New(DestIp + " is not reachable")
 	} else {
 		ifIndex = int32(reachabilityInfo.NextHopIfIndex)
-		server.logger.Info("GetIfIndexFromDestIp: DestIp: ", DestIp, "IfIndex: ", ifIndex)
+		localAddr = reachabilityInfo.Ipaddr
+		server.logger.Info("GetIfIndexFromDestIp: DestIp: ", DestIp, "IfIndex: ", ifIndex, "LocalIP: ", localAddr)
 	}
-	return ifIndex, err
+	return ifIndex, localAddr, err
 }
 
 func (server *BFDServer) GetTxJitter() int32 {
@@ -283,7 +293,7 @@ func (server *BFDServer) GetTxJitter() int32 {
 	return jitter
 }
 
-func (server *BFDServer) NewNormalBfdSession(Interface string, DestIp string, ParamName string, PerLink bool, Protocol bfddCommonDefs.BfdSessionOwner) *BfdSession {
+func (server *BFDServer) NewNormalBfdSession(Interface string, LocalIp string, DestIp string, ParamName string, PerLink bool, Protocol bfddCommonDefs.BfdSessionOwner) *BfdSession {
 	bfdSession := &BfdSession{}
 	sessionId := server.GetNewSessionId()
 	if sessionId == 0 {
@@ -292,6 +302,7 @@ func (server *BFDServer) NewNormalBfdSession(Interface string, DestIp string, Pa
 	}
 	bfdSession.state.SessionId = sessionId
 	bfdSession.state.IpAddr = DestIp
+	bfdSession.state.LocalAddr = LocalIp
 	bfdSession.state.Interface = Interface
 	bfdSession.state.PerLinkSession = PerLink
 	if PerLink {
@@ -326,8 +337,9 @@ func (server *BFDServer) NewNormalBfdSession(Interface string, DestIp string, Pa
 	bfdSession.authKeyId = uint32(sessionParam.state.AuthenticationKeyId)
 	bfdSession.authData = sessionParam.state.AuthenticationData
 	bfdSession.paramChanged = true
-	bfdSession.server = server
 	bfdSession.bfdPacket = NewBfdControlPacketDefault()
+	bfdSession.server = server
+	bfdSession.sessionLock = sync.RWMutex{}
 	server.bfdGlobal.Sessions[sessionId] = bfdSession
 	server.bfdGlobal.SessionsByIp[DestIp] = bfdSession
 	server.bfdGlobal.NumSessions++
@@ -337,12 +349,12 @@ func (server *BFDServer) NewNormalBfdSession(Interface string, DestIp string, Pa
 	return bfdSession
 }
 
-func (server *BFDServer) NewPerLinkBfdSessions(IfIndex int32, DestIp string, ParamName string, Protocol bfddCommonDefs.BfdSessionOwner) error {
+func (server *BFDServer) NewPerLinkBfdSessions(IfIndex int32, LocalIp string, DestIp string, ParamName string, Protocol bfddCommonDefs.BfdSessionOwner) error {
 	lag, exist := server.lagPropertyMap[IfIndex]
 	if exist {
 		for _, link := range lag.Links {
 			IfName, _ := server.getLinuxIntfName(IfIndex)
-			bfdSession := server.NewNormalBfdSession(IfName, DestIp, ParamName, true, Protocol)
+			bfdSession := server.NewNormalBfdSession(IfName, LocalIp, DestIp, ParamName, true, Protocol)
 			if bfdSession == nil {
 				server.logger.Info("Failed to create perlink session on ", link)
 			}
@@ -359,7 +371,7 @@ func (server *BFDServer) NewBfdSession(DestIp string, ParamName string, Interfac
 	if Interface != "" {
 		interfaceSpecific = true
 	}
-	IfIndex, err := server.GetIfIndexFromDestIp(DestIp)
+	IfIndex, localIp, err := server.GetIfIndexFromDestIp(DestIp)
 	if err != nil {
 		server.logger.Err("Session creation failed " + err.Error())
 		return nil
@@ -374,9 +386,9 @@ func (server *BFDServer) NewBfdSession(DestIp string, ParamName string, Interfac
 		}
 	}
 	if IfType == commonDefs.IfTypeLag && PerLink {
-		server.NewPerLinkBfdSessions(IfIndex, DestIp, ParamName, Protocol)
+		server.NewPerLinkBfdSessions(IfIndex, localIp, DestIp, ParamName, Protocol)
 	} else {
-		bfdSession := server.NewNormalBfdSession(Interface, DestIp, ParamName, false, Protocol)
+		bfdSession := server.NewNormalBfdSession(Interface, localIp, DestIp, ParamName, false, Protocol)
 		bfdSession.state.InterfaceSpecific = interfaceSpecific
 		return bfdSession
 	}
@@ -502,8 +514,6 @@ func (server *BFDServer) SessionDeleteHandler(session *BfdSession, Protocol bfdd
 	session.state.RegisteredProtocols[Protocol] = false
 	if ForceDel || session.CheckIfAnyProtocolRegistered() == false {
 		if session.IsSessionActive() {
-			session.txTimer.Stop()
-			session.sessionTimer.Stop()
 			session.SessionStopClientCh <- true
 		}
 		session.SessionStopServerCh <- true
@@ -561,6 +571,22 @@ func (server *BFDServer) DeleteBfdSession(sessionMgmt BfdSessionMgmt) error {
 	} else {
 		server.logger.Info("Bfd session not found ", sessionId)
 	}
+	return nil
+}
+
+func (server *BFDServer) ResetBfdSession(sessionId int32) error {
+	server.logger.Info("ResetSession: SessionId", sessionId)
+	session := server.bfdGlobal.Sessions[sessionId]
+	if session.IsSessionActive() {
+		session.SessionStopClientCh <- true
+	}
+	session.SessionStopServerCh <- true
+	session.ResetLocalSessionParams()
+	session.isClientActive = false
+	server.logger.Info("Starting server for session ", sessionId)
+	go session.StartSessionServer()
+	server.logger.Info("Starting client for session ", sessionId)
+	go session.StartSessionClient(server)
 	return nil
 }
 

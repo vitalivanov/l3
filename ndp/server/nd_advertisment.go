@@ -24,7 +24,6 @@ package server
 
 import (
 	"l3/ndp/config"
-	"l3/ndp/debug"
 	"l3/ndp/packet"
 )
 
@@ -39,8 +38,10 @@ import (
  * @TODO: handle un-solicited Neighbor Advertisemtn
  */
 func (intf *Interface) processNA(ndInfo *packet.NDInfo) (nbrInfo *config.NeighborConfig, oper NDP_OPERATION) {
-	debug.Logger.Debug("Processing NA packet", *ndInfo)
 	nbrKey := intf.createNbrKey(ndInfo)
+	if !intf.validNbrKey(nbrKey) {
+		return nil, IGNORE
+	}
 	nbr, exists := intf.Neighbor[nbrKey]
 	if exists {
 		// update existing neighbor timers and move
@@ -55,6 +56,7 @@ func (intf *Interface) processNA(ndInfo *packet.NDInfo) (nbrInfo *config.Neighbo
 		oper = CREATE
 		nbrInfo = nbr.populateNbrInfo(intf.IfIndex, intf.IntfRef)
 	}
+	nbr.updatePktRxStateInfo()
 	intf.Neighbor[nbrKey] = nbr
 	return nbrInfo, oper
 }

@@ -100,6 +100,7 @@ func (n *NeighborConf) ResetNeighborAddress() {
 
 func (n *NeighborConf) SetNeighborState(peerConf *config.NeighborConfig) {
 	n.Neighbor.State = config.NeighborState{
+		Disabled:                peerConf.Disabled,
 		PeerAS:                  peerConf.PeerAS,
 		LocalAS:                 peerConf.LocalAS,
 		UpdateSource:            peerConf.UpdateSource,
@@ -130,10 +131,14 @@ func (n *NeighborConf) SetNeighborState(peerConf *config.NeighborConfig) {
 
 func (n *NeighborConf) copyNonKeyNeighConfAttrs(nConf config.NeighborConfig) {
 	n.Neighbor.Config.BaseConfig = nConf.BaseConfig
+	n.Neighbor.Config.PeerGroup = nConf.PeerGroup
+	n.Neighbor.Config.Disabled = nConf.Disabled
 }
 
 func (n *NeighborConf) UpdateNeighborConf(nConf config.NeighborConfig, bgp *config.Bgp) {
+	n.logger.Infof("UpdateNeighborConf - nConf=%+v", nConf)
 	n.copyNonKeyNeighConfAttrs(nConf)
+	n.logger.Infof("UpdateNeighborConf - updated conf=%+v", n.Neighbor.Config)
 	n.RunningConf = config.NeighborConfig{}
 	if (n.Group == nil && nConf.PeerGroup != "") || (n.Group != nil && nConf.PeerGroup != n.Group.Name) {
 		protoFamily, _ := packet.GetProtocolFamilyFromPeerAddrType(nConf.PeerAddressType)
@@ -146,10 +151,13 @@ func (n *NeighborConf) UpdateNeighborConf(nConf config.NeighborConfig, bgp *conf
 		}
 	}
 	n.GetConfFromNeighbor(&n.Neighbor.Config, &n.RunningConf)
+	n.logger.Infof("UpdateNeighborConf - running conf=%+v", n.Neighbor.Config)
 	n.SetNeighborState(&n.RunningConf)
+	n.logger.Infof("UpdateNeighborConf - neigh state=%+v", n.Neighbor.State)
 }
 
 func (n *NeighborConf) UpdatePeerGroup(peerGroup *config.PeerGroupConfig) {
+	n.logger.Infof("UpdatePeerGroup - peergroup=%+v", peerGroup)
 	n.Group = peerGroup
 	n.RunningConf = config.NeighborConfig{}
 	n.SetRunningConf(peerGroup, &n.RunningConf)
@@ -271,6 +279,7 @@ func (n *NeighborConf) GetConfFromNeighbor(inConf *config.NeighborConfig, outCon
 	outConf.IfIndex = inConf.IfIndex
 	outConf.IfName = inConf.IfName
 	outConf.PeerGroup = inConf.PeerGroup
+	outConf.Disabled = inConf.Disabled
 }
 
 func (n *NeighborConf) setDefaults(nConf *config.NeighborConfig) {
@@ -354,6 +363,7 @@ func (n *NeighborConf) FSMStateChange(state uint32) {
 	n.logger.Infof("Neighbor %s: FSMStateChange %d", n.Neighbor.NeighborAddress, state)
 	n.PublishEvents(state)
 	n.Neighbor.State.SessionState = uint32(state)
+	n.Neighbor.State.SessionStateUpdatedTime = time.Now()
 }
 
 func (n *NeighborConf) SetPeerAttrs(bgpId net.IP, asSize uint8, holdTime uint32, keepaliveTime uint32,

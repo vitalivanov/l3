@@ -25,7 +25,6 @@ package server
 import (
 	"github.com/google/gopacket/layers"
 	"l3/ndp/config"
-	"l3/ndp/debug"
 	"l3/ndp/packet"
 )
 
@@ -38,8 +37,10 @@ import (
  * fill the NDInfo and then return it back to caller
  */
 func (intf *Interface) processRA(ndInfo *packet.NDInfo) (nbrInfo *config.NeighborConfig, oper NDP_OPERATION) {
-	debug.Logger.Debug("Processing RA packet:", *ndInfo)
 	nbrKey := intf.createNbrKey(ndInfo)
+	if !intf.validNbrKey(nbrKey) {
+		return nil, IGNORE
+	}
 	nbr, exists := intf.Neighbor[nbrKey]
 	if exists {
 		if ndInfo.RouterLifetime == 0 {
@@ -59,7 +60,6 @@ func (intf *Interface) processRA(ndInfo *packet.NDInfo) (nbrInfo *config.Neighbo
 			oper = UPDATE
 		}
 	} else {
-		debug.Logger.Debug("New Neighbor learned via RA:", nbrKey)
 		// create new neighbor
 		nbr.InitCache(intf.reachableTime, intf.retransTime, nbrKey, intf.PktDataCh, intf.IfIndex)
 		nbr.InValidTimer(ndInfo.RouterLifetime)
@@ -68,8 +68,8 @@ func (intf *Interface) processRA(ndInfo *packet.NDInfo) (nbrInfo *config.Neighbo
 		nbrInfo = nbr.populateNbrInfo(intf.IfIndex, intf.IntfRef)
 		oper = CREATE
 	}
+	nbr.updatePktRxStateInfo()
 	intf.Neighbor[nbrKey] = nbr
-	debug.Logger.Debug("Neighbor Info is:", nbr, "operation from interface to server is:", oper)
 	return nbrInfo, oper
 }
 
@@ -88,12 +88,13 @@ func (intf *Interface) SendRA(srcMac string) {
 		pkt.SrcIp = intf.linkScope
 		pktToSend := pkt.Encode()
 		intf.writePkt(pktToSend)
-
+		intf.counter.Send++
 	}
 	if intf.globalScope != "" {
 		pkt.SrcIp = intf.globalScope
 		pktToSend := pkt.Encode()
 		intf.writePkt(pktToSend)
+		intf.counter.Send++
 	}
 
 	intf.RAResTransmitTimer()

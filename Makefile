@@ -1,26 +1,26 @@
 COMPS=arp\
       rib\
       bgp\
+      ndp\
       dhcp\
       ospf\
       dhcp_relay\
       bfd \
       vrrp\
       tunnel/vxlan\
-      ndp\
       isis
 
 
 IPCS=arp\
      rib\
      bgp\
+     ndp\
      dhcp\
      ospf\
      dhcp_relay\
      bfd\
      vrrp\
      tunnel/vxlan\
-     ndp\
      isis
 
 define timedMake

@@ -27,6 +27,7 @@ func (server *BFDServer) GetBfdGlobalState() *GlobalState {
 	result := new(GlobalState)
 	ent := server.bfdGlobal
 
+	result.Vrf = ent.Vrf
 	result.Enable = ent.Enabled
 	result.NumSessions = ent.NumSessions
 	result.NumUpSessions = ent.NumUpSessions

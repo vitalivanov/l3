@@ -41,6 +41,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 	"utils/dbutils"
 	"utils/eventUtils"
 	"utils/logging"
@@ -278,16 +279,44 @@ func (s *BGPServer) createListener(proto string) (*net.TCPListener, error) {
 	return listener, nil
 }
 
-func (s *BGPServer) listenForPeers(listener *net.TCPListener, acceptCh chan *net.TCPConn) {
+func (s *BGPServer) setListener(listener *net.TCPListener, proto string) {
+	switch proto {
+	case "tcp4":
+		s.listener = listener
+	case "tcp6":
+		s.listenerIPv6 = listener
+	default:
+		s.logger.Err("BGPServer:setListener - unknonn protocol type", proto)
+	}
+}
+
+func (s *BGPServer) listenForPeers(listener *net.TCPListener, proto string, acceptCh chan *net.TCPConn) {
 	for {
 		s.logger.Info("Waiting for peer connections...")
 		tcpConn, err := listener.AcceptTCP()
 		if err != nil {
 			s.logger.Info("AcceptTCP failed with", err)
+			if strings.Contains(err.Error(), "use of closed network connection") {
+				newListener, err2 := s.createListener(proto)
+				if err2 != nil {
+					ticker := time.NewTicker(time.Duration(5) * time.Second)
+					for range ticker.C {
+						newListener, err2 = s.createListener(proto)
+						if err2 == nil {
+							ticker.Stop()
+							break
+						}
+						s.logger.Err("Create TCPListener for", proto, "failed with err", err)
+					}
+				}
+				s.logger.Info("Created new TCPListener for", proto)
+				listener = newListener
+				s.setListener(listener, proto)
+			}
 			continue
 		}
 		s.logger.Info("Got a peer connection from %s", tcpConn.RemoteAddr())
-		s.acceptCh <- tcpConn
+		acceptCh <- tcpConn
 	}
 }
 
@@ -526,7 +555,8 @@ func (s *BGPServer) UndoAggregateAction(actionInfo interface{},
 	return
 }
 
-func (s *BGPServer) ApplyAggregateAction(actionInfo interface{}, conditionInfo []interface{}, params interface{}) {
+func (s *BGPServer) ApplyAggregateAction(actionInfo interface{}, conditionInfo []interface{}, params interface{},
+	policyStmt utilspolicy.PolicyStmt) {
 	policyParams := params.(PolicyParams)
 	ipPrefix := packet.NewIPPrefix(net.ParseIP(policyParams.route.Dest.BGPRouteState.GetNetwork()),
 		uint8(policyParams.route.Dest.BGPRouteState.GetCIDRLen()))
@@ -588,7 +618,7 @@ func (s *BGPServer) CheckForAggregation(updated map[uint32]map[*bgprib.Path][]*b
 		route := dest.GetLocRibPathRoute()
 		if route == nil {
 			s.logger.Infof("BGPServer:checkForAggregate - route not found withdraw dest %s",
-				dest.NLRI.GetPrefix().String())
+				dest.NLRI.GetCIDR())
 			continue
 		}
 		peEntity := utilspolicy.PolicyEngineFilterEntityParams{
@@ -597,7 +627,7 @@ func (s *BGPServer) CheckForAggregation(updated map[uint32]map[*bgprib.Path][]*b
 			DeletePath: true,
 		}
 		s.logger.Infof("BGPServer:checkForAggregate - withdraw dest %s policylist %v hit %v before ",
-			"applying delete policy", dest.NLRI.GetPrefix().String(), route.PolicyList, route.PolicyHitCounter)
+			"applying delete policy", dest.NLRI.GetCIDR(), route.PolicyList, route.PolicyHitCounter)
 		callbackInfo := PolicyParams{
 			CreateType:      utilspolicy.Invalid,
 			DeleteType:      utilspolicy.Valid,
@@ -631,7 +661,7 @@ func (s *BGPServer) CheckForAggregation(updated map[uint32]map[*bgprib.Path][]*b
 				}
 				route := dest.GetLocRibPathRoute()
 				s.logger.Infof("BGPServer:checkForAggregate - update dest %s policylist %v hit %v before "+
-					"applying create policy", dest.NLRI.GetPrefix().String(), route.PolicyList, route.PolicyHitCounter)
+					"applying create policy", dest.NLRI.GetCIDR(), route.PolicyList, route.PolicyHitCounter)
 				if route != nil {
 					peEntity := utilspolicy.PolicyEngineFilterEntityParams{
 						DestNetIp:  route.Dest.BGPRouteState.GetNetwork() + "/" + strconv.Itoa(int(route.Dest.BGPRouteState.GetCIDRLen())),
@@ -649,7 +679,7 @@ func (s *BGPServer) CheckForAggregation(updated map[uint32]map[*bgprib.Path][]*b
 					}
 					pe.PolicyEngine.PolicyEngineFilter(peEntity, policyCommonDefs.PolicyPath_Export, callbackInfo)
 					s.logger.Infof("BGPServer:checkForAggregate - update dest %s policylist %v hit %v "+
-						"after applying create policy", dest.NLRI.GetPrefix().String(), route.PolicyList,
+						"after applying create policy", dest.NLRI.GetCIDR(), route.PolicyList,
 						route.PolicyHitCounter)
 				}
 			}
@@ -686,7 +716,6 @@ func (s *BGPServer) UpdateRouteAndPolicyDB(policyDetails utilspolicy.PolicyDetai
 
 func (s *BGPServer) TraverseAndApplyBGPRib(data interface{}, updateFunc utilspolicy.PolicyApplyfunc) {
 	s.logger.Infof("BGPServer:TraverseAndApplyBGPRib - start")
-	policy := data.(utilspolicy.ApplyPolicyInfo)
 	updated := make(map[uint32]map[*bgprib.Path][]*bgprib.Destination, 10)
 	withdrawn := make([]*bgprib.Destination, 0, 10)
 	updatedAddPaths := make([]*bgprib.Destination, 0)
@@ -719,7 +748,7 @@ func (s *BGPServer) TraverseAndApplyBGPRib(data interface{}, updateFunc utilspol
 						updatedAddPaths: &updatedAddPaths,
 					}
 
-					updateFunc(peEntity, policy, callbackInfo)
+					updateFunc(peEntity, data, callbackInfo)
 				}
 			}
 		}
@@ -749,7 +778,10 @@ func (s *BGPServer) TrAndRevAggForIPv6(policyData interface{}) {
 }
 
 func (s *BGPServer) TraverseAndReverseBGPRib(policyData interface{}, pe *bgppolicy.LocRibPolicyEngine) {
-	policy := policyData.(utilspolicy.Policy)
+	updateInfo := policyData.(utilspolicy.PolicyEngineApplyInfo)
+	applyPolicyInfo := updateInfo.ApplyPolicy
+	policy := applyPolicyInfo.ApplyPolicy
+	//	policy := policyData.(utilspolicy.Policy)
 	s.logger.Info("BGPServer:TraverseAndReverseBGPRib - policy", policy.Name)
 	policyExtensions := policy.Extensions.(bgppolicy.PolicyExtensions)
 	if len(policyExtensions.RouteList) == 0 {
@@ -786,7 +818,7 @@ func (s *BGPServer) TraverseAndReverseBGPRib(policyData interface{}, pe *bgppoli
 			s.logger.Info("Invalid route ", ipPrefix)
 			continue
 		}
-		pe.PolicyEngine.PolicyEngineUndoPolicyForEntity(peEntity, policy, callbackInfo)
+		pe.PolicyEngine.PolicyEngineUndoApplyPolicyForEntity(peEntity, updateInfo, callbackInfo)
 		pe.DeleteRoutePolicyState(route, policy.Name)
 		pe.PolicyEngine.DeletePolicyEntityMapEntry(peEntity, policy.Name)
 	}
@@ -801,7 +833,7 @@ func (s *BGPServer) DoesAdjRIBRouteExist(params interface{}, adjRIBDir bgprib.Ad
 		return false
 	}
 
-	adjRIB := s.GetAdjRIB(peer, adjRIBDir)
+	adjRIB := peer.GetAdjRIB(adjRIBDir)
 	if prefixRouteMap, ok := adjRIB[policyParams.Route.ProtocolFamily]; ok {
 		if prefixRouteMap[policyParams.Route.NLRI.String()] != nil {
 			return true
@@ -819,25 +851,60 @@ func (s *BGPServer) DoesAdjRIBOutRouteExist(params interface{}) bool {
 	return s.DoesAdjRIBRouteExist(params, bgprib.AdjRIBDirOut)
 }
 
-func (s *BGPServer) ApplyAdjRIBAction(actionInfo interface{}, conditionInfo []interface{}, params interface{}) {
+func (s *BGPServer) ApplyAdjRIBAction(actionInfo interface{}, conditionInfo []interface{}, params interface{},
+	policyStmt utilspolicy.PolicyStmt) {
 	policyParams := params.(*AdjRIBPolicyParams)
-	s.logger.Infof("BGPServer:ApplyAdjRIBAction - policyParams=%+v\n", policyParams)
-	policyParams.Accept = Accept
+	s.logger.Infof("BGPServer:ApplyAdjRIBAction - policyParams=%+v, policyStmt=%+v\n", policyParams, policyStmt)
+	if len(policyStmt.Actions) > 0 {
+		for _, action := range policyStmt.Actions {
+			if action == "permit" {
+				s.logger.Info("BGPServer:ApplyAdjRIBAction - policyParams=%+v, policyStmt=%+v, action permit\n",
+					policyParams, policyStmt, action)
+				policyParams.Accept = Accept
+				break
+			} else if action == "deny" {
+				s.logger.Info("BGPServer:ApplyAdjRIBAction - policyParams=%+v, policyStmt=%+v, action deny\n",
+					policyParams, policyStmt, action)
+				policyParams.Accept = Reject
+			} else {
+				s.logger.Err("BGPServer:ApplyAdjRIBAction - policyParams=%+v, policyStmt=%+v, unknown action=%s\n",
+					policyParams, policyStmt, action)
+			}
+		}
+	}
 }
 
 func (s *BGPServer) UndoAdjRIBAction(actionInfo interface{}, conditionInfo []interface{}, params interface{},
 	policyStmt utilspolicy.PolicyStmt) {
 	policyParams := params.(*AdjRIBPolicyParams)
-	s.logger.Info("BGPServer:UndoAdjRIBAction - policyParams=%+v\n", policyParams)
-	policyParams.Accept = Accept
+	s.logger.Info("BGPServer:UndoAdjRIBAction - policyParams=%+v policyStmt=%+v\n", policyParams, policyStmt)
+	if len(policyStmt.Actions) > 0 {
+		for _, action := range policyStmt.Actions {
+			if action == "permit" {
+				s.logger.Info("BGPServer:UndoAdjRIBAction - policyParams=%+v, policyStmt=%+v, action permit\n",
+					policyParams, policyStmt, action)
+				policyParams.Accept = Accept
+				break
+			} else if action == "deny" {
+				s.logger.Info("BGPServer:UndoAdjRIBAction - policyParams=%+v, policyStmt=%+v, action deny\n",
+					policyParams, policyStmt, action)
+				policyParams.Accept = Reject
+			} else {
+				s.logger.Err("BGPServer:UndoAdjRIBAction - policyParams=%+v, policyStmt=%+v, unknown action=%s\n",
+					policyParams, policyStmt, action)
+			}
+		}
+	}
 }
 
 func (s *BGPServer) UpdateAdjRIBRouteAndPolicyDB(policyDetails utilspolicy.PolicyDetails, params interface{},
 	pe *bgppolicy.AdjRibPPolicyEngine) {
 	var op int
 	policyParams := params.(*AdjRIBPolicyParams)
+	s.logger.Infof("UpdateAdjRIBRouteAndPolicyDB - policyDetails=%+v, route=%+v", policyDetails, policyParams.Route)
 
 	if policyParams.DeleteType != bgppolicy.Invalid {
+		s.logger.Infof("UpdateAdjRIBRouteAndPolicyDB - Route deleted")
 		op = bgppolicy.Del
 	} else {
 		if policyDetails.EntityDeleted == false {
@@ -859,32 +926,21 @@ func (s *BGPServer) UpdateAdjRIBOutRouteAndPolicyDB(policyDetails utilspolicy.Po
 	s.UpdateAdjRIBRouteAndPolicyDB(policyDetails, params, s.ribOutPE)
 }
 
-func (s *BGPServer) GetAdjRIB(peer *Peer, adjRIBDir bgprib.AdjRIBDir) map[uint32]map[string]*bgprib.AdjRIBRoute {
-	switch adjRIBDir {
-	case bgprib.AdjRIBDirIn:
-		return peer.ribIn
-
-	case bgprib.AdjRIBDirOut:
-		return peer.ribOut
-	}
-	return nil
-}
-
-func (s *BGPServer) TraverseAndApplyAdjRib(data interface{}, updateFunc utilspolicy.PolicyApplyfunc,
-	pe *bgppolicy.AdjRibPPolicyEngine, adjRibDir bgprib.AdjRIBDir) {
+func (s *BGPServer) getPeerForPolicy(data interface{}, updateFunc utilspolicy.PolicyApplyfunc,
+	pe *bgppolicy.AdjRibPPolicyEngine) *Peer {
 	s.logger.Infof("BGPServer:TraverseAndApplyAdjRib - start")
-	policyInfo := data.(utilspolicy.ApplyPolicyInfo)
+	policyInfo := data.(utilspolicy.PolicyEngineApplyInfo)
 	conditionsDB := pe.PolicyEngine.PolicyConditionsDB
 	var neighborIP string
 	var peer *Peer
 	var ok bool
 
-	for _, condition := range policyInfo.Conditions {
+	for _, condition := range policyInfo.ApplyPolicy.Conditions {
 		s.logger.Infof("BGPServer:TraverseAndApplyAdjRib - condition:%+v", condition)
 		nodeGet := conditionsDB.Get(patriciaDB.Prefix(condition))
 		if nodeGet == nil {
 			s.logger.Err("Condition", condition, "not defined")
-			return
+			return nil
 		}
 		node := nodeGet.(utilspolicy.PolicyCondition)
 		if node.ConditionType == policyCommonDefs.PolicyConditionTypeNeighborMatch {
@@ -894,46 +950,63 @@ func (s *BGPServer) TraverseAndApplyAdjRib(data interface{}, updateFunc utilspol
 
 	if peer, ok = s.PeerMap[neighborIP]; !ok {
 		s.logger.Err("Can't apply policy... Neighbor %s not found", neighborIP)
-		return
+		return nil
 	}
 
-	adjRIB := s.GetAdjRIB(peer, adjRibDir)
-	for _, prefixRouteMap := range adjRIB {
-		for _, adjRoute := range prefixRouteMap {
-			if adjRoute == nil {
-				continue
-			}
+	return peer
+	/*
+		adjRIB := s.GetAdjRIB(peer, adjRibDir)
+		for _, prefixRouteMap := range adjRIB {
+			for _, adjRoute := range prefixRouteMap {
+				if adjRoute == nil {
+					continue
+				}
 
-			s.logger.Debugf("Peer %s - NLRI %s policylist %v hit %v before applying create policy",
-				adjRoute.NLRI.GetPrefix(), adjRoute.PolicyList, adjRoute.PolicyHitCounter)
-			peEntity := utilspolicy.PolicyEngineFilterEntityParams{
-				DestNetIp:  adjRoute.NLRI.GetPrefix().String() + "/" + strconv.Itoa(int(adjRoute.NLRI.GetLength())),
-				Neighbor:   peer.NeighborConf.RunningConf.NeighborAddress.String(),
-				PolicyList: adjRoute.PolicyList,
-			}
-			callbackInfo := &AdjRIBPolicyParams{
-				CreateType: utilspolicy.Invalid,
-				DeleteType: utilspolicy.Invalid,
-				Peer:       peer,
-				Route:      adjRoute,
-			}
+				s.logger.Debugf("Peer %s - NLRI %s policylist %v hit %v before applying create policy",
+					adjRoute.NLRI.GetPrefix(), adjRoute.PolicyList, adjRoute.PolicyHitCounter)
+				peEntity := utilspolicy.PolicyEngineFilterEntityParams{
+					DestNetIp:  adjRoute.NLRI.GetCIDR(),
+					Neighbor:   peer.NeighborConf.RunningConf.NeighborAddress.String(),
+					PolicyList: adjRoute.PolicyList,
+				}
+				callbackInfo := &AdjRIBPolicyParams{
+					CreateType: utilspolicy.Invalid,
+					DeleteType: utilspolicy.Invalid,
+					Peer:       peer,
+					Route:      adjRoute,
+				}
 
-			updateFunc(peEntity, policyInfo, callbackInfo)
+				updateFunc(peEntity, policyInfo, callbackInfo)
+			}
 		}
-	}
+	*/
 }
 
 func (s *BGPServer) TraverseAndApplyAdjRibIn(data interface{}, updateFunc utilspolicy.PolicyApplyfunc) {
-	s.TraverseAndApplyAdjRib(data, updateFunc, s.ribInPE, bgprib.AdjRIBDirIn)
+	peer := s.getPeerForPolicy(data, updateFunc, s.ribInPE)
+	if peer == nil {
+		s.logger.Infof("BGPServer:TraverseAndApplyAdjRibIn - peer not found")
+		return
+	}
+	updated, withdrawn, updatedAddPaths := peer.AdjRIBInPolicyUpdated(bgprib.AdjRIBDirIn, data, updateFunc)
+	updated, withdrawn, updatedAddPaths = s.CheckForAggregation(updated, withdrawn, updatedAddPaths)
+	s.SendUpdate(updated, withdrawn, updatedAddPaths)
 }
 
 func (s *BGPServer) TraverseAndApplyAdjRibOut(data interface{}, updateFunc utilspolicy.PolicyApplyfunc) {
-	s.TraverseAndApplyAdjRib(data, updateFunc, s.ribOutPE, bgprib.AdjRIBDirOut)
+	peer := s.getPeerForPolicy(data, updateFunc, s.ribOutPE)
+	if peer == nil {
+		s.logger.Infof("BGPServer:TraverseAndApplyAdjRibOut - peer not found")
+		return
+	}
+
+	peer.AdjRIBOutPolicyUpdated(data, updateFunc)
 }
 
 func (s *BGPServer) TraverseAndReverseAdjRIB(policyData interface{}, pe *bgppolicy.AdjRibPPolicyEngine) {
-	applyPolicyInfo := policyData.(utilspolicy.ApplyPolicyInfo)
-	policy := applyPolicyInfo.ApplyPolicy //policyItem.(policy.Policy)
+	updateInfo := policyData.(utilspolicy.PolicyEngineApplyInfo)
+	applyPolicyInfo := updateInfo.ApplyPolicy //policyData.(utilspolicy.ApplyPolicyInfo)
+	policy := applyPolicyInfo.ApplyPolicy     //policyItem.(policy.Policy)
 	s.logger.Info("BGPServer:TraverseAndReverseAdjRIB - policy", policy.Name)
 	policyExtensions := policy.Extensions.(bgppolicy.AdjRibPolicyExtensions)
 	if len(policyExtensions.RouteList) == 0 {
@@ -961,11 +1034,11 @@ func (s *BGPServer) TraverseAndReverseAdjRIB(policyData interface{}, pe *bgppoli
 			Peer:       peer,
 		}
 		peEntity := utilspolicy.PolicyEngineFilterEntityParams{
-			DestNetIp: route.NLRI.GetPrefix().String() + "/" + strconv.Itoa(int(route.NLRI.GetLength())),
+			DestNetIp: route.NLRI.GetCIDR(),
 			Neighbor:  route.Neighbor.String(),
 		}
 
-		success := pe.PolicyEngine.PolicyEngineUndoApplyPolicyForEntity(peEntity, applyPolicyInfo, callbackInfo)
+		success := pe.PolicyEngine.PolicyEngineUndoApplyPolicyForEntity(peEntity, updateInfo, callbackInfo)
 		s.logger.Info("success value agyer undoapplypolicy:", success, " for policy:", policy.Name)
 		if success {
 			pe.AdjRIBDeleteRoutePolicyState(route, policy.Name)
@@ -2314,10 +2387,10 @@ func (s *BGPServer) StartServer() {
 	s.acceptCh = make(chan *net.TCPConn)
 
 	s.listener, _ = s.createListener("tcp4")
-	go s.listenForPeers(s.listener, s.acceptCh)
+	go s.listenForPeers(s.listener, "tcp4", s.acceptCh)
 
 	s.listenerIPv6, _ = s.createListener("tcp6")
-	go s.listenForPeers(s.listenerIPv6, s.acceptCh)
+	go s.listenForPeers(s.listenerIPv6, "tcp6", s.acceptCh)
 
 	s.logger.Info("Start all managers and initialize API Layer")
 	s.IntfMgr.Start()

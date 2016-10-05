@@ -35,6 +35,7 @@ import (
 	"os/signal"
 	"ribd"
 	"strconv"
+	"sync"
 	"syscall"
 	"time"
 	"utils/dbutils"
@@ -102,6 +103,7 @@ type BfdSession struct {
 	movedToDownState    bool
 	notifiedState       bool
 	server              *BFDServer
+	sessionLock         sync.RWMutex
 }
 
 type BfdSessionParam struct {
@@ -109,6 +111,7 @@ type BfdSessionParam struct {
 }
 
 type BfdGlobal struct {
+	Vrf                     string
 	Enabled                 bool
 	NumSessions             uint32
 	Sessions                map[int32]*BfdSession
@@ -146,6 +149,7 @@ type BFDServer struct {
 	DeleteSessionCh       chan BfdSessionMgmt
 	AdminUpSessionCh      chan BfdSessionMgmt
 	AdminDownSessionCh    chan BfdSessionMgmt
+	ResetSessionCh        chan int32
 	SessionConfigCh       chan SessionConfig
 	CreatedSessionCh      chan int32
 	bfddPubSocket         *nanomsg.PubSocket

@@ -120,9 +120,15 @@ func (svr *NDPServer) GetIPIntf() {
 		return
 	}
 	for _, obj := range ipsInfo {
+		// ndp will not listen on loopback interfaces
+		if svr.SwitchPlugin.IsLoopbackType(obj.IfIndex) {
+			continue
+		}
 		ipInfo, exists := svr.L3Port[obj.IfIndex]
 		if !exists {
 			ipInfo.InitIntf(obj, svr.PktDataCh, svr.NdpConfig)
+			// cache reverse map from intfref to ifIndex, used mainly during state
+			svr.L3IfIntfRefToIfIndex[obj.IntfRef] = obj.IfIndex
 		} else {
 			ipInfo.UpdateIntf(obj.IpAddr)
 		}
@@ -133,26 +139,6 @@ func (svr *NDPServer) GetIPIntf() {
 	}
 	debug.Logger.Info("Done with IPv6 State list")
 	return
-}
-
-/*
- *  API: given an ifIndex, it will search portMap (fpPort1, fpPort2, etc) to get the name or it will do
- *	 reverse search for vlanMap (vlan ifIndex ---> to vlanId) and from that we will get the name
- */
-func (svr *NDPServer) GetIntfRefName(ifIndex int32) string {
-	portEnt, exists := svr.PhyPort[ifIndex]
-	if exists {
-		return portEnt.Name
-	}
-	vlanId, exists := svr.VlanIfIdxVlanIdMap[ifIndex]
-	if exists {
-		vlanInfo, exists := svr.VlanInfo[vlanId]
-		if exists {
-			return vlanInfo.Name
-		}
-	}
-
-	return INTF_REF_NOT_FOUND
 }
 
 func isLinkLocal(ipAddr string) bool {
@@ -170,16 +156,6 @@ func (svr *NDPServer) IsIPv6Addr(ipAddr string) bool {
 	}
 
 	return false
-}
-
-func (svr *NDPServer) DeleteNDPEntryFromState(delifIndex int32) {
-	for _, ifIndex := range svr.ndpUpIntfStateSlice {
-		if delifIndex == ifIndex {
-			//svr.ndpUp = append(svr.lldpUpIntfStateSlice[:idx],
-			//	svr.lldpUpIntfStateSlice[idx+1:]...)
-			break
-		}
-	}
 }
 
 /*  API: will handle IPv6 notifications received from switch/asicd
@@ -214,8 +190,7 @@ func (svr *NDPServer) HandleIPIntfCreateDelete(obj *config.IPIntfNotification) {
 		if len(deleteEntries) > 0 {
 			svr.DeleteNeighborInfo(deleteEntries, obj.IfIndex)
 		}
-
-		//@TODO: need to remove ndp l3 interface from up slice
+		//@TODO: need to remove ndp l3 interface from up slice, but that is taken care of by stop rx/tx
 	}
 	svr.L3Port[ipInfo.IfIndex] = ipInfo
 }
@@ -233,7 +208,8 @@ func (svr *NDPServer) HandlePhyPortStateNotification(msg *config.PortState) {
 	debug.Logger.Info("Received State:", msg.IfState, "for ifIndex:", msg.IfIndex)
 	l3Port, exists := svr.findL3Port(msg.IfIndex)
 	if !exists {
-		debug.Logger.Debug("Physical Port for ifIndex:", msg.IfIndex, "is not l3 port and ignoring port state notification")
+		debug.Logger.Debug("Physical Port for ifIndex:", msg.IfIndex,
+			"is not l3 port and ignoring port state notification")
 		return
 	}
 	// search this ifIndex in l3 map to get the ifIndex -> ipAddr map

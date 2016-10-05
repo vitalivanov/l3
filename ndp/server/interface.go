@@ -32,6 +32,7 @@ import (
 	"l3/ndp/debug"
 	"l3/ndp/packet"
 	"net"
+	"strings"
 	"time"
 	"utils/commonDefs"
 )
@@ -52,14 +53,43 @@ const (
 	NDP_DEFAULT_REACHABLE_INTERVAL         uint32 = 30000
 )
 
+/* https://tools.ietf.org/html/rfc7346
+   +------+--------------------------+-------------------------+
+   | scop | NAME                     | REFERENCE               |
+   +------+--------------------------+-------------------------+
+   |  0   | Reserved                 | [RFC4291], RFC 7346     |
+   |  1   | Interface-Local scope    | [RFC4291], RFC 7346     |
+   |  2   | Link-Local scope         | [RFC4291], RFC 7346     |
+   |  3   | Realm-Local scope        | [RFC4291], RFC 7346     |
+   |  4   | Admin-Local scope        | [RFC4291], RFC 7346     |
+   |  5   | Site-Local scope         | [RFC4291], RFC 7346     |
+   |  6   | Unassigned               |                         |
+   |  7   | Unassigned               |                         |
+   |  8   | Organization-Local scope | [RFC4291], RFC 7346     |
+   |  9   | Unassigned               |                         |
+   |  A   | Unassigned               |                         |
+   |  B   | Unassigned               |                         |
+   |  C   | Unassigned               |                         |
+   |  D   | Unassigned               |                         |
+   |  E   | Global scope             | [RFC4291], RFC 7346     |
+   |  F   | Reserved                 | [RFC4291], RFC 7346     |
+   +------+--------------------------+-------------------------+
+*/
+var IPV6_MULTICAST_PREFIXES = []string{"ff00", "ff01", "ff02", "ff03", "ff04", "ff05", "ff06", "ff07",
+	"ff08", "ff09", "ff0a", "ff0b", "ff0c", "ff0d", "ff0e", "ff0f"}
+
 type PcapBase struct {
 	// Pcap Handler for Each Port
 	PcapHandle *pcap.Handle
-	PcapCtrl   chan bool
 	// at any give time there can be two users for Pcap..
 	// if 0 then only start rx/tx
 	// if 1 then only stop rx/tx
 	PcapUsers uint8
+}
+
+type PktCounter struct {
+	Send int64
+	Rcvd int64
 }
 
 type Interface struct {
@@ -80,6 +110,7 @@ type Interface struct {
 	linkScope         string                  // absolute
 	Neighbor          map[string]NeighborInfo // key is NbrIp_NbrMac to handle move scenario's
 	PktDataCh         chan config.PacketData
+	counter           PktCounter
 }
 
 func (intf *Interface) addIP(ipAddr string) {
@@ -119,11 +150,6 @@ func (intf *Interface) commonInit(ipAddr string, pktCh chan config.PacketData, g
 	intf.addIP(ipAddr)
 	// Pcap Init
 	intf.PcapBase.PcapHandle = nil
-	// create pcap ctrl channel if not created
-	if intf.PcapBase.PcapCtrl == nil {
-		debug.Logger.Debug("Pcap Ctrl channel created for port:", intf.IntfRef)
-		intf.PcapBase.PcapCtrl = make(chan bool)
-	}
 	intf.PcapBase.PcapUsers = 0
 	// Timers Value Init
 	intf.retransTime = gCfg.RetransTime             //1       // config value ms
@@ -135,6 +161,10 @@ func (intf *Interface) commonInit(ipAddr string, pktCh chan config.PacketData, g
 	// Neighbor Init
 	intf.PktDataCh = pktCh
 	intf.Neighbor = make(map[string]NeighborInfo, 10)
+
+	// set counters to zero
+	intf.counter.Send = 0
+	intf.counter.Rcvd = 0
 }
 
 /*
@@ -154,7 +184,7 @@ func (intf *Interface) InitIntf(obj *commonDefs.IPv6IntfState, pktCh chan config
 func (intf *Interface) DeInitIntf() []string {
 	deleteEntries, _ := intf.DeleteAll()
 	intf.PcapBase.PcapHandle = nil
-	intf.PcapBase.PcapCtrl = nil
+	//intf.PcapBase.PcapCtrl = nil
 	intf.PcapBase.PcapUsers = 0
 	intf.removeIP(intf.IpAddr)
 	intf.removeIP(intf.LinkLocalIp)
@@ -190,7 +220,6 @@ func (intf *Interface) deleteNbrList() ([]string, error) {
 		deleteEntries, err := intf.FlushNeighbors()
 		return deleteEntries, err
 	}
-	debug.Logger.Debug("No neighbors to be deleted for interface:", intf.IntfRef, intf.IpAddr, intf.LinkLocalIp)
 	return make([]string, 0), nil
 }
 
@@ -199,7 +228,6 @@ func (intf *Interface) deleteNbrList() ([]string, error) {
  */
 func (intf *Interface) DeleteIntf(ipAddr string) ([]string, error) {
 	debug.Logger.Debug("Deleting Interface Called for:", intf.IntfRef, intf.IpAddr, intf.LinkLocalIp)
-	//intf.removeIP(ipAddr)
 	intf.DeletePcap()
 	return intf.deleteNbrList()
 }
@@ -208,9 +236,7 @@ func (intf *Interface) DeleteIntf(ipAddr string) ([]string, error) {
  * Delete All will delete ip address and then remove entire pcap
  */
 func (intf *Interface) DeleteAll() ([]string, error) {
-	//intf.removeIP(intf.LinkLocalIp)
 	intf.DeletePcap()
-	//intf.removeIP(intf.IpAddr)
 	intf.DeletePcap()
 	return intf.deleteNbrList()
 }
@@ -224,7 +250,6 @@ func (intf *Interface) DeleteAll() ([]string, error) {
 func (intf *Interface) CreatePcap() (err error) {
 	if intf.PcapBase.PcapHandle == nil {
 		name := intf.IntfRef
-		debug.Logger.Debug("Creating new pcap for port:", intf.IntfRef)
 		intf.PcapBase.PcapHandle, err = pcap.OpenLive(name, NDP_PCAP_SNAPSHOTlEN, NDP_PCAP_PROMISCUOUS, NDP_PCAP_TIMEOUT)
 		if err != nil {
 			debug.Logger.Err("Creating Pcap Handler failed for interface:", name, "Error:", err)
@@ -270,7 +295,7 @@ func (intf *Interface) deletePcapUser() {
 func (intf *Interface) DeletePcap() {
 	if intf.PcapBase.PcapHandle == nil {
 		// create ip interface but state down will not have pcap handler created
-		debug.Logger.Debug("No pcap created and hence returning")
+		//debug.Logger.Debug("No pcap created or it might have been deleted during l2 port down returning early")
 		return
 	}
 	intf.deletePcapUser()
@@ -280,15 +305,14 @@ func (intf *Interface) DeletePcap() {
 		// once go routine is exited, delete pcap handler
 		if intf.PcapBase.PcapHandle != nil {
 			// Inform go routine spawned for intf to exit..
-			// @TODO: jgheewala: fix this after walmart
-			//intf.PcapBase.PcapCtrl <- true
-			//<-intf.PcapBase.PcapCtrl
 			intf.PcapBase.PcapHandle.Close()
 			intf.PcapBase.PcapHandle = nil
 		}
 		// deleted ctrl channel to avoid any memory usage
-		intf.PcapBase.PcapCtrl = nil
 		intf.PcapBase.PcapUsers = 0 // set to zero
+		// flushing the counter values after the pcap is deleted
+		intf.counter.Send = 0
+		intf.counter.Rcvd = 0
 	}
 }
 
@@ -309,10 +333,10 @@ func (intf *Interface) writePkt(pkt []byte) error {
 /*
  * Receive Ndp Packet and push it on the pktCh
  */
-func (intf *Interface) ReceiveNdpPkts(pktCh chan *RxPktInfo) {
+func (intf *Interface) ReceiveNdpPkts(pktCh chan *RxPktInfo) error {
 	if intf.PcapBase.PcapHandle == nil {
 		debug.Logger.Err("pcap handler for port:", intf.IntfRef, "is not valid. ABORT!!!!")
-		return
+		return errors.New(fmt.Sprintln("pcap handler for port:", intf.IntfRef, "is not valid. ABORT!!!!"))
 	}
 	src := gopacket.NewPacketSource(intf.PcapBase.PcapHandle, layers.LayerTypeEthernet)
 	in := src.Packets()
@@ -321,14 +345,13 @@ func (intf *Interface) ReceiveNdpPkts(pktCh chan *RxPktInfo) {
 		case pkt, ok := <-in:
 			if ok {
 				pktCh <- &RxPktInfo{pkt, intf.IfIndex}
+			} else {
+				debug.Logger.Debug("Pcap closed as in is invalid exiting go routine for port:", intf.IntfRef)
+				return nil
 			}
-		case <-intf.PcapBase.PcapCtrl:
-			debug.Logger.Debug("Pcap closed and hence exiting go routine for port:", intf.IntfRef)
-			intf.PcapBase.PcapCtrl <- true
-			return
 		}
 	}
-	return
+	return nil
 }
 
 /*
@@ -394,6 +417,8 @@ func (intf *Interface) ProcessND(ndInfo *packet.NDInfo) (*config.NeighborConfig,
 		return intf.processNA(ndInfo)
 	case layers.ICMPv6TypeRouterAdvertisement:
 		return intf.processRA(ndInfo)
+	case layers.ICMPv6TypeRouterSolicitation:
+		// @TODO: not supported
 	}
 
 	return nil, IGNORE
@@ -410,6 +435,56 @@ func (intf *Interface) SendND(pktData config.PacketData, mac string) NDP_OPERATI
 		// @TODO: implement this
 	case layers.ICMPv6TypeRouterAdvertisement:
 		intf.SendRA(mac)
+	case layers.ICMPv6TypeRouterSolicitation:
+		// @TODO: ignore router solicitation
 	}
 	return IGNORE
+}
+
+/*
+ *  Update timer values
+ */
+func (intf *Interface) UpdateTimer(gCfg NdpConfig) {
+	intf.reachableTime = gCfg.ReachableTime
+	intf.raRestransmitTime = gCfg.RaRestransmitTime
+	intf.retransTime = gCfg.RetransTime
+}
+
+/*
+ *  Get Neighbor Information
+ */
+func (intf *Interface) PopulateNeighborInfo(nbr NeighborInfo, nbrState *config.NeighborEntry) {
+	nbrState.IpAddr = nbr.IpAddr
+	nbrState.MacAddr = nbr.LinkLayerAddress
+	baseReachableTime := time.Duration(nbr.BaseReachableTimer) * time.Millisecond
+	elapsedTime := time.Since(nbr.pktRcvdTime)
+	expiryTime := baseReachableTime - elapsedTime
+	nbrState.ExpiryTimeLeft = expiryTime.String()
+	nbrState.ReceivedPackets = nbr.counter.Rcvd
+	nbrState.SendPackets = nbr.counter.Send
+	switch nbr.State {
+	case INCOMPLETE:
+		nbrState.State = "Incomplete"
+	case REACHABLE:
+		nbrState.State = "Reachable"
+	case STALE:
+		nbrState.State = "Stale"
+	case DELAY:
+		nbrState.State = "Stale"
+	case PROBE:
+		nbrState.State = "Stale"
+	}
+}
+
+/*
+ *   Interface validator for nbrKey generated
+ */
+func (intf *Interface) validNbrKey(nbrKey string) bool {
+	splitString := strings.Split(nbrKey, ":")
+	for _, value := range IPV6_MULTICAST_PREFIXES {
+		if strings.Contains(strings.ToLower(splitString[0]), value) {
+			return false
+		}
+	}
+	return true
 }

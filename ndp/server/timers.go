@@ -101,7 +101,7 @@ func (c *NeighborInfo) StopInvalidTimer() {
 func (c *NeighborInfo) DelayProbe() {
 	if c.DelayFirstProbeTimer != nil {
 		// we should never come here
-		debug.Logger.Debug("Resetting delay probe timer for ifIndex:", c.IfIndex, "nbrIp:", c.IpAddr)
+		debug.Logger.Debug("Resetting delay probe timer for ifIndex:", c.IfIndex, "nbrIp:", c.IpAddr, "to timer:", DELAY_FIRST_PROBE_TIME)
 		c.DelayFirstProbeTimer.Reset(time.Duration(DELAY_FIRST_PROBE_TIME) * time.Second)
 	} else {
 		var DelayProbeExpired_func func()
@@ -115,7 +115,7 @@ func (c *NeighborInfo) DelayProbe() {
 				IfIndex:     c.IfIndex,
 			}
 		}
-		debug.Logger.Debug("Setting Delay Probe timer for ifIndex:", c.IfIndex, "nbrIp:", c.IpAddr)
+		debug.Logger.Debug("Setting Delay Probe timer for ifIndex:", c.IfIndex, "nbrIp:", c.IpAddr, "to timer:", DELAY_FIRST_PROBE_TIME)
 		c.DelayFirstProbeTimer = time.AfterFunc(time.Duration(DELAY_FIRST_PROBE_TIME)*time.Second,
 			DelayProbeExpired_func)
 	}
@@ -127,7 +127,7 @@ func (c *NeighborInfo) DelayProbe() {
 func (c *NeighborInfo) Timer() {
 	// Reset the timer if it is already running when we receive Neighbor Advertisment..
 	if c.RetransTimer != nil {
-		debug.Logger.Debug("Resetting Re-Transmit timer for ifIndex:", c.IfIndex, "nbrIp:", c.IpAddr)
+		debug.Logger.Debug("Resetting Re-Transmit timer for ifIndex:", c.IfIndex, "nbrIp:", c.IpAddr, "to timer:", c.RetransTimerConfig)
 		c.RetransTimer.Reset(time.Duration(c.RetransTimerConfig) * time.Millisecond)
 	} else {
 		// start the time for the first... provide an after func and move on
@@ -142,7 +142,7 @@ func (c *NeighborInfo) Timer() {
 				IfIndex:     c.IfIndex,
 			}
 		}
-		debug.Logger.Debug("Setting Re-Transmit timer for ifIndex:", c.IfIndex, "nbrIp:", c.IpAddr)
+		debug.Logger.Debug("Setting Re-Transmit timer for ifIndex:", c.IfIndex, "nbrIp:", c.IpAddr, "to timer:", c.RetransTimerConfig)
 		c.RetransTimer = time.AfterFunc(time.Duration(c.RetransTimerConfig)*time.Millisecond,
 			ReTransmitNeighborSolicitation_func)
 	}
@@ -157,7 +157,7 @@ func (c *NeighborInfo) RchTimer() {
 	c.StopDelayProbeTimer()
 	c.StopReTransmitTimer()
 	if c.ReachableTimer != nil {
-		debug.Logger.Debug("Re-Setting Reachable Timer for neighbor:", c.IpAddr)
+		debug.Logger.Debug("Re-Setting Reachable Timer for neighbor:", c.IpAddr, "timer:", c.BaseReachableTimer)
 		//Reset the timer as we have received an advertisment for the neighbor
 		c.ReachableTimer.Reset(time.Duration(c.BaseReachableTimer) * time.Millisecond)
 	} else {
@@ -173,7 +173,7 @@ func (c *NeighborInfo) RchTimer() {
 				IfIndex:     c.IfIndex,
 			}
 		}
-		debug.Logger.Debug("Setting Reachable Timer for neighbor:", c.IpAddr)
+		debug.Logger.Debug("Setting Reachable Timer for neighbor:", c.IpAddr, "timer:", c.BaseReachableTimer)
 		c.ReachableTimer = time.AfterFunc(time.Duration(c.BaseReachableTimer)*time.Millisecond,
 			ReachableTimer_func)
 	}
@@ -211,6 +211,7 @@ func (intf *Interface) RAResTransmitTimer() {
 			intf.raTimer.Reset(time.Duration(MAX_INITIAL_RTR_ADVERT_INTERVAL) * time.Second)
 			intf.initialRASend++
 		} else {
+			debug.Logger.Debug("Re-Setting ra retransmit timer for intf:", intf.IntfRef, "to:", intf.raRestransmitTime)
 			intf.raTimer.Reset(time.Duration(intf.raRestransmitTime) * time.Second)
 		}
 	} else {
@@ -252,6 +253,7 @@ func (c *NeighborInfo) InValidTimer(lifetime uint16) {
  *	3) Update Probes Sent counter to 0
  */
 func (c *NeighborInfo) UpdateProbe() {
+	debug.Logger.Debug("UpdateProbe info by stopping delay probe timer & re-transmit timer")
 	c.StopDelayProbeTimer()
 	c.StopReTransmitTimer()
 	c.ProbesSent = uint8(0)

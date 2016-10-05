@@ -21,39 +21,22 @@
 // |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
 //
 
-// ribd_thrift_client.go
-package testutils
+package rpc
 
 import (
-	"fmt"
-	"git.apache.org/thrift.git/lib/go/thrift"
-	"ribd"
+	"bfdd"
+	"errors"
 )
 
-const (
-	IP   = "localhost"
-	PORT = "10002"
-)
-
-func GetRIBdClient() *ribd.RIBDServicesClient {
-	fmt.Println("Starting RIBd Thrift client for Testing")
-	var clientTransport thrift.TTransport
-
-	protocolFactory := thrift.NewTBinaryProtocolFactoryDefault()
-	transportFactory := thrift.NewTBufferedTransportFactory(8192)
-	clientTransport, err := thrift.NewTSocket(IP + ":" + PORT)
-	if err != nil {
-		fmt.Println("NewTSocket failed with error:", err)
-		return nil
+func (h *BFDHandler) ExecuteActionResetBfdSession(action *bfdd.ResetBfdSession) (bool, error) {
+	var err error
+	h.logger.Info("ResetBfdSession action attrs: ", action)
+	sessionId, found := h.server.FindBfdSession(action.IpAddr)
+	if found {
+		h.server.ResetSessionCh <- sessionId
+		return true, nil
+	} else {
+		err = errors.New("Failed to find session to " + action.IpAddr)
 	}
-
-	clientTransport = transportFactory.GetTransport(clientTransport)
-	if err = clientTransport.Open(); err != nil {
-		fmt.Println("Failed to open the socket, error:", err)
-	}
-
-	fmt.Println("### Calling client ", clientTransport, protocolFactory, err)
-	client := ribd.NewRIBDServicesClientFactory(clientTransport, protocolFactory)
-	fmt.Println("got client")
-	return client
+	return false, err
 }

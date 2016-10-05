@@ -121,7 +121,7 @@ func TestCreateRIBdSubscriber(t *testing.T) {
 func TestNewNormalBfdSession(t *testing.T) {
 	bfdTestServer.createDefaultSessionParam()
 	fmt.Println("Creating BFD session to 10.1.1.1")
-	bfdTestSession = bfdTestServer.NewNormalBfdSession("", "10.1.1.1", "default", false, 2)
+	bfdTestSession = bfdTestServer.NewNormalBfdSession("", "", "10.1.1.1", "default", false, 2)
 	if bfdTestSession != nil {
 		t.Log("Created BFD session to ", bfdTestSession.state.IpAddr, " session id ", bfdTestSession.state.SessionId)
 		if bfdTestSession.state.SessionState != STATE_DOWN {

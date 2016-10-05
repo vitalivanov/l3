@@ -108,6 +108,10 @@ func AddMPReachNLRIToPathAttrs(pathAttrs []BGPPathAttr, mpReach *BGPPathAttrMPRe
 	return AddPathAttrToPathAttrs(pathAttrs, BGPPathAttrTypeMPReachNLRI, mpReach)
 }
 
+func AddMPUnreachNLRIToPathAttrs(pathAttrs []BGPPathAttr, mpUnreach *BGPPathAttrMPUnreachNLRI) []BGPPathAttr {
+	return AddPathAttrToPathAttrs(pathAttrs, BGPPathAttrTypeMPUnreachNLRI, mpUnreach)
+}
+
 func addPathAttr(updateMsg *BGPMessage, code BGPPathAttrType, attr BGPPathAttr) {
 	body := updateMsg.Body.(*BGPUpdate)
 	body.PathAttributes = AddPathAttrToPathAttrs(body.PathAttributes, code, attr)
@@ -518,6 +522,15 @@ func CopyPathAttrs(pathAttrs []BGPPathAttr) []BGPPathAttr {
 	newPathAttrs := make([]BGPPathAttr, len(pathAttrs))
 	copy(newPathAttrs, pathAttrs)
 	return newPathAttrs
+}
+
+func ConstructNLRIFromPathIdAndNLRI(nlri NLRI, pathId uint32) NLRI {
+	newNLRI := nlri.Clone()
+	if extNLRI, ok := newNLRI.(*ExtNLRI); ok {
+		extNLRI.PathId = pathId
+	}
+
+	return newNLRI
 }
 
 func ConstructIPPrefix(ipStr string, maskStr string) *IPPrefix {

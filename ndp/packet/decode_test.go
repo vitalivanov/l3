@@ -23,13 +23,6 @@
 package packet
 
 import (
-	/*
-		"fmt"
-		"infra/sysd/sysdCommonDefs"
-		"l3/ndp/config"
-		"log/syslog"
-		"utils/logging"
-	*/
 	"encoding/binary"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"

@@ -43,6 +43,7 @@ type AdjRIBRoute struct {
 	PathMap          map[uint32]*Path
 	PolicyList       []string
 	PolicyHitCounter int
+	Accept           bool
 }
 
 func NewAdjRIBRoute(neighbor net.IP, protoFamily uint32, nlri packet.NLRI) *AdjRIBRoute {
@@ -53,6 +54,7 @@ func NewAdjRIBRoute(neighbor net.IP, protoFamily uint32, nlri packet.NLRI) *AdjR
 		PathMap:          make(map[uint32]*Path),
 		PolicyList:       make([]string, 0),
 		PolicyHitCounter: 0,
+		Accept:           false,
 	}
 }
 
@@ -79,4 +81,18 @@ func (a *AdjRIBRoute) GetPathMap() map[uint32]*Path {
 func (a *AdjRIBRoute) RemoveAllPaths() {
 	a.PathMap = nil
 	a.PathMap = make(map[uint32]*Path)
+}
+
+type FilteredRoutes struct {
+	Add    []packet.NLRI
+	Remove []packet.NLRI
+}
+
+func NewFilteredRoutes() *FilteredRoutes {
+	f := FilteredRoutes{
+		Add:    make([]packet.NLRI, 0),
+		Remove: make([]packet.NLRI, 0),
+	}
+
+	return &f
 }

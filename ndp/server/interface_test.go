@@ -23,6 +23,8 @@
 package server
 
 import (
+	"github.com/google/gopacket/layers"
+	"l3/ndp/packet"
 	"testing"
 )
 
@@ -67,4 +69,86 @@ func TestAddIp(t *testing.T) {
 		return
 	}
 	testIntf = nil
+}
+
+func validateTimerUpdate(t *testing.T, gCfg NdpConfig, intf Interface) {
+	if intf.reachableTime != gCfg.ReachableTime {
+		t.Error("Failure in updating reachableTime")
+		return
+	}
+
+	if intf.retransTime != gCfg.RetransTime {
+		t.Error("Failure in updating retransmit timer")
+		return
+	}
+
+	if intf.raRestransmitTime != gCfg.RaRestransmitTime {
+		t.Error("Failure in updating router advertisement timer")
+		return
+	}
+}
+
+func TestTimerUpdate(t *testing.T) {
+	intf := Interface{}
+	if intf.retransTime != 0 || intf.raRestransmitTime != 0 || intf.reachableTime != 0 {
+		t.Error("Initializing interface object failed")
+		return
+	}
+	gCfg := NdpConfig{"default", 200, 100, 245}
+	intf.UpdateTimer(gCfg)
+	validateTimerUpdate(t, gCfg, intf)
+}
+
+func TestInvalidReceiveNdpPkt(t *testing.T) {
+	intf := Interface{}
+	err := intf.ReceiveNdpPkts(nil)
+	if err == nil {
+		t.Error("no pcap handler and starting rx for ndp packet should fail")
+		return
+	}
+}
+
+func TestDeleteOneIntf(t *testing.T) {
+	TestIPv6IntfCreate(t)
+	teststateUpHelperFunc(t)
+	l3Port, exists := testNdpServer.L3Port[testIfIndex]
+	if !exists {
+		t.Error("Failed to get L3 Port for ifIndex:", testIfIndex)
+		return
+	}
+	l3Port.DeleteIntf(testMyGSIp)
+	if l3Port.PcapBase.PcapUsers != 1 {
+		t.Error("Failed Deleting Interface")
+		return
+	}
+}
+
+func TestNotSupportedProcessND(t *testing.T) {
+	ndInfo := packet.NDInfo{}
+	ndInfo.PktType = layers.ICMPv6TypeRouterSolicitation
+	initTestInterface()
+	nbrInfo, oper := testIntf.ProcessND(&ndInfo)
+	if nbrInfo != nil {
+		t.Error("Router ICMPv6TypeRouterSolicitation is not supported and hence no neigbor should be created")
+		return
+	}
+	if oper != IGNORE {
+		t.Error("ICMPv6TypeRouterSolicitation should is not supported and hence we should ignore processing RS")
+		return
+	}
+}
+
+func TestNbrKeyValidation(t *testing.T) {
+	initTestInterface()
+	keyList := []string{"fe80::8a1d:fcff:fecf:15fc_88:1d:fc:cf:15:fc", "ff02::1_88:1d:fc:cf:15:fc", "ff02::1_3000::1",
+		"FF02::1_88:1d:fc:cf:15:fc", "FF01::2_88:1d:fc:cf:15:fc", "ff02::1:ff0e:4c67_88:1d:fc:cf:15:fc",
+		"ff02::1:fff5:0_33:33:ff:f5:00:00", "3000::b9_88:1d:fc:cf:15:fc", "fe80::c837:abff:fe7c:ca34_88:1d:fc:cf:15:fc",
+	}
+	expectedOutput := []bool{true, false, false, false, false, false, false, true, true}
+	for idx, key := range keyList {
+		if testIntf.validNbrKey(key) != expectedOutput[idx] {
+			t.Error("Failure in validating key:", key, "output should be", expectedOutput[idx])
+			return
+		}
+	}
 }

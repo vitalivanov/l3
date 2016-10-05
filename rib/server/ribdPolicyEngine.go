@@ -393,7 +393,9 @@ func policyEngineActionUndoSetAdminDistance(actionItem interface{}, conditionsLi
 	logger.Info("Setting configured distance of prototype ", conditionProtocol, " to value ", 0, " default distance of this protocol is ", routeDistanceConfig.defaultDistance)
 	policyEngineTraverseAndUpdate()
 }
-func policyEngineActionSetAdminDistance(actionItem interface{}, conditionList []interface{}, params interface{}) {
+
+func policyEngineActionSetAdminDistance(actionItem interface{}, conditionList []interface{}, params interface{},
+	policyStmt policy.PolicyStmt) {
 	logger.Info("policyEngipolicyEngineActionSetAdminDistance")
 	actionInfo := actionItem.(int)
 	logger.Info("PoilcyActionTypeSetAdminDistance action to be applied")
@@ -420,7 +422,9 @@ func policyEngineActionSetAdminDistance(actionItem interface{}, conditionList []
 	policyEngineTraverseAndUpdate()
 	return
 }
-func policyEngineRouteDispositionAction(action interface{}, conditionInfo []interface{}, params interface{}) {
+
+func policyEngineRouteDispositionAction(action interface{}, conditionInfo []interface{}, params interface{},
+	policyStmt policy.PolicyStmt) {
 	logger.Info("policyEngineRouteDispositionAction")
 	if action.(string) == "Reject" {
 		logger.Info("Reject action")
@@ -429,15 +433,20 @@ func policyEngineRouteDispositionAction(action interface{}, conditionInfo []inte
 		policyEngineActionAcceptRoute(params)
 	}
 }
-func defaultImportPolicyEngineActionFunc(actionInfo interface{}, conditionInfo []interface{}, params interface{}) {
+
+func defaultImportPolicyEngineActionFunc(actionInfo interface{}, conditionInfo []interface{}, params interface{},
+	policyStmt policy.PolicyStmt) {
 	logger.Info("defaultImportPolicyEngineAction")
 	policyEngineActionAcceptRoute(params)
 }
 
-func defaultExportPolicyEngineActionFunc(actionInfo interface{}, conditionInfo []interface{}, params interface{}) {
+func defaultExportPolicyEngineActionFunc(actionInfo interface{}, conditionInfo []interface{}, params interface{},
+	policyStmt policy.PolicyStmt) {
 	logger.Info("defaultExportPolicyEngineActionFunc")
 }
-func policyEngineActionNetworkStatementAdvertise(actionInfo interface{}, conditionInfo []interface{}, params interface{}) {
+
+func policyEngineActionNetworkStatementAdvertise(actionInfo interface{}, conditionInfo []interface{}, params interface{},
+	policyStmt policy.PolicyStmt) {
 	logger.Info("policyEngineActionNetworkStatementAdvertise")
 	var route ribdInt.Routes
 	networkStatementAdvertiseTargetProtocol := actionInfo.(string)
@@ -469,7 +478,9 @@ func policyEngineActionNetworkStatementAdvertise(actionInfo interface{}, conditi
 	}
 	UpdateRedistributeTargetMap(evt, networkStatementAdvertiseTargetProtocol, route)
 }
-func policyEngineActionRedistribute(actionInfo interface{}, conditionInfo []interface{}, params interface{}) {
+
+func policyEngineActionRedistribute(actionInfo interface{}, conditionInfo []interface{}, params interface{},
+	policyStmt policy.PolicyStmt) {
 	logger.Info("policyEngineActionRedistribute")
 	var route ribdInt.Routes
 	redistributeActionInfo := actionInfo.(policy.RedistributeActionInfo)
@@ -641,8 +652,8 @@ func policyEngineApplyForRoute(prefix patriciaDB.Prefix, item patriciaDB.Item, t
 	}
 	for i := 0; i < len(selectedRouteList); i++ {
 		selectedRouteInfoRecord := selectedRouteList[i]
-		if destNetSlice[selectedRouteInfoRecord.sliceIdx].isValid == false {
-			logger.Debug("route ", selectedRouteInfoRecord, " not valid, continue")
+		if selectedRouteInfoRecord.sliceIdx == -1 || selectedRouteInfoRecord.sliceIdx >= len(destNetSlice) || destNetSlice[selectedRouteInfoRecord.sliceIdx].isValid == false {
+			logger.Info("route ", selectedRouteInfoRecord, " not valid, continue, sliceIdx:", selectedRouteInfoRecord.sliceIdx, " len(destNetSlice):", len(destNetSlice))
 			continue
 		}
 		policyRoute := ribdInt.Routes{Ipaddr: selectedRouteInfoRecord.destNetIp.String(), Mask: selectedRouteInfoRecord.networkMask.String(), NextHopIp: selectedRouteInfoRecord.nextHopIp.String(), IfIndex: ribdInt.Int(selectedRouteInfoRecord.nextHopIfIndex), Metric: ribdInt.Int(selectedRouteInfoRecord.metric), Prototype: ribdInt.Int(selectedRouteInfoRecord.protocol), IsPolicyBasedStateValid: rmapInfoRecordList.isPolicyBasedStateValid}
@@ -667,8 +678,9 @@ func policyEngineTraverseAndApply(data interface{}, updatefunc policy.PolicyAppl
 	V6RouteInfoMap.VisitAndUpdate(policyEngineApplyForRoute, traverseAndApplyPolicyData)
 }
 func policyEngineTraverseAndReverse(applyPolicyItem interface{}) {
-	applyPolicyInfo := applyPolicyItem.(policy.ApplyPolicyInfo)
-	policy := applyPolicyInfo.ApplyPolicy //policyItem.(policy.Policy)
+	updateInfo := applyPolicyItem.(policy.PolicyEngineApplyInfo)
+	applyPolicyInfo := updateInfo.ApplyPolicy //.(policy.ApplyPolicyInfo)
+	policy := applyPolicyInfo.ApplyPolicy     //policyItem.(policy.Policy)
 	logger.Info("PolicyEngineTraverseAndReverse - traverse routing table and inverse policy actions", policy.Name)
 	ext := policy.Extensions.(PolicyExtensions)
 	if ext.routeList == nil {
@@ -691,7 +703,7 @@ func policyEngineTraverseAndReverse(applyPolicyItem interface{}) {
 			return
 		}
 		//PolicyEngineDB.PolicyEngineUndoPolicyForEntity(entity, policy, params)
-		success := PolicyEngineDB.PolicyEngineUndoApplyPolicyForEntity(entity, applyPolicyInfo, params)
+		success := PolicyEngineDB.PolicyEngineUndoApplyPolicyForEntity(entity, updateInfo, params)
 		if success {
 			deleteRoutePolicyState(params.ipType, ipPrefix, policy.Name)
 			PolicyEngineDB.DeletePolicyEntityMapEntry(entity, policy.Name)

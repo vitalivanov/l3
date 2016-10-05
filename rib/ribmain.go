@@ -43,7 +43,7 @@ import (
 //var cpuprofile = flag.String("cpuprofile", "cpu.prof", "write cpu profile to file")
 //var cpuprofile = "cpu.prof"
 func SigHandler(logger *logging.Writer, dbHdl *dbutils.DBUtil, routeServer *server.RIBDServer) {
-	logger.Debug("Inside sigHandler....")
+	logger.Info("Inside sigHandler....")
 	sigChan := make(chan os.Signal, 1)
 	signalList := []os.Signal{syscall.SIGHUP}
 	signal.Notify(sigChan, signalList...)
@@ -51,10 +51,10 @@ func SigHandler(logger *logging.Writer, dbHdl *dbutils.DBUtil, routeServer *serv
 	signal := <-sigChan
 	switch signal {
 	case syscall.SIGHUP:
-		logger.Debug("Received SIGHUP signal")
+		logger.Info("Received SIGHUP signal")
 		routeServer.StopServer()
 		if dbHdl != nil {
-			logger.Debug("Closing DB handler")
+			logger.Info("Closing DB handler")
 			dbHdl.Disconnect()
 		}
 		os.Exit(0)

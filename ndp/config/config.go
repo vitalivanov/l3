@@ -65,15 +65,42 @@ type IPIntfNotification struct {
 	Operation string
 }
 
+type GlobalState struct {
+	Vrf                         string
+	RetransmitInterval          int32
+	ReachableTime               int32
+	RouterAdvertisementInterval int32
+	Neighbors                   int32
+	TotalTxPackets              int64
+	TotalRxPackets              int64
+}
+
 type NeighborConfig struct {
-	MacAddr        string
-	VlanId         int32
-	IfIndex        int32
-	Intf           string
-	IpAddr         string
-	LinkLocalIp    string
-	ExpiryTimeLeft string
-	State          int
+	MacAddr     string
+	VlanId      int32
+	IfIndex     int32
+	Intf        string
+	IpAddr      string
+	LinkLocalIp string
+}
+
+type NeighborEntry struct {
+	IpAddr          string
+	MacAddr         string
+	ExpiryTimeLeft  string
+	SendPackets     int64
+	ReceivedPackets int64
+	State           string
+}
+
+type InterfaceEntries struct {
+	IntfRef         string
+	IfIndex         int32
+	LinkScopeIp     string
+	GlobalScopeIp   string
+	SendPackets     int64
+	ReceivedPackets int64
+	Neighbor        []NeighborEntry
 }
 
 type VlanInfo struct {

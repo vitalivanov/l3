@@ -23,14 +23,13 @@
 package server
 
 import (
-	"fmt"
 	"l3/ndp/config"
 	"l3/ndp/debug"
 	"l3/ndp/packet"
 	"l3/ndp/publisher"
-	_ "models/objects"
 	"os"
 	"os/signal"
+	"runtime/pprof"
 	"sync"
 	"syscall"
 	"time"
@@ -42,6 +41,11 @@ func NDPNewServer(sPlugin asicdClient.AsicdClientIntf, dmnBase *dmnBase.FSBaseDm
 	svr := &NDPServer{}
 	svr.SwitchPlugin = sPlugin
 	svr.dmnBase = dmnBase
+	// Profiling code for lldp
+	prof, err := os.Create(NDP_CPU_PROFILE_FILE)
+	if err == nil {
+		pprof.StartCPUProfile(prof)
+	}
 	return svr
 }
 
@@ -53,16 +57,13 @@ func (svr *NDPServer) SignalHandler(sigChannel <-chan os.Signal) {
 	signal := <-sigChannel
 	switch signal {
 	case syscall.SIGHUP:
-		//svr.lldpExit <- true
 		debug.Logger.Alert("Received SIGHUP Signal")
-		//svr.CloseAllPktHandlers()
 		svr.DeInitGlobalDS()
-		//svr.CloseDB()
-		//pprof.StopCPUProfile()
+		pprof.StopCPUProfile()
 		debug.Logger.Alert("Exiting!!!!!")
 		os.Exit(0)
 	default:
-		debug.Logger.Info(fmt.Sprintln("Unhandled Signal:", signal))
+		debug.Logger.Info("Unhandled Signal:", signal)
 	}
 }
 
@@ -82,13 +83,14 @@ func (svr *NDPServer) InitGlobalDS() {
 	svr.VlanInfo = make(map[int32]config.VlanInfo, NDP_SERVER_MAP_INITIAL_CAP)
 	svr.VlanIfIdxVlanIdMap = make(map[int32]int32, NDP_SERVER_MAP_INITIAL_CAP)
 	svr.NeighborInfo = make(map[string]config.NeighborConfig, NDP_SERVER_MAP_INITIAL_CAP)
+	svr.L3IfIntfRefToIfIndex = make(map[string]int32, NDP_SERVER_MAP_INITIAL_CAP)
 	svr.PhyPortStateCh = make(chan *config.PortState, NDP_SERVER_ASICD_NOTIFICATION_CH_SIZE)
 	svr.IpIntfCh = make(chan *config.IPIntfNotification, NDP_SERVER_ASICD_NOTIFICATION_CH_SIZE)
 	svr.VlanCh = make(chan *config.VlanNotification)
-	svr.RxPktCh = make(chan *RxPktInfo, 30)
-	svr.PktDataCh = make(chan config.PacketData, 30)
+	svr.RxPktCh = make(chan *RxPktInfo, NDP_SERVER_INITIAL_CHANNEL_SIZE)
+	svr.PktDataCh = make(chan config.PacketData, NDP_SERVER_INITIAL_CHANNEL_SIZE)
 	svr.SnapShotLen = 1024
-	svr.Promiscuous = true
+	svr.Promiscuous = false
 	svr.Timeout = 1 * time.Second
 	svr.NeigborEntryLock = &sync.RWMutex{}
 	svr.Packet = packet.Init()
@@ -134,6 +136,13 @@ func (svr *NDPServer) InitSystem() {
 	}
 }
 
+func (svr *NDPServer) UpdateInterfaceTimers() {
+	for key, intf := range svr.L3Port {
+		intf.UpdateTimer(svr.NdpConfig)
+		svr.L3Port[key] = intf
+	}
+}
+
 func (svr *NDPServer) EventsListener() {
 	for {
 		select {
@@ -150,24 +159,26 @@ func (svr *NDPServer) EventsListener() {
 			if !ok {
 				continue
 			}
+			svr.counter.Rcvd++
 			svr.ProcessRxPkt(rxChInfo.ifIndex, rxChInfo.pkt)
 		case pktData, ok := <-svr.PktDataCh:
 			if !ok {
 				continue
 			}
 			svr.ProcessTimerExpiry(pktData)
-
 		case vlanInfo, ok := <-svr.VlanCh:
 			if !ok {
 				continue
 			}
 			debug.Logger.Debug("Need to support vlan Notifications:", vlanInfo)
-
 		case globalCfg, ok := <-svr.GlobalCfg:
 			if !ok {
 				continue
 			}
-			svr.NdpConfig.Create(globalCfg)
+			update := svr.NdpConfig.Create(globalCfg)
+			if update {
+				svr.UpdateInterfaceTimers()
+			}
 		}
 	}
 }

@@ -27,7 +27,6 @@ package policy
 import (
 	bgprib "l3/bgp/rib"
 	"l3/bgp/utils"
-	"strconv"
 	"utils/patriciaDB"
 	utilspolicy "utils/policy"
 )
@@ -52,19 +51,19 @@ func (eng *AdjRibPPolicyEngine) AdjRIBDeleteRoutePolicyState(route *bgprib.AdjRI
 }
 
 func deleteAdjRIBRoutePolicyStateAll(route *bgprib.AdjRIBRoute) {
-	utils.Logger.Info("deleteRoutePolicyStateAll")
+	utils.Logger.Debug("deleteAdjRIBRoutePolicyStateAll")
 	route.PolicyList = nil
 	return
 }
 
 func addAdjRIBRoutePolicyState(route *bgprib.AdjRIBRoute, policy string, policyStmt string) {
-	utils.Logger.Info("addRoutePolicyState")
+	utils.Logger.Debug("addAdjRIBRoutePolicyState")
 	route.PolicyList = append(route.PolicyList, policy)
 	return
 }
 
 func UpdateAdjRIBRoutePolicyState(route *bgprib.AdjRIBRoute, op int, policy string, policyStmt string) {
-	utils.Logger.Info("updateRoutePolicyState")
+	utils.Logger.Debug("UpdateAdjRIBRoutePolicyState - op=%d", op)
 	if op == DelAll {
 		deleteAdjRIBRoutePolicyStateAll(route)
 		//deletePolicyRouteMapEntry(route, policy)
@@ -74,9 +73,9 @@ func UpdateAdjRIBRoutePolicyState(route *bgprib.AdjRIBRoute, op int, policy stri
 }
 
 func (eng *AdjRibPPolicyEngine) addAdjRIBPolicyRouteMap(route *bgprib.AdjRIBRoute, policy string) {
-	utils.Logger.Info("addAdjRIBPolicyRouteMap")
+	utils.Logger.Debugf("addAdjRIBPolicyRouteMap - route=%+v, policy=%s", route, policy)
 	var newRoute string
-	newRoute = route.NLRI.GetPrefix().String() + "/" + strconv.Itoa(int(route.NLRI.GetLength()))
+	newRoute = route.NLRI.GetCIDR()
 	ipPrefix, err := GetNetworkPrefixFromCIDR(newRoute)
 	if err != nil {
 		utils.Logger.Info("Invalid ip prefix")
@@ -108,8 +107,7 @@ func (eng *AdjRibPPolicyEngine) addAdjRIBPolicyRouteMap(route *bgprib.AdjRIBRout
 	found = false
 	utils.Logger.Info("routeInfoList details")
 	for i := 0; i < len(policyExtensions.RouteInfoList); i++ {
-		utils.Logger.Info("IP: ", policyExtensions.RouteInfoList[i].NLRI.GetPrefix().String(), "/",
-			policyExtensions.RouteInfoList[i].NLRI.GetLength(), " neighbor: ",
+		utils.Logger.Info("IP: ", policyExtensions.RouteInfoList[i].NLRI.GetCIDR(), " neighbor: ",
 			policyExtensions.RouteInfoList[i].Neighbor)
 		if policyExtensions.RouteInfoList[i].NLRI.GetPrefix().String() == route.NLRI.GetPrefix().String() &&
 			policyExtensions.RouteInfoList[i].NLRI.GetLength() == route.NLRI.GetLength() &&
@@ -129,7 +127,7 @@ func deleteAdjRIBPolicyRouteMap(route *bgprib.AdjRIBRoute, policy string) {
 }
 
 func (eng *AdjRibPPolicyEngine) UpdateAdjRIBPolicyRouteMap(route *bgprib.AdjRIBRoute, policy string, op int) {
-	utils.Logger.Info("updatePolicyRouteMap")
+	utils.Logger.Debugf("UpdateAdjRIBPolicyRouteMap - op=%d", op)
 	if op == Add {
 		eng.addAdjRIBPolicyRouteMap(route, policy)
 	} else if op == Del {

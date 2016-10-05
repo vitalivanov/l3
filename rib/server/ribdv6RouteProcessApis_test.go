@@ -75,10 +75,10 @@ func TestProcessV6RouteCreateConfig(t *testing.T) {
 			fmt.Println("Validation failed for route:", ipv6RouteList[0], " with error:", val_err)
 			continue
 		}
-		val, err := server.ProcessV6RouteCreateConfig(v6route, FIBAndRIB)
+		val, err := server.ProcessV6RouteCreateConfig(v6route, FIBAndRIB, ribd.Int(len(destNetSlice)))
 		fmt.Println("val = ", val, " err: ", err, " for route:", v6route)
 	}
-	val, err := server.ProcessV6RouteCreateConfig(ipv6RouteList[0], FIBAndRIB)
+	val, err := server.ProcessV6RouteCreateConfig(ipv6RouteList[0], FIBAndRIB, ribd.Int(len(destNetSlice)))
 	fmt.Println("val = ", val, " err: ", err, " for route:", ipv6RouteList[0])
 	TestGetRouteReachability(t)
 	TestResolveNextHop(t)
@@ -90,7 +90,7 @@ func TestProcessv6RoutePatchUpdateConfig(t *testing.T) {
 	fmt.Println("****TestProcessv6RoutePatchUpdateConfig****")
 	for _, v6Route := range ipv6RouteList {
 		for _, op := range patchOpList {
-			fmt.Println("Applying patch:", op, " to route:", v6Route)
+			//	fmt.Println("Applying patch:", op, " to route:", v6Route)
 			testRoute := *v6Route
 			val_err := server.IPv6RouteConfigValidationCheckForPatchUpdate(&testRoute, &testRoute, []*ribd.PatchOpInfo{op})
 			if val_err != nil {

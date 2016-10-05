@@ -25,9 +25,11 @@ package api
 import (
 	"fmt"
 	"infra/sysd/sysdCommonDefs"
+	"l3/ndp/config"
 	"l3/ndp/debug"
 	"l3/ndp/server"
 	"log/syslog"
+	"reflect"
 	"testing"
 	"time"
 	asicdmock "utils/asicdClient/mock"
@@ -60,7 +62,6 @@ func NDPTestNewLogger(name string, tag string, listenToConfig bool) (*logging.Wr
 		return srLogger, err
 	}
 
-	srLogger.GlobalLogging = true
 	srLogger.MyLogLevel = sysdCommonDefs.INFO
 	return srLogger, err
 }
@@ -113,4 +114,52 @@ func TestGetNeighborEntry(t *testing.T) {
 func TestVlanNotification(t *testing.T) {
 	TestApiInit(t)
 	SendVlanNotification(testApiState, testVlanId, testVlanName, make([]int32, 0))
+}
+
+func TestNdpGlobalConfigState(t *testing.T) {
+	TestApiInit(t)
+	raTime := uint8(5)
+	reachableTime := uint32(30000)
+	retransmit := uint32(1)
+	vrf := "default"
+	rv, err := CreateGlobalConfig("", retransmit, reachableTime, raTime)
+	if err == nil {
+		t.Error("Create Global NDP Config should fail for \"\" as vrf")
+		return
+	}
+	if rv == true {
+		t.Error("Create Global NDP Config should fail for \"\" as vrf")
+		return
+	}
+	rv, err = CreateGlobalConfig(vrf, retransmit, reachableTime, raTime)
+	if err != nil {
+		t.Error("Create Global NDP Config should not fail for vrf:", vrf)
+		return
+	}
+	if rv != true {
+		t.Error("Create Global NDP Config should not fail for vrf:", vrf)
+		return
+	}
+
+	rv, err = UpdateGlobalConfig(vrf, retransmit, reachableTime, raTime)
+	if err != nil {
+		t.Error("Update Global NDP Config should not fail for vrf:", vrf)
+		return
+	}
+	if rv != true {
+		t.Error("Update Global NDP Config should not fail for vrf:", vrf)
+		return
+	}
+
+	result, _ := GetNDPGlobalState(vrf)
+	if result == nil {
+		t.Error("Get Ndp Global State failed for vrf:", vrf)
+		return
+	}
+	//t.Log(*result)
+	wantGblState := &config.GlobalState{vrf, int32(retransmit), int32(reachableTime), int32(raTime), 0, 0, 0}
+	if !reflect.DeepEqual(result, wantGblState) {
+		t.Error("Failure in getting ndp global state, want:", *wantGblState, "got:", *result)
+		return
+	}
 }

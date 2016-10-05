@@ -16,21 +16,28 @@ func main() {
 	}
 
 	routeThriftTest.Createv4RouteList()
+	routeThriftTest.Createv6RouteList()
 
 	route_ops := os.Args[1:]
-
+	fmt.Println("op:", route_ops)
 	for i := 0; i < len(route_ops); i++ {
 		op := route_ops[i]
 		switch op {
 		case "createv4":
 			fmt.Println("Create v4 route test")
 			routeThriftTest.Createv4Routes(ribdClient)
+		case "createv6":
+			fmt.Println("Create v6 route test")
+			routeThriftTest.Createv6Routes(ribdClient)
 		case "verify":
 			fmt.Println("Verify reachability info")
 			routeThriftTest.CheckRouteReachability(ribdClient)
 		case "deletev4":
 			fmt.Println("Delete v4 route test")
 			routeThriftTest.Deletev4Routes(ribdClient)
+		case "deletev6":
+			fmt.Println("Delete v6 route test")
+			routeThriftTest.Deletev6Routes(ribdClient)
 		case "scale":
 			if (i + 1) == len(route_ops) {
 				fmt.Println("Incorrect usage: should be ./main scale <number>")

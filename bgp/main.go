@@ -58,13 +58,15 @@ func BGPSignalHandler(sigChannel <-chan os.Signal, dbHdl *dbutils.DBUtil) {
 	signal := <-sigChannel
 	switch signal {
 	case syscall.SIGHUP:
-		dbHdl.DeleteObjectWithKeyFromDb("BGPRouteState*")
+		dbHdl.DeleteObjectWithKeyFromDb("BGPv4RouteState*")
+		dbHdl.DeleteObjectWithKeyFromDb("BGPv6RouteState*")
 		dbHdl.Disconnect()
 		os.Exit(0)
 	default:
 		os.Exit(0)
 	}
 }
+
 func main() {
 	//	defer profile.Start(profile.CPUProfile).Stop()
 	fmt.Println("Starting bgp daemon")
