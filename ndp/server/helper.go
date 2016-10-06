@@ -237,32 +237,6 @@ func (svr *NDPServer) HandleIPIntfCreateDelete(obj *config.IPIntfNotification) {
 func (svr *NDPServer) HandlePhyPortStateNotification(msg *config.PortState) {
 	debug.Logger.Info("Handling L2 Port State:", msg.IfState, "for ifIndex:", msg.IfIndex)
 	svr.updateL2Operstate(msg.IfIndex, msg.IfState)
-	/*
-		l3Port, exists := svr.findL3Port(msg.IfIndex)
-		if !exists {
-			debug.Logger.Debug("Physical Port for ifIndex:", msg.IfIndex,
-				"is not l3 port and ignoring port state notification")
-			return
-		}
-	*/
-	// search this ifIndex in l3 map to get the ifIndex -> ipAddr map
-	/*
-		switch msg.IfState {
-		case config.STATE_UP:
-			// if the port state is up, then we need to start RX/TX only for global scope ip address,
-			// if it is not started
-			//debug.Logger.Info("Create pkt handler for", msg.IfIndex, "GS:", l3Port.IpAddr, "LS:", l3Port.LinkLocalIp)
-			//svr.StartRxTx(msg.IfIndex)
-			svr.updateL2Operstate(msg.IfIndex, config.STATE_UP)
-
-		case config.STATE_DOWN:
-			// if the port state is down, then we need to delete all the neighbors for that ifIndex...which
-			// includes deleting neighbor from link local ip address also
-			//debug.Logger.Info("Stop receiving frames for", l3Port.IntfRef)
-			svr.updateL2Operstate(msg.IfIndex, config.STATE_DOWN)
-			//svr.StopRxTx(msg.IfIndex, "ALL")
-		}
-	*/
 }
 
 /*  API: will handle Vlan Create/Delete/Update notifications received from switch/asicd

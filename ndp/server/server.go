@@ -86,7 +86,6 @@ func (svr *NDPServer) InitGlobalDS() {
 	svr.NeighborInfo = make(map[string]config.NeighborConfig, NDP_SERVER_MAP_INITIAL_CAP)
 	svr.L3IfIntfRefToIfIndex = make(map[string]int32, NDP_SERVER_MAP_INITIAL_CAP)
 	svr.PhyPortToL3PortMap = make(map[int32]int32)
-	svr.PhyPortStateCh = make(chan *config.PortState, NDP_SERVER_ASICD_NOTIFICATION_CH_SIZE)
 	svr.IpIntfCh = make(chan *config.IPIntfNotification, NDP_SERVER_ASICD_NOTIFICATION_CH_SIZE)
 	svr.VlanCh = make(chan *config.VlanNotification)
 	svr.RxPktCh = make(chan *RxPktInfo, NDP_SERVER_INITIAL_CHANNEL_SIZE)
@@ -107,10 +106,8 @@ func (svr *NDPServer) InitGlobalDS() {
 }
 
 func (svr *NDPServer) DeInitGlobalDS() {
-	//svr.PhyPort = nil
 	svr.L2Port = nil
 	svr.L3Port = nil
-	svr.PhyPortStateCh = nil
 	svr.IpIntfCh = nil
 	svr.VlanCh = nil
 	svr.RxPktCh = nil
@@ -158,10 +155,6 @@ func (svr *NDPServer) EventsListener() {
 			if update {
 				svr.UpdateInterfaceTimers()
 			}
-		// physical or l2 port state up/down notification channel
-		//case phyPortStateCh := <-svr.PhyPortStateCh:
-		//	svr.HandlePhyPortStateNotification(phyPortStateCh)
-		// vlan create/delete/update notification channel
 		case vlanInfo, ok := <-svr.VlanCh:
 			if !ok {
 				continue

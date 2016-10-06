@@ -73,8 +73,6 @@ type NDPServer struct {
 	// it's better to use lock
 	NeigborEntryLock *sync.RWMutex
 
-	// Physical Port/ L2 Port State Notification
-	PhyPortStateCh chan *config.PortState
 	//IPV6 Create/Delete State Up/Down Notification Channel
 	IpIntfCh chan *config.IPIntfNotification
 	// Vlan Create/Delete/Update Notification Channel

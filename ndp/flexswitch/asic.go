@@ -107,12 +107,10 @@ func (notifyHdl *AsicNotificationHdl) ProcessNotification(msg commonDefs.AsicdNo
 		l2Msg := msg.(commonDefs.L2IntfStateNotifyMsg)
 		if l2Msg.IfState == asicdCommonDefs.INTF_STATE_UP {
 			debug.Logger.Debug("Received Asicd L2 Port Notfication UP:", l2Msg)
-			//api.SendL2PortNotification(l2Msg.IfIndex, config.STATE_UP)
 			api.SendL3PortNotification(l2Msg.IfIndex, config.STATE_UP, config.L2_NOTIFICATION)
 		} else {
 			debug.Logger.Debug("Received Asicd L2 Port Notfication DOWN:", l2Msg)
 			api.SendL3PortNotification(l2Msg.IfIndex, config.STATE_DOWN, config.L2_NOTIFICATION)
-			//api.SendL2PortNotification(l2Msg.IfIndex, config.STATE_DOWN)
 		}
 	case commonDefs.VlanNotifyMsg:
 		vlanMsg := msg.(commonDefs.VlanNotifyMsg)
