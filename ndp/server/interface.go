@@ -79,7 +79,9 @@ var IPV6_MULTICAST_PREFIXES = []string{"ff00", "ff01", "ff02", "ff03", "ff04", "
 	"ff08", "ff09", "ff0a", "ff0b", "ff0c", "ff0d", "ff0e", "ff0f"}
 
 type PcapBase struct {
-	// Pcap Handler for Each Port
+	// TX Pcap handler
+	Tx *pcap.Handle
+	// RX Pcap Handler for Each Port
 	PcapHandle *pcap.Handle
 	// at any give time there can be two users for Pcap..
 	// if 0 then only start rx/tx
@@ -96,6 +98,7 @@ type Interface struct {
 	PcapBase
 	IntfRef           string
 	IfIndex           int32
+	IfType            int    // IfTypePort, IfTypeVlan
 	IpAddr            string // CIDR Format
 	LinkLocalIp       string // CIDR format
 	MsgType           string
@@ -214,6 +217,12 @@ func (intf *Interface) UpdateIntf(ipAddr string) {
 	debug.Logger.Debug("UpdateIntf port:", intf.IntfRef, "ifIndex:", intf.IfIndex, "GS:", intf.IpAddr, "LS:", intf.LinkLocalIp)
 }
 
+/* set if type for the l3 port
+ */
+func (intf *Interface) SetIfType(ifType int) {
+	intf.IfType = ifType
+}
+
 func (intf *Interface) deleteNbrList() ([]string, error) {
 	if intf.PcapBase.PcapHandle == nil && intf.PcapBase.PcapUsers == 0 {
 		intf.StopRATimer()
@@ -248,6 +257,7 @@ func (intf *Interface) DeleteAll() ([]string, error) {
  *		3) Check if PcapCtrl is created or not..
  */
 func (intf *Interface) CreatePcap() (err error) {
+	// RX Pcap handler for interface
 	if intf.PcapBase.PcapHandle == nil {
 		name := intf.IntfRef
 		intf.PcapBase.PcapHandle, err = pcap.OpenLive(name, NDP_PCAP_SNAPSHOTlEN, NDP_PCAP_PROMISCUOUS, NDP_PCAP_TIMEOUT)
@@ -265,6 +275,32 @@ func (intf *Interface) CreatePcap() (err error) {
 	intf.addPcapUser()
 	debug.Logger.Info("Total pcap user for", intf.IntfRef, "to", intf.PcapBase.PcapUsers)
 	return err
+}
+
+/*
+ *  Create a TX pcap handler for sending packets on timer expiry
+ */
+func (intf *Interface) CreateTXPcap() (err error) {
+	if intf.PcapBase.Tx == nil {
+		intf.PcapBase.Tx, err = pcap.OpenLive(intf.IntfRef, NDP_PCAP_SNAPSHOTlEN, NDP_PCAP_PROMISCUOUS, NDP_PCAP_TIMEOUT)
+		if err != nil {
+			debug.Logger.Err("Creating TX Pcap Handler failed for interface:", intf.IntfRef, "Error:", err)
+			intf.DeletePcap()
+			return
+		}
+		debug.Logger.Info("TX Pcap created for interface:", intf.IntfRef)
+	}
+	return nil
+}
+
+func (intf *Interface) DeleteTXPcap() {
+	// delete tx channel only if RX channel is closed && there are no pcap users
+	if intf.PcapBase.PcapHandle == nil && intf.PcapBase.PcapUsers == 0 {
+		if intf.PcapBase.Tx != nil {
+			intf.PcapBase.Tx.Close()
+			intf.PcapBase.Tx = nil
+		}
+	}
 }
 
 /*
@@ -317,8 +353,10 @@ func (intf *Interface) DeletePcap() {
 }
 
 func (intf *Interface) writePkt(pkt []byte) error {
-	if intf.PcapBase.PcapHandle != nil {
-		err := intf.PcapBase.PcapHandle.WritePacketData(pkt)
+	//if intf.PcapBase.PcapHandle != nil {
+	if intf.PcapBase.Tx != nil {
+		//err := intf.PcapBase.PcapHandle.WritePacketData(pkt)
+		err := intf.PcapBase.Tx.WritePacketData(pkt)
 		if err != nil {
 			debug.Logger.Err("Sending Packet failed error:", err)
 			return errors.New("Sending Packet Failed")

@@ -470,7 +470,7 @@ func TestIPv6IntfStateUpDown(t *testing.T) {
 	teststateDownHelperFunc(t)
 }
 
-func TestFindL3Port(t *testing.T) {
+func _TestFindL3Port(t *testing.T) {
 	TestIPv6IntfCreate(t)
 	if _, exists := testNdpServer.findL3Port(testIfIndex); !exists {
 		t.Error("Entry for ifIndex:", testIfIndex, "should exists")

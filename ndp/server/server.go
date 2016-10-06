@@ -77,13 +77,15 @@ func (svr *NDPServer) OSSignalHandle() {
 }
 
 func (svr *NDPServer) InitGlobalDS() {
-	svr.PhyPort = make(map[int32]config.PortInfo, NDP_SERVER_MAP_INITIAL_CAP)
+	//svr.PhyPort = make(map[int32]config.PortInfo, NDP_SERVER_MAP_INITIAL_CAP)
+	svr.L2Port = make(map[int32]PhyPort, NDP_SERVER_MAP_INITIAL_CAP)
 	svr.SwitchMacMapEntries = make(map[string]struct{}, NDP_SERVER_MAP_INITIAL_CAP)
 	svr.L3Port = make(map[int32]Interface, NDP_SERVER_MAP_INITIAL_CAP)
 	svr.VlanInfo = make(map[int32]config.VlanInfo, NDP_SERVER_MAP_INITIAL_CAP)
-	svr.VlanIfIdxVlanIdMap = make(map[int32]int32, NDP_SERVER_MAP_INITIAL_CAP)
+	svr.VlanIfIdxVlanIdMap = make(map[string]int32, NDP_SERVER_MAP_INITIAL_CAP)
 	svr.NeighborInfo = make(map[string]config.NeighborConfig, NDP_SERVER_MAP_INITIAL_CAP)
 	svr.L3IfIntfRefToIfIndex = make(map[string]int32, NDP_SERVER_MAP_INITIAL_CAP)
+	svr.PhyPortToL3PortMap = make(map[int32]int32)
 	svr.PhyPortStateCh = make(chan *config.PortState, NDP_SERVER_ASICD_NOTIFICATION_CH_SIZE)
 	svr.IpIntfCh = make(chan *config.IPIntfNotification, NDP_SERVER_ASICD_NOTIFICATION_CH_SIZE)
 	svr.VlanCh = make(chan *config.VlanNotification)
@@ -105,7 +107,8 @@ func (svr *NDPServer) InitGlobalDS() {
 }
 
 func (svr *NDPServer) DeInitGlobalDS() {
-	svr.PhyPort = nil
+	//svr.PhyPort = nil
+	svr.L2Port = nil
 	svr.L3Port = nil
 	svr.PhyPortStateCh = nil
 	svr.IpIntfCh = nil
@@ -146,31 +149,7 @@ func (svr *NDPServer) UpdateInterfaceTimers() {
 func (svr *NDPServer) EventsListener() {
 	for {
 		select {
-		case phyPortStateCh := <-svr.PhyPortStateCh:
-			svr.HandlePhyPortStateNotification(phyPortStateCh)
-		case ipIntfNotify := <-svr.IpIntfCh:
-			switch ipIntfNotify.Operation {
-			case config.CONFIG_CREATE, config.CONFIG_DELETE:
-				svr.HandleIPIntfCreateDelete(ipIntfNotify)
-			case config.STATE_UP, config.STATE_DOWN:
-				svr.HandleStateNotification(ipIntfNotify)
-			}
-		case rxChInfo, ok := <-svr.RxPktCh:
-			if !ok {
-				continue
-			}
-			svr.counter.Rcvd++
-			svr.ProcessRxPkt(rxChInfo.ifIndex, rxChInfo.pkt)
-		case pktData, ok := <-svr.PktDataCh:
-			if !ok {
-				continue
-			}
-			svr.ProcessTimerExpiry(pktData)
-		case vlanInfo, ok := <-svr.VlanCh:
-			if !ok {
-				continue
-			}
-			debug.Logger.Debug("Need to support vlan Notifications:", vlanInfo)
+		// global configuration channel
 		case globalCfg, ok := <-svr.GlobalCfg:
 			if !ok {
 				continue
@@ -179,6 +158,48 @@ func (svr *NDPServer) EventsListener() {
 			if update {
 				svr.UpdateInterfaceTimers()
 			}
+		// physical or l2 port state up/down notification channel
+		//case phyPortStateCh := <-svr.PhyPortStateCh:
+		//	svr.HandlePhyPortStateNotification(phyPortStateCh)
+		// vlan create/delete/update notification channel
+		case vlanInfo, ok := <-svr.VlanCh:
+			if !ok {
+				continue
+			}
+			svr.HandleVlanNotification(vlanInfo)
+		// ipv6 interface create/delete state up/down notification channel
+		case ipIntfNotify := <-svr.IpIntfCh:
+			switch ipIntfNotify.Operation {
+			case config.CONFIG_CREATE, config.CONFIG_DELETE:
+				svr.HandleIPIntfCreateDelete(ipIntfNotify)
+			case config.STATE_UP, config.STATE_DOWN:
+				// we need to received l2, l3 state up notification via one channel only
+				// by doing so we will maintain the order in which the state notifications are
+				// coming
+				switch ipIntfNotify.IpAddr {
+				case config.L2_NOTIFICATION:
+					phyPortStateCh := &config.PortState{
+						IfIndex: ipIntfNotify.IfIndex,
+						IfState: ipIntfNotify.Operation,
+					}
+					svr.HandlePhyPortStateNotification(phyPortStateCh)
+				default:
+					svr.HandleStateNotification(ipIntfNotify)
+				}
+			}
+		// packet rx channel
+		case rxChInfo, ok := <-svr.RxPktCh:
+			if !ok {
+				continue
+			}
+			svr.counter.Rcvd++
+			svr.ProcessRxPkt(rxChInfo.ifIndex, rxChInfo.pkt)
+		// packet tx channel on timer expiry
+		case pktData, ok := <-svr.PktDataCh:
+			if !ok {
+				continue
+			}
+			svr.ProcessTimerExpiry(pktData)
 		}
 	}
 }

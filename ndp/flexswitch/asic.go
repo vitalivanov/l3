@@ -106,15 +106,17 @@ func (notifyHdl *AsicNotificationHdl) ProcessNotification(msg commonDefs.AsicdNo
 	case commonDefs.L2IntfStateNotifyMsg:
 		l2Msg := msg.(commonDefs.L2IntfStateNotifyMsg)
 		if l2Msg.IfState == asicdCommonDefs.INTF_STATE_UP {
-			debug.Logger.Debug("Received Asicd L2 Port Notfication UP:", l2Msg,
-				"so NDP should get L3 Port UP Notification also")
+			debug.Logger.Debug("Received Asicd L2 Port Notfication UP:", l2Msg)
 			//api.SendL2PortNotification(l2Msg.IfIndex, config.STATE_UP)
+			api.SendL3PortNotification(l2Msg.IfIndex, config.STATE_UP, config.L2_NOTIFICATION)
 		} else {
 			debug.Logger.Debug("Received Asicd L2 Port Notfication DOWN:", l2Msg)
-			api.SendL2PortNotification(l2Msg.IfIndex, config.STATE_DOWN)
+			api.SendL3PortNotification(l2Msg.IfIndex, config.STATE_DOWN, config.L2_NOTIFICATION)
+			//api.SendL2PortNotification(l2Msg.IfIndex, config.STATE_DOWN)
 		}
 	case commonDefs.VlanNotifyMsg:
 		vlanMsg := msg.(commonDefs.VlanNotifyMsg)
+		debug.Logger.Debug("Received Asicd Vlan Notfication:", vlanMsg)
 		oper := ""
 		switch vlanMsg.MsgType {
 		case commonDefs.NOTIFY_VLAN_CREATE:
@@ -127,6 +129,6 @@ func (notifyHdl *AsicNotificationHdl) ProcessNotification(msg commonDefs.AsicdNo
 			debug.Logger.Debug("Received Asicd VLAN UPDATE")
 			oper = config.CONFIG_UPDATE
 		}
-		api.SendVlanNotification(oper, int32(vlanMsg.VlanId), vlanMsg.VlanName, vlanMsg.UntagPorts)
+		api.SendVlanNotification(oper, int32(vlanMsg.VlanId), vlanMsg.VlanIfIndex, vlanMsg.VlanName, vlanMsg.UntagPorts, vlanMsg.TagPorts)
 	}
 }
