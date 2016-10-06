@@ -96,9 +96,9 @@ func (svr *NDPServer) updateL2Operstate(ifIndex int32, state string) {
 }
 
 /*
- * internal api for creating pcap handler for l2 physical port for RX
+ * internal api for creating pcap handler for l2 untagged physical port for RX
  */
-func (l2Port *PhyPort) createPcap(pktCh chan *RxPktInfo) (err error) {
+func (l2Port *PhyPort) createUntagPortPcap(pktCh chan *RxPktInfo) (err error) {
 	if l2Port.RX == nil && l2Port.Info.OperState == config.STATE_UP {
 		name := l2Port.Info.Name
 		l2Port.RX, err = pcap.OpenLive(name, NDP_PCAP_SNAPSHOTlEN, NDP_PCAP_PROMISCUOUS, NDP_PCAP_TIMEOUT)
@@ -113,6 +113,29 @@ func (l2Port *PhyPort) createPcap(pktCh chan *RxPktInfo) (err error) {
 			return err
 		}
 		debug.Logger.Info("Created l2 Pcap handler for port:", l2Port.Info.Name, "now start receiving NdpPkts")
+		go l2Port.L2ReceiveNdpPkts(pktCh)
+	}
+	return nil
+}
+
+/*
+ * internal api for creating pcap handler for l2 tagged physical port for RX
+ */
+func (l2Port *PhyPort) createTagPortPcap(pktCh chan *RxPktInfo, vlan string) (err error) {
+	if l2Port.RX == nil && l2Port.Info.OperState == config.STATE_UP {
+		name := l2Port.Info.Name + "." + vlan
+		l2Port.RX, err = pcap.OpenLive(name, NDP_PCAP_SNAPSHOTlEN, NDP_PCAP_PROMISCUOUS, NDP_PCAP_TIMEOUT)
+		if err != nil {
+			debug.Logger.Err("Creating Pcap Handler failed for l2 interface:", name, "Error:", err)
+			return err
+		}
+		err = l2Port.RX.SetBPFFilter(NDP_PCAP_FILTER)
+		if err != nil {
+			debug.Logger.Err("Creating BPF Filter failed Error", err)
+			l2Port.RX = nil
+			return err
+		}
+		debug.Logger.Info("Created l2 Pcap handler for port:", name, "now start receiving NdpPkts")
 		go l2Port.L2ReceiveNdpPkts(pktCh)
 	}
 	return nil
@@ -166,7 +189,7 @@ func (svr *NDPServer) CreatePcap(ifIndex int32) error {
 	for pIfIndex, _ := range vlan.TagPortsMap {
 		l2Port, exists := svr.L2Port[pIfIndex]
 		if exists {
-			err := l2Port.createPcap(svr.RxPktCh)
+			err := l2Port.createTagPortPcap(svr.RxPktCh, vlan.Name)
 			if err == nil {
 				svr.L2Port[pIfIndex] = l2Port
 				// reverse map updated
@@ -178,7 +201,7 @@ func (svr *NDPServer) CreatePcap(ifIndex int32) error {
 	for pIfIndex, _ := range vlan.UntagPortsMap {
 		l2Port, exists := svr.L2Port[pIfIndex]
 		if exists {
-			err := l2Port.createPcap(svr.RxPktCh)
+			err := l2Port.createUntagPortPcap(svr.RxPktCh)
 			if err == nil {
 				svr.L2Port[pIfIndex] = l2Port
 				// reverse map updated
