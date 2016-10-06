@@ -719,7 +719,7 @@ func (p *Peer) ReceiveUpdate(pktInfo *packet.BGPPktSrc) (map[uint32]map[*bgprib.
 	//path := bgprib.NewPath(p.locRib, p.NeighborConf, updateMsg.PathAttributes, mpReach, bgprib.RouteTypeEGP)
 
 	mpReach, mpUnreach := packet.RemoveMPAttrs(&updateMsg.PathAttributes)
-	//	remPath := bgprib.NewPath(p.locRib, p.neighborConf, updateMsg.PathAttributes, mpReach, RouteTypeEGP)
+	//remPath := bgprib.NewPath(p.locRib, p.neighborConf, updateMsg.PathAttributes, mpReach, RouteTypeEGP)
 	path := bgprib.NewPath(p.locRib, p.NeighborConf, updateMsg.PathAttributes, mpReach, bgprib.RouteTypeEGP)
 
 	p.processWithdraws(protoFamily, &updateMsg.WithdrawnRoutes)
