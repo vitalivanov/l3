@@ -60,13 +60,6 @@ func Init(svr *server.NDPServer) {
 	ndpApi.server = svr
 }
 
-func SendL2PortNotification(ifIndex int32, state string) {
-	ndpApi.server.PhyPortStateCh <- &config.PortState{
-		IfIndex: ifIndex,
-		IfState: state,
-	}
-}
-
 func SendL3PortNotification(ifIndex int32, state, ipAddr string) {
 	ndpApi.server.IpIntfCh <- &config.IPIntfNotification{
 		IfIndex:   ifIndex,
