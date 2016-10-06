@@ -343,18 +343,14 @@ func (svr *NDPServer) DeleteL3IntfFromUpState(ifIndex int32) {
  *    API: It will populate correct vlan information which will be used for ipv6 neighbor create
  */
 func (svr *NDPServer) PopulateVlanInfo(nbrInfo *config.NeighborConfig, intfRef string) {
-	debug.Logger.Info("jgheewala: populate vlan info called for intfRef:", intfRef, "incoming vlan is", nbrInfo.VlanId)
 	// check if the ifIndex is present in the reverse map..
 	vlanId, exists := svr.VlanIfIdxVlanIdMap[intfRef]
 	if exists {
-		debug.Logger.Info("jgheewala: svr.VlanIfIdxVlanIdMap have entry for and hence new vlan is", vlanId)
 		// if the entry exists then use the vlanId from reverse map
 		nbrInfo.VlanId = vlanId
 	} else {
 		// @TODO: move this to plugin specific
 		// in this case use system reserved Vlan id which is -1
-		debug.Logger.Info("jgheewala: svr.VlanIfIdxVlanIdMap does not have entry for ifIndex:", intfRef,
-			"hence new vlan is internal vlan")
 		nbrInfo.VlanId = -1
 	}
 }

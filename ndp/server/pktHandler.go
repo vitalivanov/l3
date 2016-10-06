@@ -50,7 +50,6 @@ func (svr *NDPServer) StartRxTx(ifIndex int32) {
 	var err error
 	switch ipPort.IfType {
 	case commonDefs.IfTypePort:
-		debug.Logger.Info("jgheewala: iftype is port")
 		// create pcap handler if there is none created right now
 		err = ipPort.CreatePcap()
 		if err != nil {
@@ -58,7 +57,6 @@ func (svr *NDPServer) StartRxTx(ifIndex int32) {
 			return
 		}
 	case commonDefs.IfTypeVlan:
-		debug.Logger.Info("jgheewala: iftype is vlan and total pcap users are:", ipPort.PcapBase.PcapUsers)
 		if ipPort.PcapBase.PcapUsers == 0 {
 			// for all the ports in tag/untag list create pcap for RX channel, only if there are no
 			// pcap users created right now
@@ -182,7 +180,6 @@ func (svr *NDPServer) CheckSrcMac(macAddr string) bool {
  *	insertNeighborInfo: Helper API to update list of neighbor keys that are created by ndp
  */
 func (svr *NDPServer) insertNeigborInfo(nbrInfo *config.NeighborConfig) {
-	debug.Logger.Info("jgheewala: adding new ndp_entry:", *nbrInfo)
 	svr.NeigborEntryLock.Lock()
 	svr.NeighborInfo[nbrInfo.IpAddr] = *nbrInfo
 	svr.neighborKey = append(svr.neighborKey, nbrInfo.IpAddr)
@@ -260,7 +257,6 @@ func (svr *NDPServer) DeleteNeighborInfo(deleteEntries []string, ifIndex int32) 
  *			c) CreateIPv6 Neighbor entry
  */
 func (svr *NDPServer) ProcessRxPkt(ifIndex int32, pkt gopacket.Packet) error {
-	debug.Logger.Info("jgheewala: processing rx pkt for ifIndex:", ifIndex)
 	var ipPort Interface
 	var exists bool
 	// if we receive packet on L2 Physical interface then the we need get l3 port via cross referencing PhyPortToL3PortMap
@@ -278,13 +274,11 @@ func (svr *NDPServer) ProcessRxPkt(ifIndex int32, pkt gopacket.Packet) error {
 			return errors.New(fmt.Sprintln("Entry for ifIndex:", ifIndex, "doesn't exists"))
 		}
 	}
-	debug.Logger.Info("jgheewala: ipPort Information is", ipPort.IntfRef)
 	ipPort.counter.Rcvd++
 	ndInfo, err := svr.Packet.DecodeND(pkt)
 	if err != nil || ndInfo == nil {
 		return errors.New(fmt.Sprintln("Failed decoding ND packet, error:", err))
 	}
-	debug.Logger.Info("jgheewala: Processing ND info:", *ndInfo)
 	nbrInfo, operation := ipPort.ProcessND(ndInfo)
 	if l3exists {
 		svr.L3Port[l3IfIndex] = ipPort
@@ -292,10 +286,8 @@ func (svr *NDPServer) ProcessRxPkt(ifIndex int32, pkt gopacket.Packet) error {
 		svr.L3Port[ifIndex] = ipPort
 	}
 	if nbrInfo == nil || (operation != CREATE && operation != DELETE) {
-		debug.Logger.Info("jgheewala: returning without creating hardware neighbor entry as nbrInfo is", nbrInfo, "and oper is", operation)
 		return nil
 	}
-	debug.Logger.Info("jgheewala: Operation is", operation)
 	switch operation {
 	case CREATE:
 		// update ifIndex to l2 ifIndex if iftype is vlan
@@ -311,7 +303,6 @@ func (svr *NDPServer) ProcessRxPkt(ifIndex int32, pkt gopacket.Packet) error {
 }
 
 func (svr *NDPServer) ProcessTimerExpiry(pktData config.PacketData) error {
-	debug.Logger.Info("jgheewala: Proceessing timer expiry for ifIndex:", pktData.IfIndex)
 	var l3Port Interface
 	var exists bool
 	// if we receive packet on L2 Physical interface then the we need get l3 port via cross referencing PhyPortToL3PortMap
