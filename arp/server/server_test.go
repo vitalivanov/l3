@@ -20,7 +20,6 @@ func NewLogger(name string, tag string, listenToConfig bool) (*logging.Writer, e
 		return srLogger, err
 	}
 
-	srLogger.GlobalLogging = true
 	srLogger.MyLogLevel = sysdCommonDefs.INFO
 	fmt.Println("Logging level ", srLogger.MyLogLevel, " set for ", srLogger.MyComponentName)
 	return srLogger, err
