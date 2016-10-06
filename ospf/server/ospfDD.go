@@ -380,7 +380,7 @@ func (server *OSPFServer) ProcessRxDbdPkt(data []byte, ospfHdrMd *OspfHdrMetadat
 
 func (server *OSPFServer) ConstructAndSendDbdPacket(nbrKey NeighborConfKey,
 	ibit bool, mbit bool, msbit bool, options uint8,
-	seq uint32, append_lsa bool, is_duplicate bool) (dbd_mdata ospfDatabaseDescriptionData, last_exchange bool) {
+	seq uint32, append_lsa bool, is_duplicate bool, ifMtu int32) (dbd_mdata ospfDatabaseDescriptionData, last_exchange bool) {
 	last_exchange = true
 	nbrCon, exists := server.NeighborConfigMap[nbrKey]
 	if !exists {
@@ -393,7 +393,7 @@ func (server *OSPFServer) ConstructAndSendDbdPacket(nbrKey NeighborConfKey,
 	dbd_mdata.mbit = mbit
 	dbd_mdata.msbit = msbit
 
-	dbd_mdata.interface_mtu = INTF_MTU_MIN
+	dbd_mdata.interface_mtu = uint16(ifMtu)
 	dbd_mdata.options = options
 	dbd_mdata.dd_sequence_number = seq
 
