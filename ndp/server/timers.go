@@ -202,7 +202,7 @@ func (c *NeighborInfo) ReComputeBaseReachableTimer() {
  * Router Advertisment Timer: Only timer owned by Interface Object
  */
 func (intf *Interface) RAResTransmitTimer() {
-	if intf.PcapBase.PcapHandle == nil {
+	if intf.PcapBase.Tx == nil {
 		intf.StopRATimer()
 		return
 	}
@@ -227,6 +227,33 @@ func (intf *Interface) RAResTransmitTimer() {
 		intf.raTimer = time.AfterFunc(time.Duration(MAX_INITIAL_RTR_ADVERT_INTERVAL)*time.Second,
 			raReTransmit_func)
 	}
+	/*
+		if intf.PcapBase.PcapHandle == nil {
+			intf.StopRATimer()
+			return
+		}
+		if intf.raTimer != nil {
+			if intf.initialRASend < MAX_INITIAL_RTR_ADVERTISEMENTS {
+				intf.raTimer.Reset(time.Duration(MAX_INITIAL_RTR_ADVERT_INTERVAL) * time.Second)
+				intf.initialRASend++
+			} else {
+				debug.Logger.Debug("Re-Setting ra retransmit timer for intf:", intf.IntfRef, "to:", intf.raRestransmitTime)
+				intf.raTimer.Reset(time.Duration(intf.raRestransmitTime) * time.Second)
+			}
+		} else {
+			var raReTransmit_func func()
+			raReTransmit_func = func() {
+				intf.PktDataCh <- config.PacketData{
+					SendPktType: layers.ICMPv6TypeRouterAdvertisement,
+					IfIndex:     intf.IfIndex,
+				}
+			}
+			debug.Logger.Debug("Setting ra retransmit timer for intf:", intf.IntfRef, "to:", intf.raRestransmitTime)
+			intf.initialRASend = 0
+			intf.raTimer = time.AfterFunc(time.Duration(MAX_INITIAL_RTR_ADVERT_INTERVAL)*time.Second,
+				raReTransmit_func)
+		}
+	*/
 }
 
 /*

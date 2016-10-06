@@ -24,6 +24,7 @@ package server
 
 import (
 	"github.com/google/gopacket"
+	"github.com/google/gopacket/pcap"
 	"l3/ndp/config"
 	"l3/ndp/packet"
 	"sync"
@@ -44,19 +45,25 @@ type NdpConfig struct {
 	RaRestransmitTime uint8
 }
 
+type PhyPort struct {
+	RX   *pcap.Handle
+	Info config.PortInfo
+}
+
 type NDPServer struct {
 	NdpConfig                                // base config
 	dmnBase      *dmnBase.FSBaseDmn          // base Daemon
 	SwitchPlugin asicdClient.AsicdClientIntf // asicd plugin
 
 	// System Ports information, key is IntfRef
-	PhyPort             map[int32]config.PortInfo        // key is l2 ifIndex
+	L2Port              map[int32]PhyPort                //config.PortInfo        // key is l2 ifIndex
 	L3Port              map[int32]Interface              // key is l3 ifIndex
 	VlanInfo            map[int32]config.VlanInfo        // key is vlanId
-	VlanIfIdxVlanIdMap  map[int32]int32                  //reverse map for ifIndex ----> vlanId, used during ipv6 neig create
+	VlanIfIdxVlanIdMap  map[string]int32                 //reverse map for vlanName ----> vlanId, used during ipv6 neig create
 	SwitchMacMapEntries map[string]struct{}              // cache entry for all mac addresses on a switch
 	NeighborInfo        map[string]config.NeighborConfig // neighbor created by NDP used for STATE
 	neighborKey         []string                         // keys for all neighbor entries is stored here for GET calls
+	PhyPortToL3PortMap  map[int32]int32                  // reverse map for l2IfIndex ----> l3IfIndex, used during vlan RX Pcap
 
 	//Configuration Channels
 	GlobalCfg chan NdpConfig
