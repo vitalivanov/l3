@@ -118,6 +118,7 @@ func initServerBasic() {
 }
 
 func initPhysicalPorts() {
+	var l2Port PhyPort
 	port := config.PortInfo{
 		IntfRef:   "lo",
 		IfIndex:   testIfIndex,
@@ -125,7 +126,9 @@ func initPhysicalPorts() {
 		OperState: "UP",
 		MacAddr:   "aa:bb:cc:dd:ee:ff",
 	}
-	testNdpServer.PhyPort[port.IfIndex] = port
+	l2Port = testNdpServer.L2Port[port.IfIndex]
+	l2Port.Info = port
+	testNdpServer.L2Port[port.IfIndex] = l2Port
 	port = config.PortInfo{
 		IntfRef:   "lo1",
 		IfIndex:   96,
@@ -133,7 +136,9 @@ func initPhysicalPorts() {
 		OperState: "UP",
 		MacAddr:   "aa:bb:cc:dd:ee:ff",
 	}
-	testNdpServer.PhyPort[port.IfIndex] = port
+	l2Port = testNdpServer.L2Port[port.IfIndex]
+	l2Port.Info = port
+	testNdpServer.L2Port[port.IfIndex] = l2Port
 	port = config.PortInfo{
 		IntfRef:   "lo2",
 		IfIndex:   97,
@@ -141,7 +146,9 @@ func initPhysicalPorts() {
 		OperState: "UP",
 		MacAddr:   "aa:bb:cc:dd:ee:ff",
 	}
-	testNdpServer.PhyPort[port.IfIndex] = port
+	l2Port = testNdpServer.L2Port[port.IfIndex]
+	l2Port.Info = port
+	testNdpServer.L2Port[port.IfIndex] = l2Port
 	port = config.PortInfo{
 		IntfRef:   "lo3",
 		IfIndex:   98,
@@ -149,7 +156,9 @@ func initPhysicalPorts() {
 		OperState: "UP",
 		MacAddr:   "aa:bb:cc:dd:ee:ff",
 	}
-	testNdpServer.PhyPort[port.IfIndex] = port
+	l2Port = testNdpServer.L2Port[port.IfIndex]
+	l2Port.Info = port
+	testNdpServer.L2Port[port.IfIndex] = l2Port
 	port = config.PortInfo{
 		IntfRef:   "lo4",
 		IfIndex:   99,
@@ -157,7 +166,9 @@ func initPhysicalPorts() {
 		OperState: "UP",
 		MacAddr:   "aa:bb:cc:dd:ee:ff",
 	}
-	testNdpServer.PhyPort[port.IfIndex] = port
+	l2Port = testNdpServer.L2Port[port.IfIndex]
+	l2Port.Info = port
+	testNdpServer.L2Port[port.IfIndex] = l2Port
 	port = config.PortInfo{
 		IntfRef:   "lo5",
 		IfIndex:   95,
@@ -165,7 +176,9 @@ func initPhysicalPorts() {
 		OperState: "UP",
 		MacAddr:   "aa:bb:cc:dd:ee:ff",
 	}
-	testNdpServer.PhyPort[port.IfIndex] = port
+	l2Port = testNdpServer.L2Port[port.IfIndex]
+	l2Port.Info = port
+	testNdpServer.L2Port[port.IfIndex] = l2Port
 }
 
 func InitNDPTestServer() {
@@ -194,8 +207,8 @@ func TestNDPStartServer(t *testing.T) {
 func TestNdpDeInit(t *testing.T) {
 	TestNDPStartServer(t)
 	testNdpServer.DeInitGlobalDS()
-	if testNdpServer.PhyPort != nil {
-		t.Error("Deinit failed for PhyPort")
+	if testNdpServer.L2Port != nil {
+		t.Error("Deinit failed for L2Port")
 		return
 	}
 	if testNdpServer.L3Port != nil {
@@ -468,19 +481,6 @@ func TestIPv6IntfStateUpDown(t *testing.T) {
 	TestIPv6IntfCreate(t)
 	teststateUpHelperFunc(t)
 	teststateDownHelperFunc(t)
-}
-
-func _TestFindL3Port(t *testing.T) {
-	TestIPv6IntfCreate(t)
-	if _, exists := testNdpServer.findL3Port(testIfIndex); !exists {
-		t.Error("Entry for ifIndex:", testIfIndex, "should exists")
-		return
-	}
-	invalidIfIndex := int32(123)
-	if _, exists := testNdpServer.findL3Port(invalidIfIndex); exists {
-		t.Error("Entry for ifIndex:", invalidIfIndex, "should not exists")
-		return
-	}
 }
 
 func TestProcessPkt(t *testing.T) {
