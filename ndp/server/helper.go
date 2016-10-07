@@ -270,6 +270,33 @@ func (svr *NDPServer) HandleStateNotification(msg *config.IPIntfNotification) {
 }
 
 /*
+ *    API: helper function to update ifIndex & port information for software. Hardware is already taken care
+ *	   off
+ */
+func (svr *NDPServer) SoftwareUpdateNbrEntry(msg *config.MacMoveNotification) {
+	nbrIp := msg.IpAddr
+	svr.NeigborEntryLock.Lock()
+	defer svr.NeigborEntryLock.Unlock()
+	nbrEntry, exists := svr.NeighborInfo[nbrIp]
+	if !exists {
+		return
+	}
+	l2Port, exists := svr.L2Port[msg.IfIndex]
+	if exists {
+		nbrEntry.Intf = l2Port.Info.Name
+		svr.NeighborInfo[nbrIp] = nbrEntry
+		return
+	}
+
+	l3Port, exists := svr.L3Port[msg.IfIndex]
+	if exists {
+		nbrEntry.Intf = l3Port.IntfRef
+		svr.NeighborInfo[nbrIp] = nbrEntry
+		return
+	}
+}
+
+/*
  *    API: It will remove any deleted ip port from the up state slice list
  */
 func (svr *NDPServer) DeleteL3IntfFromUpState(ifIndex int32) {

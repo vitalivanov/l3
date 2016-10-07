@@ -29,7 +29,6 @@ import (
 	"github.com/google/gopacket/layers"
 	"l3/ndp/config"
 	"l3/ndp/debug"
-	"reflect"
 	"utils/commonDefs"
 )
 
@@ -187,11 +186,13 @@ func (svr *NDPServer) insertNeigborInfo(nbrInfo *config.NeighborConfig) {
 	svr.NeigborEntryLock.Unlock()
 }
 
+/*
 func (svr *NDPServer) updateNeighborInfo(nbrInfo *config.NeighborConfig) {
 	svr.NeigborEntryLock.Lock()
 	svr.NeighborInfo[nbrInfo.IpAddr] = *nbrInfo
 	svr.NeigborEntryLock.Unlock()
 }
+*/
 
 /*
  *	deleteNeighborInfo: Helper API to update list of neighbor keys that are deleted by ndp
@@ -239,6 +240,7 @@ func (svr *NDPServer) deleteNeighbor(nbrIp string, ifIndex int32) {
 	svr.deleteNeighborInfo(nbrIp)
 }
 
+/*
 func (svr *NDPServer) UpdateNeighborInfo(nbrInfo *config.NeighborConfig, oldNbrEntry config.NeighborConfig) {
 	svr.SendIPv6DeleteNotification(oldNbrEntry.IpAddr, oldNbrEntry.IfIndex)
 	debug.Logger.Debug("Calling update ipv6 neighgor for global nbrinfo is", nbrInfo.IpAddr, nbrInfo.MacAddr,
@@ -253,6 +255,7 @@ func (svr *NDPServer) UpdateNeighborInfo(nbrInfo *config.NeighborConfig, oldNbrE
 	svr.SendIPv6CreateNotification(nbrInfo.IpAddr, nbrInfo.IfIndex)
 	svr.updateNeighborInfo(nbrInfo)
 }
+*/
 
 /*
  *	 DeleteNeighborInfo
@@ -323,6 +326,7 @@ func (svr *NDPServer) ProcessRxPkt(ifIndex int32, pkt gopacket.Packet) error {
 	case CREATE:
 		svr.CreateNeighborInfo(nbrInfo)
 	case UPDATE:
+		/* @FUTURE if needed
 		nbrEntry, exists := svr.NeighborInfo[nbrInfo.IpAddr]
 		if !exists { //entry does not exists and hence creating new
 			debug.Logger.Debug("!!!!!!ALERT!!!!!! NDP Server does not have nbrInfo for ipaddr:",
@@ -336,6 +340,7 @@ func (svr *NDPServer) ProcessRxPkt(ifIndex int32, pkt gopacket.Packet) error {
 				svr.UpdateNeighborInfo(nbrInfo, nbrEntry)
 			}
 		}
+		*/
 	case DELETE:
 		svr.deleteNeighbor(nbrInfo.IpAddr, ifIndex) // used mostly by RA
 	}

@@ -125,6 +125,12 @@ type VlanNotification struct {
 	TagPorts    []int32
 }
 
+type MacMoveNotification struct {
+	IpAddr  string
+	IfIndex int32
+	VlanId  int32
+}
+
 type PacketData struct {
 	SendPktType layers.ICMPv6TypeCode
 	NeighborIp  string
