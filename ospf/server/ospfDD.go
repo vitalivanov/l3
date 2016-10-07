@@ -393,7 +393,8 @@ func (server *OSPFServer) ConstructAndSendDbdPacket(nbrKey NeighborConfKey,
 	dbd_mdata.mbit = mbit
 	dbd_mdata.msbit = msbit
 
-	dbd_mdata.interface_mtu = uint16(ifMtu)
+	//dbd_mdata.interface_mtu = uint16(ifMtu)  TEMP fix
+	dbd_mdata.interface_mtu = uint16(INTF_MTU_MIN)
 	dbd_mdata.options = options
 	dbd_mdata.dd_sequence_number = seq
 
