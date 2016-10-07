@@ -117,7 +117,7 @@ func (intf *Interface) processNS(ndInfo *packet.NDInfo) (nbrInfo *config.Neighbo
 		// update the neighbor ??? what to do in this case moving to stale
 		nbr.State = STALE
 		oper = UPDATE
-		nbrInfo = nil
+		//nbrInfo = nil
 	} else {
 		// create new neighbor
 		nbr.InitCache(intf.reachableTime, intf.retransTime, nbrKey, intf.PktDataCh, intf.IfIndex)
@@ -128,9 +128,10 @@ func (intf *Interface) processNS(ndInfo *packet.NDInfo) (nbrInfo *config.Neighbo
 				}
 			}
 		}
-		nbrInfo = nbr.populateNbrInfo(intf.IfIndex, intf.IntfRef)
+		//nbrInfo = nbr.populateNbrInfo(intf.IfIndex, intf.IntfRef)
 		oper = CREATE
 	}
+	nbrInfo = nbr.populateNbrInfo(intf.IfIndex, intf.IntfRef)
 	nbr.updatePktRxStateInfo()
 	intf.Neighbor[nbrKey] = nbr
 	return nbrInfo, oper

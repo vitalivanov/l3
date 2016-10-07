@@ -444,6 +444,7 @@ func (intf *Interface) createNbrKey(ndInfo *packet.NDInfo) (nbrkey string) {
  * process nd will be called during received message
  */
 func (intf *Interface) ProcessND(ndInfo *packet.NDInfo) (*config.NeighborConfig, NDP_OPERATION) {
+	intf.counter.Rcvd++
 	if intf.Neighbor == nil {
 		debug.Logger.Alert("!!!!Neighbor Initialization for intf:", intf.IntfRef, "didn't happen properly!!!!!")
 		intf.Neighbor = make(map[string]NeighborInfo, 10)

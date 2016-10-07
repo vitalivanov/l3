@@ -45,9 +45,16 @@ type NdpConfig struct {
 	RaRestransmitTime uint8
 }
 
+type L3Info struct {
+	Name     string
+	IfIndex  int32
+	PortType string // tag or untag
+}
+
 type PhyPort struct {
 	RX   *pcap.Handle
 	Info config.PortInfo
+	L3   L3Info
 }
 
 type NDPServer struct {

@@ -54,8 +54,9 @@ func (intf *Interface) processNA(ndInfo *packet.NDInfo) (nbrInfo *config.Neighbo
 		nbr.InitCache(intf.reachableTime, intf.retransTime, nbrKey, intf.PktDataCh, intf.IfIndex)
 		nbr.State = REACHABLE
 		oper = CREATE
-		nbrInfo = nbr.populateNbrInfo(intf.IfIndex, intf.IntfRef)
+		//nbrInfo = nbr.populateNbrInfo(intf.IfIndex, intf.IntfRef)
 	}
+	nbrInfo = nbr.populateNbrInfo(intf.IfIndex, intf.IntfRef)
 	nbr.updatePktRxStateInfo()
 	intf.Neighbor[nbrKey] = nbr
 	return nbrInfo, oper

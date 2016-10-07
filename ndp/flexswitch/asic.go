@@ -46,7 +46,7 @@ func initAsicdNotification() commonDefs.AsicdNotification {
 		commonDefs.NOTIFY_VLAN_UPDATE:               true,
 		commonDefs.NOTIFY_LOGICAL_INTF_CREATE:       false,
 		commonDefs.NOTIFY_LOGICAL_INTF_DELETE:       false,
-		commonDefs.NOTIFY_LOGICAL_INTF_UPDATE:       true,
+		commonDefs.NOTIFY_LOGICAL_INTF_UPDATE:       false,
 		commonDefs.NOTIFY_IPV4INTF_CREATE:           false,
 		commonDefs.NOTIFY_IPV4INTF_DELETE:           false,
 		commonDefs.NOTIFY_IPV6INTF_CREATE:           true,
@@ -55,8 +55,17 @@ func initAsicdNotification() commonDefs.AsicdNotification {
 		commonDefs.NOTIFY_LAG_DELETE:                true,
 		commonDefs.NOTIFY_LAG_UPDATE:                true,
 		commonDefs.NOTIFY_IPV4NBR_MAC_MOVE:          false,
+		commonDefs.NOTIFY_IPV6NBR_MAC_MOVE:          true,
 		commonDefs.NOTIFY_IPV4_ROUTE_CREATE_FAILURE: false,
 		commonDefs.NOTIFY_IPV4_ROUTE_DELETE_FAILURE: false,
+		commonDefs.NOTIFY_IPV6_ROUTE_CREATE_FAILURE: false,
+		commonDefs.NOTIFY_IPV6_ROUTE_DELETE_FAILURE: false,
+		commonDefs.NOTIFY_VTEP_CREATE:               false,
+		commonDefs.NOTIFY_VTEP_DELETE:               false,
+		commonDefs.NOTIFY_MPLSINTF_STATE_CHANGE:     false,
+		commonDefs.NOTIFY_MPLSINTF_CREATE:           false,
+		commonDefs.NOTIFY_MPLSINTF_DELETE:           false,
+		commonDefs.NOTIFY_PORT_CONFIG_MODE_CHANGE:   false,
 	}
 	return nMap
 }

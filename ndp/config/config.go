@@ -34,7 +34,10 @@ const (
 	CONFIG_DELETE = "DELETE"
 	CONFIG_UPDATE = "UPDATE"
 
-	L2_NOTIFICATION = "UNKNOWN_IP"
+	L2_NOTIFICATION    = "UNKNOWN_IP"
+	L2_TAG_TYPE        = "tag"
+	L2_UNTAG_TYPE      = "untag"
+	L3_INVALID_IFINDEX = -1
 )
 
 type PortInfo struct {
@@ -78,12 +81,11 @@ type GlobalState struct {
 }
 
 type NeighborConfig struct {
-	MacAddr     string
-	VlanId      int32
-	IfIndex     int32
-	Intf        string
-	IpAddr      string
-	LinkLocalIp string
+	MacAddr string
+	VlanId  int32
+	IfIndex int32
+	Intf    string
+	IpAddr  string
 }
 
 type NeighborEntry struct {
