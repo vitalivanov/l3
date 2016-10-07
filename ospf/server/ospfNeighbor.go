@@ -43,14 +43,14 @@ func (server *OSPFServer) exchangePacketDiscardCheck(nbrConf OspfNeighborEntry, 
 		msg.eventInfo = "SeqNumberMismatch. Nbr should be master " + nbrConf.OspfNbrIPAddr.String()
 		server.logger.Info(fmt.Sprintln("NBREVENT: SeqNumberMismatch. Nbr should be master  dbdmsbit ", nbrDbPkt.msbit,
 			" isMaster ", nbrConf.isMaster))
-		server.DbEventOp <- msg
+		//server.DbEventOp <- msg
 		return true
 	}
 
 	if nbrDbPkt.ibit == true {
 		server.logger.Info("NBREVENT:SeqNumberMismatch . Nbr ibit is true ")
 		msg.eventInfo = "SeqNumberMismatch . Nbr ibit is true " + nbrConf.OspfNbrIPAddr.String()
-		server.DbEventOp <- msg
+		//server.DbEventOp <- msg
 		return true
 	}
 	/*
@@ -69,7 +69,7 @@ func (server *OSPFServer) exchangePacketDiscardCheck(nbrConf OspfNeighborEntry, 
 			server.logger.Info(fmt.Sprintln("NBREVENT:SeqNumberMismatch : Nbr is master but dbd packet seq no doesnt match. dbd seq ",
 				nbrDbPkt.dd_sequence_number, "nbr seq ", nbrConf.ospfNbrSeqNum))
 			msg.eventInfo = "SeqNumberMismatch . " + nbrConf.OspfNbrIPAddr.String()
-			server.DbEventOp <- msg
+			//	server.DbEventOp <- msg
 			return true
 		}
 	} else {
@@ -77,7 +77,7 @@ func (server *OSPFServer) exchangePacketDiscardCheck(nbrConf OspfNeighborEntry, 
 			server.logger.Info(fmt.Sprintln("NBREVENT:SeqNumberMismatch : Nbr is slave but dbd packet seq no doesnt match.dbd seq ",
 				nbrDbPkt.dd_sequence_number, "nbr seq ", nbrConf.ospfNbrSeqNum))
 			msg.eventInfo = "SeqNumberMismatch . " + nbrConf.OspfNbrIPAddr.String()
-			server.DbEventOp <- msg
+			//	server.DbEventOp <- msg
 			return true
 		}
 	}
@@ -253,6 +253,7 @@ func (server *OSPFServer) processDBDEvent(nbrKey NeighborConfKey, nbrDbPkt ospfD
 					" nbr state ", nbrConf.OspfNbrState))
 
 				nbrState = config.NbrExchangeStart
+				nbrConf.OspfNbrState = config.NbrExchangeStart
 				server.processNeighborExstart(nbrKey, nbrConf, nbrDbPkt, intfConf.IfMtu)
 
 				//invalidate all lists.

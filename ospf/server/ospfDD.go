@@ -358,7 +358,7 @@ func (server *OSPFServer) ProcessRxDbdPkt(data []byte, ospfHdrMd *OspfHdrMetadat
 		},
 		ospfNbrDBDData: *ospfdbd_data,
 	}
-	server.logger.Info(fmt.Sprintln("DBD: nbr key ", ipaddr, key.IntfIdx))
+	server.logger.Debug(fmt.Sprintln("DBD: nbr key ", ipaddr, key.IntfIdx))
 	if ospfNeighborIPToMAC == nil {
 		server.logger.Info(fmt.Sprintln("DBD: ospfNeighborIPToMAC is NULL. Check if nbr thread is running."))
 		return nil
@@ -406,7 +406,7 @@ func (server *OSPFServer) ConstructAndSendDbdPacket(nbrKey NeighborConfKey,
 
 		nbrCon.db_summary_list_mutex.Lock()
 		db_list, exist := ospfNeighborDBSummary_list[nbrKey]
-		server.logger.Info(fmt.Sprintln("DBD: db_list ", db_list))
+		server.logger.Debug(fmt.Sprintln("DBD: db_list ", db_list))
 		if exist {
 			for index = 0; index < uint8(len(db_list)); index++ {
 				if db_list[index].valid {
@@ -425,7 +425,7 @@ func (server *OSPFServer) ConstructAndSendDbdPacket(nbrKey NeighborConfKey,
 		}
 	}
 
-	server.logger.Info(fmt.Sprintln("DBDSEND: nbr state ", nbrCon.OspfNbrState,
+	server.logger.Debug(fmt.Sprintln("DBDSEND: nbr state ", nbrCon.OspfNbrState,
 		" imms ", dbd_mdata.ibit, dbd_mdata.mbit, dbd_mdata.msbit,
 		" seq num ", seq, "options ", dbd_mdata.options, " headers_list ", dbd_mdata.lsa_headers))
 
