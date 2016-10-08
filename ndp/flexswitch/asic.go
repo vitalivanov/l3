@@ -139,7 +139,7 @@ func (notifyHdl *AsicNotificationHdl) ProcessNotification(msg commonDefs.AsicdNo
 		api.SendVlanNotification(oper, int32(vlanMsg.VlanId), vlanMsg.VlanIfIndex, vlanMsg.VlanName, vlanMsg.UntagPorts, vlanMsg.TagPorts)
 	case commonDefs.IPv6NbrMacMoveNotifyMsg:
 		macMoveMsg := msg.(commonDefs.IPv6NbrMacMoveNotifyMsg)
-		debug.Logger.Debug("Received Asicd IPv4 Neighbor Mac Move Notification:", macMoveMsg)
+		debug.Logger.Debug("Received Asicd IPv6 Neighbor Mac Move Notification:", macMoveMsg)
 		api.SendMacMoveNotification(macMoveMsg.IpAddr, macMoveMsg.IfIndex, macMoveMsg.VlanId)
 	}
 }
