@@ -272,6 +272,9 @@ func (svr *NDPServer) HandleStateNotification(msg *config.IPIntfNotification) {
 /*
  *    API: helper function to update ifIndex & port information for software. Hardware is already taken care
  *	   off
+ *	   NOTE:
+ *         Below Scenario will only happen when mac move happens between a physical port.. L3 port remains
+ *	   the same and hence do not need to update clients
  */
 func (svr *NDPServer) SoftwareUpdateNbrEntry(msg *config.MacMoveNotification) {
 	nbrIp := msg.IpAddr
