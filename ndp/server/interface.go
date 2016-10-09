@@ -38,7 +38,7 @@ import (
 )
 
 const (
-	NDP_PCAP_FILTER                              = "(ip6[6] == 0x3a) and (ip6[40] >= 133 && ip6[40] <= 137)"
+	NDP_PCAP_FILTER                              = "(ip6[6] == 0x3a) and (ip6[40] >= 133 && ip6[40] <= 136)"
 	NDP_PCAP_TIMEOUT                             = 1 * time.Second
 	NDP_PCAP_SNAPSHOTlEN                         = 1024
 	NDP_PCAP_PROMISCUOUS                         = false
@@ -101,6 +101,8 @@ type Interface struct {
 	IfType            int    // IfTypePort, IfTypeVlan
 	IpAddr            string // CIDR Format
 	LinkLocalIp       string // CIDR format
+	globalScope       string // absolute
+	linkScope         string // absolute
 	MsgType           string
 	OperState         string
 	reachableTime     uint32
@@ -109,8 +111,6 @@ type Interface struct {
 	raRestransmitTime uint8 // @TODO: get it from user
 	raTimer           *time.Timer
 	initialRASend     uint8                   // on port up we have to send 3 RA before kicking in config timer
-	globalScope       string                  // absolute
-	linkScope         string                  // absolute
 	Neighbor          map[string]NeighborInfo // key is NbrIp_NbrMac to handle move scenario's
 	PktDataCh         chan config.PacketData
 	counter           PktCounter

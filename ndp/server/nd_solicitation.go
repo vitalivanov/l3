@@ -104,7 +104,7 @@ func (intf *Interface) SendNS(myMac, nbrMac, nbrIp string) NDP_OPERATION {
  *		    Then update the state to STALE
  */
 func (intf *Interface) processNS(ndInfo *packet.NDInfo) (nbrInfo *config.NeighborConfig, oper NDP_OPERATION) {
-	if ndInfo.SrcIp == "" || ndInfo.SrcIp == "::" {
+	if ndInfo.SrcIp == "" || ndInfo.SrcIp == "::" || ndInfo.SrcIp == intf.linkScope || ndInfo.SrcIp == intf.globalScope {
 		// NS was generated locally or it is multicast-solicitation message
 		return nil, IGNORE
 	}
