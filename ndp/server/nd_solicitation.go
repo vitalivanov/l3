@@ -115,21 +115,19 @@ func (intf *Interface) processNS(ndInfo *packet.NDInfo) (nbrInfo *config.Neighbo
 	nbr, exists := intf.Neighbor[nbrKey]
 	if exists {
 		// update the neighbor ??? what to do in this case moving to stale
-		nbr.State = STALE
+		//nbr.State = STALE
 		oper = UPDATE
-		//nbrInfo = nil
 	} else {
 		// create new neighbor
 		nbr.InitCache(intf.reachableTime, intf.retransTime, nbrKey, intf.PktDataCh, intf.IfIndex)
-		if len(ndInfo.Options) > 0 {
-			for _, option := range ndInfo.Options {
-				if option.Type == packet.NDOptionTypeSourceLinkLayerAddress {
-					nbr.State = REACHABLE
-				}
+		oper = CREATE
+	}
+	if len(ndInfo.Options) > 0 {
+		for _, option := range ndInfo.Options {
+			if option.Type == packet.NDOptionTypeSourceLinkLayerAddress {
+				nbr.State = REACHABLE
 			}
 		}
-		//nbrInfo = nbr.populateNbrInfo(intf.IfIndex, intf.IntfRef)
-		oper = CREATE
 	}
 	nbrInfo = nbr.populateNbrInfo(intf.IfIndex, intf.IntfRef)
 	nbr.updatePktRxStateInfo()
