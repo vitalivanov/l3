@@ -38,6 +38,10 @@ import (
  * @TODO: handle un-solicited Neighbor Advertisemtn
  */
 func (intf *Interface) processNA(ndInfo *packet.NDInfo) (nbrInfo *config.NeighborConfig, oper NDP_OPERATION) {
+	if ndInfo.SrcIp == intf.linkScope || ndInfo.SrcIp == intf.globalScope {
+		// NA was generated locally or it is multicast-solicitation message
+		return nil, IGNORE
+	}
 	nbrKey := intf.createNbrKey(ndInfo)
 	if !intf.validNbrKey(nbrKey) {
 		return nil, IGNORE
@@ -54,8 +58,9 @@ func (intf *Interface) processNA(ndInfo *packet.NDInfo) (nbrInfo *config.Neighbo
 		nbr.InitCache(intf.reachableTime, intf.retransTime, nbrKey, intf.PktDataCh, intf.IfIndex)
 		nbr.State = REACHABLE
 		oper = CREATE
-		nbrInfo = nbr.populateNbrInfo(intf.IfIndex, intf.IntfRef)
+		//nbrInfo = nbr.populateNbrInfo(intf.IfIndex, intf.IntfRef)
 	}
+	nbrInfo = nbr.populateNbrInfo(intf.IfIndex, intf.IntfRef)
 	nbr.updatePktRxStateInfo()
 	intf.Neighbor[nbrKey] = nbr
 	return nbrInfo, oper

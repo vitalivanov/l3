@@ -88,6 +88,10 @@ func SendVlanNotification(oper string, vlanId int32, vlanIfIndex int32, vlanName
 	}
 }
 
+func SendMacMoveNotification(ipAddr string, ifIndex, vlanId int32) {
+	ndpApi.server.MacMoveCh <- &config.MacMoveNotification{ipAddr, ifIndex, vlanId}
+}
+
 func GetAllNeigborEntries(from, count int) (int, int, []config.NeighborConfig) {
 	n, c, result := ndpApi.server.GetNeighborEntries(from, count)
 	return n, c, result

@@ -65,9 +65,10 @@ func (intf *Interface) processRA(ndInfo *packet.NDInfo) (nbrInfo *config.Neighbo
 		nbr.InValidTimer(ndInfo.RouterLifetime)
 		nbr.RchTimer()
 		nbr.State = REACHABLE
-		nbrInfo = nbr.populateNbrInfo(intf.IfIndex, intf.IntfRef)
+		//nbrInfo = nbr.populateNbrInfo(intf.IfIndex, intf.IntfRef)
 		oper = CREATE
 	}
+	nbrInfo = nbr.populateNbrInfo(intf.IfIndex, intf.IntfRef)
 	nbr.updatePktRxStateInfo()
 	intf.Neighbor[nbrKey] = nbr
 	return nbrInfo, oper
