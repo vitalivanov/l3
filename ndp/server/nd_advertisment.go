@@ -49,17 +49,15 @@ func (intf *Interface) processNA(ndInfo *packet.NDInfo) (nbrInfo *config.Neighbo
 	nbr, exists := intf.Neighbor[nbrKey]
 	if exists {
 		// update existing neighbor timers and move
-		nbr.State = REACHABLE
 		nbr.UpdateProbe()
 		nbr.RchTimer()
 		oper = UPDATE
 	} else {
 		// create new neighbor
 		nbr.InitCache(intf.reachableTime, intf.retransTime, nbrKey, intf.PktDataCh, intf.IfIndex)
-		nbr.State = REACHABLE
 		oper = CREATE
-		//nbrInfo = nbr.populateNbrInfo(intf.IfIndex, intf.IntfRef)
 	}
+	nbr.State = REACHABLE
 	nbrInfo = nbr.populateNbrInfo(intf.IfIndex, intf.IntfRef)
 	nbr.updatePktRxStateInfo()
 	intf.Neighbor[nbrKey] = nbr

@@ -51,11 +51,11 @@ func (intf *Interface) processRA(ndInfo *packet.NDInfo) (nbrInfo *config.Neighbo
 			return nbrInfo, DELETE
 		} else {
 			// update existing neighbor timers
-			// Recahable timer reset
-			// Router Lifetime/Invalidation Timer reset
-			// Stop any probes
 			nbr.State = REACHABLE
+			// Router Lifetime/Invalidation Timer reset
 			nbr.InValidTimer(ndInfo.RouterLifetime)
+			// Recahable timer reset
+			// Stop any probes
 			nbr.RchTimer()
 			oper = UPDATE
 		}
@@ -65,7 +65,6 @@ func (intf *Interface) processRA(ndInfo *packet.NDInfo) (nbrInfo *config.Neighbo
 		nbr.InValidTimer(ndInfo.RouterLifetime)
 		nbr.RchTimer()
 		nbr.State = REACHABLE
-		//nbrInfo = nbr.populateNbrInfo(intf.IfIndex, intf.IntfRef)
 		oper = CREATE
 	}
 	nbrInfo = nbr.populateNbrInfo(intf.IfIndex, intf.IntfRef)

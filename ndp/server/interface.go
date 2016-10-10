@@ -493,9 +493,10 @@ func (intf *Interface) UpdateTimer(gCfg NdpConfig) {
  *  Get Neighbor Information
  */
 func (intf *Interface) PopulateNeighborInfo(nbr NeighborInfo, nbrState *config.NeighborEntry) {
+	debug.Logger.Debug("Neighbor Information in NDP is:", nbr)
 	nbrState.IpAddr = nbr.IpAddr
 	nbrState.MacAddr = nbr.LinkLayerAddress
-	baseReachableTime := time.Duration(nbr.BaseReachableTimer) * time.Millisecond
+	baseReachableTime := time.Duration(nbr.BaseReachableTimer) * time.Minute
 	elapsedTime := time.Since(nbr.pktRcvdTime)
 	expiryTime := baseReachableTime - elapsedTime
 	nbrState.ExpiryTimeLeft = expiryTime.String()
@@ -509,9 +510,9 @@ func (intf *Interface) PopulateNeighborInfo(nbr NeighborInfo, nbrState *config.N
 	case STALE:
 		nbrState.State = "Stale"
 	case DELAY:
-		nbrState.State = "Stale"
+		nbrState.State = "Delay"
 	case PROBE:
-		nbrState.State = "Stale"
+		nbrState.State = "Probe"
 	}
 }
 

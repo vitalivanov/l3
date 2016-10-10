@@ -159,7 +159,7 @@ func (c *NeighborInfo) RchTimer() {
 	if c.ReachableTimer != nil {
 		debug.Logger.Debug("Re-Setting Reachable Timer for neighbor:", c.IpAddr, "timer:", c.BaseReachableTimer)
 		//Reset the timer as we have received an advertisment for the neighbor
-		c.ReachableTimer.Reset(time.Duration(c.BaseReachableTimer) * time.Millisecond)
+		c.ReachableTimer.Reset(time.Duration(c.BaseReachableTimer) * time.Minute)
 	} else {
 		// This is first time initialization of reachable timer... let set it up
 		var ReachableTimer_func func()
@@ -174,7 +174,7 @@ func (c *NeighborInfo) RchTimer() {
 			}
 		}
 		debug.Logger.Debug("Setting Reachable Timer for neighbor:", c.IpAddr, "timer:", c.BaseReachableTimer)
-		c.ReachableTimer = time.AfterFunc(time.Duration(c.BaseReachableTimer)*time.Millisecond,
+		c.ReachableTimer = time.AfterFunc(time.Duration(c.BaseReachableTimer)*time.Minute,
 			ReachableTimer_func)
 	}
 }
@@ -190,7 +190,7 @@ func (c *NeighborInfo) ReComputeBaseReachableTimer() {
 		var RecomputeBaseTimer_func func()
 		RecomputeBaseTimer_func = func() {
 			c.BaseReachableTimer = computeBase(c.ReachableTimeConfig)
-			c.ReachableTimer.Reset(time.Duration(c.BaseReachableTimer) * time.Millisecond)
+			c.ReachableTimer.Reset(time.Duration(c.BaseReachableTimer) * time.Minute)
 		}
 		debug.Logger.Debug("Setting Recompute Timer for neighbor:", c.IpAddr)
 		c.RecomputeBaseTimer = time.AfterFunc(time.Duration(RECOMPUTE_BASE_REACHABLE_TIMER)*time.Hour,
@@ -211,7 +211,7 @@ func (intf *Interface) RAResTransmitTimer() {
 			intf.raTimer.Reset(time.Duration(MAX_INITIAL_RTR_ADVERT_INTERVAL) * time.Second)
 			intf.initialRASend++
 		} else {
-			debug.Logger.Debug("Re-Setting ra retransmit timer for intf:", intf.IntfRef, "to:", intf.raRestransmitTime)
+			//debug.Logger.Debug("Re-Setting ra retransmit timer for intf:", intf.IntfRef, "to:", intf.raRestransmitTime)
 			intf.raTimer.Reset(time.Duration(intf.raRestransmitTime) * time.Second)
 		}
 	} else {
