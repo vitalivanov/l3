@@ -70,14 +70,13 @@ type IPIntfProperty struct {
 	Cost    uint32
 }
 
-func (server *OSPFServer) computeMinMTU(msg IPv4IntfNotifyMsg) int32 {
-	var minMtu int32 = 10000                 //in bytes
-	if msg.IfType == commonDefs.IfTypePort { // PHY
-		ent, _ := server.portPropertyMap[int32(msg.IfId)]
+func (server *OSPFServer) computeMinMTU(IfType uint8, IfId uint16) int32 {
+	var minMtu int32 = 10000             //in bytes
+	if IfType == commonDefs.IfTypePort { // PHY
+		ent, _ := server.portPropertyMap[int32(IfId)]
 		minMtu = ent.Mtu
-		server.logger.Err(fmt.Sprintln("Ospf : min MTU " ,minMtu))
-	} else if msg.IfType == commonDefs.IfTypeVlan { // Vlan
-		ent, _ := server.vlanPropertyMap[msg.IfId]
+	} else if IfType == commonDefs.IfTypeVlan { // Vlan
+		ent, _ := server.vlanPropertyMap[IfId]
 		for _, portNum := range ent.UntagPorts {
 			entry, _ := server.portPropertyMap[portNum]
 			if minMtu > entry.Mtu {
@@ -86,6 +85,12 @@ func (server *OSPFServer) computeMinMTU(msg IPv4IntfNotifyMsg) int32 {
 		}
 	}
 	return minMtu
+}
+
+func (server *OSPFServer) UpdateMtu(ifIndex int32, mtu int32) {
+	ent, _ := server.portPropertyMap[ifIndex]
+	ent.Mtu = mtu
+	server.portPropertyMap[ifIndex] = ent
 }
 
 func (server *OSPFServer) updateIpPropertyMap(msg IPv4IntfNotifyMsg, msgType uint8) {
@@ -201,7 +206,7 @@ func (server *OSPFServer) constructL3Infra() {
 			ipv4IntfMsg.IpAddr = ent.IpAddr
 			ipv4IntfMsg.IfType = ifType
 			ipv4IntfMsg.IfId = ifId
-			mtu := server.computeMinMTU(ipv4IntfMsg)
+			mtu := server.computeMinMTU(ipv4IntfMsg.IfType, ipv4IntfMsg.IfId)
 			server.createIPIntfConfMap(ipv4IntfMsg, mtu, ifIdx, broadcast)
 			server.ipPropertyMap[ip] = ent
 		}
@@ -345,7 +350,7 @@ func (server *OSPFServer) UpdateIPv4Infra(msg asicdCommonDefs.IPv4IntfNotifyMsg,
 	if msgType == asicdCommonDefs.NOTIFY_IPV4INTF_CREATE ||
 		msgType == asicdCommonDefs.NOTIFY_LOGICAL_INTF_CREATE {
 		server.logger.Info(fmt.Sprintln("Receive IPV4INTF_CREATE", msg))
-		mtu := server.computeMinMTU(ipv4IntfMsg)
+		mtu := server.computeMinMTU(ipv4IntfMsg.IfType, ipv4IntfMsg.IfId)
 		// We need more information from Asicd about numbered/unnumbered p2p
 		// or broadcast
 		//Start

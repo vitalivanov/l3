@@ -52,7 +52,8 @@ type GlobalState struct {
 	EBGPAllowMultipleAS bool
 	IBGPMaxPaths        uint32
 	TotalPaths          uint32
-	TotalPrefixes       uint32
+	Totalv4Prefixes     uint32
+	Totalv6Prefixes     uint32
 }
 
 type Global struct {
