@@ -91,7 +91,7 @@ func (server *OSPFServer) processAsicdNotification(asicdrxBuf []byte) {
 			server.logger.Err(fmt.Sprintln("Mtu change :Unable to unmarshal msg :", msg.Msg))
 			return
 		}
-		server.UpdateMtu(uint8(mtuChangeMsg.IfType), mtuChangeMsg.IfIndex, mtuChangeMsg.Mtu)
+		server.UpdateMtu(mtuChangeMsg.IfIndex, mtuChangeMsg.Mtu)
 	}
 
 	if msg.MsgType == asicdCommonDefs.NOTIFY_LOGICAL_INTF_CREATE ||

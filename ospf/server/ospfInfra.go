@@ -87,20 +87,10 @@ func (server *OSPFServer) computeMinMTU(IfType uint8, IfId uint16) int32 {
 	return minMtu
 }
 
-func (server *OSPFServer) UpdateMtu(ifType uint8, ifIndex int32, mtu int32) {
-	if ifType == commonDefs.IfTypePort {
-		ent, _ := server.portPropertyMap[ifIndex]
-		ent.Mtu = mtu
-		server.portPropertyMap[ifIndex] = ent
-	} else if ifType == commonDefs.IfTypeVlan {
-		ent, _ := server.vlanPropertyMap[uint16(ifIndex)]
-		for _, portNum := range ent.UntagPorts {
-			entry, _ := server.portPropertyMap[portNum]
-			entry.Mtu = mtu
-			server.portPropertyMap[portNum] = entry
-		}
-
-	}
+func (server *OSPFServer) UpdateMtu(ifIndex int32, mtu int32) {
+	ent, _ := server.portPropertyMap[ifIndex]
+	ent.Mtu = mtu
+	server.portPropertyMap[ifIndex] = ent
 }
 
 func (server *OSPFServer) updateIpPropertyMap(msg IPv4IntfNotifyMsg, msgType uint8) {
