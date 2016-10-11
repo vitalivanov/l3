@@ -725,7 +725,8 @@ func (h *BGPHandler) GetBGPGlobalState(rtrId string) (*bgpd.BGPGlobalState, erro
 	bgpGlobalResponse.EBGPAllowMultipleAS = bgpGlobal.EBGPAllowMultipleAS
 	bgpGlobalResponse.IBGPMaxPaths = int32(bgpGlobal.IBGPMaxPaths)
 	bgpGlobalResponse.TotalPaths = int32(bgpGlobal.TotalPaths)
-	bgpGlobalResponse.TotalPrefixes = int32(bgpGlobal.TotalPrefixes)
+	bgpGlobalResponse.Totalv4Prefixes = int32(bgpGlobal.Totalv4Prefixes)
+	bgpGlobalResponse.Totalv6Prefixes = int32(bgpGlobal.Totalv6Prefixes)
 	return bgpGlobalResponse, nil
 }
 
