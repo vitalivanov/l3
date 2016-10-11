@@ -337,7 +337,8 @@ func (svr *NDPServer) ProcessRxPkt(ifIndex int32, pkt gopacket.Packet) error {
 			}
 		}
 	case DELETE:
-		svr.deleteNeighbor(nbrInfo.IpAddr, ifIndex) // used mostly by RA
+		//svr.deleteNeighbor(nbrInfo.IpAddr, ifIndex) // used mostly by RA
+		svr.deleteNeighbor(nbrInfo.IpAddr, l3Port.IfIndex) // used mostly by RA
 	}
 
 early_exit:
@@ -370,7 +371,8 @@ func (svr *NDPServer) ProcessTimerExpiry(pktData config.PacketData) error {
 	// fix this when we have per port mac addresses
 	operation := l3Port.SendND(pktData, svr.SwitchMac)
 	if operation == DELETE {
-		svr.deleteNeighbor(pktData.NeighborIp, pktData.IfIndex)
+		//svr.deleteNeighbor(pktData.NeighborIp, pktData.IfIndex)
+		svr.deleteNeighbor(pktData.NeighborIp, l3Port.IfIndex)
 	}
 	if l3exists {
 		svr.L3Port[l3IfIndex] = l3Port

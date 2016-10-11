@@ -540,3 +540,14 @@ func (intf *Interface) RefreshAllNeighbors(mac string) {
 		intf.SendNS(mac, nbr.LinkLayerAddress, nbr.IpAddr)
 	}
 }
+
+/*
+ *   Api to delete one neighbor entry request by the action
+ */
+func (intf *Interface) DeleteNeighbor(nbrEntry config.NeighborConfig) ([]string, error) {
+	nbrIp := nbrEntry.IpAddr
+	nbrMac := nbrEntry.MacAddr
+	nbrKey := nbrIp + "_" + nbrMac
+
+	return intf.FlushNeighborPerIp(nbrKey, nbrIp)
+}

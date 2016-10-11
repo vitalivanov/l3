@@ -38,6 +38,8 @@ const (
 	L2_TAG_TYPE        = "tag"
 	L2_UNTAG_TYPE      = "untag"
 	L3_INVALID_IFINDEX = -1
+
+	INTERNAL_VLAN = -1
 )
 
 const (

@@ -313,11 +313,13 @@ func (svr *NDPServer) HandleAction(action *config.ActionData) {
 		svr.ActionDeleteByIntf(action.IntfRef)
 
 	case config.DELETE_BY_IPADDR:
+		svr.ActionDeleteByNbrIp(action.NbrIp)
 
 	case config.REFRESH_BY_IFNAME:
 		svr.ActionRefreshByIntf(action.IntfRef)
 
 	case config.REFRESH_BY_IPADDR:
+		svr.ActionRefreshByNbrIp(action.NbrIp)
 	}
 }
 
@@ -347,7 +349,7 @@ func (svr *NDPServer) PopulateVlanInfo(nbrInfo *config.NeighborConfig, intfRef s
 	} else {
 		// @TODO: move this to plugin specific
 		// in this case use system reserved Vlan id which is -1
-		nbrInfo.VlanId = -1
+		nbrInfo.VlanId = config.INTERNAL_VLAN
 	}
 }
 
