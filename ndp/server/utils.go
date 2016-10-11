@@ -256,3 +256,46 @@ func (svr *NDPServer) DeletePcap(ifIndex int32) {
 		}
 	}
 }
+
+/*
+ *  Utility Action function to delete ndp entries by L3 Port interface name
+ */
+func (svr *NDPServer) ActionDeleteByIntf(intfRef string) {
+	ifIndex, exists := svr.L3IfIntfRefToIfIndex[intfRef]
+	if !exists {
+		debug.Logger.Err("Refresh Action by Interface Name:", intfRef,
+			"cannot be performed as no ifIndex found for L3 interface")
+		return
+	}
+	l3Port, exists := svr.L3Port[ifIndex]
+	if !exists {
+		debug.Logger.Err("Delete Action by Interface Name:", intfRef,
+			"cannot be performed as no such L3 interface exists")
+		return
+	}
+	deleteEntries, err := l3Port.FlushNeighbors()
+	if len(deleteEntries) > 0 && err == nil {
+		debug.Logger.Info("Server Action Delete by Intf:", l3Port.IntfRef, "Neighbors:", deleteEntries)
+		svr.DeleteNeighborInfo(deleteEntries, ifIndex)
+	}
+}
+
+/*
+ *  Utility Action function to refreshndp entries by L3 Port interface name
+ */
+func (svr *NDPServer) ActionRefreshByIntf(intfRef string) {
+	ifIndex, exists := svr.L3IfIntfRefToIfIndex[intfRef]
+	if !exists {
+		debug.Logger.Err("Refresh Action by Interface Name:", intfRef,
+			"cannot be performed as no ifIndex found for L3 interface")
+		return
+	}
+	l3Port, exists := svr.L3Port[ifIndex]
+	if !exists {
+		debug.Logger.Err("Refresh Action by Interface Name:", intfRef,
+			"cannot be performed as no such L3 interface exists")
+		return
+	}
+
+	l3Port.RefreshAllNeighbors(svr.SwitchMac)
+}

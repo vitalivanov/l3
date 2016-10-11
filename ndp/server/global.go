@@ -90,6 +90,8 @@ type NDPServer struct {
 	RxPktCh chan *RxPktInfo
 	//Package packet informs server over PktDataCh saying that send this packet..
 	PktDataCh chan config.PacketData
+	//Action Channel for NDP
+	ActionCh chan *config.ActionData
 
 	ndpL3IntfStateSlice   []int32
 	ndpUpL3IntfStateSlice []int32

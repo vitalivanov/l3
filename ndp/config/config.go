@@ -40,6 +40,14 @@ const (
 	L3_INVALID_IFINDEX = -1
 )
 
+const (
+	_ = iota
+	DELETE_BY_IFNAME
+	DELETE_BY_IPADDR
+	REFRESH_BY_IFNAME
+	REFRESH_BY_IPADDR
+)
+
 type PortInfo struct {
 	IntfRef     string
 	IfIndex     int32
@@ -136,4 +144,10 @@ type PacketData struct {
 	NeighborIp  string
 	NeighborMac string
 	IfIndex     int32
+}
+
+type ActionData struct {
+	Type    int
+	NbrIp   string
+	IntfRef string
 }
