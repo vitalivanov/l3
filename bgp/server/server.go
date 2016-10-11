@@ -655,7 +655,6 @@ func (s *BGPServer) CheckForAggregation(updated map[uint32]map[*bgprib.Path][]*b
 		for _, destinations := range pathDestMap {
 			s.logger.Infof("BGPServer:checkForAggregate - update destinations %+v", destinations)
 			for _, dest := range destinations {
-				s.logger.Infof("BGPServer:checkForAggregate - update dest %+v", dest.NLRI.GetPrefix())
 				if dest == nil || dest.LocRibPath == nil || dest.LocRibPath.IsAggregate() {
 					continue
 				}
@@ -785,7 +784,7 @@ func (s *BGPServer) TraverseAndReverseBGPRib(policyData interface{}, pe *bgppoli
 	s.logger.Info("BGPServer:TraverseAndReverseBGPRib - policy", policy.Name)
 	policyExtensions := policy.Extensions.(bgppolicy.PolicyExtensions)
 	if len(policyExtensions.RouteList) == 0 {
-		fmt.Println("No route affected by this policy, so nothing to do")
+		s.logger.Info("No route affected by this policy, so nothing to do")
 		return
 	}
 
@@ -1010,7 +1009,7 @@ func (s *BGPServer) TraverseAndReverseAdjRIB(policyData interface{}, pe *bgppoli
 	s.logger.Info("BGPServer:TraverseAndReverseAdjRIB - policy", policy.Name)
 	policyExtensions := policy.Extensions.(bgppolicy.AdjRibPolicyExtensions)
 	if len(policyExtensions.RouteList) == 0 {
-		fmt.Println("No route affected by this policy, so nothing to do")
+		s.logger.Info("No route affected by this policy, so nothing to do")
 		return
 	}
 
@@ -2250,9 +2249,10 @@ func (s *BGPServer) listenChannelUpdates() {
 			s.ProcessUpdate(pktInfo)
 
 		case reachabilityInfo := <-s.ReachabilityCh:
-			s.logger.Info("Server: Reachability info for ip", reachabilityInfo.IP)
+			s.logger.Info("Server: Get reachability info for ip", reachabilityInfo.IP)
 
-			_, err := s.routeMgr.GetNextHopInfo(reachabilityInfo.IP, reachabilityInfo.IfIndex)
+			nhInfo, err := s.routeMgr.GetNextHopInfo(reachabilityInfo.IP, reachabilityInfo.IfIndex)
+			s.logger.Infof("Server: Reachability info for ip is %+v", nhInfo)
 			if err != nil {
 				reachabilityInfo.ReachableCh <- false
 			} else {
@@ -2412,6 +2412,21 @@ func (s *BGPServer) StartServer() {
 }
 
 func (s *BGPServer) GetBGPGlobalState() config.GlobalState {
+	routesCount := s.LocRib.GetRoutesCount()
+	s.BgpConfig.Global.State.Totalv4Prefixes = 0
+	s.BgpConfig.Global.State.Totalv6Prefixes = 0
+	for protoFamily, count := range routesCount {
+		switch protoFamily {
+		case packet.ProtocolFamilyMap["ipv4-unicast"]:
+			s.BgpConfig.Global.State.Totalv4Prefixes = count
+
+		case packet.ProtocolFamilyMap["ipv6-unicast"]:
+			s.BgpConfig.Global.State.Totalv6Prefixes = count
+
+		default:
+			s.logger.Err("Unknown protocol family type", protoFamily)
+		}
+	}
 	return s.BgpConfig.Global.State
 }
 

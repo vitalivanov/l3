@@ -12,7 +12,6 @@ func ConvertAsdotToAsplain(asdot string) (int, error) {
 	asnum := 0
 	nums := strings.Split(asdot, ".")
 	if len(nums) != 2 {
-		fmt.Println("Invalid asdot")
 		return asnum, errors.New(fmt.Sprintln("Invalid asdot ", asdot))
 	}
 	n1, _ := strconv.Atoi(nums[0])
@@ -20,6 +19,7 @@ func ConvertAsdotToAsplain(asdot string) (int, error) {
 	asnum = (n1 * 65536) + n2
 	return asnum, nil
 }
+
 func GetAsNum(asdot string) (int, error) {
 	asnum := 0
 	if asdot == "" {
@@ -29,11 +29,11 @@ func GetAsNum(asdot string) (int, error) {
 		return asnum, err
 	} else {
 		asnum, err := strconv.Atoi(asdot)
-		fmt.Println("asnum:", asnum, " err:", err)
 		return asnum, err
 	}
 	return asnum, nil
 }
+
 func GetAsDot(asnum int) (string, error) {
 	asdot := ""
 	if asnum < 65536 {
