@@ -60,13 +60,6 @@ func Init(svr *server.NDPServer) {
 	ndpApi.server = svr
 }
 
-func SendL2PortNotification(ifIndex int32, state string) {
-	ndpApi.server.PhyPortStateCh <- &config.PortState{
-		IfIndex: ifIndex,
-		IfState: state,
-	}
-}
-
 func SendL3PortNotification(ifIndex int32, state, ipAddr string) {
 	ndpApi.server.IpIntfCh <- &config.IPIntfNotification{
 		IfIndex:   ifIndex,
@@ -93,6 +86,10 @@ func SendVlanNotification(oper string, vlanId int32, vlanIfIndex int32, vlanName
 		UntagPorts:  untagPorts,
 		TagPorts:    tagPorts,
 	}
+}
+
+func SendMacMoveNotification(ipAddr string, ifIndex, vlanId int32) {
+	ndpApi.server.MacMoveCh <- &config.MacMoveNotification{ipAddr, ifIndex, vlanId}
 }
 
 func GetAllNeigborEntries(from, count int) (int, int, []config.NeighborConfig) {

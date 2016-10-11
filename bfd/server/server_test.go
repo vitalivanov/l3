@@ -39,7 +39,6 @@ var bfdTestControlPacket *BfdControlPacket
 func BfdTestNewLogger() *logging.Writer {
 	logger := new(logging.Writer)
 	logger.SysLogger, _ = syslog.New(syslog.LOG_DEBUG|syslog.LOG_DAEMON, "BFDTEST")
-	logger.GlobalLogging = true
 	logger.MyLogLevel = sysdCommonDefs.DEBUG
 	return logger
 }

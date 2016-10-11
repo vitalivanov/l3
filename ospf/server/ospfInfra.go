@@ -75,6 +75,7 @@ func (server *OSPFServer) computeMinMTU(msg IPv4IntfNotifyMsg) int32 {
 	if msg.IfType == commonDefs.IfTypePort { // PHY
 		ent, _ := server.portPropertyMap[int32(msg.IfId)]
 		minMtu = ent.Mtu
+		server.logger.Err(fmt.Sprintln("Ospf : min MTU " ,minMtu))
 	} else if msg.IfType == commonDefs.IfTypeVlan { // Vlan
 		ent, _ := server.vlanPropertyMap[msg.IfId]
 		for _, portNum := range ent.UntagPorts {

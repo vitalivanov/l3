@@ -38,7 +38,7 @@ import (
 )
 
 const (
-	NDP_PCAP_FILTER                              = "(ip6[6] == 0x3a) and (ip6[40] >= 133 && ip6[40] <= 137)"
+	NDP_PCAP_FILTER                              = "(ip6[6] == 0x3a) and (ip6[40] >= 133 && ip6[40] <= 136)"
 	NDP_PCAP_TIMEOUT                             = 1 * time.Second
 	NDP_PCAP_SNAPSHOTlEN                         = 1024
 	NDP_PCAP_PROMISCUOUS                         = false
@@ -101,6 +101,8 @@ type Interface struct {
 	IfType            int    // IfTypePort, IfTypeVlan
 	IpAddr            string // CIDR Format
 	LinkLocalIp       string // CIDR format
+	globalScope       string // absolute
+	linkScope         string // absolute
 	MsgType           string
 	OperState         string
 	reachableTime     uint32
@@ -109,8 +111,6 @@ type Interface struct {
 	raRestransmitTime uint8 // @TODO: get it from user
 	raTimer           *time.Timer
 	initialRASend     uint8                   // on port up we have to send 3 RA before kicking in config timer
-	globalScope       string                  // absolute
-	linkScope         string                  // absolute
 	Neighbor          map[string]NeighborInfo // key is NbrIp_NbrMac to handle move scenario's
 	PktDataCh         chan config.PacketData
 	counter           PktCounter
@@ -444,6 +444,7 @@ func (intf *Interface) createNbrKey(ndInfo *packet.NDInfo) (nbrkey string) {
  * process nd will be called during received message
  */
 func (intf *Interface) ProcessND(ndInfo *packet.NDInfo) (*config.NeighborConfig, NDP_OPERATION) {
+	intf.counter.Rcvd++
 	if intf.Neighbor == nil {
 		debug.Logger.Alert("!!!!Neighbor Initialization for intf:", intf.IntfRef, "didn't happen properly!!!!!")
 		intf.Neighbor = make(map[string]NeighborInfo, 10)
@@ -492,9 +493,10 @@ func (intf *Interface) UpdateTimer(gCfg NdpConfig) {
  *  Get Neighbor Information
  */
 func (intf *Interface) PopulateNeighborInfo(nbr NeighborInfo, nbrState *config.NeighborEntry) {
+	debug.Logger.Debug("Neighbor Information in NDP is:", nbr)
 	nbrState.IpAddr = nbr.IpAddr
 	nbrState.MacAddr = nbr.LinkLayerAddress
-	baseReachableTime := time.Duration(nbr.BaseReachableTimer) * time.Millisecond
+	baseReachableTime := time.Duration(nbr.BaseReachableTimer) * time.Minute
 	elapsedTime := time.Since(nbr.pktRcvdTime)
 	expiryTime := baseReachableTime - elapsedTime
 	nbrState.ExpiryTimeLeft = expiryTime.String()
@@ -508,9 +510,9 @@ func (intf *Interface) PopulateNeighborInfo(nbr NeighborInfo, nbrState *config.N
 	case STALE:
 		nbrState.State = "Stale"
 	case DELAY:
-		nbrState.State = "Stale"
+		nbrState.State = "Delay"
 	case PROBE:
-		nbrState.State = "Stale"
+		nbrState.State = "Probe"
 	}
 }
 
