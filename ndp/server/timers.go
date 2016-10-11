@@ -157,7 +157,7 @@ func (c *NeighborInfo) RchTimer() {
 	c.StopDelayProbeTimer()
 	c.StopReTransmitTimer()
 	if c.ReachableTimer != nil {
-		debug.Logger.Debug("Re-Setting Reachable Timer for neighbor:", c.IpAddr, "timer:", c.BaseReachableTimer)
+		//debug.Logger.Debug("Re-Setting Reachable Timer for neighbor:", c.IpAddr, "timer:", c.BaseReachableTimer)
 		//Reset the timer as we have received an advertisment for the neighbor
 		c.ReachableTimer.Reset(time.Duration(c.BaseReachableTimer) * time.Minute)
 	} else {

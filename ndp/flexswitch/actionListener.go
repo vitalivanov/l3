@@ -20,52 +20,31 @@
 // |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
 // |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
 //
-
-package vrrpServer
+package flexswitch
 
 import (
-	"fmt"
-	"models/objects"
-	"utils/dbutils"
-	"vrrpd"
+	"l3/ndp/api"
+	_ "l3/ndp/config"
+	_ "l3/ndp/debug"
+	"ndpd"
 )
 
-func (svr *VrrpServer) VrrpInitDB() error {
-	svr.logger.Info("Initializing DB")
-	var err error
-	svr.vrrpDbHdl = dbutils.NewDBUtil(svr.logger)
-	err = svr.vrrpDbHdl.Connect()
-	if err != nil {
-		svr.logger.Err(fmt.Sprintln("Failed to Create DB Handle", err))
-		return err
-	}
-
-	svr.logger.Info("DB connection is established")
-	return err
+func (h *ConfigHandler) ExecuteActionNdpDeleteByIfName(config *ndpd.NdpDeleteByIfName) (bool, error) {
+	api.SendDeleteByIfName(config.IfName)
+	return true, nil
 }
 
-func (svr *VrrpServer) VrrpCloseDB() {
-	svr.logger.Info("Closed vrrp db")
-	svr.vrrpDbHdl.Disconnect()
+func (h *ConfigHandler) ExecuteActionNdpDeleteByIPv6Addr(config *ndpd.NdpDeleteByIPv6Addr) (bool, error) {
+	api.SendDeleteByNeighborIp(config.IpAddr)
+	return true, nil
 }
 
-func (svr *VrrpServer) VrrpReadDB() error {
-	svr.logger.Info("Reading VrrpIntf Config from DB")
-	if svr.vrrpDbHdl == nil {
-		return nil
-	}
-	var dbObj objects.VrrpIntf
-	objList, err := dbObj.GetAllObjFromDb(svr.vrrpDbHdl)
-	if err != nil {
-		svr.logger.Warning("DB querry failed for VrrpIntf Config")
-		return err
-	}
-	for idx := 0; idx < len(objList); idx++ {
-		obj := vrrpd.NewVrrpIntf()
-		dbObject := objList[idx].(objects.VrrpIntf)
-		objects.ConvertvrrpdVrrpIntfObjToThrift(&dbObject, obj)
-		svr.VrrpCreateGblInfo(*obj)
-	}
-	svr.logger.Info("Done reading from DB")
-	return err
+func (h *ConfigHandler) ExecuteActionNdpRefreshByIfName(config *ndpd.NdpRefreshByIfName) (bool, error) {
+	api.SendRefreshByIfName(config.IfName)
+	return true, nil
+}
+
+func (h *ConfigHandler) ExecuteActionNdpRefreshByIPv6Addr(config *ndpd.NdpRefreshByIPv6Addr) (bool, error) {
+	api.SendRefreshByNeighborIp(config.IpAddr)
+	return true, nil
 }

@@ -528,3 +528,26 @@ func (intf *Interface) validNbrKey(nbrKey string) bool {
 	}
 	return true
 }
+
+/*
+ *   Api to Send Unicast Solicitation Message for all neighbor entries to do refresh before the expiry
+ *   Time
+ */
+func (intf *Interface) RefreshAllNeighbors(mac string) {
+	debug.Logger.Info("Refresh Action for All Neighbors by intferface:", intf.IntfRef)
+	for _, nbr := range intf.Neighbor {
+		debug.Logger.Info("Refreshing Neighbor:", nbr.LinkLayerAddress, nbr.IpAddr)
+		intf.SendNS(mac, nbr.LinkLayerAddress, nbr.IpAddr)
+	}
+}
+
+/*
+ *   Api to delete one neighbor entry request by the action
+ */
+func (intf *Interface) DeleteNeighbor(nbrEntry config.NeighborConfig) ([]string, error) {
+	nbrIp := nbrEntry.IpAddr
+	nbrMac := nbrEntry.MacAddr
+	nbrKey := nbrIp + "_" + nbrMac
+
+	return intf.FlushNeighborPerIp(nbrKey, nbrIp)
+}

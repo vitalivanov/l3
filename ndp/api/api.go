@@ -129,3 +129,31 @@ func GetAllNdpIntfState(from, count int) (int, int, []config.InterfaceEntries) {
 func GetNdpIntfState(intfRef string) *config.InterfaceEntries {
 	return ndpApi.server.GetInterfaceNeighborEntry(intfRef)
 }
+
+func SendDeleteByIfName(intfRef string) {
+	ndpApi.server.ActionCh <- &config.ActionData{
+		Type:    config.DELETE_BY_IFNAME,
+		IntfRef: intfRef,
+	}
+}
+
+func SendDeleteByNeighborIp(ipAddr string) {
+	ndpApi.server.ActionCh <- &config.ActionData{
+		Type:  config.DELETE_BY_IPADDR,
+		NbrIp: ipAddr,
+	}
+}
+
+func SendRefreshByIfName(intfRef string) {
+	ndpApi.server.ActionCh <- &config.ActionData{
+		Type:    config.REFRESH_BY_IFNAME,
+		IntfRef: intfRef,
+	}
+}
+
+func SendRefreshByNeighborIp(ipAddr string) {
+	ndpApi.server.ActionCh <- &config.ActionData{
+		Type:  config.REFRESH_BY_IPADDR,
+		NbrIp: ipAddr,
+	}
+}

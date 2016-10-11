@@ -77,7 +77,6 @@ func (svr *NDPServer) OSSignalHandle() {
 }
 
 func (svr *NDPServer) InitGlobalDS() {
-	//svr.PhyPort = make(map[int32]config.PortInfo, NDP_SERVER_MAP_INITIAL_CAP)
 	svr.L2Port = make(map[int32]PhyPort, NDP_SERVER_MAP_INITIAL_CAP)
 	svr.SwitchMacMapEntries = make(map[string]struct{}, NDP_SERVER_MAP_INITIAL_CAP)
 	svr.L3Port = make(map[int32]Interface, NDP_SERVER_MAP_INITIAL_CAP)
@@ -91,6 +90,7 @@ func (svr *NDPServer) InitGlobalDS() {
 	svr.MacMoveCh = make(chan *config.MacMoveNotification)
 	svr.RxPktCh = make(chan *RxPktInfo, NDP_SERVER_INITIAL_CHANNEL_SIZE)
 	svr.PktDataCh = make(chan config.PacketData, NDP_SERVER_INITIAL_CHANNEL_SIZE)
+	svr.ActionCh = make(chan *config.ActionData)
 	svr.SnapShotLen = 1024
 	svr.Promiscuous = false
 	svr.Timeout = 1 * time.Second
@@ -200,6 +200,12 @@ func (svr *NDPServer) EventsListener() {
 				continue
 			}
 			svr.SoftwareUpdateNbrEntry(macMoveInfo)
+		// action notification
+		case actionData, ok := <-svr.ActionCh:
+			if !ok {
+				continue
+			}
+			svr.HandleAction(actionData)
 		}
 	}
 }
