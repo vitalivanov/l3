@@ -280,6 +280,7 @@ func (svr *NDPServer) HandleStateNotification(msg *config.IPIntfNotification) {
  *	   the same and hence do not need to update clients
  */
 func (svr *NDPServer) SoftwareUpdateNbrEntry(msg *config.MacMoveNotification) {
+	debug.Logger.Info("Received Mac Move Notification for IPV6 entry:", *msg)
 	nbrIp := msg.IpAddr
 	svr.NeigborEntryLock.Lock()
 	defer svr.NeigborEntryLock.Unlock()
