@@ -84,6 +84,16 @@ func (server *OSPFServer) processAsicdNotification(asicdrxBuf []byte) {
 		server.logger.Err(fmt.Sprintln("Unable to unmarshal asicdrxBuf:", asicdrxBuf))
 		return
 	}
+	if msg.MsgType == asicdCommonDefs.NOTIFY_PORT_CONFIG_MTU_CHANGE {
+		var mtuChangeMsg asicdCommonDefs.PortConfigMtuChgNotigyMsg
+		err = json.Unmarshal(msg.Msg, &mtuChangeMsg)
+		if err != nil {
+			server.logger.Err(fmt.Sprintln("Mtu change :Unable to unmarshal msg :", msg.Msg))
+			return
+		}
+		server.UpdateMtu(mtuChangeMsg.IfIndex, mtuChangeMsg.Mtu)
+	}
+
 	if msg.MsgType == asicdCommonDefs.NOTIFY_LOGICAL_INTF_CREATE ||
 		msg.MsgType == asicdCommonDefs.NOTIFY_LOGICAL_INTF_DELETE {
 		var newLogicalIntfMgs asicdCommonDefs.LogicalIntfNotifyMsg

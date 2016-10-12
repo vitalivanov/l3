@@ -182,6 +182,8 @@ func (svr *NDPServer) HandleIPIntfCreateDelete(obj *config.IPIntfNotification) {
 		ipInfo = Interface{}
 		ipInfo.CreateIntf(obj, svr.PktDataCh, svr.NdpConfig)
 		ipInfo.SetIfType(svr.GetIfType(obj.IfIndex))
+		// cache reverse map from intfref to ifIndex, used mainly during state
+		svr.L3IfIntfRefToIfIndex[obj.IntfRef] = obj.IfIndex
 		svr.ndpL3IntfStateSlice = append(svr.ndpL3IntfStateSlice, ipInfo.IfIndex)
 	case config.CONFIG_DELETE:
 		if !exists {
@@ -194,6 +196,7 @@ func (svr *NDPServer) HandleIPIntfCreateDelete(obj *config.IPIntfNotification) {
 		if len(deleteEntries) > 0 {
 			svr.DeleteNeighborInfo(deleteEntries, obj.IfIndex)
 		}
+		delete(svr.L3IfIntfRefToIfIndex, obj.IntfRef)
 		// @TODO: need to take care for ifTYpe vlan
 		//@TODO: need to remove ndp l3 interface from up slice, but that is taken care of by stop rx/tx
 	}
@@ -300,6 +303,27 @@ func (svr *NDPServer) SoftwareUpdateNbrEntry(msg *config.MacMoveNotification) {
 }
 
 /*
+ *    API: handle action request coming from the user
+ */
+func (svr *NDPServer) HandleAction(action *config.ActionData) {
+	debug.Logger.Debug("Handle Action:", *action)
+
+	switch action.Type {
+	case config.DELETE_BY_IFNAME:
+		svr.ActionDeleteByIntf(action.IntfRef)
+
+	case config.DELETE_BY_IPADDR:
+		svr.ActionDeleteByNbrIp(action.NbrIp)
+
+	case config.REFRESH_BY_IFNAME:
+		svr.ActionRefreshByIntf(action.IntfRef)
+
+	case config.REFRESH_BY_IPADDR:
+		svr.ActionRefreshByNbrIp(action.NbrIp)
+	}
+}
+
+/*
  *    API: It will remove any deleted ip port from the up state slice list
  */
 func (svr *NDPServer) DeleteL3IntfFromUpState(ifIndex int32) {
@@ -325,7 +349,7 @@ func (svr *NDPServer) PopulateVlanInfo(nbrInfo *config.NeighborConfig, intfRef s
 	} else {
 		// @TODO: move this to plugin specific
 		// in this case use system reserved Vlan id which is -1
-		nbrInfo.VlanId = -1
+		nbrInfo.VlanId = config.INTERNAL_VLAN
 	}
 }
 

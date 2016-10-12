@@ -256,3 +256,114 @@ func (svr *NDPServer) DeletePcap(ifIndex int32) {
 		}
 	}
 }
+
+/*
+ *  Utility Action function to delete ndp entries by L3 Port interface name
+ */
+func (svr *NDPServer) ActionDeleteByIntf(intfRef string) {
+	ifIndex, exists := svr.L3IfIntfRefToIfIndex[intfRef]
+	if !exists {
+		debug.Logger.Err("Refresh Action by Interface Name:", intfRef,
+			"cannot be performed as no ifIndex found for L3 interface")
+		return
+	}
+	l3Port, exists := svr.L3Port[ifIndex]
+	if !exists {
+		debug.Logger.Err("Delete Action by Interface Name:", intfRef,
+			"cannot be performed as no such L3 interface exists")
+		return
+	}
+	deleteEntries, err := l3Port.FlushNeighbors()
+	if len(deleteEntries) > 0 && err == nil {
+		debug.Logger.Info("Server Action Delete by Intf:", l3Port.IntfRef, "Neighbors:", deleteEntries)
+		svr.DeleteNeighborInfo(deleteEntries, ifIndex)
+	}
+	svr.L3Port[ifIndex] = l3Port
+}
+
+/*
+ *  Utility Action function to refreshndp entries by L3 Port interface name
+ */
+func (svr *NDPServer) ActionRefreshByIntf(intfRef string) {
+	ifIndex, exists := svr.L3IfIntfRefToIfIndex[intfRef]
+	if !exists {
+		debug.Logger.Err("Refresh Action by Interface Name:", intfRef,
+			"cannot be performed as no ifIndex found for L3 interface")
+		return
+	}
+	l3Port, exists := svr.L3Port[ifIndex]
+	if !exists {
+		debug.Logger.Err("Refresh Action by Interface Name:", intfRef,
+			"cannot be performed as no such L3 interface exists")
+		return
+	}
+
+	l3Port.RefreshAllNeighbors(svr.SwitchMac)
+	svr.L3Port[ifIndex] = l3Port
+}
+
+/*
+ *  Utility Action function to delete ndp entries by Neighbor Ip Address
+ */
+func (svr *NDPServer) ActionDeleteByNbrIp(ipAddr string) {
+	nbrEntry, exists := svr.NeighborInfo[ipAddr]
+	if !exists {
+		debug.Logger.Err("Delete Action by Ip Address:", ipAddr, "as no such neighbor is learned")
+		return
+	}
+	l3IfIndex := nbrEntry.IfIndex
+	// if valid vlan then get l3 ifIndex from PhyPortToL3PortMap
+	if nbrEntry.VlanId != config.INTERNAL_VLAN {
+		l3IfIndex, exists = svr.PhyPortToL3PortMap[nbrEntry.IfIndex]
+		if !exists {
+			debug.Logger.Err("Delete Action by Ip Address:", ipAddr,
+				"cannot be performed as no l3IfIndex mapping found for", nbrEntry.IfIndex,
+				"vlan:", nbrEntry.VlanId)
+			return
+		}
+	}
+
+	l3Port, exists := svr.L3Port[l3IfIndex]
+	if !exists {
+		debug.Logger.Err("Delete Action by Ip Address:", ipAddr, "as no L3 Port found where this neighbor is learned")
+		return
+	}
+	deleteEntries, err := l3Port.DeleteNeighbor(nbrEntry)
+	if err == nil {
+		debug.Logger.Info("Server Action Delete by NbrIp:", ipAddr, "L3 Port:", l3Port.IntfRef,
+			"Neighbors:", deleteEntries)
+		svr.deleteNeighbor(deleteEntries[0], l3Port.IfIndex)
+	}
+
+	svr.L3Port[l3IfIndex] = l3Port
+}
+
+/*
+ *  Utility Action function to refresh ndp entries by Neighbor Ip Address
+ */
+func (svr *NDPServer) ActionRefreshByNbrIp(ipAddr string) {
+	nbrEntry, exists := svr.NeighborInfo[ipAddr]
+	if !exists {
+		debug.Logger.Err("Refresh Action by Ip Address:", ipAddr, "as no such neighbor is learned")
+		return
+	}
+	l3IfIndex := nbrEntry.IfIndex
+	// if valid vlan then get l3 ifIndex from PhyPortToL3PortMap
+	if nbrEntry.VlanId != config.INTERNAL_VLAN {
+		l3IfIndex, exists = svr.PhyPortToL3PortMap[nbrEntry.IfIndex]
+		if !exists {
+			debug.Logger.Err("Refresh Action by Ip Address:", ipAddr,
+				"cannot be performed as no l3IfIndex mapping found for", nbrEntry.IfIndex,
+				"vlan:", nbrEntry.VlanId)
+			return
+		}
+	}
+
+	l3Port, exists := svr.L3Port[l3IfIndex]
+	if !exists {
+		debug.Logger.Err("Delete Action by Ip Address:", ipAddr, "as no L3 Port found where this neighbor is learned")
+		return
+	}
+	l3Port.SendNS(svr.SwitchMac, nbrEntry.MacAddr, nbrEntry.IpAddr)
+	svr.L3Port[l3IfIndex] = l3Port
+}
