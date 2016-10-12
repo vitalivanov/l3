@@ -469,7 +469,7 @@ func (intf *Interface) ProcessND(ndInfo *packet.NDInfo) (*config.NeighborConfig,
 func (intf *Interface) SendND(pktData config.PacketData, mac string) NDP_OPERATION {
 	switch pktData.SendPktType {
 	case layers.ICMPv6TypeNeighborSolicitation:
-		return intf.SendNS(mac, pktData.NeighborMac, pktData.NeighborIp)
+		return intf.SendNS(mac, pktData.NeighborMac, pktData.NeighborIp, pktData.FastProbe)
 	case layers.ICMPv6TypeNeighborAdvertisement:
 		// @TODO: implement this
 	case layers.ICMPv6TypeRouterAdvertisement:
@@ -496,7 +496,8 @@ func (intf *Interface) PopulateNeighborInfo(nbr NeighborInfo, nbrState *config.N
 	debug.Logger.Debug("Neighbor Information in NDP is:", nbr)
 	nbrState.IpAddr = nbr.IpAddr
 	nbrState.MacAddr = nbr.LinkLayerAddress
-	baseReachableTime := time.Duration(nbr.BaseReachableTimer) * time.Minute
+	baseTime := (int64)(nbr.BaseReachableTimer * 60 * 1000)
+	baseReachableTime := time.Duration(baseTime) * time.Millisecond
 	elapsedTime := time.Since(nbr.pktRcvdTime)
 	expiryTime := baseReachableTime - elapsedTime
 	nbrState.ExpiryTimeLeft = expiryTime.String()
@@ -537,7 +538,7 @@ func (intf *Interface) RefreshAllNeighbors(mac string) {
 	debug.Logger.Info("Refresh Action for All Neighbors by intferface:", intf.IntfRef)
 	for _, nbr := range intf.Neighbor {
 		debug.Logger.Info("Refreshing Neighbor:", nbr.LinkLayerAddress, nbr.IpAddr)
-		intf.SendNS(mac, nbr.LinkLayerAddress, nbr.IpAddr)
+		intf.SendNS(mac, nbr.LinkLayerAddress, nbr.IpAddr, false /* isFastProbe */)
 	}
 }
 

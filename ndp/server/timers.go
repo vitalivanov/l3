@@ -23,6 +23,7 @@
 package server
 
 import (
+	_ "fmt"
 	"github.com/google/gopacket/layers"
 	"l3/ndp/config"
 	"l3/ndp/debug"
@@ -74,7 +75,7 @@ func (c *NeighborInfo) StopDelayProbeTimer() {
 }
 
 /*
- *  stop delay probe Timer
+ *  stop Router Advertisement Timer
  */
 func (intf *Interface) StopRATimer() {
 	if intf.raTimer != nil {
@@ -85,13 +86,26 @@ func (intf *Interface) StopRATimer() {
 }
 
 /*
- *  stop delay probe Timer
+ *  stop Invalid Timer
  */
 func (c *NeighborInfo) StopInvalidTimer() {
 	if c.InvalidationTimer != nil {
 		debug.Logger.Debug("Stopping InvalidationTimer for Neighbor", c.IpAddr)
 		c.InvalidationTimer.Stop()
 		c.InvalidationTimer = nil
+	}
+}
+
+/*
+ *  stop fast probe Timer
+ */
+func (c *NeighborInfo) StopFastProbeTimer() {
+	if c.FastProbeTimer != nil {
+		debug.Logger.Debug("Stopping FastProbe Timer  for Neighbor", c.IpAddr)
+		c.FastProbeTimer.Stop()
+		c.StopFastProbe = true
+		c.FastProbesMultiplier = 1
+		c.FastProbeTimer = nil
 	}
 }
 
@@ -156,10 +170,10 @@ func (c *NeighborInfo) RchTimer() {
 	// no matter what happens
 	c.StopDelayProbeTimer()
 	c.StopReTransmitTimer()
+	baseTime := (int64)(c.BaseReachableTimer * 60 * 1000)
 	if c.ReachableTimer != nil {
-		//debug.Logger.Debug("Re-Setting Reachable Timer for neighbor:", c.IpAddr, "timer:", c.BaseReachableTimer)
 		//Reset the timer as we have received an advertisment for the neighbor
-		c.ReachableTimer.Reset(time.Duration(c.BaseReachableTimer) * time.Minute)
+		c.ReachableTimer.Reset(time.Duration(baseTime) * time.Millisecond)
 	} else {
 		// This is first time initialization of reachable timer... let set it up
 		var ReachableTimer_func func()
@@ -171,11 +185,59 @@ func (c *NeighborInfo) RchTimer() {
 				NeighborIp:  c.IpAddr,
 				NeighborMac: c.LinkLayerAddress,
 				IfIndex:     c.IfIndex,
+				FastProbe:   false,
 			}
 		}
 		debug.Logger.Debug("Setting Reachable Timer for neighbor:", c.IpAddr, "timer:", c.BaseReachableTimer)
-		c.ReachableTimer = time.AfterFunc(time.Duration(c.BaseReachableTimer)*time.Minute,
+		c.ReachableTimer = time.AfterFunc(time.Duration(baseTime)*time.Millisecond,
 			ReachableTimer_func)
+	}
+	// Set/Reset Fast Probe Time When Reachable time is getting updated
+	c.FastProbe()
+}
+
+/*
+ *  Start Fast Probe Timer
+ */
+func (c *NeighborInfo) FastProbe() {
+	baseTime := (int64)(c.BaseReachableTimer * 60 * 1000)
+	//fmt.Println("basetime:", baseTime)
+	if c.FastProbeTimer != nil {
+		// Reset Fast Probes Sent to 1
+		c.FastProbesMultiplier = 1
+		factor := (int64)(2 * c.FastProbesMultiplier)
+		resetTime := time.Duration(baseTime/factor) * time.Millisecond
+		c.FastProbeTimer.Reset(resetTime)
+	} else {
+		if c.StopFastProbe { // we stop fast probe only when Fast Probe is less than 60 seconds
+			return
+		}
+		var FastProbe_func func()
+		factor := (int64)(2 * c.FastProbesMultiplier)
+		resetTime := time.Duration(baseTime/factor) * time.Millisecond
+		cutOffTime := time.Duration(60*1000) * time.Millisecond
+		//fmt.Println("resetTime:", resetTime.String())
+		FastProbe_func = func() {
+			debug.Logger.Debug("Probing Neighbor:", c.IpAddr, "by Initiating unicast NS for IfIndex:", c.IfIndex)
+			c.ReturnCh <- config.PacketData{
+				SendPktType: layers.ICMPv6TypeNeighborSolicitation,
+				NeighborIp:  c.IpAddr,
+				NeighborMac: c.LinkLayerAddress,
+				IfIndex:     c.IfIndex,
+				FastProbe:   true,
+			}
+			// If Fast Probe timer is less then 60 seconds then we will stop the timer and let
+			// Reachable Timer take care of the rest
+			if resetTime <= cutOffTime {
+				c.StopFastProbeTimer()
+				return
+			}
+			c.FastProbesMultiplier++
+			c.FastProbeTimer = nil
+		}
+		debug.Logger.Debug("Setting Fast Probe Timer for neighbor:", c.IpAddr, "timer:", resetTime.String())
+		//fmt.Println("Setting Fast Probe Timer for neighbor:", c.IpAddr, "timer:", resetTime.String())
+		c.FastProbeTimer = time.AfterFunc(resetTime, FastProbe_func)
 	}
 }
 
@@ -190,7 +252,9 @@ func (c *NeighborInfo) ReComputeBaseReachableTimer() {
 		var RecomputeBaseTimer_func func()
 		RecomputeBaseTimer_func = func() {
 			c.BaseReachableTimer = computeBase(c.ReachableTimeConfig)
-			c.ReachableTimer.Reset(time.Duration(c.BaseReachableTimer) * time.Minute)
+			baseTime := (int64)(c.BaseReachableTimer * 60 * 1000)
+			c.ReachableTimer.Reset(time.Duration(baseTime) * time.Millisecond)
+			//c.ReachableTimer.Reset(time.Duration(c.BaseReachableTimer) * time.Minute)
 		}
 		debug.Logger.Debug("Setting Recompute Timer for neighbor:", c.IpAddr)
 		c.RecomputeBaseTimer = time.AfterFunc(time.Duration(RECOMPUTE_BASE_REACHABLE_TIMER)*time.Hour,

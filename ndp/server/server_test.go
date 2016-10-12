@@ -81,8 +81,8 @@ const (
 	testServerNSSrcIp  = "fe80::21f:16ff:fe25:33ce"
 	testServerNSDstIp  = "2001:db8:0:f101::1"
 
-	testReachableTimerValue = 30000
-	estReTransmitTimerValue = 1000
+	testReachableTimerValue  = 30000
+	testReTransmitTimerValue = 1000
 )
 
 var testNdpServer *NDPServer

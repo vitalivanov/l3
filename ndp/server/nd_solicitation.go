@@ -31,7 +31,7 @@ import (
 /*
  *  Generic API to send Neighbor Solicitation Packet based on inputs..
  */
-func (intf *Interface) sendUnicastNS(srcMac, nbrMac, nbrIp string) NDP_OPERATION {
+func (intf *Interface) sendUnicastNS(srcMac, nbrMac, nbrIp string, isFastProbe bool) NDP_OPERATION {
 	nbrKey := nbrIp + "_" + nbrMac
 	nbr, exists := intf.Neighbor[nbrKey]
 	if !exists {
@@ -60,20 +60,28 @@ func (intf *Interface) sendUnicastNS(srcMac, nbrMac, nbrIp string) NDP_OPERATION
 	if err != nil {
 		return IGNORE
 	}
+
 	// when sending unicast packet re-start retransmit/delay probe timer.. rest all will be taken care of when
 	// NA packet is received..
-	if nbr.State == REACHABLE {
-		// This means that Reachable Timer has expierd and hence we are sending Unicast Message..
-		// Lets set the time for delay first probe
-		nbr.DelayProbe()
-		nbr.State = DELAY
-		nbr.ProbesSent = 0
-	} else if nbr.State == DELAY || nbr.State == PROBE {
-		// Probes Sent can still be zero but the state has changed to Delay..
-		// Start Timer for Probe and move the state from delay to Probe
-		nbr.Timer()
-		nbr.State = PROBE
-		nbr.ProbesSent += 1
+	if isFastProbe == false {
+		if nbr.State == REACHABLE {
+			// This means that Reachable Timer has expierd and hence we are sending Unicast Message..
+			// Lets set the time for delay first probe
+			nbr.DelayProbe()
+			nbr.State = DELAY
+			nbr.ProbesSent = 0
+		} else if nbr.State == DELAY || nbr.State == PROBE {
+			// Probes Sent can still be zero but the state has changed to Delay..
+			// Start Timer for Probe and move the state from delay to Probe
+			nbr.Timer()
+			nbr.State = PROBE
+			nbr.ProbesSent += 1
+		}
+	} else {
+		// reset the fast probe to reachable timer / 2 * FastProbleMultipliers
+		if nbr.StopFastProbe == false {
+			nbr.FastProbe()
+		}
 	}
 	intf.counter.Send++
 	nbr.counter.Send++
@@ -81,11 +89,11 @@ func (intf *Interface) sendUnicastNS(srcMac, nbrMac, nbrIp string) NDP_OPERATION
 	return IGNORE
 }
 
-func (intf *Interface) SendNS(myMac, nbrMac, nbrIp string) NDP_OPERATION {
+func (intf *Interface) SendNS(myMac, nbrMac, nbrIp string, isFastProbe bool) NDP_OPERATION {
 	if nbrIp == "" {
 		//send multicast solicitation when we take over linux called when port comes up
 	} else {
-		return intf.sendUnicastNS(myMac, nbrMac, nbrIp)
+		return intf.sendUnicastNS(myMac, nbrMac, nbrIp, isFastProbe)
 	}
 
 	return IGNORE

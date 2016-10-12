@@ -364,6 +364,6 @@ func (svr *NDPServer) ActionRefreshByNbrIp(ipAddr string) {
 		debug.Logger.Err("Delete Action by Ip Address:", ipAddr, "as no L3 Port found where this neighbor is learned")
 		return
 	}
-	l3Port.SendNS(svr.SwitchMac, nbrEntry.MacAddr, nbrEntry.IpAddr)
+	l3Port.SendNS(svr.SwitchMac, nbrEntry.MacAddr, nbrEntry.IpAddr, false /*isFastProbe*/)
 	svr.L3Port[l3IfIndex] = l3Port
 }

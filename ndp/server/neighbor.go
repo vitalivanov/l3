@@ -68,7 +68,10 @@ type NeighborInfo struct {
 	RetransTimer         *time.Timer
 	DelayFirstProbeTimer *time.Timer
 	InvalidationTimer    *time.Timer
+	FastProbeTimer       *time.Timer
 	ProbesSent           uint8
+	FastProbesMultiplier uint8
+	StopFastProbe        bool
 	State                int
 	LinkLayerAddress     string // this is our neighbor port mac address
 	IpAddr               string
@@ -86,6 +89,7 @@ func (c *NeighborInfo) DeInit() {
 	debug.Logger.Debug("De-Init neighbor", c.IpAddr)
 	c.StopReTransmitTimer()
 	c.StopReachableTimer()
+	c.StopFastProbeTimer()
 	c.StopDelayProbeTimer()
 	c.StopInvalidTimer()
 	c.StopReComputeBaseTimer()
@@ -107,6 +111,8 @@ func (c *NeighborInfo) InitCache(reachableTime, retransTime uint32, nbrKey strin
 	c.ReachableTimeConfig = reachableTime
 	c.RetransTimerConfig = retransTime
 	c.BaseReachableTimer = computeBase(reachableTime)
+	// Set the multiplier
+	c.FastProbesMultiplier = 1
 	c.State = INCOMPLETE
 	ipMacStr := strings.Split(nbrKey, "_")
 	c.IpAddr = ipMacStr[0]
@@ -115,6 +121,7 @@ func (c *NeighborInfo) InitCache(reachableTime, retransTime uint32, nbrKey strin
 	c.ReturnCh = pktCh
 	c.IfIndex = ifIndex
 	// Once initalized start reachable timer... And also start one hour timer for re-computing BaseReachableTimer
+	// Reachable timer will handle Fast Probe Timer
 	c.RchTimer()
 	c.ReComputeBaseReachableTimer()
 	c.counter.Rcvd = 0
