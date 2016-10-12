@@ -1125,9 +1125,9 @@ func (s *BGPServer) ProcessIntfStates(intfs []*config.IntfStateInfo) {
 	}
 }
 
-func (s *BGPServer) GetIfaceIP(ifIndex int32) (ipInfo utils.IPInfo, err error) {
-	ipInfo, err = s.ifaceMgr.GetIfaceIP(ifIndex)
-	return ipInfo, err
+func (s *BGPServer) GetIfaceIP(ifIndex int32) (utils.IPInfo, error) {
+	ipInfo, err := s.ifaceMgr.GetIfaceIP(ifIndex)
+	return *ipInfo, err
 }
 
 func (s *BGPServer) ProcessRemoveNeighbor(peerIp string, peer *Peer) {
@@ -2253,11 +2253,7 @@ func (s *BGPServer) listenChannelUpdates() {
 
 			nhInfo, err := s.routeMgr.GetNextHopInfo(reachabilityInfo.IP, reachabilityInfo.IfIndex)
 			s.logger.Infof("Server: Reachability info for ip is %+v", nhInfo)
-			if err != nil {
-				reachabilityInfo.ReachableCh <- false
-			} else {
-				reachabilityInfo.ReachableCh <- true
-			}
+			reachabilityInfo.ReachableCh <- config.ReachabilityResult{Err: err, NextHopInfo: nhInfo}
 
 		case bfdNotify := <-s.BfdCh:
 			s.handleBfdNotifications(bfdNotify.Oper, bfdNotify.DestIp, bfdNotify.State)
@@ -2334,7 +2330,6 @@ func (s *BGPServer) InitBGPEvent() {
 }
 
 func (s *BGPServer) GetIntfObjects() {
-
 	intfs := s.IntfMgr.GetIPv4Intfs()
 	s.ProcessIntfStates(intfs)
 	s.logger.Info("After ProcessIntfStates for intfs")
@@ -2358,7 +2353,6 @@ func (s *BGPServer) GetIntfObjects() {
 	logicalIntfMap := s.IntfMgr.GetLogicalIntfInfo()
 	s.ProcessIntfMapUpdates(logicalIntfMap)
 	s.logger.Info("After ProcessIntfMapUpdates for logicalIntfs")
-
 }
 
 func (s *BGPServer) StartServer() {
