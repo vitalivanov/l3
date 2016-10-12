@@ -30,19 +30,38 @@ import (
 	"net"
 	"sync"
 	"utils/logging"
-	netutils "utils/netUtils"
 )
 
 type IPInfo struct {
 	IpAddr          net.IP
 	IPv6Addr        net.IP
 	IpMask          net.IPMask
+	IPv6Mask        net.IPMask
 	LinklocalIpAddr string
 }
+
+func newIPInfo() *IPInfo {
+	return &IPInfo{
+		IpAddr:          nil,
+		IpMask:          nil,
+		IPv6Addr:        nil,
+		IPv6Mask:        nil,
+		LinklocalIpAddr: "",
+	}
+}
+
+func (i *IPInfo) isEmpty() bool {
+	if i.IpAddr == nil && i.IPv6Addr == nil && i.IpMask == nil && i.IPv6Mask == nil && i.LinklocalIpAddr == "" {
+		return true
+	}
+
+	return false
+}
+
 type InterfaceMgr struct {
 	logger      *logging.Writer
 	rwMutex     *sync.RWMutex
-	ifIndexToIP map[int32]IPInfo //string
+	ifIndexToIP map[int32]*IPInfo //string
 	ipToIfIndex map[string]int32
 }
 
@@ -57,7 +76,7 @@ func NewInterfaceMgr(logger *logging.Writer) *InterfaceMgr {
 	ifaceMgr = &InterfaceMgr{
 		logger:      logger,
 		rwMutex:     &sync.RWMutex{},
-		ifIndexToIP: make(map[int32]IPInfo),
+		ifIndexToIP: make(map[int32]*IPInfo),
 		ipToIfIndex: make(map[string]int32),
 	}
 	logger.Info("NewInterfaceMgr: Creating new interface manager", ifaceMgr)
@@ -72,7 +91,7 @@ func (i *InterfaceMgr) IsIPConfigured(ip string) bool {
 	return ok
 }
 
-func (i *InterfaceMgr) GetIfaceIP(ifIndex int32) (ipInfo IPInfo, err error) {
+func (i *InterfaceMgr) GetIfaceIP(ifIndex int32) (ipInfo *IPInfo, err error) {
 	var ok bool
 	i.rwMutex.RLock()
 	defer i.rwMutex.RUnlock()
@@ -107,22 +126,43 @@ func (i *InterfaceMgr) AddIface(ifIndex int32, addr string) {
 		return
 	}
 
-	var ipAddr string
-	if oldIP, ok := i.ifIndexToIP[ifIndex]; ok {
-		//delete(i.ifIndexToIP, ifIndex)
-		//delete(i.ipToIfIndex, oldIP)
-		ipAddr = oldIP.LinklocalIpAddr
+	var ipInfo *IPInfo
+	var ok bool
+
+	if ipInfo, ok = i.ifIndexToIP[ifIndex]; !ok {
+		ipInfo = newIPInfo()
+		i.ifIndexToIP[ifIndex] = ipInfo
 	}
-	ipInfo := IPInfo{
-		IpAddr:          ip,
-		IpMask:          ipMask.Mask,
-		LinklocalIpAddr: ipAddr,
-	}
-	i.ifIndexToIP[ifIndex] = ipInfo //ip.String()
+
+	ipInfo.IpAddr = ip
+	ipInfo.IpMask = ipMask.Mask
+
 	i.ipToIfIndex[ip.String()] = ifIndex
 }
 
 func (i *InterfaceMgr) AddV6Iface(ifIndex int32, addr string) {
+	i.rwMutex.Lock()
+	defer i.rwMutex.Unlock()
+	i.logger.Info("AddV6Iface: ifIndex", ifIndex, "ip", addr, "ifIndexToIP", i.ifIndexToIP, "ipToIfIndex", i.ipToIfIndex)
+
+	ip, ipMask, err := net.ParseCIDR(addr)
+	if err != nil {
+		i.logger.Err("AddV6Iface: ParseCIDR failed for addr", addr, "with error", err)
+		return
+	}
+
+	var ipInfo *IPInfo
+	var ok bool
+
+	if ipInfo, ok = i.ifIndexToIP[ifIndex]; !ok {
+		ipInfo = newIPInfo()
+		i.ifIndexToIP[ifIndex] = ipInfo
+	}
+
+	ipInfo.IPv6Addr = ip
+	ipInfo.IPv6Mask = ipMask.Mask
+
+	i.ipToIfIndex[ip.String()] = ifIndex
 }
 
 func (i *InterfaceMgr) AddLinkLocalIface(ifIndex int32, addr string) {
@@ -136,25 +176,21 @@ func (i *InterfaceMgr) AddLinkLocalIface(ifIndex int32, addr string) {
 		return
 	}
 
-	var ipAddr net.IP
-	var ipMask net.IPMask
-	if oldIP, ok := i.ifIndexToIP[ifIndex]; ok {
-		if oldIP.LinklocalIpAddr != "" {
-			i.logger.Err("AddLinkLocalIface: ifIndex", ifIndex, "ip", addr, "link local ip", oldIP.LinklocalIpAddr,
-				"is already set on the interface")
-			return
-		}
-		//delete(i.ifIndexToIP, ifIndex)
-		//delete(i.ipToIfIndex, oldIP)
-		ipAddr = oldIP.IpAddr
-		ipMask = oldIP.IpMask
+	var ipInfo *IPInfo
+	var ok bool
+
+	if ipInfo, ok = i.ifIndexToIP[ifIndex]; !ok {
+		ipInfo = newIPInfo()
+		i.ifIndexToIP[ifIndex] = ipInfo
 	}
-	ipInfo := IPInfo{
-		IpAddr:          ipAddr,
-		IpMask:          ipMask,
-		LinklocalIpAddr: addr,
+
+	if ipInfo.LinklocalIpAddr != "" {
+		i.logger.Err("AddLinkLocalIface: ifIndex", ifIndex, "ip", addr, "link local ip", ipInfo.LinklocalIpAddr,
+			"is already set on the interface")
+		return
 	}
-	i.ifIndexToIP[ifIndex] = ipInfo //ip.String()
+
+	ipInfo.LinklocalIpAddr = addr
 	i.ipToIfIndex[addr] = ifIndex
 }
 
@@ -164,20 +200,32 @@ func (i *InterfaceMgr) RemoveIface(ifIndex int32, addr string) {
 	i.logger.Info("RemoveIface: ifIndex", ifIndex, "ip", addr, "ifIndexToIP", i.ifIndexToIP, "ipToIfIndex",
 		i.ipToIfIndex)
 
-	if oldIP, ok := i.ifIndexToIP[ifIndex]; ok {
-		if oldIP.LinklocalIpAddr == "" {
+	if ipInfo, ok := i.ifIndexToIP[ifIndex]; ok {
+		delete(i.ipToIfIndex, ipInfo.IpAddr.String())
+		ipInfo.IpAddr = nil
+		ipInfo.IpMask = nil
+
+		if ipInfo.isEmpty() {
 			delete(i.ifIndexToIP, ifIndex)
-			delete(i.ipToIfIndex, oldIP.IpAddr.String())
-			return
 		}
-		ipInfo := IPInfo{
-			LinklocalIpAddr: oldIP.LinklocalIpAddr,
-		}
-		i.ifIndexToIP[ifIndex] = ipInfo
 	}
 }
 
 func (i *InterfaceMgr) RemoveV6Iface(ifIndex int32, addr string) {
+	i.rwMutex.Lock()
+	defer i.rwMutex.Unlock()
+	i.logger.Info("RemoveV6Iface: ifIndex", ifIndex, "ip", addr, "ifIndexToIP", i.ifIndexToIP, "ipToIfIndex",
+		i.ipToIfIndex)
+
+	if ipInfo, ok := i.ifIndexToIP[ifIndex]; ok {
+		delete(i.ipToIfIndex, ipInfo.IPv6Addr.String())
+		ipInfo.IPv6Addr = nil
+		ipInfo.IPv6Mask = nil
+
+		if ipInfo.isEmpty() {
+			delete(i.ifIndexToIP, ifIndex)
+		}
+	}
 }
 
 func (i *InterfaceMgr) RemoveLinkLocalIface(ifIndex int32, addr string) {
@@ -192,16 +240,12 @@ func (i *InterfaceMgr) RemoveLinkLocalIface(ifIndex int32, addr string) {
 		return
 	}
 
-	if oldIP, ok := i.ifIndexToIP[ifIndex]; ok {
-		if netutils.IsZeros(oldIP.IpAddr) {
+	if ipInfo, ok := i.ifIndexToIP[ifIndex]; ok {
+		delete(i.ipToIfIndex, ipInfo.LinklocalIpAddr)
+		ipInfo.LinklocalIpAddr = ""
+
+		if ipInfo.isEmpty() {
 			delete(i.ifIndexToIP, ifIndex)
-			delete(i.ipToIfIndex, oldIP.LinklocalIpAddr)
-			return
 		}
-		ipInfo := IPInfo{
-			IpAddr: oldIP.IpAddr,
-			IpMask: oldIP.IpMask,
-		}
-		i.ifIndexToIP[ifIndex] = ipInfo
 	}
 }
