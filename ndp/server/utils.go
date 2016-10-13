@@ -306,7 +306,19 @@ func (svr *NDPServer) ActionRefreshByIntf(intfRef string) {
  *  Utility Action function to delete ndp entries by Neighbor Ip Address
  */
 func (svr *NDPServer) ActionDeleteByNbrIp(ipAddr string) {
-	nbrEntry, exists := svr.NeighborInfo[ipAddr]
+	var nbrKey string
+	found := false
+	for _, nbrKey = range svr.neighborKey {
+		splitString := splitNeighborKey(nbrKey)
+		if splitString[1] == ipAddr {
+			found = true
+		}
+	}
+	if !found {
+		debug.Logger.Err("Delete Action by Ip Address:", ipAddr, "as no such neighbor is learned")
+		return
+	}
+	nbrEntry, exists := svr.NeighborInfo[nbrKey]
 	if !exists {
 		debug.Logger.Err("Delete Action by Ip Address:", ipAddr, "as no such neighbor is learned")
 		return
@@ -342,7 +354,19 @@ func (svr *NDPServer) ActionDeleteByNbrIp(ipAddr string) {
  *  Utility Action function to refresh ndp entries by Neighbor Ip Address
  */
 func (svr *NDPServer) ActionRefreshByNbrIp(ipAddr string) {
-	nbrEntry, exists := svr.NeighborInfo[ipAddr]
+	var nbrKey string
+	found := false
+	for _, nbrKey = range svr.neighborKey {
+		splitString := splitNeighborKey(nbrKey)
+		if splitString[1] == ipAddr {
+			found = true
+		}
+	}
+	if !found {
+		debug.Logger.Err("Delete Action by Ip Address:", ipAddr, "as no such neighbor is learned")
+		return
+	}
+	nbrEntry, exists := svr.NeighborInfo[nbrKey]
 	if !exists {
 		debug.Logger.Err("Refresh Action by Ip Address:", ipAddr, "as no such neighbor is learned")
 		return

@@ -147,7 +147,7 @@ func TestProcessRA(t *testing.T) {
 		return
 	}
 	// delete neighbor entry that just got created using router advertisement
-	testNdpServer.deleteNeighbor(nbrInfo.IpAddr, testIfIndex)
+	testNdpServer.deleteNeighbor(createNeighborKey(nbrInfo.MacAddr, nbrInfo.IpAddr, testIntfRef), testIfIndex)
 	if len(testNdpServer.NeighborInfo) != 0 {
 		t.Error("Failed to delete learned neighbor information after processing router advertisement")
 		return

@@ -562,7 +562,7 @@ func TestDeleteNeighborInfo(t *testing.T) {
 		return
 	}
 
-	deleteEntries := []string{"fe80::1", "fe80::2"}
+	deleteEntries := []string{"aa:bb:cc:dd:ee:ff_fe80::1_lo", "aa:bb:cc:dd:ee:ff_fe80::2_lo1"}
 	testNdpServer.DeleteNeighborInfo(deleteEntries, testIfIndex)
 
 	if len(testNdpServer.NeighborInfo) != 4 {

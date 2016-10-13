@@ -403,7 +403,8 @@ func (intf *Interface) FlushNeighbors() ([]string, error) {
 	deleteEntries := make([]string, 0)
 	for nbrKey, nbr := range intf.Neighbor {
 		nbr.DeInit()
-		deleteEntries = append(deleteEntries, nbr.IpAddr)
+		//deleteEntries = append(deleteEntries, nbr.IpAddr)
+		deleteEntries = append(deleteEntries, nbrKey)
 		debug.Logger.Debug("Deleting neighbor:", nbrKey)
 		delete(intf.Neighbor, nbrKey)
 	}
@@ -422,7 +423,8 @@ func (intf *Interface) FlushNeighborPerIp(nbrKey, ipAddr string) ([]string, erro
 		return deleteEntries, errors.New("No Neighbor found for:" + nbrKey)
 	}
 	nbr.DeInit()
-	deleteEntries = append(deleteEntries, ipAddr)
+	//deleteEntries = append(deleteEntries, ipAddr)
+	deleteEntries = append(deleteEntries, nbrKey)
 	delete(intf.Neighbor, nbrKey)
 	return deleteEntries, nil
 }

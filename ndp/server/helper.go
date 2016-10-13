@@ -25,6 +25,7 @@ package server
 import (
 	"l3/ndp/config"
 	"l3/ndp/debug"
+	"strings"
 	"utils/commonDefs"
 )
 
@@ -284,22 +285,28 @@ func (svr *NDPServer) SoftwareUpdateNbrEntry(msg *config.MacMoveNotification) {
 	nbrIp := msg.IpAddr
 	svr.NeigborEntryLock.Lock()
 	defer svr.NeigborEntryLock.Unlock()
-	nbrEntry, exists := svr.NeighborInfo[nbrIp]
-	if !exists {
-		return
-	}
-	l2Port, exists := svr.L2Port[msg.IfIndex]
-	if exists {
-		nbrEntry.Intf = l2Port.Info.Name
-		svr.NeighborInfo[nbrIp] = nbrEntry
-		return
-	}
+	for _, nbrKey := range svr.neighborKey {
+		splitString := splitNeighborKey(nbrKey)
+		if splitString[1] == nbrIp {
+			nbrEntry, exists := svr.NeighborInfo[nbrKey]
+			if !exists {
+				return
+			}
+			l2Port, exists := svr.L2Port[msg.IfIndex]
+			if exists {
+				nbrEntry.Intf = l2Port.Info.Name
+				svr.NeighborInfo[nbrKey] = nbrEntry
+				return
+			}
 
-	l3Port, exists := svr.L3Port[msg.IfIndex]
-	if exists {
-		nbrEntry.Intf = l3Port.IntfRef
-		svr.NeighborInfo[nbrIp] = nbrEntry
-		return
+			l3Port, exists := svr.L3Port[msg.IfIndex]
+			if exists {
+				nbrEntry.Intf = l3Port.IntfRef
+				svr.NeighborInfo[nbrKey] = nbrEntry
+				return
+			}
+			break
+		}
 	}
 }
 
@@ -386,4 +393,12 @@ func (svr *NDPServer) SendIPv6DeleteNotification(ipAddr string, ifIndex int32) {
 	}
 	debug.Logger.Info("Sending Delete notification for ip address:", ipAddr, "and ifIndex:", ifIndex)
 	svr.pushNotification(notification)
+}
+
+func createNeighborKey(mac, ip, intfName string) string {
+	return mac + "_" + ip + "_" + intfName
+}
+
+func splitNeighborKey(nbrKey string) []string {
+	return strings.Split(nbrKey, "_")
 }

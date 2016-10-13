@@ -25,6 +25,7 @@ package server
 import (
 	"github.com/google/gopacket/layers"
 	"l3/ndp/config"
+	"l3/ndp/debug"
 	"l3/ndp/packet"
 )
 
@@ -64,6 +65,7 @@ func (intf *Interface) sendUnicastNS(srcMac, nbrMac, nbrIp string, isFastProbe b
 	// when sending unicast packet re-start retransmit/delay probe timer.. rest all will be taken care of when
 	// NA packet is received..
 	if isFastProbe == false {
+		debug.Logger.Debug("Reachable Timer is probing Neighbor:", nbrIp, nbrMac)
 		if nbr.State == REACHABLE {
 			// This means that Reachable Timer has expierd and hence we are sending Unicast Message..
 			// Lets set the time for delay first probe
@@ -79,9 +81,10 @@ func (intf *Interface) sendUnicastNS(srcMac, nbrMac, nbrIp string, isFastProbe b
 		}
 	} else {
 		// reset the fast probe to reachable timer / 2 * FastProbleMultipliers
-		if nbr.StopFastProbe == false {
-			nbr.FastProbe()
-		}
+		//if nbr.StopFastProbe == false {
+		debug.Logger.Debug("Fast Probe Timer is probing Neighbor:", nbrIp, nbrMac)
+		//	nbr.FastProbe()
+		//}
 	}
 	intf.counter.Send++
 	nbr.counter.Send++

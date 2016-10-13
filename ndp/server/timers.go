@@ -188,9 +188,8 @@ func (c *NeighborInfo) RchTimer() {
 				FastProbe:   false,
 			}
 		}
-		debug.Logger.Debug("Setting Reachable Timer for neighbor:", c.IpAddr, "timer:", c.BaseReachableTimer)
-		c.ReachableTimer = time.AfterFunc(time.Duration(baseTime)*time.Millisecond,
-			ReachableTimer_func)
+		debug.Logger.Debug("Setting Reachable Timer for neighbor:", c.IpAddr, "timer:", baseTime)
+		c.ReachableTimer = time.AfterFunc(time.Duration(baseTime)*time.Millisecond, ReachableTimer_func)
 	}
 	// Set/Reset Fast Probe Time When Reachable time is getting updated
 	c.FastProbe()
@@ -201,7 +200,6 @@ func (c *NeighborInfo) RchTimer() {
  */
 func (c *NeighborInfo) FastProbe() {
 	baseTime := (int64)(c.BaseReachableTimer * 60 * 1000)
-	//fmt.Println("basetime:", baseTime)
 	if c.FastProbeTimer != nil {
 		// Reset Fast Probes Sent to 1
 		c.FastProbesMultiplier = 1
@@ -216,9 +214,7 @@ func (c *NeighborInfo) FastProbe() {
 		factor := (int64)(2 * c.FastProbesMultiplier)
 		resetTime := time.Duration(baseTime/factor) * time.Millisecond
 		cutOffTime := time.Duration(60*1000) * time.Millisecond
-		//fmt.Println("resetTime:", resetTime.String())
 		FastProbe_func = func() {
-			debug.Logger.Debug("Probing Neighbor:", c.IpAddr, "by Initiating unicast NS for IfIndex:", c.IfIndex)
 			c.ReturnCh <- config.PacketData{
 				SendPktType: layers.ICMPv6TypeNeighborSolicitation,
 				NeighborIp:  c.IpAddr,
@@ -226,17 +222,21 @@ func (c *NeighborInfo) FastProbe() {
 				IfIndex:     c.IfIndex,
 				FastProbe:   true,
 			}
+			debug.Logger.Debug("Fast Probing Neighbor:", c.IpAddr, "by Initiating unicast NS for IfIndex:", c.IfIndex)
 			// If Fast Probe timer is less then 60 seconds then we will stop the timer and let
 			// Reachable Timer take care of the rest
 			if resetTime <= cutOffTime {
+				debug.Logger.Debug("Fast Probe Reached CutoFF time of", cutOffTime.String(), "hence stopping it")
 				c.StopFastProbeTimer()
 				return
 			}
 			c.FastProbesMultiplier++
-			c.FastProbeTimer = nil
+			factor := (int64)(2 * c.FastProbesMultiplier)
+			resetTime := time.Duration(baseTime/factor) * time.Millisecond
+			c.FastProbeTimer.Reset(resetTime)
+			debug.Logger.Debug("Re-Setting Fast Probe Timer for neighbor:", c.IpAddr, "timer:", resetTime.String())
 		}
 		debug.Logger.Debug("Setting Fast Probe Timer for neighbor:", c.IpAddr, "timer:", resetTime.String())
-		//fmt.Println("Setting Fast Probe Timer for neighbor:", c.IpAddr, "timer:", resetTime.String())
 		c.FastProbeTimer = time.AfterFunc(resetTime, FastProbe_func)
 	}
 }
@@ -254,7 +254,6 @@ func (c *NeighborInfo) ReComputeBaseReachableTimer() {
 			c.BaseReachableTimer = computeBase(c.ReachableTimeConfig)
 			baseTime := (int64)(c.BaseReachableTimer * 60 * 1000)
 			c.ReachableTimer.Reset(time.Duration(baseTime) * time.Millisecond)
-			//c.ReachableTimer.Reset(time.Duration(c.BaseReachableTimer) * time.Minute)
 		}
 		debug.Logger.Debug("Setting Recompute Timer for neighbor:", c.IpAddr)
 		c.RecomputeBaseTimer = time.AfterFunc(time.Duration(RECOMPUTE_BASE_REACHABLE_TIMER)*time.Hour,
@@ -317,7 +316,7 @@ func (c *NeighborInfo) InValidTimer(lifetime uint16) {
  *	3) Update Probes Sent counter to 0
  */
 func (c *NeighborInfo) UpdateProbe() {
-	debug.Logger.Debug("UpdateProbe info by stopping delay probe timer & re-transmit timer")
+	//debug.Logger.Debug("UpdateProbe info by stopping delay probe timer & re-transmit timer")
 	c.StopDelayProbeTimer()
 	c.StopReTransmitTimer()
 	c.ProbesSent = uint8(0)
