@@ -252,7 +252,7 @@ func (svr *NDPServer) UpdateNeighborInfo(nbrInfo *config.NeighborConfig, oldNbrE
 	//svr.SendIPv6DeleteNotification(oldNbrEntry.IpAddr, oldNbrEntry.IfIndex)
 	debug.Logger.Debug("Calling update ipv6 neighgor for global nbrinfo is", nbrInfo.IpAddr, nbrInfo.MacAddr,
 		nbrInfo.VlanId, nbrInfo.IfIndex)
-	if net.ParseIP(nbrIp).IsLinkLocalUnicast() == false {
+	if net.ParseIP(nbrInfo.IpAddr).IsLinkLocalUnicast() == false {
 		_, err := svr.SwitchPlugin.UpdateIPv6Neighbor(nbrInfo.IpAddr, nbrInfo.MacAddr, nbrInfo.VlanId, nbrInfo.IfIndex)
 		if err != nil {
 			debug.Logger.Err("update ipv6 global neigbor failed for", nbrInfo, "error is", err)
