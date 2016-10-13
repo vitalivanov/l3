@@ -139,7 +139,7 @@ func (pkt *Packet) Encode() []byte {
 		ComputeChecksums: true,
 	}
 
-	debug.Logger.Debug("Sending pkt (DMAC, SMAC):(", eth.DstMAC.String(), ",", eth.SrcMAC.String(), ") and (SIP,DIP):(", ipv6.SrcIP.String(), ",", ipv6.DstIP.String(), ")")
+	//debug.Logger.Debug("Sending pkt (DMAC, SMAC):(", eth.DstMAC.String(), ",", eth.SrcMAC.String(), ") and (SIP,DIP):(", ipv6.SrcIP.String(), ",", ipv6.DstIP.String(), ")")
 
 	err := gopacket.SerializeLayers(buffer, options, eth, ipv6, gopacket.Payload(icmpv6Payload))
 	if err != nil {

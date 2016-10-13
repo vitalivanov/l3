@@ -98,7 +98,7 @@ func (server *OSPFServer) BuildHelloPkt(ent IntfConf) []byte {
 	           their Hello packets
 	*/
 	if ent.IfAreaId == nil {
-		server.logger.Info(fmt.Sprintln("HELLO: Null area id for intfkey ", ent))
+		server.logger.Debug(fmt.Sprintln("HELLO: Null area id for intfkey ", ent))
 		return nil
 	}
 	areaId := config.AreaId(convertIPInByteToString(ent.IfAreaId))
@@ -136,14 +136,14 @@ func (server *OSPFServer) BuildHelloPkt(ent IntfConf) []byte {
 	ospfHdr.pktlen = uint16(ospfPktlen)
 
 	ospfEncHdr := encodeOspfHdr(ospfHdr)
-	//server.logger.Info(fmt.Sprintln("ospfEncHdr:", ospfEncHdr))
+	//server.logger.Debug(fmt.Sprintln("ospfEncHdr:", ospfEncHdr))
 	helloDataEnc := encodeOspfHelloData(helloData)
-	//server.logger.Info(fmt.Sprintln("HelloPkt:", helloDataEnc))
+	//server.logger.Debug(fmt.Sprintln("HelloPkt:", helloDataEnc))
 	helloDataNbrEnc := append(helloDataEnc, neighbor...)
-	//server.logger.Info(fmt.Sprintln("HelloPkt with Neighbor:", helloDataNbrEnc))
+	//server.logger.Debug(fmt.Sprintln("HelloPkt with Neighbor:", helloDataNbrEnc))
 
 	ospf := append(ospfEncHdr, helloDataNbrEnc...)
-	//server.logger.Info(fmt.Sprintln("ospf:", ospf))
+	//server.logger.Debug(fmt.Sprintln("ospf:", ospf))
 	csum := computeCheckSum(ospf)
 	binary.BigEndian.PutUint16(ospf[12:14], csum)
 	copy(ospf[16:24], ent.IfAuthKey)
@@ -172,9 +172,9 @@ func (server *OSPFServer) BuildHelloPkt(ent IntfConf) []byte {
 		ComputeChecksums: true,
 	}
 	gopacket.SerializeLayers(buffer, options, &ethLayer, &ipLayer, gopacket.Payload(ospf))
-	//server.logger.Info(fmt.Sprintln("buffer: ", buffer))
+	//server.logger.Debug(fmt.Sprintln("buffer: ", buffer))
 	ospfPkt := buffer.Bytes()
-	//server.logger.Info(fmt.Sprintln("ospfPkt: ", ospfPkt))
+	//server.logger.Debug(fmt.Sprintln("ospfPkt: ", ospfPkt))
 	return ospfPkt
 }
 
@@ -191,7 +191,7 @@ func (server *OSPFServer) processRxHelloPkt(data []byte, ospfHdrMd *OspfHdrMetad
 	//  Todo: Sec 10.5 RFC2328 Need to add check for Virtual links
 	if ent.IfType != config.NumberedP2P || ent.IfType != config.UnnumberedP2P {
 		if bytesEqual(ent.IfNetmask, ospfHelloData.netmask) == false {
-			server.logger.Info(fmt.Sprintln("HELLO: Netmask mismatch. Int mask", ent.IfNetmask, " Hello mask ", ospfHelloData.netmask, " ip ", ipHdrMd.srcIP))
+			server.logger.Debug(fmt.Sprintln("HELLO: Netmask mismatch. Int mask", ent.IfNetmask, " Hello mask ", ospfHelloData.netmask, " ip ", ipHdrMd.srcIP))
 			err := errors.New("Netmask mismatch")
 			return err
 		}
@@ -208,7 +208,7 @@ func (server *OSPFServer) processRxHelloPkt(data []byte, ospfHdrMd *OspfHdrMetad
 	}
 
 	if ospfHdrMd.backbone == true {
-		//server.logger.Info(fmt.Sprintln("Options:", ospfHelloData.options, "EOPTIONS:", EOption))
+		//server.logger.Debug(fmt.Sprintln("Options:", ospfHelloData.options, "EOPTIONS:", EOption))
 		if (ospfHelloData.options & EOption) == 0 {
 			err := errors.New("External Routing Capability mismatch")
 			return err
@@ -231,16 +231,16 @@ func (server *OSPFServer) processRxHelloPkt(data []byte, ospfHdrMd *OspfHdrMetad
 	   ipHdrMetadata.srcIP = ipHdrMd.srcIP
 	   copy(ipHdrMetadata.dstIP, ipHdrMd.dstIP)
 	*/
-	//server.logger.Info(fmt.Sprintln("ospfHelloData", ospfHelloData))
-	//server.logger.Info(fmt.Sprintln("ipHdrMd", ipHdrMd))
-	//server.logger.Info(fmt.Sprintln("ospfHdrMd", ospfHdrMd))
+	//server.logger.Debug(fmt.Sprintln("ospfHelloData", ospfHelloData))
+	//server.logger.Debug(fmt.Sprintln("ipHdrMd", ipHdrMd))
+	//server.logger.Debug(fmt.Sprintln("ospfHdrMd", ospfHdrMd))
 	nbrlen := ospfHdrMd.pktlen - (OSPF_HELLO_MIN_SIZE + OSPF_HEADER_SIZE)
 	if nbrlen > 0 {
 		j := uint16(OSPF_HELLO_MIN_SIZE)
 		i := OSPF_HELLO_MIN_SIZE + 4
 		k := 0
 		for ; k < int(nbrlen); i, j, k = i+4, j+4, k+4 {
-			server.logger.Info(fmt.Sprintln("HELLO: nbr ", data[j:i], " global_router", server.ospfGlobalConf.RouterId))
+			server.logger.Debug(fmt.Sprintln("HELLO: nbr ", data[j:i], " global_router", server.ospfGlobalConf.RouterId))
 			if bytesEqual(data[j:i], server.ospfGlobalConf.RouterId) == true {
 				TwoWayStatus = true
 				break
@@ -264,9 +264,9 @@ func (server *OSPFServer) processRxHelloPkt(data []byte, ospfHdrMd *OspfHdrMetad
 
 func (server *OSPFServer) processOspfHelloNeighbor(TwoWayStatus bool, ospfHelloData *OSPFHelloData, ipHdrMd *IpHdrMetadata, ospfHdrMd *OspfHdrMetadata, key IntfConfKey) {
 
-	//server.logger.Info(fmt.Sprintln("ospfHelloData", ospfHelloData))
-	//server.logger.Info(fmt.Sprintln("ipHdrMd", ipHdrMd))
-	//server.logger.Info(fmt.Sprintln("ospfHdrMd", ospfHdrMd))
+	//server.logger.Debug(fmt.Sprintln("ospfHelloData", ospfHelloData))
+	//server.logger.Debug(fmt.Sprintln("ipHdrMd", ipHdrMd))
+	//server.logger.Debug(fmt.Sprintln("ospfHdrMd", ospfHdrMd))
 	routerId := convertIPv4ToUint32(ospfHdrMd.routerId)
 	NbrIP := convertIPv4ToUint32(ipHdrMd.srcIP)
 
@@ -290,7 +290,7 @@ func (server *OSPFServer) processOspfHelloNeighbor(TwoWayStatus bool, ospfHelloD
 		neighCreateMsg.DRtr = append(neighCreateMsg.DRtr, ospfHelloData.designatedRtr...)
 		neighCreateMsg.BDRtr = append(neighCreateMsg.BDRtr, ospfHelloData.backupDesignatedRtr...)
 		ent.NeighCreateCh <- neighCreateMsg
-		server.logger.Info(fmt.Sprintln("Neighbor Entry Created", neighborEntry))
+		server.logger.Debug(fmt.Sprintln("Neighbor Entry Created", neighborEntry))
 	} else {
 		if neighborEntry.TwoWayStatus != TwoWayStatus ||
 			bytesEqual(neighborEntry.DRtr, ospfHelloData.designatedRtr) == false ||
@@ -305,7 +305,7 @@ func (server *OSPFServer) processOspfHelloNeighbor(TwoWayStatus bool, ospfHelloD
 			neighChangeMsg.BDRtr = append(neighChangeMsg.BDRtr, ospfHelloData.backupDesignatedRtr...)
 			ent.NeighChangeCh <- neighChangeMsg
 		}
-		server.logger.Info(fmt.Sprintln("Neighbor Entry already exist", neighborEntry))
+		server.logger.Debug(fmt.Sprintln("Neighbor Entry already exist", neighborEntry))
 	}
 
 	nbrDeadInterval := time.Duration(ent.IfRtrDeadInterval) * time.Second
@@ -317,21 +317,19 @@ func (server *OSPFServer) processOspfHelloNeighbor(TwoWayStatus bool, ospfHelloD
 		if bytesEqual(ipHdrMd.srcIP, ospfHelloData.designatedRtr) == true {
 			if bytesEqual(ospfHelloData.backupDesignatedRtr, []byte{0, 0, 0, 0}) == false {
 				ret := ent.WaitTimer.Stop()
-				server.logger.Info("DIE")
-
 				if ret == true {
 					backupSeenMsg.RouterId = routerId
 					backupSeenMsg.DRId = append(backupSeenMsg.DRId, ipHdrMd.srcIP...)
 					backupSeenMsg.BDRId = append(backupSeenMsg.BDRId, ospfHelloData.backupDesignatedRtr...)
-					server.logger.Info("Neigbor choose itself as Designated Router")
-					server.logger.Info("Backup Designated Router also exist")
+					server.logger.Debug("Neigbor choose itself as Designated Router")
+					server.logger.Debug("Backup Designated Router also exist")
 					ent.BackupSeenCh <- backupSeenMsg
 				}
 			}
 		} else if bytesEqual(ipHdrMd.srcIP, ospfHelloData.backupDesignatedRtr) == true {
 			ret := ent.WaitTimer.Stop()
 			if ret == true {
-				server.logger.Info("Neigbor choose itself as Backup Designated Router")
+				server.logger.Debug("Neigbor choose itself as Backup Designated Router")
 				backupSeenMsg.RouterId = routerId
 				backupSeenMsg.DRId = append(backupSeenMsg.DRId, ospfHelloData.designatedRtr...)
 				backupSeenMsg.BDRId = append(backupSeenMsg.BDRId, ipHdrMd.srcIP...)
@@ -365,6 +363,6 @@ func (server *OSPFServer) CreateAndSendHelloRecvdMsg(routerId uint32,
 	msg.IntfConfKey.IntfIdx = key.IntfIdx
 	msg.TwoWayStatus = TwoWayStatus
 
-	server.logger.Info(fmt.Sprintln("Sending msg to Neighbor State Machine", msg))
+	server.logger.Debug(fmt.Sprintln("Sending msg to Neighbor State Machine", msg))
 	server.neighborHelloEventCh <- msg
 }

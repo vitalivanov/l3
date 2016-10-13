@@ -23,11 +23,8 @@
 package server
 
 import (
-	"encoding/json"
-	_ "errors"
 	"l3/ndp/config"
 	"l3/ndp/debug"
-	"net"
 	"utils/commonDefs"
 )
 
@@ -40,6 +37,9 @@ func (svr *NDPServer) GetPorts() {
 	if err != nil {
 		debug.Logger.Err("Failed to get all ports from system, ERROR:", err)
 		return
+	}
+	l3Info := L3Info{
+		IfIndex: config.L3_INVALID_IFINDEX,
 	}
 	for _, obj := range portsInfo {
 		var empty struct{}
@@ -56,7 +56,11 @@ func (svr *NDPServer) GetPorts() {
 			port.MacAddr = pObj.MacAddr
 			port.Description = pObj.Description
 		}
-		svr.PhyPort[port.IfIndex] = port
+		l2Port := svr.L2Port[port.IfIndex]
+		l2Port.Info = port
+		l2Port.RX = nil
+		l2Port.L3 = l3Info
+		svr.L2Port[port.IfIndex] = l2Port
 		svr.SwitchMacMapEntries[port.MacAddr] = empty
 		svr.SwitchMac = port.MacAddr // @HACK.... need better solution
 	}
@@ -83,29 +87,29 @@ func (svr *NDPServer) GetVlans() {
 	if err != nil {
 		debug.Logger.Err("Failed to get system vlan config information, ERROR:", err)
 	}
-
-	// Store untag port information
-	for _, vlanConfig := range vlansConfigInfo {
-		entry := svr.VlanInfo[vlanConfig.VlanId]
-		entry.UntagPortsMap = make(map[int]bool)
-		for _, untagIntf := range vlanConfig.UntagIfIndexList {
-			entry.UntagPortsMap[int(untagIntf)] = true
-		}
-		svr.VlanInfo[vlanConfig.VlanId] = entry
-	}
-
 	// store vlan state information like name, ifIndex, operstate
 	for _, vlanState := range vlansStateInfo {
-		entry, ok := svr.VlanInfo[vlanState.VlanId]
-		if !ok {
-			debug.Logger.Warning("config object for vlan", vlanState.VlanId, "not found")
-		}
+		entry, _ := svr.VlanInfo[vlanState.IfIndex]
+		entry.VlanId = vlanState.VlanId
+		entry.VlanIfIndex = vlanState.IfIndex
 		entry.Name = vlanState.VlanName
-		entry.IfIndex = vlanState.IfIndex
 		entry.OperState = vlanState.OperState
-		svr.VlanInfo[vlanState.VlanId] = entry
-		svr.VlanIfIdxVlanIdMap[vlanState.IfIndex] = vlanState.VlanId //cached the info for ipv6 neighbor create
+		for _, vlanconfig := range vlansConfigInfo {
+			if entry.VlanId == vlanconfig.VlanId {
+				entry.UntagPortsMap = make(map[int32]bool)
+				for _, untagintf := range vlanconfig.UntagIfIndexList {
+					entry.UntagPortsMap[untagintf] = true
+				}
+				entry.TagPortsMap = make(map[int32]bool)
+				for _, tagIntf := range vlanconfig.IfIndexList {
+					entry.TagPortsMap[tagIntf] = true
+				}
+			}
+		}
+		svr.VlanInfo[vlanState.IfIndex] = entry
+		svr.VlanIfIdxVlanIdMap[vlanState.VlanName] = vlanState.VlanId
 	}
+	debug.Logger.Info("Done with Vlan List")
 	return
 }
 
@@ -127,6 +131,7 @@ func (svr *NDPServer) GetIPIntf() {
 		ipInfo, exists := svr.L3Port[obj.IfIndex]
 		if !exists {
 			ipInfo.InitIntf(obj, svr.PktDataCh, svr.NdpConfig)
+			ipInfo.SetIfType(svr.GetIfType(obj.IfIndex))
 			// cache reverse map from intfref to ifIndex, used mainly during state
 			svr.L3IfIntfRefToIfIndex[obj.IntfRef] = obj.IfIndex
 		} else {
@@ -141,21 +146,19 @@ func (svr *NDPServer) GetIPIntf() {
 	return
 }
 
-func isLinkLocal(ipAddr string) bool {
-	ip, _, err := net.ParseCIDR(ipAddr)
-	if err != nil {
-		ip = net.ParseIP(ipAddr)
-	}
-	return ip.IsLinkLocalUnicast() && (ip.To4() == nil)
-}
-
-func (svr *NDPServer) IsIPv6Addr(ipAddr string) bool {
-	ip, _, _ := net.ParseCIDR(ipAddr)
-	if ip.To4() == nil {
-		return true
+func (svr *NDPServer) GetIfType(ifIndex int32) int {
+	debug.Logger.Info("get ifType for ifIndex:", ifIndex)
+	if _, ok := svr.L2Port[ifIndex]; ok {
+		debug.Logger.Info("L3 Port is of IfTypePort")
+		return commonDefs.IfTypePort
 	}
 
-	return false
+	if _, ok := svr.VlanInfo[ifIndex]; ok {
+		debug.Logger.Info("L3 Port is of IfTypeVlan")
+		return commonDefs.IfTypeVlan
+	}
+	debug.Logger.Info("no valid ifIndex found")
+	return -1
 }
 
 /*  API: will handle IPv6 notifications received from switch/asicd
@@ -178,6 +181,9 @@ func (svr *NDPServer) HandleIPIntfCreateDelete(obj *config.IPIntfNotification) {
 
 		ipInfo = Interface{}
 		ipInfo.CreateIntf(obj, svr.PktDataCh, svr.NdpConfig)
+		ipInfo.SetIfType(svr.GetIfType(obj.IfIndex))
+		// cache reverse map from intfref to ifIndex, used mainly during state
+		svr.L3IfIntfRefToIfIndex[obj.IntfRef] = obj.IfIndex
 		svr.ndpL3IntfStateSlice = append(svr.ndpL3IntfStateSlice, ipInfo.IfIndex)
 	case config.CONFIG_DELETE:
 		if !exists {
@@ -190,14 +196,11 @@ func (svr *NDPServer) HandleIPIntfCreateDelete(obj *config.IPIntfNotification) {
 		if len(deleteEntries) > 0 {
 			svr.DeleteNeighborInfo(deleteEntries, obj.IfIndex)
 		}
+		delete(svr.L3IfIntfRefToIfIndex, obj.IntfRef)
+		// @TODO: need to take care for ifTYpe vlan
 		//@TODO: need to remove ndp l3 interface from up slice, but that is taken care of by stop rx/tx
 	}
 	svr.L3Port[ipInfo.IfIndex] = ipInfo
-}
-
-func (svr *NDPServer) findL3Port(ifIndex int32) (Interface, bool) {
-	l3port, exists := svr.L3Port[ifIndex]
-	return l3port, exists
 }
 
 /*  API: will handle l2/physical notifications received from switch/asicd
@@ -205,26 +208,48 @@ func (svr *NDPServer) findL3Port(ifIndex int32) (Interface, bool) {
  *
  */
 func (svr *NDPServer) HandlePhyPortStateNotification(msg *config.PortState) {
-	debug.Logger.Info("Received State:", msg.IfState, "for ifIndex:", msg.IfIndex)
-	l3Port, exists := svr.findL3Port(msg.IfIndex)
-	if !exists {
-		debug.Logger.Debug("Physical Port for ifIndex:", msg.IfIndex,
-			"is not l3 port and ignoring port state notification")
-		return
-	}
-	// search this ifIndex in l3 map to get the ifIndex -> ipAddr map
-	switch msg.IfState {
-	case config.STATE_UP:
-		// if the port state is up, then we need to start RX/TX only for global scope ip address,
-		// if it is not started
-		debug.Logger.Info("Create pkt handler for", msg.IfIndex, "GS:", l3Port.IpAddr, "LS:", l3Port.LinkLocalIp)
-		svr.StartRxTx(msg.IfIndex)
+	debug.Logger.Info("Handling L2 Port State:", msg.IfState, "for ifIndex:", msg.IfIndex)
+	svr.updateL2Operstate(msg.IfIndex, msg.IfState)
+}
 
-	case config.STATE_DOWN:
-		// if the port state is down, then we need to delete all the neighbors for that ifIndex...which
-		// includes deleting neighbor from link local ip address also
-		debug.Logger.Info("Stop receiving frames for", l3Port.IntfRef)
-		svr.StopRxTx(msg.IfIndex, "ALL")
+/*  API: will handle Vlan Create/Delete/Update notifications received from switch/asicd
+ */
+func (svr *NDPServer) HandleVlanNotification(msg *config.VlanNotification) {
+	debug.Logger.Info("Handle Vlan Notfication:", msg.Operation, "for vlanId:", msg.VlanId, "vlan:", msg.VlanName,
+		"vlanIfIndex:", msg.VlanIfIndex, "tagList:", msg.TagPorts, "unTagList:", msg.UntagPorts)
+	vlan, exists := svr.VlanInfo[msg.VlanIfIndex]
+	switch msg.Operation {
+	case config.CONFIG_CREATE:
+		debug.Logger.Info("Received Vlan Create:", *msg)
+		svr.VlanIfIdxVlanIdMap[msg.VlanName] = msg.VlanId
+		vlan.Name = msg.VlanName
+		vlan.VlanId = msg.VlanId
+		vlan.VlanIfIndex = msg.VlanIfIndex
+		// Store untag port information
+		for _, untagIntf := range msg.UntagPorts {
+			if vlan.UntagPortsMap == nil {
+				vlan.UntagPortsMap = make(map[int32]bool)
+			}
+			vlan.UntagPortsMap[untagIntf] = true
+		}
+		// Store untag port information
+		for _, tagIntf := range msg.TagPorts {
+			if vlan.TagPortsMap == nil {
+				vlan.TagPortsMap = make(map[int32]bool)
+			}
+			vlan.TagPortsMap[tagIntf] = true
+		}
+		svr.VlanInfo[msg.VlanIfIndex] = vlan
+	case config.CONFIG_DELETE:
+		debug.Logger.Info("Received Vlan Delete:", *msg)
+		if exists {
+			vlan.UntagPortsMap = nil
+			vlan.TagPortsMap = nil
+			delete(svr.VlanInfo, msg.VlanIfIndex)
+		}
+	case config.CONFIG_UPDATE:
+		//@TODO: jgheewala
+		debug.Logger.Info("NEED TO SUPPORT Vlan Update:", *msg)
 	}
 }
 
@@ -236,15 +261,65 @@ func (svr *NDPServer) HandlePhyPortStateNotification(msg *config.PortState) {
  *		     Stop Rx/Tx in this case
  */
 func (svr *NDPServer) HandleStateNotification(msg *config.IPIntfNotification) {
-	debug.Logger.Info("Received State:", msg.Operation, "for port:", msg.IntfRef, "ifIndex:", msg.IfIndex, "ipAddr:", msg.IpAddr)
+	debug.Logger.Info("Handling L3 State:", msg.Operation, "for port:", msg.IntfRef, "ifIndex:", msg.IfIndex, "ipAddr:", msg.IpAddr)
 	switch msg.Operation {
 	case config.STATE_UP:
 		debug.Logger.Info("Create pkt handler for port:", msg.IntfRef, "ifIndex:", msg.IfIndex, "IpAddr:", msg.IpAddr)
 		svr.StartRxTx(msg.IfIndex)
 	case config.STATE_DOWN:
 		debug.Logger.Info("Delete pkt handler for port:", msg.IntfRef, "ifIndex:", msg.IfIndex, "IpAddr:", msg.IpAddr)
-		// stop pcap handler
 		svr.StopRxTx(msg.IfIndex, msg.IpAddr)
+	}
+}
+
+/*
+ *    API: helper function to update ifIndex & port information for software. Hardware is already taken care
+ *	   off
+ *	   NOTE:
+ *         Below Scenario will only happen when mac move happens between a physical port.. L3 port remains
+ *	   the same and hence do not need to update clients
+ */
+func (svr *NDPServer) SoftwareUpdateNbrEntry(msg *config.MacMoveNotification) {
+	nbrIp := msg.IpAddr
+	svr.NeigborEntryLock.Lock()
+	defer svr.NeigborEntryLock.Unlock()
+	nbrEntry, exists := svr.NeighborInfo[nbrIp]
+	if !exists {
+		return
+	}
+	l2Port, exists := svr.L2Port[msg.IfIndex]
+	if exists {
+		nbrEntry.Intf = l2Port.Info.Name
+		svr.NeighborInfo[nbrIp] = nbrEntry
+		return
+	}
+
+	l3Port, exists := svr.L3Port[msg.IfIndex]
+	if exists {
+		nbrEntry.Intf = l3Port.IntfRef
+		svr.NeighborInfo[nbrIp] = nbrEntry
+		return
+	}
+}
+
+/*
+ *    API: handle action request coming from the user
+ */
+func (svr *NDPServer) HandleAction(action *config.ActionData) {
+	debug.Logger.Debug("Handle Action:", *action)
+
+	switch action.Type {
+	case config.DELETE_BY_IFNAME:
+		svr.ActionDeleteByIntf(action.IntfRef)
+
+	case config.DELETE_BY_IPADDR:
+		svr.ActionDeleteByNbrIp(action.NbrIp)
+
+	case config.REFRESH_BY_IFNAME:
+		svr.ActionRefreshByIntf(action.IntfRef)
+
+	case config.REFRESH_BY_IPADDR:
+		svr.ActionRefreshByNbrIp(action.NbrIp)
 	}
 }
 
@@ -265,46 +340,17 @@ func (svr *NDPServer) DeleteL3IntfFromUpState(ifIndex int32) {
 /*
  *    API: It will populate correct vlan information which will be used for ipv6 neighbor create
  */
-func (svr *NDPServer) PopulateVlanInfo(nbrInfo *config.NeighborConfig, ifIndex int32) {
+func (svr *NDPServer) PopulateVlanInfo(nbrInfo *config.NeighborConfig, intfRef string) {
 	// check if the ifIndex is present in the reverse map..
-	vlanId, exists := svr.VlanIfIdxVlanIdMap[ifIndex]
+	vlanId, exists := svr.VlanIfIdxVlanIdMap[intfRef]
 	if exists {
 		// if the entry exists then use the vlanId from reverse map
 		nbrInfo.VlanId = vlanId
 	} else {
 		// @TODO: move this to plugin specific
 		// in this case use system reserved Vlan id which is -1
-		nbrInfo.VlanId = -1
+		nbrInfo.VlanId = config.INTERNAL_VLAN
 	}
-}
-
-/*
- * helper function to create notification msg
- */
-func createNotificationMsg(ipAddr string, ifIndex int32) ([]byte, error) {
-	msg := commonDefs.Ipv6NeighborNotification{
-		IpAddr:  ipAddr,
-		IfIndex: ifIndex,
-	}
-	msgBuf, err := json.Marshal(msg)
-	if err != nil {
-		debug.Logger.Err("Failed to marshal IPv6 Neighbor Notification message", msg, "error:", err)
-		return msgBuf, err
-	}
-
-	return msgBuf, nil
-}
-
-/*
- * helper function to marshal notification and push it on to the channel
- */
-func (svr *NDPServer) pushNotification(notification commonDefs.NdpNotification) {
-	notifyBuf, err := json.Marshal(notification)
-	if err != nil {
-		debug.Logger.Err("Failed to marshal ipv6 notification before pushing it on channel error:", err)
-		return
-	}
-	svr.notifyChan <- notifyBuf
 }
 
 /*

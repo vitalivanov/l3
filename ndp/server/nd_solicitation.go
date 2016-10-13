@@ -104,7 +104,7 @@ func (intf *Interface) SendNS(myMac, nbrMac, nbrIp string) NDP_OPERATION {
  *		    Then update the state to STALE
  */
 func (intf *Interface) processNS(ndInfo *packet.NDInfo) (nbrInfo *config.NeighborConfig, oper NDP_OPERATION) {
-	if ndInfo.SrcIp == "" || ndInfo.SrcIp == "::" {
+	if ndInfo.SrcIp == "" || ndInfo.SrcIp == "::" || ndInfo.SrcIp == intf.linkScope || ndInfo.SrcIp == intf.globalScope {
 		// NS was generated locally or it is multicast-solicitation message
 		return nil, IGNORE
 	}
@@ -115,22 +115,21 @@ func (intf *Interface) processNS(ndInfo *packet.NDInfo) (nbrInfo *config.Neighbo
 	nbr, exists := intf.Neighbor[nbrKey]
 	if exists {
 		// update the neighbor ??? what to do in this case moving to stale
-		nbr.State = STALE
+		//nbr.State = STALE
 		oper = UPDATE
-		nbrInfo = nil
 	} else {
 		// create new neighbor
 		nbr.InitCache(intf.reachableTime, intf.retransTime, nbrKey, intf.PktDataCh, intf.IfIndex)
-		if len(ndInfo.Options) > 0 {
-			for _, option := range ndInfo.Options {
-				if option.Type == packet.NDOptionTypeSourceLinkLayerAddress {
-					nbr.State = REACHABLE
-				}
-			}
-		}
-		nbrInfo = nbr.populateNbrInfo(intf.IfIndex, intf.IntfRef)
 		oper = CREATE
 	}
+	if len(ndInfo.Options) > 0 {
+		for _, option := range ndInfo.Options {
+			if option.Type == packet.NDOptionTypeSourceLinkLayerAddress {
+				nbr.State = REACHABLE
+			}
+		}
+	}
+	nbrInfo = nbr.populateNbrInfo(intf.IfIndex, intf.IntfRef)
 	nbr.updatePktRxStateInfo()
 	intf.Neighbor[nbrKey] = nbr
 	return nbrInfo, oper

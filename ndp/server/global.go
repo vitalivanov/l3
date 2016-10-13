@@ -24,6 +24,7 @@ package server
 
 import (
 	"github.com/google/gopacket"
+	"github.com/google/gopacket/pcap"
 	"l3/ndp/config"
 	"l3/ndp/packet"
 	"sync"
@@ -44,19 +45,32 @@ type NdpConfig struct {
 	RaRestransmitTime uint8
 }
 
+type L3Info struct {
+	Name     string
+	IfIndex  int32
+	PortType string // tag or untag
+}
+
+type PhyPort struct {
+	RX   *pcap.Handle
+	Info config.PortInfo
+	L3   L3Info
+}
+
 type NDPServer struct {
 	NdpConfig                                // base config
 	dmnBase      *dmnBase.FSBaseDmn          // base Daemon
 	SwitchPlugin asicdClient.AsicdClientIntf // asicd plugin
 
 	// System Ports information, key is IntfRef
-	PhyPort             map[int32]config.PortInfo        // key is l2 ifIndex
+	L2Port              map[int32]PhyPort                //config.PortInfo        // key is l2 ifIndex
 	L3Port              map[int32]Interface              // key is l3 ifIndex
 	VlanInfo            map[int32]config.VlanInfo        // key is vlanId
-	VlanIfIdxVlanIdMap  map[int32]int32                  //reverse map for ifIndex ----> vlanId, used during ipv6 neig create
+	VlanIfIdxVlanIdMap  map[string]int32                 //reverse map for vlanName ----> vlanId, used during ipv6 neig create
 	SwitchMacMapEntries map[string]struct{}              // cache entry for all mac addresses on a switch
 	NeighborInfo        map[string]config.NeighborConfig // neighbor created by NDP used for STATE
 	neighborKey         []string                         // keys for all neighbor entries is stored here for GET calls
+	PhyPortToL3PortMap  map[int32]int32                  // reverse map for l2IfIndex ----> l3IfIndex, used during vlan RX Pcap
 
 	//Configuration Channels
 	GlobalCfg chan NdpConfig
@@ -66,16 +80,18 @@ type NDPServer struct {
 	// it's better to use lock
 	NeigborEntryLock *sync.RWMutex
 
-	// Physical Port/ L2 Port State Notification
-	PhyPortStateCh chan *config.PortState
 	//IPV6 Create/Delete State Up/Down Notification Channel
 	IpIntfCh chan *config.IPIntfNotification
 	// Vlan Create/Delete/Update Notification Channel
 	VlanCh chan *config.VlanNotification
+	// Mac Move Notification Channel
+	MacMoveCh chan *config.MacMoveNotification
 	//Received Pkt Channel
 	RxPktCh chan *RxPktInfo
 	//Package packet informs server over PktDataCh saying that send this packet..
 	PktDataCh chan config.PacketData
+	//Action Channel for NDP
+	ActionCh chan *config.ActionData
 
 	ndpL3IntfStateSlice   []int32
 	ndpUpL3IntfStateSlice []int32
@@ -102,7 +118,7 @@ type NDPServer struct {
 const (
 	NDP_CPU_PROFILE_FILE                  = "/var/log/ndpd.prof"
 	NDP_SERVER_MAP_INITIAL_CAP            = 30
-	NDP_SERVER_ASICD_NOTIFICATION_CH_SIZE = 5
+	NDP_SERVER_ASICD_NOTIFICATION_CH_SIZE = 1
 	NDP_SERVER_INITIAL_CHANNEL_SIZE       = 1
 	INTF_REF_NOT_FOUND                    = "Not Found"
 )

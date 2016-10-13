@@ -121,9 +121,11 @@ func main() {
 		// starting bgp policy engine...
 		logger.Info(fmt.Sprintln("Starting BGP policy engine..."))
 		bgpPolicyMgr := bgppolicy.NewPolicyManager(logger, pMgr)
-		go bgpPolicyMgr.StartPolicyEngine()
-
 		bgpServer := server.NewBGPServer(logger, bgpPolicyMgr, iMgr, rMgr, bMgr, sDBMgr)
+
+		doneCh := make(chan bool)
+		go bgpPolicyMgr.StartPolicyEngine(dbUtil, doneCh)
+		<-doneCh
 		go bgpServer.StartServer()
 
 		logger.Info(" Starting config listener...")
@@ -158,20 +160,22 @@ func main() {
 		if err != nil {
 			return
 		}
-		pMgr := FSMgr.NewFSPolicyMgr(logger, fileName)
 		sDBMgr, err := statedbclient.NewStateDBClient(statedbclient.FlexSwitchPlugin, logger)
 		if err != nil {
 			return
 		}
 		// starting bgp policy engine...
 		logger.Info(fmt.Sprintln("Starting BGP policy engine..."))
+		pMgr := FSMgr.NewFSPolicyMgr(logger, fileName)
 		bgpPolicyMgr := bgppolicy.NewPolicyManager(logger, pMgr)
-		go bgpPolicyMgr.StartPolicyEngine()
-
 		logger.Info(fmt.Sprintln("Starting BGP Server..."))
-
 		bgpServer := server.NewBGPServer(logger, bgpPolicyMgr, iMgr, rMgr, bMgr, sDBMgr)
+
+		doneCh := make(chan bool)
+		go bgpPolicyMgr.StartPolicyEngine(dbUtil, doneCh)
+		<-doneCh
 		go bgpServer.StartServer()
+
 		up := <-bgpServer.ServerUpCh
 		logger.Info(" Serverup:", up)
 
@@ -183,6 +187,7 @@ func main() {
 
 		logger.Info(fmt.Sprintln("Starting config listener"))
 		confIface := rpc.NewBGPHandler(bgpServer, bgpPolicyMgr, logger, dbUtil, fileName)
+		confIface.ReadBGPConfigFromDB()
 		//dbUtil.Disconnect()
 
 		logger.Info(fmt.Sprintln("Starting thrift server"))

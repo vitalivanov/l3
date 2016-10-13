@@ -194,6 +194,7 @@ func (server *OSPFServer) UpdateNeighborConf() {
 		select {
 		case nbrMsg := <-(server.neighborConfCh):
 			var nbrConf OspfNeighborEntry
+			intfConf, _ := server.IntfConfMap[nbrMsg.ospfNbrEntry.intfConfKey]
 			//server.logger.Info(fmt.Sprintln("Update neighbor conf.  received"))
 			if nbrMsg.nbrMsgType == NBRDEL {
 				delete(server.NeighborConfigMap, nbrMsg.ospfNbrConfKey)
@@ -237,7 +238,7 @@ func (server *OSPFServer) UpdateNeighborConf() {
 				if nbrMsg.ospfNbrEntry.OspfNbrState >= config.NbrTwoWay {
 					seq_num := uint32(time.Now().Nanosecond())
 					server.ConstructAndSendDbdPacket(nbrMsg.ospfNbrConfKey, true, true, true,
-						INTF_OPTIONS, seq_num, false, false)
+						INTF_OPTIONS, seq_num, false, false, intfConf.IfMtu)
 					nbrConf.OspfNbrState = config.NbrExchangeStart
 					nbrConf.nbrEvent = config.Nbr2WayReceived
 					nbrConf.ospfNbrSeqNum = seq_num

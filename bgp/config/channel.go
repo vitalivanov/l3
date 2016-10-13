@@ -28,10 +28,15 @@ import (
 	"l3/rib/ribdCommonDefs"
 )
 
+type ReachabilityResult struct {
+	Err         error
+	NextHopInfo *NextHopInfo
+}
+
 type ReachabilityInfo struct {
 	IP          string
 	IfIndex     int32
-	ReachableCh chan bool
+	ReachableCh chan ReachabilityResult
 }
 
 type Operation int

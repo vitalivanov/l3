@@ -75,7 +75,7 @@ func (o *OutTCPConn) Connect(seconds uint32, remote, local string, connCh chan n
 		return
 	}
 
-	reachableCh := make(chan bool)
+	reachableCh := make(chan config.ReachabilityResult)
 	reachabilityInfo := config.ReachabilityInfo{
 		IP:          o.fsm.pConf.NeighborAddress.String(),
 		ReachableCh: reachableCh,
@@ -83,7 +83,7 @@ func (o *OutTCPConn) Connect(seconds uint32, remote, local string, connCh chan n
 	}
 	o.fsm.Manager.reachabilityCh <- reachabilityInfo
 	reachable := <-reachableCh
-	if !reachable {
+	if reachable.Err != nil {
 		duration := uint32(3)
 		if (duration * 2) < seconds {
 			for {
@@ -93,14 +93,23 @@ func (o *OutTCPConn) Connect(seconds uint32, remote, local string, connCh chan n
 					reachable = <-reachableCh
 				}
 				seconds -= duration
-				if reachable || seconds <= (duration*2) {
+				if reachable.Err == nil || seconds <= (duration*2) {
 					break
 				}
 			}
 		}
-		if !reachable {
+		if reachable.Err != nil {
 			errCh <- config.AddressNotResolvedError{"Neighbor is not reachable"}
 			return
+		}
+	}
+
+	if local == "" && reachable.NextHopInfo != nil {
+		nextHopIP := net.ParseIP(strings.TrimSpace(reachable.NextHopInfo.NextHopIp))
+		if nextHopIP != nil && (nextHopIP.Equal(net.IPv4zero) || nextHopIP.Equal(net.IPv6zero)) {
+			o.logger.Info("Neighbor:", o.fsm.pConf.NeighborAddress, "FSM", o.fsm.id, "Next hop ip", nextHopIP,
+				"is 0, Set source ip for the TCP connection to", reachable.NextHopInfo.IPAddr)
+			local = net.JoinHostPort(strings.TrimSpace(reachable.NextHopInfo.IPAddr), "0")
 		}
 	}
 

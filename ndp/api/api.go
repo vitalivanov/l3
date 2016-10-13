@@ -60,13 +60,6 @@ func Init(svr *server.NDPServer) {
 	ndpApi.server = svr
 }
 
-func SendL2PortNotification(ifIndex int32, state string) {
-	ndpApi.server.PhyPortStateCh <- &config.PortState{
-		IfIndex: ifIndex,
-		IfState: state,
-	}
-}
-
 func SendL3PortNotification(ifIndex int32, state, ipAddr string) {
 	ndpApi.server.IpIntfCh <- &config.IPIntfNotification{
 		IfIndex:   ifIndex,
@@ -84,13 +77,19 @@ func SendIPIntfNotfication(ifIndex int32, ipaddr, intfRef, msgType string) {
 	}
 }
 
-func SendVlanNotification(oper string, vlanId int32, vlanName string, untagPorts []int32) {
+func SendVlanNotification(oper string, vlanId int32, vlanIfIndex int32, vlanName string, untagPorts []int32, tagPorts []int32) {
 	ndpApi.server.VlanCh <- &config.VlanNotification{
-		Operation:  oper,
-		VlanId:     vlanId,
-		VlanName:   vlanName,
-		UntagPorts: untagPorts,
+		Operation:   oper,
+		VlanId:      vlanId,
+		VlanIfIndex: vlanIfIndex,
+		VlanName:    vlanName,
+		UntagPorts:  untagPorts,
+		TagPorts:    tagPorts,
 	}
+}
+
+func SendMacMoveNotification(ipAddr string, ifIndex, vlanId int32) {
+	ndpApi.server.MacMoveCh <- &config.MacMoveNotification{ipAddr, ifIndex, vlanId}
 }
 
 func GetAllNeigborEntries(from, count int) (int, int, []config.NeighborConfig) {
@@ -129,4 +128,32 @@ func GetAllNdpIntfState(from, count int) (int, int, []config.InterfaceEntries) {
 
 func GetNdpIntfState(intfRef string) *config.InterfaceEntries {
 	return ndpApi.server.GetInterfaceNeighborEntry(intfRef)
+}
+
+func SendDeleteByIfName(intfRef string) {
+	ndpApi.server.ActionCh <- &config.ActionData{
+		Type:    config.DELETE_BY_IFNAME,
+		IntfRef: intfRef,
+	}
+}
+
+func SendDeleteByNeighborIp(ipAddr string) {
+	ndpApi.server.ActionCh <- &config.ActionData{
+		Type:  config.DELETE_BY_IPADDR,
+		NbrIp: ipAddr,
+	}
+}
+
+func SendRefreshByIfName(intfRef string) {
+	ndpApi.server.ActionCh <- &config.ActionData{
+		Type:    config.REFRESH_BY_IFNAME,
+		IntfRef: intfRef,
+	}
+}
+
+func SendRefreshByNeighborIp(ipAddr string) {
+	ndpApi.server.ActionCh <- &config.ActionData{
+		Type:  config.REFRESH_BY_IPADDR,
+		NbrIp: ipAddr,
+	}
 }

@@ -67,6 +67,7 @@ type LocRib struct {
 	destPathMap      map[uint32]map[string]*Destination
 	reachabilityMap  map[string]*ReachabilityInfo
 	unreachablePaths map[string]map[*Path]map[*Destination][]uint32
+	routesCount      map[uint32]uint32
 	routeList        map[uint32][]*Destination
 	routeMutex       sync.RWMutex
 	routeListDirty   map[uint32]bool
@@ -84,6 +85,7 @@ func NewLocRib(logger *logging.Writer, rMgr config.RouteMgrIntf, sDBMgr statedbc
 		destPathMap:      make(map[uint32]map[string]*Destination),
 		reachabilityMap:  make(map[string]*ReachabilityInfo),
 		unreachablePaths: make(map[string]map[*Path]map[*Destination][]uint32),
+		routesCount:      make(map[uint32]uint32),
 		routeList:        make(map[uint32][]*Destination),
 		routeListDirty:   make(map[uint32]bool),
 		activeGet:        make(map[uint32]bool),
@@ -102,6 +104,10 @@ func isIpInList(prefixes []packet.NLRI, ip packet.NLRI) bool {
 		}
 	}
 	return false
+}
+
+func (l *LocRib) GetRoutesCount() map[uint32]uint32 {
+	return l.routesCount
 }
 
 func (l *LocRib) GetReachabilityInfo(ipStr string) *ReachabilityInfo {
@@ -149,6 +155,10 @@ func (l *LocRib) GetDest(nlri packet.NLRI, protoFamily uint32, createIfNotExist 
 			dest = NewDestination(l, nlri, protoFamily, l.gConf)
 			l.destPathMap[protoFamily][nlri.GetCIDR()] = dest
 			l.addRoutesToRouteList(dest, protoFamily)
+			if _, found := l.routesCount[protoFamily]; !found {
+				l.routesCount[protoFamily] = 0
+			}
+			l.routesCount[protoFamily]++
 		}
 	}
 
@@ -241,6 +251,7 @@ func (l *LocRib) ProcessRoutes(peerIP string, add, rem []packet.NLRI, addPath, r
 					op = l.stateDBMgr.DeleteObject
 					l.removeRoutesFromRouteList(dest, protoFamily)
 					delete(l.destPathMap[protoFamily], nlri.GetCIDR())
+					l.routesCount[protoFamily]--
 				}
 			}
 			op(l.GetRouteStateConfigObj(dest.GetBGPRoute()))
@@ -485,6 +496,7 @@ func (l *LocRib) RemoveUpdatesFromNeighbor(peerIP string, neighborConf *base.Nei
 				l.logger.Info("All routes removed for dest", dest.NLRI.GetCIDR())
 				l.removeRoutesFromRouteList(dest, protoFamily)
 				delete(l.destPathMap[protoFamily], destIP)
+				l.routesCount[protoFamily]--
 				op = l.stateDBMgr.DeleteObject
 			}
 			op(l.GetRouteStateConfigObj(dest.GetBGPRoute()))
@@ -512,6 +524,7 @@ func (l *LocRib) RemoveUpdatesFromAllNeighbors(addPathCount int) {
 			if action == RouteActionDelete && dest.IsEmpty() {
 				l.removeRoutesFromRouteList(dest, protoFamily)
 				delete(l.destPathMap[protoFamily], destIP)
+				l.routesCount[protoFamily]--
 				op = l.stateDBMgr.DeleteObject
 			}
 			op(l.GetRouteStateConfigObj(dest.GetBGPRoute()))
@@ -584,6 +597,7 @@ func (l *LocRib) RemoveRouteFromAggregate(ip *packet.IPPrefix, aggIP *packet.IPP
 	if action == RouteActionDelete && aggDest.IsEmpty() {
 		l.removeRoutesFromRouteList(dest, protoFamily)
 		delete(l.destPathMap[protoFamily], aggIP.Prefix.String())
+		l.routesCount[protoFamily]--
 		op = l.stateDBMgr.DeleteObject
 	}
 	op(l.GetRouteStateConfigObj(dest.GetBGPRoute()))
