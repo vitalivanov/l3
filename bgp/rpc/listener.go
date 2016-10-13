@@ -781,7 +781,7 @@ func (h *BGPHandler) getIPAndIfIndexForV4Neighbor(neighborIP string, neighborInt
 			return ip, ifIndex, ifName, err
 		}
 
-		var ipInfo bgputils.IPInfo
+		var ipInfo *bgputils.IPInfo
 		ipInfo, err = h.server.GetIfaceIP(ifIndex)
 		h.logger.Info("getIPAndIfIndexForV4Neighbor - ipInfo:", ipInfo, " err:", err)
 		if err == nil {

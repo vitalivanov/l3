@@ -1125,9 +1125,9 @@ func (s *BGPServer) ProcessIntfStates(intfs []*config.IntfStateInfo) {
 	}
 }
 
-func (s *BGPServer) GetIfaceIP(ifIndex int32) (utils.IPInfo, error) {
+func (s *BGPServer) GetIfaceIP(ifIndex int32) (*utils.IPInfo, error) {
 	ipInfo, err := s.ifaceMgr.GetIfaceIP(ifIndex)
-	return *ipInfo, err
+	return ipInfo, err
 }
 
 func (s *BGPServer) ProcessRemoveNeighbor(peerIp string, peer *Peer) {
