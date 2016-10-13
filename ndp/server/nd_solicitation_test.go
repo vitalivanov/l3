@@ -33,10 +33,11 @@ const (
 	testMulticastSolicitationAddr = "ff02::1:ff7c:ca9f"
 	testUnspecifiecSrcIp          = "::"
 	//Unicast Neighbor Solicitation Const
-	testNsSrcMac = "00:1f:16:25:33:ce"
-	testNsDstMac = "00:1f:16:25:34:31"
-	testNsSrcIp  = "fe80::21f:16ff:fe25:33ce"
-	testNsDstIp  = "2001:db8:0:f101::1"
+	testNsSrcMac    = "00:1f:16:25:33:ce"
+	testNsDstMac    = "00:1f:16:25:34:31"
+	testNsSrcIp     = "fe80::21f:16ff:fe25:33ce"
+	testNsDstIp     = "2001:db8:0:f101::1"
+	testIsFastProbe = false
 )
 
 var nsBaseTestPkt = []byte{
@@ -109,7 +110,7 @@ func TestUnicastNS(t *testing.T) {
 		t.Error("Failed to get L3 Port for ifIndex:", testIfIndex)
 		return
 	}
-	operation := l3Port.SendNS(myMac, nbrMac, nbrIp)
+	operation := l3Port.SendNS(myMac, nbrMac, nbrIp, testIsFastProbe)
 	if operation != IGNORE {
 		t.Error("When no neighbor entries are present operation should be Ignore")
 		return
@@ -128,7 +129,7 @@ func TestUnicastNS(t *testing.T) {
 	}
 	//t.Log(*nbrInfo, oper)
 	//t.Log(l3Port.Neighbor)
-	operation = l3Port.SendNS(myMac, nbrMac, nbrIp)
+	operation = l3Port.SendNS(myMac, nbrMac, nbrIp, testIsFastProbe)
 	if operation != IGNORE {
 		t.Error("When neighbor entries are present operation should be Ignore and unicast packet should be send out")
 		return

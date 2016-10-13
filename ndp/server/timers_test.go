@@ -34,7 +34,7 @@ func initTestNbrInfo() {
 	initServerBasic()
 	nbrTest = &NeighborInfo{}
 	testPktDataCh = make(chan config.PacketData)
-	nbrTest.InitCache(testReachableTimerValue, testReachableTimerValue,
+	nbrTest.InitCache(testReachableTimerValue, testReTransmitTimerValue,
 		testMyAbsLinkScopeIP+"_"+testSrcMac, testPktDataCh, testIfIndex)
 }
 
@@ -155,5 +155,33 @@ func TestInvaliTimer(t *testing.T) {
 	if nbrTest.InvalidationTimer != nil {
 		t.Error("Failed to stop invalidation timer")
 		return
+	}
+}
+
+func TestFastProbeTimer(t *testing.T) {
+	//initServerBasic()
+	nbrTest = &NeighborInfo{}
+	TestIPv6IntfCreate(t)
+	testPktDataCh = make(chan config.PacketData)
+	nbrTest.InitCache(2, testReTransmitTimerValue,
+		testMyAbsLinkScopeIP+"_"+testSrcMac, testPktDataCh, testIfIndex)
+	probes := 0
+	for {
+		select {
+		case pktDataInfo, ok := <-testPktDataCh:
+			if !ok {
+				break
+			}
+			probes++
+			//t.Log("Received probe", probes)
+			testNdpServer.counter.Rcvd++
+			if pktDataInfo.FastProbe == false {
+				t.Error("For Fast Probe timer isFastProbe should be set to true")
+				return
+			}
+			//t.Log("Processing Timer Expiry:", pktDataInfo)
+			testNdpServer.ProcessTimerExpiry(pktDataInfo)
+		}
+		break
 	}
 }
