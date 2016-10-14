@@ -115,8 +115,8 @@ func (c *NeighborInfo) InitCache(reachableTime, retransTime uint32, nbrKey strin
 	c.FastProbesMultiplier = 1
 	c.State = INCOMPLETE
 	ipMacStr := strings.Split(nbrKey, "_")
-	c.IpAddr = ipMacStr[0]
-	c.LinkLayerAddress = ipMacStr[1] // this is mac address
+	c.IpAddr = ipMacStr[1]
+	c.LinkLayerAddress = ipMacStr[0] // this is mac address
 	c.ProbesSent = uint8(0)
 	c.ReturnCh = pktCh
 	c.IfIndex = ifIndex
