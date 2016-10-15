@@ -435,9 +435,9 @@ func (intf *Interface) FlushNeighborPerIp(nbrKey, ipAddr string) ([]string, erro
 func (intf *Interface) createNbrKey(ndInfo *packet.NDInfo) (nbrkey string) {
 	if ndInfo.SrcIp == intf.globalScope || ndInfo.SrcIp == intf.linkScope {
 		// use destination ip as index to neighbor information
-		nbrkey = ndInfo.DstIp + "_" + ndInfo.DstMac
+		nbrkey = ndInfo.DstMac + "_" + ndInfo.DstIp + "_" + ndInfo.LearnedIntfRef
 	} else {
-		nbrkey = ndInfo.SrcIp + "_" + ndInfo.SrcMac
+		nbrkey = ndInfo.SrcMac + "_" + ndInfo.SrcIp + "_" + ndInfo.LearnedIntfRef
 	}
 	return nbrkey
 }
@@ -523,7 +523,10 @@ func (intf *Interface) PopulateNeighborInfo(nbr NeighborInfo, nbrState *config.N
  *   Interface validator for nbrKey generated
  */
 func (intf *Interface) validNbrKey(nbrKey string) bool {
-	splitString := strings.Split(nbrKey, ":")
+	// mac_ip_intf
+	nSplit := strings.Split(nbrKey, "_")
+	// ip
+	splitString := strings.Split(nSplit[1], ":")
 	for _, value := range IPV6_MULTICAST_PREFIXES {
 		if strings.Contains(strings.ToLower(splitString[0]), value) {
 			return false

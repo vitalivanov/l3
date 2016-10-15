@@ -129,10 +129,10 @@ func (svr *NDPServer) StopRxTx(ifIndex int32, ipAddr string) {
 	case commonDefs.IfTypePort:
 		switch ipAddr {
 		case "ALL":
-			//debug.Logger.Debug("Deleting all entries")
+			debug.Logger.Debug("Deleting all entries during stop rx/tx")
 			deleteEntries, err = l3Port.DeleteAll()
 		default:
-			//debug.Logger.Debug("Deleing interface:", ipAddr)
+			debug.Logger.Debug("Deleing interface:", ipAddr, "during stop rx/tx")
 			deleteEntries, err = l3Port.DeleteIntf(ipAddr)
 		}
 	case commonDefs.IfTypeVlan:
@@ -197,10 +197,13 @@ func (svr *NDPServer) updateNeighborInfo(nbrInfo *config.NeighborConfig) {
 }
 
 /*
- *	deleteNeighborInfo: Helper API to update list of neighbor keys that are deleted by ndp
+ *	deleteSvrStateNbrInfo: Helper API to update list of neighbor keys that are deleted by ndp
  *	@NOTE: caller is responsible for acquiring the lock to access slice
  */
-func (svr *NDPServer) deleteNeighborInfo(nbrKey string) {
+func (svr *NDPServer) deleteSvrStateNbrInfo(nbrKey string) {
+	// delete the entry from neighbor map
+	delete(svr.NeighborInfo, nbrKey)
+
 	for idx, _ := range svr.neighborKey {
 		if svr.neighborKey[idx] == nbrKey {
 			svr.neighborKey = append(svr.neighborKey[:idx], svr.neighborKey[idx+1:]...)
@@ -231,11 +234,11 @@ func (svr *NDPServer) CreateNeighborInfo(nbrInfo *config.NeighborConfig) {
 }
 
 func (svr *NDPServer) deleteNeighbor(nbrKey string, ifIndex int32) {
+	debug.Logger.Debug("deleteNeighbor called for nbrKey:", nbrKey)
 	// Inform clients that neighbor is gonna be deleted
 	splitString := splitNeighborKey(nbrKey)
 	nbrIp := splitString[1]
 	svr.SendIPv6DeleteNotification(nbrIp, ifIndex)
-	//nbrInfo := svr.NeighborInfo[nbrKey]
 	// Request asicd to delete the neighbor
 	if net.ParseIP(nbrIp).IsLinkLocalUnicast() == false {
 		_, err := svr.SwitchPlugin.DeleteIPv6Neighbor(nbrIp)
@@ -243,9 +246,7 @@ func (svr *NDPServer) deleteNeighbor(nbrKey string, ifIndex int32) {
 			debug.Logger.Err("delete ipv6 neigbor failed for", nbrIp, "error is", err)
 		}
 	}
-	// delete the entry from neighbor map
-	delete(svr.NeighborInfo, nbrKey)
-	svr.deleteNeighborInfo(nbrKey)
+	svr.deleteSvrStateNbrInfo(nbrKey)
 }
 
 func (svr *NDPServer) UpdateNeighborInfo(nbrInfo *config.NeighborConfig, oldNbrEntry config.NeighborConfig) {
@@ -274,7 +275,7 @@ func (svr *NDPServer) UpdateNeighborInfo(nbrInfo *config.NeighborConfig, oldNbrE
 func (svr *NDPServer) DeleteNeighborInfo(deleteEntries []string, ifIndex int32) {
 	svr.NeigborEntryLock.Lock()
 	for _, nbrKey := range deleteEntries {
-		//debug.Logger.Debug("Calling delete ipv6 neighbor for nbrIp:", nbrIp)
+		debug.Logger.Debug("Calling delete ipv6 neighbor for nbr:", nbrKey)
 		svr.deleteNeighbor(nbrKey, ifIndex)
 	}
 	svr.NeigborEntryLock.Unlock()
@@ -314,6 +315,17 @@ func (svr *NDPServer) ProcessRxPkt(ifIndex int32, pkt gopacket.Packet) error {
 	if err != nil || ndInfo == nil {
 		return errors.New(fmt.Sprintln("Failed decoding ND packet, error:", err))
 	}
+	// Step2: process decode neighbor information
+	// update ifIndex to l2 ifIndex if iftype is not ifTypePort
+	switch l3Port.IfType {
+	case commonDefs.IfTypeVlan:
+		ndInfo.LearnedIfIndex = ifIndex
+		// if vlan type then updating the name to original port where the packet was received
+		ndInfo.LearnedIntfRef = l2Port.Info.Name
+	case commonDefs.IfTypePort:
+		ndInfo.LearnedIfIndex = l3Port.IfIndex
+		ndInfo.LearnedIntfRef = l3Port.IntfRef
+	}
 	// Step2: process decoded packet
 	nbrInfo, operation := l3Port.ProcessND(ndInfo)
 	if nbrInfo == nil && operation == IGNORE { //|| (operation != CREATE && operation != DELETE) {
@@ -349,8 +361,7 @@ func (svr *NDPServer) ProcessRxPkt(ifIndex int32, pkt gopacket.Packet) error {
 			}
 		}
 	case DELETE:
-		//svr.deleteNeighbor(nbrInfo.IpAddr, ifIndex) // used mostly by RA
-		svr.deleteNeighbor(createNeighborKey(nbrInfo.MacAddr, nbrInfo.IpAddr, nbrInfo.Intf), l3Port.IfIndex) // used mostly by RA
+		svr.deleteNeighbor(nbrKey, l3Port.IfIndex) // used mostly by RA
 	}
 
 early_exit:

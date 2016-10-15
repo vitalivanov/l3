@@ -40,12 +40,14 @@ type NDOption struct {
  */
 type NDInfo struct {
 	// NS/NA Information
-	TargetAddress net.IP
-	PktType       layers.ICMPv6TypeCode
-	SrcMac        string
-	SrcIp         string
-	DstIp         string
-	DstMac        string
+	TargetAddress  net.IP
+	PktType        layers.ICMPv6TypeCode
+	SrcMac         string
+	SrcIp          string
+	DstIp          string
+	DstMac         string
+	LearnedIntfRef string
+	LearnedIfIndex int32
 	// RA Information
 	CurHopLimit    uint8
 	ReservedFlags  uint8
