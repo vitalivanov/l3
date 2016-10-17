@@ -922,7 +922,7 @@ func (ip *IPPrefix) Decode(pkt []byte, afi AFI) error {
 	}
 
 	ipLen := net.IPv4len
-	if afi == AfiIP6 {
+	if afi == AfiIP6 || int(bytes) > ipLen {
 		ipLen = net.IPv6len
 	}
 	ip.Prefix = make(net.IP, ipLen)
