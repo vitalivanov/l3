@@ -97,8 +97,8 @@ func TestProcessNAPkt(t *testing.T) {
 		return
 	}
 
-	if nbrInfo != nil {
-		t.Error("If neighbor exists then the operation should be update and nbrInfo should be nil")
+	if !reflect.DeepEqual(wantNbrInfo, nbrInfo) {
+		t.Error("During Update Want Neigbor Info:", *wantNbrInfo, "but received nbrInfo:", *nbrInfo)
 		return
 	}
 }

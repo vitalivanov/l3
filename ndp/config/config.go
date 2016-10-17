@@ -146,6 +146,7 @@ type PacketData struct {
 	NeighborIp  string
 	NeighborMac string
 	IfIndex     int32
+	FastProbe   bool
 }
 
 type ActionData struct {

@@ -130,8 +130,8 @@ func TestProcessRA(t *testing.T) {
 		t.Error("Failed to create a new neighbor entry on RA packet")
 		return
 	}
-	if nbrInfo != nil {
-		t.Error("During Update there should be no Neighbor Info received")
+	if !reflect.DeepEqual(wantNbrInfo, nbrInfo) {
+		t.Error("During Update Want Neigbor Info:", *wantNbrInfo, "but received nbrInfo:", *nbrInfo)
 		return
 	}
 
@@ -147,7 +147,7 @@ func TestProcessRA(t *testing.T) {
 		return
 	}
 	// delete neighbor entry that just got created using router advertisement
-	testNdpServer.deleteNeighbor(nbrInfo.IpAddr, testIfIndex)
+	testNdpServer.deleteNeighbor(createNeighborKey(nbrInfo.MacAddr, nbrInfo.IpAddr, testIntfRef), testIfIndex)
 	if len(testNdpServer.NeighborInfo) != 0 {
 		t.Error("Failed to delete learned neighbor information after processing router advertisement")
 		return

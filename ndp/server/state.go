@@ -57,10 +57,14 @@ func (svr *NDPServer) GetNeighborEntries(idx, cnt int) (int, int, []config.Neigh
 func (svr *NDPServer) GetNeighborEntry(ipAddr string) *config.NeighborConfig {
 	svr.NeigborEntryLock.RLock()
 	defer svr.NeigborEntryLock.RUnlock()
-
-	nbrEntry, exists := svr.NeighborInfo[ipAddr]
-	if exists {
-		return &nbrEntry
+	for _, nbrKey := range svr.neighborKey {
+		splitString := splitNeighborKey(nbrKey)
+		if splitString[1] == ipAddr {
+			nbrEntry, exists := svr.NeighborInfo[nbrKey]
+			if exists {
+				return &nbrEntry
+			}
+		}
 	}
 	return nil
 }
