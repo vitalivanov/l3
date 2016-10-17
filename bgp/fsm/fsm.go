@@ -1212,11 +1212,16 @@ func (fsm *FSM) ProcessUpdateMessage(pkt *packet.BGPMessage) {
 }
 
 func (fsm *FSM) sendUpdateMessage(bgpMsg *packet.BGPMessage) {
+	fsm.logger.Infof("Neighbor:%s FSM %d Send BGP update message %+v", fsm.pConf.NeighborAddress, fsm.id, bgpMsg)
 	updateMsgs := packet.ConstructMaxSizedUpdatePackets(bgpMsg)
 	atomic.AddUint32(&fsm.neighborConf.Neighbor.State.Queues.Output, ^uint32(0))
 
 	for idx, _ := range updateMsgs {
-		packet, _ := updateMsgs[idx].Encode()
+		packet, err := updateMsgs[idx].Encode()
+		if err != nil {
+			fsm.logger.Errf("Neighbor:%s FSM %d Failed to encode packet", fsm.pConf.NeighborAddress, fsm.id)
+			continue
+		}
 		fsm.logger.Infof("Neighbor:%s FSM %d Tx BGP UPDATE %x", fsm.pConf.NeighborAddress, fsm.id, packet)
 
 		num, err := (*fsm.peerConn.conn).Write(packet)
