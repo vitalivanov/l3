@@ -86,7 +86,7 @@ func AppendASToAS4PathSeg(asPath *BGPPathAttrASPath, pathSeg BGPASPathSegment, a
 	return pathSeg
 }
 
-func AddPathAttrToPathAttrs(pathAttrs []BGPPathAttr, code BGPPathAttrType, attr BGPPathAttr) []BGPPathAttr {
+func AddPathAttrToPathAttrsByCode(pathAttrs []BGPPathAttr, code BGPPathAttrType, attr BGPPathAttr) []BGPPathAttr {
 	addIdx := -1
 	for idx, pa := range pathAttrs {
 		if pa.GetCode() > code {
@@ -104,17 +104,25 @@ func AddPathAttrToPathAttrs(pathAttrs []BGPPathAttr, code BGPPathAttrType, attr 
 	return pathAttrs
 }
 
+func addPathAttrToPathAttrs(pathAttrs []BGPPathAttr, attr BGPPathAttr) []BGPPathAttr {
+	if attr != nil {
+		return AddPathAttrToPathAttrsByCode(pathAttrs, attr.GetCode(), attr)
+	}
+
+	return pathAttrs
+}
+
 func AddMPReachNLRIToPathAttrs(pathAttrs []BGPPathAttr, mpReach *BGPPathAttrMPReachNLRI) []BGPPathAttr {
-	return AddPathAttrToPathAttrs(pathAttrs, BGPPathAttrTypeMPReachNLRI, mpReach)
+	return AddPathAttrToPathAttrsByCode(pathAttrs, BGPPathAttrTypeMPReachNLRI, mpReach)
 }
 
 func AddMPUnreachNLRIToPathAttrs(pathAttrs []BGPPathAttr, mpUnreach *BGPPathAttrMPUnreachNLRI) []BGPPathAttr {
-	return AddPathAttrToPathAttrs(pathAttrs, BGPPathAttrTypeMPUnreachNLRI, mpUnreach)
+	return AddPathAttrToPathAttrsByCode(pathAttrs, BGPPathAttrTypeMPUnreachNLRI, mpUnreach)
 }
 
 func addPathAttr(updateMsg *BGPMessage, code BGPPathAttrType, attr BGPPathAttr) {
 	body := updateMsg.Body.(*BGPUpdate)
-	body.PathAttributes = AddPathAttrToPathAttrs(body.PathAttributes, code, attr)
+	body.PathAttributes = AddPathAttrToPathAttrsByCode(body.PathAttributes, code, attr)
 	return
 }
 
@@ -560,13 +568,17 @@ func ConstructIPPrefixFromCIDR(cidr string) (*IPPrefix, error) {
 	return NewIPPrefix(ipNet.IP, uint8(ones)), nil
 }
 
-func ConstructMPUnreachNLRI(protoFamily uint32, nlriList []NLRI) *BGPPathAttrMPUnreachNLRI {
-	afi, safi := GetAfiSafi(protoFamily)
+func ConstructMPUnreachNLRI(afi AFI, safi SAFI, nlriList []NLRI) *BGPPathAttrMPUnreachNLRI {
 	mpUnreachNLRI := NewBGPPathAttrMPUnreachNLRI()
 	mpUnreachNLRI.AFI = afi
 	mpUnreachNLRI.SAFI = safi
 	mpUnreachNLRI.AddNLRIList(nlriList)
 	return mpUnreachNLRI
+}
+
+func ConstructMPUnreachNLRIFromProtoFamily(protoFamily uint32, nlriList []NLRI) *BGPPathAttrMPUnreachNLRI {
+	afi, safi := GetAfiSafi(protoFamily)
+	return ConstructMPUnreachNLRI(afi, safi, nlriList)
 }
 
 func ConstructIPv6MPReachNLRI(protoFamily uint32, nextHop, nextHopLinkLocal net.IP,
@@ -583,6 +595,15 @@ func ConstructIPv6MPReachNLRI(protoFamily uint32, nextHop, nextHopLinkLocal net.
 	mpReachNLRI.SetNextHop(mpNextHop)
 	mpReachNLRI.SetNLRIList(nlriList)
 	return mpReachNLRI
+}
+
+func CloneMPReachNLRIWithNewNLRI(mpReachNLRI *BGPPathAttrMPReachNLRI, nlri []NLRI) *BGPPathAttrMPReachNLRI {
+	newMPReachNLRI := NewBGPPathAttrMPReachNLRI()
+	newMPReachNLRI.AFI = mpReachNLRI.AFI
+	newMPReachNLRI.SAFI = mpReachNLRI.SAFI
+	newMPReachNLRI.SetNextHop(mpReachNLRI.NextHop)
+	newMPReachNLRI.SetNLRIList(nlri)
+	return newMPReachNLRI
 }
 
 func ConstructIPv6MPReachNLRIForConnRoutes(protoFamily uint32) *BGPPathAttrMPReachNLRI {
@@ -937,12 +958,14 @@ func ConstructMaxSizedUpdatePackets(bgpMsg *BGPMessage) []*BGPMessage {
 	startIdx := 0
 	lastIdx := 0
 	updateMsg := bgpMsg.Body.(*BGPUpdate)
+	pathAttrs := make([]BGPPathAttr, 0)
 
 	if updateMsg.WithdrawnRoutes != nil {
 		for lastIdx = 0; lastIdx < len(updateMsg.WithdrawnRoutes); lastIdx++ {
 			nlriLen := updateMsg.WithdrawnRoutes[lastIdx].Len()
 			if nlriLen+pktLen > BGPMsgMaxLen {
 				newMsg := NewBGPUpdateMessage(updateMsg.WithdrawnRoutes[startIdx:lastIdx], nil, nil)
+				utils.Logger.Debug("ConstructMaxSizedUpdatePackets - Constructed BGP update message for withdrawn routes")
 				newUpdateMsgs = append(newUpdateMsgs, newMsg)
 				startIdx = lastIdx
 				pktLen = uint32(BGPUpdateMsgMinLen)
@@ -959,8 +982,113 @@ func ConstructMaxSizedUpdatePackets(bgpMsg *BGPMessage) []*BGPMessage {
 	for i := 0; i < len(updateMsg.PathAttributes); i++ {
 		paLen += updateMsg.PathAttributes[i].TotalLen()
 	}
+
 	if pktLen+paLen > BGPMsgMaxLen {
-		newMsg := NewBGPUpdateMessage(withdrawnRoutes, nil, nil)
+		mpReach, mpUnreach := GetMPAttrs(updateMsg.PathAttributes)
+		utils.Logger.Debugf("ConstructMaxSizedUpdatePackets - pktLen %d mpReach %+v, mpUnreach %+v", pktLen, mpReach, mpUnreach)
+		if mpUnreach != nil {
+			utils.Logger.Debugf("ConstructMaxSizedUpdatePackets - mpUnreach is not nil total len %d", mpUnreach.TotalLen())
+			removeTypeFromPathAttrs(&updateMsg.PathAttributes, BGPPathAttrTypeMPUnreachNLRI)
+			mpUnreachBaseLen := uint32(mpUnreach.BGPPathAttrLen) + 3 // Path attr base len + (AFI + SAFI) len
+			startIdx = 0
+			lastIdx = 0
+			if len(mpUnreach.NLRI) > 0 && pktLen+mpUnreach.TotalLen() > BGPMsgMaxLen {
+				for lastIdx = 0; lastIdx < len(mpUnreach.NLRI); lastIdx++ {
+					nlriLen := mpUnreach.NLRI[lastIdx].Len()
+					if nlriLen+pktLen+mpUnreachBaseLen > BGPMsgMaxLen {
+						pa := make([]BGPPathAttr, 0)
+						if lastIdx != 0 {
+							mpUnreachPA := ConstructMPUnreachNLRI(mpUnreach.AFI, mpUnreach.SAFI, mpUnreach.NLRI[startIdx:lastIdx])
+							pa = append(pa, mpUnreachPA)
+						}
+						newMsg := NewBGPUpdateMessage(withdrawnRoutes, pa, nil)
+						utils.Logger.Debug("ConstructMaxSizedUpdatePackets - Constructed BGP update message for MPUnreach routes")
+						newUpdateMsgs = append(newUpdateMsgs, newMsg)
+						withdrawnRoutes = nil
+						startIdx = lastIdx
+						pktLen = uint32(BGPUpdateMsgMinLen)
+					}
+					pktLen += nlriLen
+				}
+			}
+			if startIdx != lastIdx {
+				utils.Logger.Debugf("ConstructMaxSizedUpdatePackets - mpUnreach startIdx %d != lastIdx %d", startIdx, lastIdx)
+				mpUnreachPA := ConstructMPUnreachNLRI(mpUnreach.AFI, mpUnreach.SAFI, mpUnreach.NLRI[startIdx:lastIdx])
+				pathAttrs = append(pathAttrs, mpUnreachPA)
+				pktLen += mpUnreachBaseLen
+			}
+		}
+
+		if mpReach != nil {
+			removeTypeFromPathAttrs(&updateMsg.PathAttributes, BGPPathAttrTypeMPReachNLRI)
+			startIdx = 0
+			lastIdx = 0
+			otherPAs := CopyPathAttrs(updateMsg.PathAttributes)
+			otherPAsLen := uint32(0)
+			for i := 0; i < len(updateMsg.PathAttributes); i++ {
+				otherPAsLen += updateMsg.PathAttributes[i].TotalLen()
+			}
+			utils.Logger.Debugf("ConstructMaxSizedUpdatePackets - mpReach is not nil total len %d, pkt len %d, other PAs len %d",
+				mpReach.TotalLen(), pktLen, otherPAsLen)
+			if len(mpReach.NLRI) > 0 && pktLen+otherPAsLen+mpReach.TotalLen() > BGPMsgMaxLen {
+				// Path attr base len + (AFI + SAFI + Reserved) len + Next hop len + path attrs len
+				mpReachBaseLen := uint32(mpReach.BGPPathAttrLen) + 4 + uint32(mpReach.NextHop.Len()) + otherPAsLen
+				for lastIdx = 0; lastIdx < len(mpReach.NLRI); lastIdx++ {
+					nlriLen := mpReach.NLRI[lastIdx].Len()
+					if nlriLen+pktLen+mpReachBaseLen > BGPMsgMaxLen {
+						pa := make([]BGPPathAttr, 0)
+						if lastIdx != 0 {
+							mpReachPA := CloneMPReachNLRIWithNewNLRI(mpReach, mpReach.NLRI[startIdx:lastIdx])
+							pa = AddMPReachNLRIToPathAttrs(otherPAs, mpReachPA)
+						}
+						if len(pathAttrs) > 0 {
+							for idx, _ := range pathAttrs {
+								pa = addPathAttrToPathAttrs(pa, pathAttrs[idx])
+							}
+							pathAttrs = make([]BGPPathAttr, 0)
+						}
+						newMsg := NewBGPUpdateMessage(withdrawnRoutes, pa, nil)
+						utils.Logger.Debug("ConstructMaxSizedUpdatePackets - Constructed BGP update message for MPReach routes")
+						newUpdateMsgs = append(newUpdateMsgs, newMsg)
+						withdrawnRoutes = nil
+						startIdx = lastIdx
+						pktLen = uint32(BGPUpdateMsgMinLen)
+					}
+					pktLen += nlriLen
+				}
+			}
+			if startIdx != lastIdx {
+				utils.Logger.Debugf("ConstructMaxSizedUpdatePackets - mpReach startIdx %d != lastIdx %d", startIdx, lastIdx)
+				mpReachPA := CloneMPReachNLRIWithNewNLRI(mpReach, mpReach.NLRI[startIdx:lastIdx])
+				pathAttrs = AddMPReachNLRIToPathAttrs(pathAttrs, mpReachPA)
+				pktLen += uint32(mpReach.BGPPathAttrLen) + 4 + uint32(mpReach.NextHop.Len())
+			}
+		}
+	}
+
+	paLen = uint32(0)
+	for i := 0; i < len(updateMsg.PathAttributes); i++ {
+		paLen += updateMsg.PathAttributes[i].TotalLen()
+	}
+	utils.Logger.Debugf("ConstructMaxSizedUpdatePackets - paLen %d pktLen %d", paLen, pktLen)
+
+	if pktLen+paLen > BGPMsgMaxLen {
+		utils.Logger.Debugf("ConstructMaxSizedUpdatePackets - pktLen+paLen > BGPMsgMaxLen")
+		otherPAs := make([]BGPPathAttr, 0)
+		mpReachPA := getTypeFromPathAttrs(pathAttrs, BGPPathAttrTypeMPReachNLRI)
+		if mpReachPA != nil {
+			utils.Logger.Debugf("ConstructMaxSizedUpdatePackets - mpReachPA is not nil, copy path attrs")
+			otherPAs = CopyPathAttrs(updateMsg.PathAttributes)
+		}
+		if len(pathAttrs) > 0 {
+			utils.Logger.Debugf("ConstructMaxSizedUpdatePackets - pathAttrs %+v", pathAttrs)
+			for idx, _ := range pathAttrs {
+				otherPAs = addPathAttrToPathAttrs(otherPAs, pathAttrs[idx])
+			}
+			pathAttrs = make([]BGPPathAttr, 0)
+		}
+		newMsg := NewBGPUpdateMessage(withdrawnRoutes, otherPAs, nil)
+		utils.Logger.Debugf("ConstructMaxSizedUpdatePackets - Constructed BGP update message for withdrawn routes... last message")
 		withdrawnRoutes = nil
 		newUpdateMsgs = append(newUpdateMsgs, newMsg)
 		pktLen = BGPUpdateMsgMinLen
@@ -972,11 +1100,17 @@ func ConstructMaxSizedUpdatePackets(bgpMsg *BGPMessage) []*BGPMessage {
 	for lastIdx = 0; lastIdx < len(updateMsg.NLRI); lastIdx++ {
 		nlriLen := updateMsg.NLRI[lastIdx].Len()
 		if nlriLen+pktLen+paLen > BGPMsgMaxLen {
-			newMsg := NewBGPUpdateMessage(withdrawnRoutes, updateMsg.PathAttributes, updateMsg.NLRI[startIdx:lastIdx])
-			newUpdateMsgs = append(newUpdateMsgs, newMsg)
-			if withdrawnRoutes != nil {
-				withdrawnRoutes = nil
+			pa := updateMsg.PathAttributes
+			if len(pathAttrs) > 0 {
+				for idx, _ := range pathAttrs {
+					pa = addPathAttrToPathAttrs(pa, pathAttrs[idx])
+				}
+				pathAttrs = make([]BGPPathAttr, 0)
 			}
+			newMsg := NewBGPUpdateMessage(withdrawnRoutes, pa, updateMsg.NLRI[startIdx:lastIdx])
+			utils.Logger.Debug("ConstructMaxSizedUpdatePackets - Constructed BGP update message for updated routes")
+			newUpdateMsgs = append(newUpdateMsgs, newMsg)
+			withdrawnRoutes = nil
 			startIdx = lastIdx
 			pktLen = uint32(BGPUpdateMsgMinLen)
 			mpAttsFound = false
@@ -984,8 +1118,16 @@ func ConstructMaxSizedUpdatePackets(bgpMsg *BGPMessage) []*BGPMessage {
 		pktLen += nlriLen
 	}
 
-	if (withdrawnRoutes != nil && len(withdrawnRoutes) > 0) || (lastIdx > startIdx) || mpAttsFound {
-		newMsg := NewBGPUpdateMessage(withdrawnRoutes, updateMsg.PathAttributes, updateMsg.NLRI[startIdx:lastIdx])
+	if (withdrawnRoutes != nil && len(withdrawnRoutes) > 0) || (lastIdx > startIdx) || len(pathAttrs) > 0 || mpAttsFound {
+		utils.Logger.Debug("ConstructMaxSizedUpdatePackets - Constructed BGP update message for updated routes... last message")
+		pa := updateMsg.PathAttributes
+		if len(pathAttrs) > 0 {
+			for idx, _ := range pathAttrs {
+				pa = addPathAttrToPathAttrs(pa, pathAttrs[idx])
+			}
+			pathAttrs = make([]BGPPathAttr, 0)
+		}
+		newMsg := NewBGPUpdateMessage(withdrawnRoutes, pa, updateMsg.NLRI[startIdx:lastIdx])
 		newUpdateMsgs = append(newUpdateMsgs, newMsg)
 	}
 

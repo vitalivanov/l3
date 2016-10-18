@@ -1127,7 +1127,7 @@ func (p *Peer) SendUpdate(updated map[uint32]map[*bgprib.Path][]*bgprib.Destinat
 		}
 		for protoFamily, nlriList := range withdrawList {
 			if len(nlriList) > 0 {
-				mpUnreachNLRI := packet.ConstructMPUnreachNLRI(protoFamily, nlriList)
+				mpUnreachNLRI := packet.ConstructMPUnreachNLRIFromProtoFamily(protoFamily, nlriList)
 				pathAtts := make([]packet.BGPPathAttr, 0)
 				pathAtts = append(pathAtts, mpUnreachNLRI)
 				updateMsg = packet.NewBGPUpdateMessage(ipv4List, pathAtts, nil)
@@ -1239,7 +1239,7 @@ func (p *Peer) AdjRIBOutPolicyUpdated(data interface{}, updateFunc utilspolicy.P
 						pa = make([]packet.BGPPathAttr, 0)
 					}
 
-					mpUnreachNLRI := packet.ConstructMPUnreachNLRI(protoFamily, routesMap.Remove)
+					mpUnreachNLRI := packet.ConstructMPUnreachNLRIFromProtoFamily(protoFamily, routesMap.Remove)
 					pa = packet.AddMPUnreachNLRIToPathAttrs(pa, mpUnreachNLRI)
 				}
 
