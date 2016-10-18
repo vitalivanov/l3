@@ -1,7 +1,7 @@
 package snapclient
 
 import (
-	"asicd/asicdCommonDefs"
+//	"asicd/asicdCommonDefs"
 	"encoding/json"
 	"fmt"
 	nanomsg "github.com/op/go-nanomsg"
@@ -129,20 +129,26 @@ func (intf VXLANSnapClient) GetNextHopInfo(ip net.IP, vtepnexthopchan chan<- vxl
 	if ribdclnt.ClientHdl != nil {
 		nexthopinfo, err := ribdclnt.ClientHdl.GetRouteReachabilityInfo(ip.String(), -1)
 		if err == nil {
+                        fmt.Println("GetNextHopInfo", ip, nexthopinfo, vxlan.PortConfigMap[3].Name)
+
 			nexthopip := net.ParseIP(nexthopinfo.NextHopIp)
+			if nexthopinfo.IsReachable &&
+				nexthopinfo.NextHopIp == "0.0.0.0" {
+				nexthopip = ip
+			}
 			// lets let RIB notify us if there is a change in next hop
 			ribdclnt.ClientHdl.TrackReachabilityStatus(ip.String(), "VXLAND", "add")
 			// TODO at this point assuming the next hop is a physical interface
-			nexthopinfo := vxlan.VtepNextHopInfo{
+			nexthopdata := vxlan.VtepNextHopInfo{
 				Ip:      nexthopip,
 				IfIndex: int32(nexthopinfo.NextHopIfIndex),
-				IfName:  fmt.Sprintf("fpPort%d", asicdCommonDefs.GetIntfIdFromIfIndex(int32(nexthopinfo.NextHopIfIndex))),
+				IfName:  vxlan.PortConfigMap[int32(nexthopinfo.NextHopIfIndex)].Name,
 			}
 
 			event := vxlan.MachineEvent{
 				E:    vxlan.VxlanVtepEventNextHopInfoResolved,
 				Src:  vxlan.VXLANSnapClientStr,
-				Data: nexthopinfo,
+				Data: nexthopdata,
 			}
 			vtepnexthopchan <- event
 		}

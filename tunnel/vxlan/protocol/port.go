@@ -115,15 +115,15 @@ func (p *VxlanPort) IsMyVtepPkt(packet gopacket.Packet) (*VtepDbEntry, bool) {
 			// 1) Dst MAC
 			// 2) Dst IP
 			// 3) VNI
-			logger.Info(fmt.Sprintf("pkg mac %#v config mac %#v", eth.DstMAC, vtep.SrcMac))
-			logger.Info(fmt.Sprintf("pkg ip %#v config ip %#v", ip.DstIP, vtep.SrcIp))
-			logger.Info(fmt.Sprintf("pkt vni %#v config vni %d", vxlan.VNI, vtep.Vni))
+			//logger.Info(fmt.Sprintf("pkg mac %#v config mac %#v", eth.DstMAC, vtep.SrcMac))
+			//logger.Info(fmt.Sprintf("pkg ip %#v config ip %#v", ip.DstIP.To4(), vtep.SrcIp.To4()))
+			//logger.Info(fmt.Sprintf("pkt vni %#v config vni %d equal %t", vxlan.VNI, vtep.Vni, CompareVNI(vtep.Vni, vxlan.VNI)))
 			if bytes.Compare(eth.DstMAC, vtep.SrcMac) == 0 &&
-				bytes.Compare(ip.DstIP, vtep.SrcIp) == 0 &&
+				bytes.Compare(ip.DstIP.To4(), vtep.SrcIp.To4()) == 0 &&
 				CompareVNI(vtep.Vni, vxlan.VNI) == 0 {
 				return vtep, true
 			}
-			logger.Warning(fmt.Sprintf("%s: Received VXLAN packet not meant for us %s", p.IfName, packet))
+			//logger.Warning(fmt.Sprintf("%s: Received VXLAN packet not meant for us %s", p.IfName, packet))
 
 		}
 	} else {
@@ -152,7 +152,7 @@ func (p *VxlanPort) createPortSenderListener() error {
 			select {
 			case packet, ok := <-rxchan:
 				if ok {
-					fmt.Println("PORT Rx: ", packet)
+					//logger.Debug(fmt.Sprintln("PORT Rx: ", packet))
 					if vtep, ok := p.IsMyVtepPkt(packet); ok {
 						//fmt.Println("FOUND MY PACKET: ", packet)
 						p.rxPkts++

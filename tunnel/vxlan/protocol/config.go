@@ -352,9 +352,15 @@ func (s *VXLANServer) ConfigListener() {
 
 			case port := <-cc.VxlanPortCreate:
 				// store all the valid physical ports
-				if p, ok := PortConfigMap[port.IfIndex]; ok {
-					var portcfg = &PortConfig{}
-					CopyStruct(p, portcfg)
+				if _, ok := PortConfigMap[port.IfIndex]; !ok {
+					var portcfg = &PortConfig{
+						Name:         port.Name,
+						HardwareAddr: port.HardwareAddr,
+						Speed:        port.Speed,
+						PortNum:      port.PortNum,
+						IfIndex:      port.IfIndex,
+					}					
+                                        logger.Info("Saving Port Config to db", *portcfg)
 					PortConfigMap[port.IfIndex] = portcfg
 				}
 			case intfinfo := <-cc.Vxlanintfinfo:
