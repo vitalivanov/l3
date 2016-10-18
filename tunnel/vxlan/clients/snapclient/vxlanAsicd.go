@@ -77,6 +77,9 @@ func (intf VXLANSnapClient) ConstructPortConfigMap() {
 			more := bool(bulkInfo.More)
 			currMarker = asicdServices.Int(bulkInfo.EndIdx)
 			for i := 0; i < objCount; i++ {
+				if bulkInfo.PortStateList[i].IntfRef != bulkCfgInfo.PortList[i].IntfRef {
+					logger.Err(fmt.Sprintln("Error IntfRef differ at index",bulkInfo.PortStateList[i].IntfRef, bulkCfgInfo.PortList[i].IntfRef))
+				}
 				ifindex := bulkInfo.PortStateList[i].IfIndex
 				netMac, _ := net.ParseMAC(bulkCfgInfo.PortList[i].MacAddr)
 				PortNum, _ := strconv.Atoi(bulkInfo.PortStateList[i].IntfRef)
@@ -86,6 +89,7 @@ func (intf VXLANSnapClient) ConstructPortConfigMap() {
 					Name:         bulkInfo.PortStateList[i].Name,
 					HardwareAddr: netMac,
 				}
+				logger.Info("Creating Port", config)
 				serverchannels.VxlanPortCreate <- config
 			}
 			if more == false {
