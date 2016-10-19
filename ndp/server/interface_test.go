@@ -140,9 +140,15 @@ func TestNotSupportedProcessND(t *testing.T) {
 
 func TestNbrKeyValidation(t *testing.T) {
 	initTestInterface()
-	keyList := []string{"fe80::8a1d:fcff:fecf:15fc_88:1d:fc:cf:15:fc", "ff02::1_88:1d:fc:cf:15:fc", "ff02::1_3000::1",
-		"FF02::1_88:1d:fc:cf:15:fc", "FF01::2_88:1d:fc:cf:15:fc", "ff02::1:ff0e:4c67_88:1d:fc:cf:15:fc",
-		"ff02::1:fff5:0_33:33:ff:f5:00:00", "3000::b9_88:1d:fc:cf:15:fc", "fe80::c837:abff:fe7c:ca34_88:1d:fc:cf:15:fc",
+	keyList := []string{"88:1d:fc:cf:15:fc_fe80::8a1d:fcff:fecf:15fc",
+		"88:1d:fc:cf:15:fc_ff02::1",
+		"3000::1_ff02::1",
+		"88:1d:fc:cf:15:fc_FF02::1_",
+		"88:1d:fc:cf:15:fc_FF02::1_",
+		"88:1d:fc:cf:15:fc_ff02::1:ff0e:4c67",
+		"33:33:ff:f5:00:00_ff02::1:fff5:0",
+		"88:1d:fc:cf:15:fc_3000::b9_",
+		"88:1d:fc:cf:15:fc_fe80::c837:abff:fe7c:ca34",
 	}
 	expectedOutput := []bool{true, false, false, false, false, false, false, true, true}
 	for idx, key := range keyList {

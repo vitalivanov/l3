@@ -210,11 +210,12 @@ func (c *NeighborInfo) FastProbe() {
 		if c.StopFastProbe { // we stop fast probe only when Fast Probe is less than 60 seconds
 			return
 		}
-		var FastProbe_func func()
 		factor := (int64)(2 * c.FastProbesMultiplier)
 		resetTime := time.Duration(baseTime/factor) * time.Millisecond
+		var FastProbe_func func()
 		cutOffTime := time.Duration(60*1000) * time.Millisecond
 		FastProbe_func = func() {
+			baseTime := (int64)(c.BaseReachableTimer * 60 * 1000)
 			c.ReturnCh <- config.PacketData{
 				SendPktType: layers.ICMPv6TypeNeighborSolicitation,
 				NeighborIp:  c.IpAddr,
@@ -232,6 +233,13 @@ func (c *NeighborInfo) FastProbe() {
 			}
 			c.FastProbesMultiplier++
 			factor := (int64)(2 * c.FastProbesMultiplier)
+			if factor == 0 {
+				debug.Logger.Alert("FastProbesMultiplier is:", c.FastProbesMultiplier, "factor is:", factor,
+					"NeighborInfo is:", c.IpAddr, "baseTime:", baseTime,
+					"ReachableTimer:", c.BaseReachableTimer)
+				// @HACK: setting factor to be 2 and moving on
+				factor = 2
+			}
 			resetTime := time.Duration(baseTime/factor) * time.Millisecond
 			c.FastProbeTimer.Reset(resetTime)
 			debug.Logger.Debug("Re-Setting Fast Probe Timer for neighbor:", c.IpAddr, "timer:", resetTime.String())
