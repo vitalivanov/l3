@@ -158,12 +158,12 @@ func TestInvaliTimer(t *testing.T) {
 	}
 }
 
-func TestFastProbeTimer(t *testing.T) {
+func _TestFastProbeTimer(t *testing.T) {
 	//initServerBasic()
 	nbrTest = &NeighborInfo{}
 	TestIPv6IntfCreate(t)
 	testPktDataCh = make(chan config.PacketData)
-	nbrTest.InitCache(2, testReTransmitTimerValue,
+	nbrTest.InitCache(1, testReTransmitTimerValue,
 		testMyAbsLinkScopeIP+"_"+testSrcMac, testPktDataCh, testIfIndex)
 	probes := 0
 	for {
