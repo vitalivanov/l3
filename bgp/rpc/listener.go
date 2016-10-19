@@ -78,14 +78,20 @@ func (h *BGPHandler) convertModelToBGPGlobalConfig(obj objects.BGPGlobal) (gConf
 		h.logger.Err("Invalid asnum")
 		return gConf, err
 	}
+
 	gConf = config.GlobalConfig{
-		AS:                  uint32(asnum),
-		RouterId:            h.convertStrIPToNetIP(obj.RouterId),
-		UseMultiplePaths:    obj.UseMultiplePaths,
-		EBGPMaxPaths:        obj.EBGPMaxPaths,
-		EBGPAllowMultipleAS: obj.EBGPAllowMultipleAS,
-		IBGPMaxPaths:        obj.IBGPMaxPaths,
+		GlobalBase: config.GlobalBase{
+			Vrf:                 obj.Vrf,
+			AS:                  uint32(asnum),
+			RouterId:            h.convertStrIPToNetIP(obj.RouterId),
+			Disabled:            obj.Disabled,
+			UseMultiplePaths:    obj.UseMultiplePaths,
+			EBGPMaxPaths:        obj.EBGPMaxPaths,
+			EBGPAllowMultipleAS: obj.EBGPAllowMultipleAS,
+			IBGPMaxPaths:        obj.IBGPMaxPaths,
+		},
 	}
+
 	if obj.Redistribution != nil {
 		gConf.Redistribution = make([]config.SourcePolicyMap, 0)
 		for i := 0; i < len(obj.Redistribution); i++ {
@@ -141,6 +147,7 @@ func (h *BGPHandler) convertModelToBGPv4PeerGroup(obj objects.BGPv4PeerGroup) (g
 			LocalAS:                 uint32(localAS),
 			PeerAddressType:         config.PeerAddressV4,
 			UpdateSource:            obj.UpdateSource,
+			NextHopSelf:             obj.NextHopSelf,
 			AuthPassword:            obj.AuthPassword,
 			Description:             obj.Description,
 			RouteReflectorClusterId: uint32(obj.RouteReflectorClusterId),
@@ -205,6 +212,7 @@ func (h *BGPHandler) convertModelToBGPv6PeerGroup(obj objects.BGPv6PeerGroup) (g
 			LocalAS:                 uint32(localAS),
 			PeerAddressType:         config.PeerAddressV6,
 			UpdateSource:            obj.UpdateSource,
+			NextHopSelf:             obj.NextHopSelf,
 			Description:             obj.Description,
 			RouteReflectorClusterId: uint32(obj.RouteReflectorClusterId),
 			RouteReflectorClient:    obj.RouteReflectorClient,
@@ -271,12 +279,14 @@ func (h *BGPHandler) convertModelToBGPv4Neighbor(obj objects.BGPv4Neighbor) (nei
 		h.logger.Err("Invalid local asnum")
 		return neighbor, err
 	}
+
 	neighbor = config.NeighborConfig{
 		BaseConfig: config.BaseConfig{
 			PeerAS:                  uint32(peerAS),
 			LocalAS:                 uint32(localAS),
 			PeerAddressType:         config.PeerAddressV4,
 			UpdateSource:            obj.UpdateSource,
+			NextHopSelf:             obj.NextHopSelf,
 			AuthPassword:            obj.AuthPassword,
 			Description:             obj.Description,
 			RouteReflectorClusterId: uint32(obj.RouteReflectorClusterId),
@@ -339,6 +349,7 @@ func (h *BGPHandler) convertModelToBGPv6Neighbor(obj objects.BGPv6Neighbor) (nei
 			"failed for neighbor address", obj.NeighborAddress, "and ifIndex", obj.IntfRef)
 		return neighbor, err
 	}
+
 	peerAS, err := bgputils.GetAsNum(obj.PeerAS)
 	if err != nil {
 		h.logger.Err("Invalid peer asnum")
@@ -356,6 +367,7 @@ func (h *BGPHandler) convertModelToBGPv6Neighbor(obj objects.BGPv6Neighbor) (nei
 			LocalAS:                 uint32(localAS),
 			PeerAddressType:         config.PeerAddressV6,
 			UpdateSource:            obj.UpdateSource,
+			NextHopSelf:             obj.NextHopSelf,
 			Description:             obj.Description,
 			RouteReflectorClusterId: uint32(obj.RouteReflectorClusterId),
 			RouteReflectorClient:    obj.RouteReflectorClient,
@@ -536,13 +548,18 @@ func (h *BGPHandler) validateBGPGlobal(bgpGlobal *bgpd.BGPGlobal) (gConf config.
 	}
 
 	gConf = config.GlobalConfig{
-		AS:                  uint32(asNum),
-		RouterId:            ip,
-		UseMultiplePaths:    bgpGlobal.UseMultiplePaths,
-		EBGPMaxPaths:        uint32(bgpGlobal.EBGPMaxPaths),
-		EBGPAllowMultipleAS: bgpGlobal.EBGPAllowMultipleAS,
-		IBGPMaxPaths:        uint32(bgpGlobal.IBGPMaxPaths),
+		GlobalBase: config.GlobalBase{
+			Vrf:                 bgpGlobal.Vrf,
+			AS:                  uint32(asNum),
+			RouterId:            ip,
+			Disabled:            bgpGlobal.Disabled,
+			UseMultiplePaths:    bgpGlobal.UseMultiplePaths,
+			EBGPMaxPaths:        uint32(bgpGlobal.EBGPMaxPaths),
+			EBGPAllowMultipleAS: bgpGlobal.EBGPAllowMultipleAS,
+			IBGPMaxPaths:        uint32(bgpGlobal.IBGPMaxPaths),
+		},
 	}
+
 	if bgpGlobal.Redistribution != nil {
 		gConf.Redistribution = make([]config.SourcePolicyMap, 0)
 		for i := 0; i < len(bgpGlobal.Redistribution); i++ {
@@ -550,6 +567,7 @@ func (h *BGPHandler) validateBGPGlobal(bgpGlobal *bgpd.BGPGlobal) (gConf config.
 			gConf.Redistribution = append(gConf.Redistribution, redistribution)
 		}
 	}
+
 	return gConf, nil
 }
 
@@ -573,12 +591,16 @@ func (h *BGPHandler) validateBGPGlobalForPatchUpdate(oldConfig *bgpd.BGPGlobal, 
 	}
 
 	gConf = config.GlobalConfig{
-		AS:                  uint32(oldAsnum),
-		RouterId:            ip,
-		UseMultiplePaths:    oldConfig.UseMultiplePaths,
-		EBGPMaxPaths:        uint32(oldConfig.EBGPMaxPaths),
-		EBGPAllowMultipleAS: oldConfig.EBGPAllowMultipleAS,
-		IBGPMaxPaths:        uint32(oldConfig.IBGPMaxPaths),
+		GlobalBase: config.GlobalBase{
+			Vrf:                 oldConfig.Vrf,
+			AS:                  uint32(oldAsnum),
+			RouterId:            ip,
+			Disabled:            oldConfig.Disabled,
+			UseMultiplePaths:    oldConfig.UseMultiplePaths,
+			EBGPMaxPaths:        uint32(oldConfig.EBGPMaxPaths),
+			EBGPAllowMultipleAS: oldConfig.EBGPAllowMultipleAS,
+			IBGPMaxPaths:        uint32(oldConfig.IBGPMaxPaths),
+		},
 	}
 
 	for idx := 0; idx < len(op); idx++ {
@@ -640,12 +662,16 @@ func (h *BGPHandler) validateBGPGlobalForUpdate(oldConfig *bgpd.BGPGlobal, newCo
 	}
 
 	gConf = config.GlobalConfig{
-		AS:                  uint32(newASNum),
-		RouterId:            ip,
-		UseMultiplePaths:    newConfig.UseMultiplePaths,
-		EBGPMaxPaths:        uint32(newConfig.EBGPMaxPaths),
-		EBGPAllowMultipleAS: newConfig.EBGPAllowMultipleAS,
-		IBGPMaxPaths:        uint32(newConfig.IBGPMaxPaths),
+		GlobalBase: config.GlobalBase{
+			Vrf:                 newConfig.Vrf,
+			AS:                  uint32(newASNum),
+			RouterId:            ip,
+			Disabled:            newConfig.Disabled,
+			UseMultiplePaths:    newConfig.UseMultiplePaths,
+			EBGPMaxPaths:        uint32(newConfig.EBGPMaxPaths),
+			EBGPAllowMultipleAS: newConfig.EBGPAllowMultipleAS,
+			IBGPMaxPaths:        uint32(newConfig.IBGPMaxPaths),
+		},
 	}
 
 	if newConfig.Redistribution != nil {
@@ -713,11 +739,13 @@ func (h *BGPHandler) CreateBGPGlobal(bgpGlobal *bgpd.BGPGlobal) (bool, error) {
 	return h.SendBGPGlobal(nil, bgpGlobal, make([]bool, 0), make([]*bgpd.PatchOpInfo, 0), "create")
 }
 
-func (h *BGPHandler) GetBGPGlobalState(rtrId string) (*bgpd.BGPGlobalState, error) {
+func (h *BGPHandler) GetBGPGlobalState(vrfId string) (*bgpd.BGPGlobalState, error) {
 	bgpGlobal := h.server.GetBGPGlobalState()
 	bgpGlobalResponse := bgpd.NewBGPGlobalState()
+	bgpGlobalResponse.Vrf = bgpGlobal.Vrf
 	bgpGlobalResponse.AS, _ = bgputils.GetAsDot(int(bgpGlobal.AS)) //int32(bgpGlobal.AS)
 	bgpGlobalResponse.RouterId = bgpGlobal.RouterId.String()
+	bgpGlobalResponse.Disabled = bgpGlobal.Disabled
 	bgpGlobalResponse.UseMultiplePaths = bgpGlobal.UseMultiplePaths
 	bgpGlobalResponse.EBGPMaxPaths = int32(bgpGlobal.EBGPMaxPaths)
 	bgpGlobalResponse.EBGPAllowMultipleAS = bgpGlobal.EBGPAllowMultipleAS
@@ -735,7 +763,7 @@ func (h *BGPHandler) GetBulkBGPGlobalState(index bgpd.Int,
 	bgpGlobalStateBulk.Count = bgpd.Int(1)
 	bgpGlobalStateBulk.More = false
 	bgpGlobalStateBulk.BGPGlobalStateList = make([]*bgpd.BGPGlobalState, 1)
-	bgpGlobalStateBulk.BGPGlobalStateList[0], _ = h.GetBGPGlobalState("bgp")
+	bgpGlobalStateBulk.BGPGlobalStateList[0], _ = h.GetBGPGlobalState("default")
 
 	return bgpGlobalStateBulk, nil
 }
@@ -835,6 +863,7 @@ func (h *BGPHandler) ConvertV4NeighborFromThrift(bgpNeighbor *bgpd.BGPv4Neighbor
 			LocalAS:                 uint32(localAS),
 			PeerAddressType:         config.PeerAddressV4,
 			UpdateSource:            bgpNeighbor.UpdateSource,
+			NextHopSelf:             bgpNeighbor.NextHopSelf,
 			AuthPassword:            bgpNeighbor.AuthPassword,
 			Description:             bgpNeighbor.Description,
 			RouteReflectorClusterId: uint32(bgpNeighbor.RouteReflectorClusterId),
@@ -975,6 +1004,7 @@ func (h *BGPHandler) convertToThriftV4Neighbor(neighborState *config.NeighborSta
 	bgpNeighborResponse.PeerAS = peerAS   //int32(neighborState.PeerAS)
 	bgpNeighborResponse.LocalAS = localAS //int32(neighborState.LocalAS)
 	bgpNeighborResponse.UpdateSource = neighborState.UpdateSource
+	bgpNeighborResponse.NextHopSelf = neighborState.NextHopSelf
 	bgpNeighborResponse.AuthPassword = neighborState.AuthPassword
 	bgpNeighborResponse.PeerType = int8(neighborState.PeerType)
 	bgpNeighborResponse.Description = neighborState.Description
@@ -1121,6 +1151,7 @@ func (h *BGPHandler) ConvertV6NeighborFromThrift(bgpNeighbor *bgpd.BGPv6Neighbor
 			LocalAS:                 uint32(localAS),
 			PeerAddressType:         config.PeerAddressV6,
 			UpdateSource:            bgpNeighbor.UpdateSource,
+			NextHopSelf:             bgpNeighbor.NextHopSelf,
 			Description:             bgpNeighbor.Description,
 			RouteReflectorClusterId: uint32(bgpNeighbor.RouteReflectorClusterId),
 			RouteReflectorClient:    bgpNeighbor.RouteReflectorClient,
@@ -1254,6 +1285,7 @@ func (h *BGPHandler) convertToThriftV6Neighbor(neighborState *config.NeighborSta
 	bgpNeighborResponse.PeerAS = peerAS   // int32(neighborState.PeerAS)
 	bgpNeighborResponse.LocalAS = localAS //int32(neighborState.LocalAS)
 	bgpNeighborResponse.UpdateSource = neighborState.UpdateSource
+	bgpNeighborResponse.NextHopSelf = neighborState.NextHopSelf
 	bgpNeighborResponse.PeerType = int8(neighborState.PeerType)
 	bgpNeighborResponse.Description = neighborState.Description
 	bgpNeighborResponse.SessionState = int32(neighborState.SessionState)
@@ -1385,6 +1417,7 @@ func (h *BGPHandler) ValidateBGPv4PeerGroup(peerGroup *bgpd.BGPv4PeerGroup) (gro
 			LocalAS:                 uint32(localAS),
 			PeerAddressType:         config.PeerAddressV4,
 			UpdateSource:            peerGroup.UpdateSource,
+			NextHopSelf:             peerGroup.NextHopSelf,
 			AuthPassword:            peerGroup.AuthPassword,
 			Description:             peerGroup.Description,
 			RouteReflectorClusterId: uint32(peerGroup.RouteReflectorClusterId),
@@ -1481,6 +1514,7 @@ func (h *BGPHandler) ValidateBGPv6PeerGroup(peerGroup *bgpd.BGPv6PeerGroup) (gro
 			LocalAS:                 uint32(localAS),
 			PeerAddressType:         config.PeerAddressV6,
 			UpdateSource:            peerGroup.UpdateSource,
+			NextHopSelf:             peerGroup.NextHopSelf,
 			Description:             peerGroup.Description,
 			RouteReflectorClusterId: uint32(peerGroup.RouteReflectorClusterId),
 			RouteReflectorClient:    peerGroup.RouteReflectorClient,

@@ -280,6 +280,7 @@ func (mgr *FSMManager) Cleanup() {
 			fsm.closeCh <- true
 			fsm = nil
 			mgr.fsmBroken(id, true)
+			mgr.fsmStateChange(id, config.BGPFSMIdle)
 			mgr.fsms[id] = nil
 			delete(mgr.fsms, id)
 		}
