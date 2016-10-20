@@ -456,7 +456,7 @@ func (p *Peer) PeerConnEstablished(conn *net.Conn) {
 			p.NeighborConf.Neighbor.NeighborAddress, (*conn).LocalAddr())
 		return
 	}
-	p.logger.Infof("Neighbor %s: Local address %s port %s for conn", p.NeighborConf.Neighbor.NeighborAddress, host)
+	p.logger.Infof("Neighbor %s: Local address %s for conn", p.NeighborConf.Neighbor.NeighborAddress, host)
 	hostSplit := strings.Split(host, "%")
 	host = hostSplit[0]
 	p.NeighborConf.Neighbor.Transport.Config.LocalAddress = net.ParseIP(host)

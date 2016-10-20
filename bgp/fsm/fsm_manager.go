@@ -188,8 +188,8 @@ func (mgr *FSMManager) Init() {
 }
 
 func (mgr *FSMManager) handleBfdStatusChange(status bool) {
-	defer mgr.fsmMutex.Unlock()
 	mgr.fsmMutex.Lock()
+	defer mgr.fsmMutex.Unlock()
 
 	for id, fsm := range mgr.fsms {
 		if fsm != nil {
@@ -208,8 +208,8 @@ func (mgr *FSMManager) RejectPeerConn() {
 }
 
 func (mgr *FSMManager) fsmTcpConnFailed(id uint8) {
-	defer mgr.fsmMutex.Unlock()
 	mgr.fsmMutex.Lock()
+	defer mgr.fsmMutex.Unlock()
 
 	mgr.logger.Infof("FSMManager: Peer %s FSM %d TCP conn failed", mgr.pConf.NeighborAddress.String(), id)
 	if len(mgr.fsms) != 1 && mgr.activeFSM != id {
@@ -253,14 +253,17 @@ func (mgr *FSMManager) fsmBroken(id uint8, fsmDelete bool) {
 }
 
 func (mgr *FSMManager) fsmStateChange(id uint8, state config.BGPFSMState) {
+	mgr.fsmMutex.Lock()
+	defer mgr.fsmMutex.Unlock()
+
 	if mgr.activeFSM == id || mgr.activeFSM == uint8(config.ConnDirInvalid) {
 		mgr.neighborConf.FSMStateChange(uint32(state))
 	}
 }
 
 func (mgr *FSMManager) SendUpdateMsg(bgpMsg *packet.BGPMessage) {
-	defer mgr.fsmMutex.RUnlock()
 	mgr.fsmMutex.RLock()
+	defer mgr.fsmMutex.RUnlock()
 
 	if mgr.activeFSM == uint8(config.ConnDirInvalid) {
 		mgr.logger.Infof("FSMManager: Neighbor %s FSM is not in ESTABLISHED state", mgr.pConf.NeighborAddress)
@@ -271,8 +274,8 @@ func (mgr *FSMManager) SendUpdateMsg(bgpMsg *packet.BGPMessage) {
 }
 
 func (mgr *FSMManager) Cleanup() {
-	defer mgr.fsmMutex.Unlock()
 	mgr.fsmMutex.Lock()
+	defer mgr.fsmMutex.Unlock()
 
 	for id, fsm := range mgr.fsms {
 		if fsm != nil {
@@ -288,8 +291,8 @@ func (mgr *FSMManager) Cleanup() {
 }
 
 func (mgr *FSMManager) StopFSM(stopMsg string) {
-	defer mgr.fsmMutex.Unlock()
 	mgr.fsmMutex.Lock()
+	defer mgr.fsmMutex.Unlock()
 
 	for id, fsm := range mgr.fsms {
 		if fsm != nil {
@@ -305,8 +308,8 @@ func (mgr *FSMManager) getNewId(id uint8) uint8 {
 }
 
 func (mgr *FSMManager) createFSMForNewConnection(id uint8, connDir config.ConnDir) (*FSM, chan net.Conn) {
-	defer mgr.fsmMutex.Unlock()
 	mgr.fsmMutex.Lock()
+	defer mgr.fsmMutex.Unlock()
 
 	var state BaseStateIface
 
@@ -351,8 +354,8 @@ func (mgr *FSMManager) getFSMIdByDir(connDir config.ConnDir) uint8 {
 func (mgr *FSMManager) receivedBGPOpenMessage(id uint8, connDir config.ConnDir, openMsg *packet.BGPOpen) bool {
 	var closeConnDir config.ConnDir = config.ConnDirInvalid
 	var closeFSMId uint8 = uint8(config.ConnDirInvalid)
-	defer mgr.fsmMutex.Unlock()
 	mgr.fsmMutex.Lock()
+	defer mgr.fsmMutex.Unlock()
 
 	mgr.logger.Infof("FSMManager - Neighbor %s: FSM %d rx OPEN message", mgr.pConf.NeighborAddress, id)
 
