@@ -835,9 +835,9 @@ func (p *Peer) updatePathAttrs(bgpMsg *packet.BGPMessage, path *bgprib.Path) boo
 			packet.AddClusterId(bgpMsg, path.NeighborConf.RunningConf.RouteReflectorClusterId)
 		} else {
 			packet.SetLocalPref(bgpMsg, path.GetPreference())
-			if p.NeighborConf.RunningConf.NextHopSelf {
-				packet.SetNextHop(bgpMsg, p.NeighborConf.Neighbor.Transport.Config.LocalAddress)
-			}
+		}
+		if p.NeighborConf.RunningConf.NextHopSelf {
+			packet.SetNextHop(bgpMsg, p.NeighborConf.Neighbor.Transport.Config.LocalAddress)
 		}
 	} else {
 		// Do change these path attrs for local routes
