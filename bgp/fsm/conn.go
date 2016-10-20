@@ -57,7 +57,7 @@ func NewOutTCPConn(fsm *FSM, fsmConnCh chan net.Conn, fsmConnErrCh chan PeerConn
 		ifaceMgr:     utils.NewInterfaceMgr(fsm.logger),
 		fsmConnCh:    fsmConnCh,
 		fsmConnErrCh: fsmConnErrCh,
-		StopConnCh:   make(chan bool),
+		StopConnCh:   make(chan bool, 2),
 	}
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	outConn.id = r.Uint32()

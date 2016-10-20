@@ -850,8 +850,8 @@ func NewFSM(fsmManager *FSMManager, id uint8, neighborConf *base.NeighborConf) *
 		keepAliveTime:    neighborConf.RunningConf.KeepaliveTime,    // seconds
 		restartTime:      BGPRestartTimeDefault,                     // seconds
 		rxPktsFlag:       false,
-		outConnCh:        make(chan net.Conn),
-		outConnErrCh:     make(chan PeerConnErr, 2),
+		outConnCh:        make(chan net.Conn, 3),
+		outConnErrCh:     make(chan PeerConnErr, 3),
 		stopConnCh:       make(chan bool),
 		inConnCh:         make(chan net.Conn),
 		connId:           0,

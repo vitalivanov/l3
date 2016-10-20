@@ -68,18 +68,7 @@ func NewNeighborConf(logger *logging.Writer, globalConf *config.GlobalConfig, pe
 
 	conf.SetRunningConf(peerGroup, &conf.RunningConf)
 	conf.SetNeighborState(&conf.RunningConf)
-
-	if conf.RunningConf.LocalAS == conf.RunningConf.PeerAS {
-		conf.Neighbor.State.PeerType = config.PeerTypeInternal
-	} else {
-		conf.Neighbor.State.PeerType = config.PeerTypeExternal
-	}
-	if conf.RunningConf.BfdEnable {
-		conf.Neighbor.State.BfdNeighborState = "up"
-	} else {
-		conf.Neighbor.State.BfdNeighborState = "down"
-	}
-
+	conf.setOtherStates()
 	conf.AfiSafiMap, _ = packet.GetProtocolFromConfig(&conf.Neighbor.AfiSafis, conf.Neighbor.NeighborAddress)
 	return &conf
 }
@@ -104,6 +93,7 @@ func (n *NeighborConf) SetNeighborState(peerConf *config.NeighborConfig) {
 		PeerAS:                  peerConf.PeerAS,
 		LocalAS:                 peerConf.LocalAS,
 		UpdateSource:            peerConf.UpdateSource,
+		NextHopSelf:             peerConf.NextHopSelf,
 		AuthPassword:            peerConf.AuthPassword,
 		Description:             peerConf.Description,
 		NeighborAddress:         peerConf.NeighborAddress,
@@ -127,6 +117,19 @@ func (n *NeighborConf) SetNeighborState(peerConf *config.NeighborConfig) {
 		AdjRIBOutFilter:         peerConf.AdjRIBOutFilter,
 	}
 	n.MaxPrefixesThreshold = uint32(float64(peerConf.MaxPrefixes*uint32(peerConf.MaxPrefixesThresholdPct)) / 100)
+}
+
+func (n *NeighborConf) setOtherStates() {
+	if n.RunningConf.LocalAS == n.RunningConf.PeerAS {
+		n.Neighbor.State.PeerType = config.PeerTypeInternal
+	} else {
+		n.Neighbor.State.PeerType = config.PeerTypeExternal
+	}
+	if n.RunningConf.BfdEnable {
+		n.Neighbor.State.BfdNeighborState = "up"
+	} else {
+		n.Neighbor.State.BfdNeighborState = "down"
+	}
 }
 
 func (n *NeighborConf) copyNonKeyNeighConfAttrs(nConf config.NeighborConfig) {
@@ -154,6 +157,15 @@ func (n *NeighborConf) UpdateNeighborConf(nConf config.NeighborConfig, bgp *conf
 	n.logger.Infof("UpdateNeighborConf - running conf=%+v", n.Neighbor.Config)
 	n.SetNeighborState(&n.RunningConf)
 	n.logger.Infof("UpdateNeighborConf - neigh state=%+v", n.Neighbor.State)
+}
+
+func (n *NeighborConf) UpdateGlobal(gConf *config.GlobalConfig) {
+	n.logger.Infof("UpdateGlobal - gConf=%+v", gConf)
+	n.Global = gConf
+	n.RunningConf = config.NeighborConfig{}
+	n.SetRunningConf(n.Group, &n.RunningConf)
+	n.SetNeighborState(&n.RunningConf)
+	n.setOtherStates()
 }
 
 func (n *NeighborConf) UpdatePeerGroup(peerGroup *config.PeerGroupConfig) {
@@ -195,6 +207,10 @@ func (n *NeighborConf) GetConfFromNeighbor(inConf *config.NeighborConfig, outCon
 
 	if inConf.UpdateSource != "" {
 		outConf.UpdateSource = inConf.UpdateSource
+	}
+
+	if inConf.NextHopSelf != false {
+		outConf.NextHopSelf = inConf.NextHopSelf
 	}
 
 	if inConf.AuthPassword != "" {
