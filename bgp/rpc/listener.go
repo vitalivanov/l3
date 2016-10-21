@@ -59,6 +59,7 @@ type BGPHandler struct {
 	bgpPolicyMgr  *bgppolicy.BGPPolicyManager
 	logger        *logging.Writer
 	dbUtil        *dbutils.DBUtil
+	globalASMap   map[string]uint32
 }
 
 func NewBGPHandler(server *server.BGPServer, policyMgr *bgppolicy.BGPPolicyManager, logger *logging.Writer,
@@ -69,6 +70,7 @@ func NewBGPHandler(server *server.BGPServer, policyMgr *bgppolicy.BGPPolicyManag
 	h.bgpPolicyMgr = policyMgr
 	h.logger = logger
 	h.dbUtil = dbUtil
+	h.globalASMap = make(map[string]uint32)
 	return h
 }
 
@@ -124,6 +126,7 @@ func (h *BGPHandler) handleGlobalConfig() error {
 			h.logger.Err("handleGlobalConfig - Failed to convert Model object BGP Global, error:", err)
 			return err
 		}
+		h.globalASMap[gConf.Vrf] = gConf.AS
 		h.server.GlobalConfigCh <- server.GlobalUpdate{nil, config.GlobalConfig{}, gConf, make([]bool, 0), nil, "create"}
 	}
 	return nil
@@ -730,6 +733,7 @@ func (h *BGPHandler) SendBGPGlobal(oldConfig *bgpd.BGPGlobal, newConfig *bgpd.BG
 		}
 	}
 
+	h.globalASMap[newGlobal.Vrf] = newGlobal.AS
 	h.server.GlobalConfigCh <- server.GlobalUpdate{oldConfig, oldGlobal, newGlobal, attrSet, patchOp, op}
 	return true, err
 }
@@ -780,13 +784,9 @@ func (h *BGPHandler) DeleteBGPGlobal(bgpGlobal *bgpd.BGPGlobal) (bool, error) {
 }
 
 func (h *BGPHandler) checkBGPGlobal() error {
-	created := h.server.VerifyBgpGlobalConfig()
-	if !created {
-		return errors.New("BGP Global object not created yet")
-	}
+	vrf := "default"
 
-	global := h.server.GetBGPGlobalState()
-	if global.AS == 0 {
+	if as, ok := h.globalASMap[vrf]; !ok || as == 0 {
 		return errors.New(fmt.Sprintf("The default BGP AS number 0 is not updated yet."))
 	}
 
