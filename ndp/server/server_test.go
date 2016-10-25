@@ -81,8 +81,8 @@ const (
 	testServerNSSrcIp  = "fe80::21f:16ff:fe25:33ce"
 	testServerNSDstIp  = "2001:db8:0:f101::1"
 
-	testReachableTimerValue = 30000
-	estReTransmitTimerValue = 1000
+	testReachableTimerValue  = 30000
+	testReTransmitTimerValue = 1000
 )
 
 var testNdpServer *NDPServer
@@ -562,7 +562,7 @@ func TestDeleteNeighborInfo(t *testing.T) {
 		return
 	}
 
-	deleteEntries := []string{"fe80::1", "fe80::2"}
+	deleteEntries := []string{"aa:bb:cc:dd:ee:ff_fe80::1_lo", "aa:bb:cc:dd:ee:ff_fe80::2_lo1"}
 	testNdpServer.DeleteNeighborInfo(deleteEntries, testIfIndex)
 
 	if len(testNdpServer.NeighborInfo) != 4 {

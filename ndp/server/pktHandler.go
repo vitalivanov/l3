@@ -29,6 +29,7 @@ import (
 	"github.com/google/gopacket/layers"
 	"l3/ndp/config"
 	"l3/ndp/debug"
+	"net"
 	"reflect"
 	"utils/commonDefs"
 )
@@ -128,10 +129,10 @@ func (svr *NDPServer) StopRxTx(ifIndex int32, ipAddr string) {
 	case commonDefs.IfTypePort:
 		switch ipAddr {
 		case "ALL":
-			//debug.Logger.Debug("Deleting all entries")
+			debug.Logger.Debug("Deleting all entries during stop rx/tx")
 			deleteEntries, err = l3Port.DeleteAll()
 		default:
-			//debug.Logger.Debug("Deleing interface:", ipAddr)
+			debug.Logger.Debug("Deleing interface:", ipAddr, "during stop rx/tx")
 			deleteEntries, err = l3Port.DeleteIntf(ipAddr)
 		}
 	case commonDefs.IfTypeVlan:
@@ -182,24 +183,29 @@ func (svr *NDPServer) CheckSrcMac(macAddr string) bool {
  */
 func (svr *NDPServer) insertNeigborInfo(nbrInfo *config.NeighborConfig) {
 	svr.NeigborEntryLock.Lock()
-	svr.NeighborInfo[nbrInfo.IpAddr] = *nbrInfo
-	svr.neighborKey = append(svr.neighborKey, nbrInfo.IpAddr)
+	nbrKey := createNeighborKey(nbrInfo.MacAddr, nbrInfo.IpAddr, nbrInfo.Intf)
+	svr.NeighborInfo[nbrKey] = *nbrInfo
+	svr.neighborKey = append(svr.neighborKey, nbrKey)
 	svr.NeigborEntryLock.Unlock()
 }
 
 func (svr *NDPServer) updateNeighborInfo(nbrInfo *config.NeighborConfig) {
 	svr.NeigborEntryLock.Lock()
-	svr.NeighborInfo[nbrInfo.IpAddr] = *nbrInfo
+	nbrKey := createNeighborKey(nbrInfo.MacAddr, nbrInfo.IpAddr, nbrInfo.Intf)
+	svr.NeighborInfo[nbrKey] = *nbrInfo
 	svr.NeigborEntryLock.Unlock()
 }
 
 /*
- *	deleteNeighborInfo: Helper API to update list of neighbor keys that are deleted by ndp
+ *	deleteSvrStateNbrInfo: Helper API to update list of neighbor keys that are deleted by ndp
  *	@NOTE: caller is responsible for acquiring the lock to access slice
  */
-func (svr *NDPServer) deleteNeighborInfo(nbrIp string) {
+func (svr *NDPServer) deleteSvrStateNbrInfo(nbrKey string) {
+	// delete the entry from neighbor map
+	delete(svr.NeighborInfo, nbrKey)
+
 	for idx, _ := range svr.neighborKey {
-		if svr.neighborKey[idx] == nbrIp {
+		if svr.neighborKey[idx] == nbrKey {
 			svr.neighborKey = append(svr.neighborKey[:idx], svr.neighborKey[idx+1:]...)
 			break
 		}
@@ -215,40 +221,45 @@ func (svr *NDPServer) deleteNeighborInfo(nbrIp string) {
 func (svr *NDPServer) CreateNeighborInfo(nbrInfo *config.NeighborConfig) {
 	debug.Logger.Debug("Calling create ipv6 neighgor for global nbrinfo is", nbrInfo.IpAddr, nbrInfo.MacAddr,
 		nbrInfo.VlanId, nbrInfo.IfIndex)
-	_, err := svr.SwitchPlugin.CreateIPv6Neighbor(nbrInfo.IpAddr, nbrInfo.MacAddr,
-		nbrInfo.VlanId, nbrInfo.IfIndex)
-	if err != nil {
-		debug.Logger.Err("create ipv6 global neigbor failed for", nbrInfo, "error is", err)
-		// do not enter that neighbor in our neigbor map
-		return
+	if net.ParseIP(nbrInfo.IpAddr).IsLinkLocalUnicast() == false {
+		_, err := svr.SwitchPlugin.CreateIPv6Neighbor(nbrInfo.IpAddr, nbrInfo.MacAddr, nbrInfo.VlanId, nbrInfo.IfIndex)
+		if err != nil {
+			debug.Logger.Err("create ipv6 global neigbor failed for", nbrInfo, "error is", err)
+			// do not enter that neighbor in our neigbor map
+			return
+		}
 	}
 	svr.SendIPv6CreateNotification(nbrInfo.IpAddr, nbrInfo.IfIndex)
 	svr.insertNeigborInfo(nbrInfo)
 }
 
-func (svr *NDPServer) deleteNeighbor(nbrIp string, ifIndex int32) {
+func (svr *NDPServer) deleteNeighbor(nbrKey string, ifIndex int32) {
+	debug.Logger.Debug("deleteNeighbor called for nbrKey:", nbrKey)
 	// Inform clients that neighbor is gonna be deleted
+	splitString := splitNeighborKey(nbrKey)
+	nbrIp := splitString[1]
 	svr.SendIPv6DeleteNotification(nbrIp, ifIndex)
 	// Request asicd to delete the neighbor
-	_, err := svr.SwitchPlugin.DeleteIPv6Neighbor(nbrIp)
-	if err != nil {
-		debug.Logger.Err("delete ipv6 neigbor failed for", nbrIp, "error is", err)
+	if net.ParseIP(nbrIp).IsLinkLocalUnicast() == false {
+		_, err := svr.SwitchPlugin.DeleteIPv6Neighbor(nbrIp)
+		if err != nil {
+			debug.Logger.Err("delete ipv6 neigbor failed for", nbrIp, "error is", err)
+		}
 	}
-	// delete the entry from neighbor map
-	delete(svr.NeighborInfo, nbrIp)
-	svr.deleteNeighborInfo(nbrIp)
+	svr.deleteSvrStateNbrInfo(nbrKey)
 }
 
 func (svr *NDPServer) UpdateNeighborInfo(nbrInfo *config.NeighborConfig, oldNbrEntry config.NeighborConfig) {
 	//svr.SendIPv6DeleteNotification(oldNbrEntry.IpAddr, oldNbrEntry.IfIndex)
 	debug.Logger.Debug("Calling update ipv6 neighgor for global nbrinfo is", nbrInfo.IpAddr, nbrInfo.MacAddr,
 		nbrInfo.VlanId, nbrInfo.IfIndex)
-	_, err := svr.SwitchPlugin.UpdateIPv6Neighbor(nbrInfo.IpAddr, nbrInfo.MacAddr,
-		nbrInfo.VlanId, nbrInfo.IfIndex)
-	if err != nil {
-		debug.Logger.Err("update ipv6 global neigbor failed for", nbrInfo, "error is", err)
-		// do not enter that neighbor in our neigbor map
-		return
+	if net.ParseIP(nbrInfo.IpAddr).IsLinkLocalUnicast() == false {
+		_, err := svr.SwitchPlugin.UpdateIPv6Neighbor(nbrInfo.IpAddr, nbrInfo.MacAddr, nbrInfo.VlanId, nbrInfo.IfIndex)
+		if err != nil {
+			debug.Logger.Err("update ipv6 global neigbor failed for", nbrInfo, "error is", err)
+			// do not enter that neighbor in our neigbor map
+			return
+		}
 	}
 	//svr.SendIPv6CreateNotification(nbrInfo.IpAddr, nbrInfo.IfIndex)
 	svr.updateNeighborInfo(nbrInfo)
@@ -263,9 +274,9 @@ func (svr *NDPServer) UpdateNeighborInfo(nbrInfo *config.NeighborConfig, oldNbrE
  */
 func (svr *NDPServer) DeleteNeighborInfo(deleteEntries []string, ifIndex int32) {
 	svr.NeigborEntryLock.Lock()
-	for _, nbrIp := range deleteEntries {
-		//debug.Logger.Debug("Calling delete ipv6 neighbor for nbrIp:", nbrIp)
-		svr.deleteNeighbor(nbrIp, ifIndex)
+	for _, nbrKey := range deleteEntries {
+		debug.Logger.Debug("Calling delete ipv6 neighbor for nbr:", nbrKey)
+		svr.deleteNeighbor(nbrKey, ifIndex)
 	}
 	svr.NeigborEntryLock.Unlock()
 }
@@ -282,6 +293,7 @@ func (svr *NDPServer) ProcessRxPkt(ifIndex int32, pkt gopacket.Packet) error {
 	var l3Port Interface
 	var l2Port PhyPort
 	var exists bool
+	var nbrKey string
 	// if we receive packet on L2 Physical interface then the we need get l3 port via cross referencing PhyPortToL3PortMap
 	l3IfIndex, l3exists := svr.PhyPortToL3PortMap[ifIndex]
 	if l3exists {
@@ -303,6 +315,17 @@ func (svr *NDPServer) ProcessRxPkt(ifIndex int32, pkt gopacket.Packet) error {
 	if err != nil || ndInfo == nil {
 		return errors.New(fmt.Sprintln("Failed decoding ND packet, error:", err))
 	}
+	// Step2: process decode neighbor information
+	// update ifIndex to l2 ifIndex if iftype is not ifTypePort
+	switch l3Port.IfType {
+	case commonDefs.IfTypeVlan:
+		ndInfo.LearnedIfIndex = ifIndex
+		// if vlan type then updating the name to original port where the packet was received
+		ndInfo.LearnedIntfRef = l2Port.Info.Name
+	case commonDefs.IfTypePort:
+		ndInfo.LearnedIfIndex = l3Port.IfIndex
+		ndInfo.LearnedIntfRef = l3Port.IntfRef
+	}
 	// Step2: process decoded packet
 	nbrInfo, operation := l3Port.ProcessND(ndInfo)
 	if nbrInfo == nil && operation == IGNORE { //|| (operation != CREATE && operation != DELETE) {
@@ -318,12 +341,13 @@ func (svr *NDPServer) ProcessRxPkt(ifIndex int32, pkt gopacket.Packet) error {
 		nbrInfo.Intf = l2Port.Info.Name
 	}
 	svr.PopulateVlanInfo(nbrInfo, l3Port.IntfRef)
+	nbrKey = createNeighborKey(nbrInfo.MacAddr, nbrInfo.IpAddr, nbrInfo.Intf)
 	// based on operation program hardware, update sw & send notifications
 	switch operation {
 	case CREATE:
 		svr.CreateNeighborInfo(nbrInfo)
 	case UPDATE:
-		nbrEntry, exists := svr.NeighborInfo[nbrInfo.IpAddr]
+		nbrEntry, exists := svr.NeighborInfo[nbrKey]
 		if !exists { //entry does not exists and hence creating new
 			debug.Logger.Info("!!!!!!ALERT!!!!!! NDP Server does not have nbrInfo for ipaddr:",
 				nbrInfo.IpAddr, "hence on UPDATE doing CREATE")
@@ -337,8 +361,7 @@ func (svr *NDPServer) ProcessRxPkt(ifIndex int32, pkt gopacket.Packet) error {
 			}
 		}
 	case DELETE:
-		//svr.deleteNeighbor(nbrInfo.IpAddr, ifIndex) // used mostly by RA
-		svr.deleteNeighbor(nbrInfo.IpAddr, l3Port.IfIndex) // used mostly by RA
+		svr.deleteNeighbor(nbrKey, l3Port.IfIndex) // used mostly by RA
 	}
 
 early_exit:
@@ -353,6 +376,7 @@ early_exit:
 func (svr *NDPServer) ProcessTimerExpiry(pktData config.PacketData) error {
 	var l3Port Interface
 	var exists bool
+	var intfName string
 	// if we receive packet on L2 Physical interface then the we need get l3 port via cross referencing PhyPortToL3PortMap
 	l3IfIndex, l3exists := svr.PhyPortToL3PortMap[pktData.IfIndex]
 	if l3exists {
@@ -361,26 +385,30 @@ func (svr *NDPServer) ProcessTimerExpiry(pktData config.PacketData) error {
 		if !exists {
 			return errors.New(fmt.Sprintln("Entry for ifIndex:", l3IfIndex, "doesn't exists"))
 		}
+		l2Port := svr.L2Port[pktData.IfIndex]
+		intfName = l2Port.Info.Name
 	} else {
 		// Port is the l3 port
 		l3Port, exists = svr.L3Port[pktData.IfIndex]
 		if !exists {
 			return errors.New(fmt.Sprintln("Entry for ifIndex:", pktData.IfIndex, "doesn't exists"))
 		}
+		intfName = l3Port.IntfRef
 	}
+	nbrKey := createNeighborKey(pktData.NeighborMac, pktData.NeighborIp, intfName)
 	// fix this when we have per port mac addresses
 	operation := l3Port.SendND(pktData, svr.SwitchMac)
 	if operation == DELETE {
 		//svr.deleteNeighbor(pktData.NeighborIp, pktData.IfIndex)
-		svr.deleteNeighbor(pktData.NeighborIp, l3Port.IfIndex)
+		svr.deleteNeighbor(nbrKey, l3Port.IfIndex)
 	}
 	if l3exists {
 		svr.L3Port[l3IfIndex] = l3Port
 	} else {
 		svr.L3Port[pktData.IfIndex] = l3Port
 	}
-	nbrInfo := svr.NeighborInfo[pktData.NeighborIp]
-	svr.NeighborInfo[pktData.NeighborIp] = nbrInfo
+	//nbrInfo := svr.NeighborInfo[nbrKey]
+	//svr.NeighborInfo[nbrKey] = nbrInfo
 	svr.counter.Send++
 	return nil
 }

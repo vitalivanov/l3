@@ -185,7 +185,7 @@ func NewVtepDbEntry(c *VtepConfig) *VtepDbEntry {
 func CreateVtep(c *VtepConfig) *VtepDbEntry {
 
 	vtep := saveVtepConfigData(c)
-	logger.Info(fmt.Sprintln("Vtep CreateVtep Start", vtep.VtepName))
+	logger.Info(fmt.Sprintln("Vtep CreateVtep Start", vtep))
 	// lets start the FSM
 	vtep.VxlanVtepMachineMain()
 	vtep.VxlanVtepMachineFsm.BEGIN()
@@ -296,9 +296,9 @@ func (vtep *VtepDbEntry) createVtepSenderListener() error {
 
 	// TODO need to revisit the timeout interval in case of processing lots of
 	// data frames
-	handle, err := pcap.OpenLive(vtep.VtepHandleName, 65536, false, 50*time.Millisecond)
+	handle, err := pcap.OpenLive(vtep.VtepHandleName, 65536, true, 50*time.Millisecond)
 	if err != nil {
-		logger.Err(fmt.Sprintf("%s: Error opening pcap.OpenLive %s", vtep.VtepName, err))
+		logger.Err(fmt.Sprintf("%s: Error opening pcap.OpenLive for %s err=%s", vtep.VtepName, vtep.VtepHandleName, err))
 		return err
 	}
 	logger.Info(fmt.Sprintf("Creating VXLAN Listener for intf ", vtep.VtepName))
@@ -332,6 +332,7 @@ func (vtep *VtepDbEntry) filterPacket(packet gopacket.Packet) bool {
 	ethernetL := packet.Layer(layers.LayerTypeEthernet)
 	if ethernetL != nil {
 		ethernet := ethernetL.(*layers.Ethernet)
+		//logger.Info("filterPacket pkt:", ethernet.SrcMAC, "vtep:", vtep.SrcMac)
 		if ethernet.SrcMAC[0] == vtep.SrcMac[0] &&
 			ethernet.SrcMAC[1] == vtep.SrcMac[1] &&
 			ethernet.SrcMAC[2] == vtep.SrcMac[2] &&
@@ -351,7 +352,7 @@ func (vtep *VtepDbEntry) snoop(data []byte) {
 		ethernet, _ := ethernetL.(*layers.Ethernet)
 		learnmac := ethernet.SrcMAC
 		// fdb entry mac -> vtep ip interface
-		logger.Info(fmt.Sprintf("Learning mac", learnmac, "against", strings.TrimRight(vtep.VtepName, "Int")))
+		logger.Debug(fmt.Sprintln("Learning mac", learnmac, "against", strings.TrimRight(vtep.VtepName, "Int")))
 		//asicDLearnFwdDbEntry(learnmac, vtep.VtepName, vtep.VtepIfIndex)
 	}
 
@@ -363,7 +364,7 @@ func (vtep *VtepDbEntry) decapAndDispatchPkt(packet gopacket.Packet) {
 	if vxlanLayer != nil {
 		vxlan := vxlanLayer.(*layers.VXLAN)
 		buf := vxlan.LayerPayload()
-		logger.Info(fmt.Sprintf("Sending Packet to %s %#v", vtep.VtepName, buf))
+		//logger.Info(fmt.Sprintf("Sending Packet to %s %#v", vtep.VtepName, buf))
 		vtep.snoop(buf)
 		if err := vtep.handle.WritePacketData(buf); err != nil {
 			logger.Err("Error writing packet to interface")
@@ -375,17 +376,20 @@ func (vtep *VtepDbEntry) encapAndDispatchPkt(packet gopacket.Packet) {
 	// every vtep is tied to a port
 	if p, ok := portDB[vtep.SrcIfName]; ok {
 		phandle := p.handle
+                if phandle != nil {
+
 		// outer ethernet header
-		eth := layers.Ethernet{
-			SrcMAC:       vtep.SrcMac,
+		eth := layers.VxlanEthernet{
+			layers.Ethernet{SrcMAC:       vtep.SrcMac,
 			DstMAC:       vtep.DstMac,
 			EthernetType: layers.EthernetTypeIPv4,
+			},
 		}
 		ip := layers.IPv4{
 			Version:    4,
 			IHL:        20,
 			TOS:        0,
-			Length:     120,
+			//Length:     20 + uint16(origpktlen),
 			Id:         0xd2c0,
 			Flags:      layers.IPv4DontFragment, //IPv4Flag
 			FragOffset: 0,                       //uint16
@@ -398,14 +402,11 @@ func (vtep *VtepDbEntry) encapAndDispatchPkt(packet gopacket.Packet) {
 		udp := layers.UDP{
 			SrcPort: layers.UDPPort(vtep.UDP), // TODO need a src port
 			DstPort: layers.UDPPort(vtep.UDP),
-			Length:  100,
+			//Length:  8 + uint16(origpktlen),
 		}
 		udp.SetNetworkLayerForChecksum(&ip)
 
 		vxlan := layers.VXLAN{
-			BaseLayer: layers.BaseLayer{
-				Payload: packet.Data(),
-			},
 			Flags: 0x08,
 		}
 		vxlan.SetVNI(vtep.Vni)
@@ -417,12 +418,13 @@ func (vtep *VtepDbEntry) encapAndDispatchPkt(packet gopacket.Packet) {
 			ComputeChecksums: true,
 		}
 		// Send one packet for every address.
-		gopacket.SerializeLayers(buf, opts, &eth, &ip, &udp, &vxlan)
-		logger.Info(fmt.Sprintf("Rx Packet now encapsulating and sending packet to if", vtep.SrcIfName, buf))
+		gopacket.SerializeLayers(buf, opts, &eth, &ip, &udp, &vxlan, gopacket.Payload(packet.Data()))
+		//logger.Info(fmt.Sprintf("Rx Packet now encapsulating and sending packet to if", vtep.SrcIfName, buf.Bytes()))
 		if err := phandle.WritePacketData(buf.Bytes()); err != nil {
 			logger.Err("Error writing packet to interface")
 			return
 		}
 		vtep.txpkts++
+                }
 	}
 }

@@ -65,6 +65,7 @@ type Peer struct {
 	locRib       *bgprib.LocRib
 	NeighborConf *base.NeighborConf
 	fsmManager   *fsm.FSMManager
+	active       bool
 	ifIdx        int32
 	ribIn        map[uint32]map[string]*bgprib.AdjRIBRoute
 	ribOut       map[uint32]map[string]*bgprib.AdjRIBRoute
@@ -78,6 +79,7 @@ func NewPeer(server *BGPServer, locRib *bgprib.LocRib, globalConf *config.Global
 		server: server,
 		logger: server.logger,
 		locRib: locRib,
+		active: false,
 		ifIdx:  -1,
 		ribIn:  make(map[uint32]map[string]*bgprib.AdjRIBRoute),
 		ribOut: make(map[uint32]map[string]*bgprib.AdjRIBRoute),
@@ -100,6 +102,10 @@ func NewPeer(server *BGPServer, locRib *bgprib.LocRib, globalConf *config.Global
 	peer.fsmManager = fsm.NewFSMManager(peer.logger, peer.NeighborConf, server.BGPPktSrcCh,
 		server.PeerFSMConnCh, server.ReachabilityCh)
 	return &peer
+}
+
+func (p *Peer) UpdateGlobal(gConf *config.GlobalConfig) {
+	p.NeighborConf.UpdateGlobal(gConf)
 }
 
 func (p *Peer) UpdatePeerGroup(peerGroup *config.PeerGroupConfig) {
@@ -248,6 +254,10 @@ func (p *Peer) IsDisabled() bool {
 	return p.NeighborConf.RunningConf.Disabled
 }
 
+func (p *Peer) IsActive() bool {
+	return p.active
+}
+
 func (p *Peer) SetNeighborAddress(ip net.IP) {
 	p.NeighborConf.SetNeighborAddress(ip)
 }
@@ -258,6 +268,13 @@ func (p *Peer) ResetNeighborAddress() {
 
 func (p *Peer) Init() {
 	var fsmMgr *fsm.FSMManager
+
+	if p.IsActive() {
+		p.logger.Info("Init - Neighbor is already active, ip:",
+			p.NeighborConf.Neighbor.NeighborAddress, "ifIndex:", p.NeighborConf.Neighbor.Config.IfIndex)
+		return
+	}
+
 	if !p.IsConfigured() {
 		p.logger.Info("Init - Neighbor is not ready to be started, ip:",
 			p.NeighborConf.Neighbor.NeighborAddress, "ifIndex:", p.NeighborConf.Neighbor.Config.IfIndex)
@@ -293,10 +310,17 @@ func (p *Peer) Init() {
 	runtime.Gosched()
 
 	p.fsmManager = fsmMgr
+	p.active = true
 	p.ProcessBfd(true)
 }
 
 func (p *Peer) Cleanup() {
+	if !p.IsActive() {
+		p.logger.Info("Cleanup - Neighbor is not active, ip:",
+			p.NeighborConf.Neighbor.NeighborAddress, "ifIndex:", p.NeighborConf.Neighbor.Config.IfIndex)
+		return
+	}
+
 	if !p.IsConfigured() {
 		p.logger.Infof("Cleanup - Neighbor is not started yet, ip:",
 			p.NeighborConf.Neighbor.NeighborAddress, "ifIndex:", p.NeighborConf.Neighbor.Config.IfIndex)
@@ -308,6 +332,8 @@ func (p *Peer) Cleanup() {
 			p.NeighborConf.Neighbor.Config.IfIndex)
 		return
 	}
+
+	p.active = false
 
 	if p.NeighborConf.RunningConf.AdjRIBInFilter != "" {
 		p.RemoveAdjRIBFilter(p.server.ribInPE, p.NeighborConf.RunningConf.AdjRIBInFilter, bgprib.AdjRIBDirIn)
@@ -430,7 +456,7 @@ func (p *Peer) PeerConnEstablished(conn *net.Conn) {
 			p.NeighborConf.Neighbor.NeighborAddress, (*conn).LocalAddr())
 		return
 	}
-	p.logger.Infof("Neighbor %s: Local address %s port %s for conn", p.NeighborConf.Neighbor.NeighborAddress, host)
+	p.logger.Infof("Neighbor %s: Local address %s for conn", p.NeighborConf.Neighbor.NeighborAddress, host)
 	hostSplit := strings.Split(host, "%")
 	host = hostSplit[0]
 	p.NeighborConf.Neighbor.Transport.Config.LocalAddress = net.ParseIP(host)
@@ -810,6 +836,9 @@ func (p *Peer) updatePathAttrs(bgpMsg *packet.BGPMessage, path *bgprib.Path) boo
 		} else {
 			packet.SetLocalPref(bgpMsg, path.GetPreference())
 		}
+		if p.NeighborConf.RunningConf.NextHopSelf {
+			packet.SetNextHop(bgpMsg, p.NeighborConf.Neighbor.Transport.Config.LocalAddress)
+		}
 	} else {
 		// Do change these path attrs for local routes
 		if path.NeighborConf != nil {
@@ -1127,7 +1156,7 @@ func (p *Peer) SendUpdate(updated map[uint32]map[*bgprib.Path][]*bgprib.Destinat
 		}
 		for protoFamily, nlriList := range withdrawList {
 			if len(nlriList) > 0 {
-				mpUnreachNLRI := packet.ConstructMPUnreachNLRI(protoFamily, nlriList)
+				mpUnreachNLRI := packet.ConstructMPUnreachNLRIFromProtoFamily(protoFamily, nlriList)
 				pathAtts := make([]packet.BGPPathAttr, 0)
 				pathAtts = append(pathAtts, mpUnreachNLRI)
 				updateMsg = packet.NewBGPUpdateMessage(ipv4List, pathAtts, nil)
@@ -1239,7 +1268,7 @@ func (p *Peer) AdjRIBOutPolicyUpdated(data interface{}, updateFunc utilspolicy.P
 						pa = make([]packet.BGPPathAttr, 0)
 					}
 
-					mpUnreachNLRI := packet.ConstructMPUnreachNLRI(protoFamily, routesMap.Remove)
+					mpUnreachNLRI := packet.ConstructMPUnreachNLRIFromProtoFamily(protoFamily, routesMap.Remove)
 					pa = packet.AddMPUnreachNLRIToPathAttrs(pa, mpUnreachNLRI)
 				}
 

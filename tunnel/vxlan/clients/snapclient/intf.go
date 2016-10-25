@@ -58,11 +58,14 @@ func (v VXLANSnapClient) SetServerChannels(s *vxlan.VxLanConfigChannels) {
 }
 
 func (v VXLANSnapClient) IsClientIntfType(client vxlan.VXLANClientIntf, clientStr string) bool {
-	switch client.(type) {
-	case *VXLANSnapClient:
+	logger.Info("IsClientIntfType", clientStr)
+        switch client.(type) {
+	case VXLANSnapClient:
 		if clientStr == "SnapClient" {
 			return true
 		}
+	default:
+	logger.Info("IsClientInfType: default did not find client type")
 	}
 	return false
 }

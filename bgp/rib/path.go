@@ -397,7 +397,7 @@ func (p *Path) addPathToAggregate(destIP string, path *Path, generateASSet bool)
 
 	if !foundAtomicAgg && atomicAggregate != nil {
 		atomicAggregate := packet.NewBGPPathAttrAtomicAggregate()
-		p.PathAttrs = packet.AddPathAttrToPathAttrs(p.PathAttrs, packet.BGPPathAttrTypeAtomicAggregate, atomicAggregate)
+		p.PathAttrs = packet.AddPathAttrToPathAttrsByCode(p.PathAttrs, packet.BGPPathAttrTypeAtomicAggregate, atomicAggregate)
 	}
 
 	p.AggregatedPaths[destIP] = path

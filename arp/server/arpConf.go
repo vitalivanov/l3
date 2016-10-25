@@ -36,8 +36,9 @@ func (server *ARPServer) processResolveIPv4(conf ResolveIPv4) {
 		return
 	}
 	IfIndex := conf.IfId
-	ifType := asicdCommonDefs.GetIntfIdFromIfIndex(int32(IfIndex))
+	ifType := asicdCommonDefs.GetIntfTypeFromIfIndex(int32(IfIndex))
 	if ifType == commonDefs.IfTypeVlan {
+		server.logger.Debug("Calling UpdateArpEntryMsg ... Vlan for IfIndex", IfIndex)
 		vlanEnt := server.vlanPropMap[IfIndex]
 		for port, _ := range vlanEnt.UntagPortMap {
 			server.arpEntryUpdateCh <- UpdateArpEntryMsg{
@@ -49,6 +50,7 @@ func (server *ARPServer) processResolveIPv4(conf ResolveIPv4) {
 			server.sendArpReq(conf.TargetIP, port)
 		}
 	} else if ifType == commonDefs.IfTypeLag {
+		server.logger.Debug("Calling UpdateArpEntryMsg ... Lag for IfIndex", IfIndex)
 		lagEnt := server.lagPropMap[IfIndex]
 		for port, _ := range lagEnt.PortMap {
 			server.arpEntryUpdateCh <- UpdateArpEntryMsg{
@@ -60,6 +62,7 @@ func (server *ARPServer) processResolveIPv4(conf ResolveIPv4) {
 			server.sendArpReq(conf.TargetIP, port)
 		}
 	} else if ifType == commonDefs.IfTypePort {
+		server.logger.Debug("Calling UpdateArpEntryMsg ... Port for IfIndex", IfIndex)
 		server.arpEntryUpdateCh <- UpdateArpEntryMsg{
 			PortNum: IfIndex,
 			IpAddr:  conf.TargetIP,
@@ -67,6 +70,8 @@ func (server *ARPServer) processResolveIPv4(conf ResolveIPv4) {
 			Type:    true,
 		}
 		server.sendArpReq(conf.TargetIP, IfIndex)
+	} else {
+		server.logger.Err("Invalid ifType:", ifType)
 	}
 }
 

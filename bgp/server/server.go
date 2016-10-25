@@ -1125,9 +1125,9 @@ func (s *BGPServer) ProcessIntfStates(intfs []*config.IntfStateInfo) {
 	}
 }
 
-func (s *BGPServer) GetIfaceIP(ifIndex int32) (utils.IPInfo, error) {
+func (s *BGPServer) GetIfaceIP(ifIndex int32) (*utils.IPInfo, error) {
 	ipInfo, err := s.ifaceMgr.GetIfaceIP(ifIndex)
-	return *ipInfo, err
+	return ipInfo, err
 }
 
 func (s *BGPServer) ProcessRemoveNeighbor(peerIp string, peer *Peer) {
@@ -1340,8 +1340,11 @@ func (s *BGPServer) UpdateAggPolicy(policyName string, pe *bgppolicy.LocRibPolic
 }
 
 func (s *BGPServer) copyGlobalConf(gConf config.GlobalConfig) {
+	// Don't create a new Global object. Peers have reference to the global object.
+	s.BgpConfig.Global.Config.Vrf = gConf.Vrf
 	s.BgpConfig.Global.Config.AS = gConf.AS
 	s.BgpConfig.Global.Config.RouterId = gConf.RouterId
+	s.BgpConfig.Global.Config.Disabled = gConf.Disabled
 	s.BgpConfig.Global.Config.UseMultiplePaths = gConf.UseMultiplePaths
 	s.BgpConfig.Global.Config.EBGPMaxPaths = gConf.EBGPMaxPaths
 	s.BgpConfig.Global.Config.EBGPAllowMultipleAS = gConf.EBGPAllowMultipleAS
@@ -1401,8 +1404,10 @@ func (s *BGPServer) clearInterfaceMapForPeer(peerIP string, peer *Peer) {
 }
 
 func (s *BGPServer) constructBGPGlobalState(gConf *config.GlobalConfig) {
+	s.BgpConfig.Global.State.Vrf = gConf.Vrf
 	s.BgpConfig.Global.State.AS = gConf.AS
 	s.BgpConfig.Global.State.RouterId = gConf.RouterId
+	s.BgpConfig.Global.State.Disabled = gConf.Disabled
 	s.BgpConfig.Global.State.UseMultiplePaths = gConf.UseMultiplePaths
 	s.BgpConfig.Global.State.EBGPMaxPaths = gConf.EBGPMaxPaths
 	s.BgpConfig.Global.State.EBGPAllowMultipleAS = gConf.EBGPAllowMultipleAS
@@ -1598,12 +1603,14 @@ func (s *BGPServer) UpdateGlobal(bgpGlobal *bgpd.BGPGlobal, oldConfig, newConfig
 		s.logger.Err("bgpglobal nil in update")
 		return
 	}
+
 	if attrSet != nil {
 		objTyp := reflect.TypeOf(*bgpGlobal)
+		restart := false
 		for i := 0; i < objTyp.NumField(); i++ {
 			objName := objTyp.Field(i).Name
 			if attrSet[i] {
-				s.logger.Debug("UpdateGlobal : changed ", objName)
+				s.logger.Debug("UpdateGlobal: changed ", objName)
 				if objName == "Redistribution" {
 					if len(newConfig.Redistribution) == 0 {
 						s.logger.Err("Must specify redistribution")
@@ -1611,12 +1618,19 @@ func (s *BGPServer) UpdateGlobal(bgpGlobal *bgpd.BGPGlobal, oldConfig, newConfig
 					}
 					s.SetupRedistribution(newConfig)
 				} else {
-					//if objName == "RouterId" || objName == "ASNum" {
-					s.Restart(newConfig)
+					restart = true
 				}
 			}
 		}
+
+		if restart {
+			s.Restart(newConfig)
+		}
 	}
+}
+
+func (s *BGPServer) isBGPGlobalDisabled() bool {
+	return s.BgpConfig.Global.Config.Disabled
 }
 
 func (s *BGPServer) Restart(cfg config.GlobalConfig) {
@@ -1628,21 +1642,32 @@ func (s *BGPServer) Restart(cfg config.GlobalConfig) {
 	s.logger.Infof("Giving up CPU so that all peer FSMs will get cleaned up")
 	runtime.Gosched()
 
+	s.RemoveRoutesFromAllNeighbor()
+
 	gConf := cfg
 	packet.SetNextHopPathAttrs(s.ConnRoutesPath.PathAttrs, gConf.RouterId)
-	s.RemoveRoutesFromAllNeighbor()
 	s.copyGlobalConf(gConf)
 	s.constructBGPGlobalState(&gConf)
+
 	for _, peer := range s.PeerMap {
-		peer.Init()
+		peer.UpdateGlobal(&s.BgpConfig.Global.Config)
 	}
-	//s.SetupRedistribution(gConf)
-	// Get routes from the route manager
+
+	if s.isBGPGlobalDisabled() {
+		s.logger.Info("BGP global for Vrf", gConf.Vrf, "is disabled, not bringing the neighbors up.")
+		return
+	}
+
 	add, remove := s.routeMgr.GetRoutes()
 	if add != nil && remove != nil {
 		s.ProcessConnectedRoutes(add, remove)
 	}
 
+	for _, peer := range s.PeerMap {
+		peer.Init()
+	}
+	//s.SetupRedistribution(gConf)
+	// Get routes from the route manager
 }
 
 func (s *BGPServer) updateGlobalConfig(bgpGlobal *bgpd.BGPGlobal, oldConfig, newConfig config.GlobalConfig,
@@ -1742,6 +1767,7 @@ func (s *BGPServer) CreatePeer(newPeer config.NeighborConfig) {
 			s.logger.Infof("Failed to add neighbor. Peer address type", newPeer.PeerAddressType, "not supported")
 			return
 		}
+
 		if _, ok = s.ifaceNeighbors[newPeer.PeerAddressType][newPeer.IfIndex]; ok {
 			s.logger.Infof("Failed to add neighbor. Neighbor at interface %d already exists", newPeer.IfIndex)
 			return
@@ -1790,6 +1816,11 @@ func (s *BGPServer) CreatePeer(newPeer config.NeighborConfig) {
 	s.NeighborMutex.Lock()
 	s.addPeerToList(peer)
 	s.NeighborMutex.Unlock()
+	if s.isBGPGlobalDisabled() {
+		s.logger.Info("BGP global", s.BgpConfig.Global.Config.Vrf, "is disabled, not activating neighbor",
+			newPeer.NeighborAddress)
+		return
+	}
 	peer.Init()
 }
 
@@ -1852,6 +1883,13 @@ func (s *BGPServer) updatePeerConf(oldPeer, newPeer config.NeighborConfig, peer 
 				newPeer.NeighborAddress.String(), "with error", err)
 		}
 	}
+
+	if s.isBGPGlobalDisabled() {
+		s.logger.Info("BGP global", s.BgpConfig.Global.Config.Vrf, "is disabled, not activating neighbor",
+			newPeer.NeighborAddress)
+		return
+	}
+
 	peer.Init()
 }
 
