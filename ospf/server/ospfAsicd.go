@@ -85,7 +85,7 @@ func (server *OSPFServer) processAsicdNotification(asicdrxBuf []byte) {
 		return
 	}
 	if msg.MsgType == asicdCommonDefs.NOTIFY_PORT_CONFIG_MTU_CHANGE {
-		var mtuChangeMsg asicdCommonDefs.PortConfigMtuChgNotigyMsg
+		var mtuChangeMsg asicdCommonDefs.PortConfigMtuChgNotifyMsg
 		err = json.Unmarshal(msg.Msg, &mtuChangeMsg)
 		if err != nil {
 			server.logger.Err(fmt.Sprintln("Mtu change :Unable to unmarshal msg :", msg.Msg))
