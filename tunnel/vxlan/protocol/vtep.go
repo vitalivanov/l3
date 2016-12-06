@@ -379,11 +379,10 @@ func (vtep *VtepDbEntry) encapAndDispatchPkt(packet gopacket.Packet) {
                 if phandle != nil {
 
 		// outer ethernet header
-		eth := layers.VxlanEthernet{
-			layers.Ethernet{SrcMAC:       vtep.SrcMac,
+		eth := layers.Ethernet{
+			SrcMAC:       vtep.SrcMac,
 			DstMAC:       vtep.DstMac,
 			EthernetType: layers.EthernetTypeIPv4,
-			},
 		}
 		ip := layers.IPv4{
 			Version:    4,
